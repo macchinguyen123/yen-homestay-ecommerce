@@ -1,0 +1,457 @@
+/* ==========================================================================
+   YÊN HOMESTAY - TRANG ĐĂNG NHẬP (Login.css)
+   ========================================================================== */
+
+.login-page {
+  position: relative;
+  min-height: 100vh;
+  width: 100vw;
+  background-color: #0F172A;
+  color: #1E293B;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  overflow-x: hidden;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+}
+
+/* BACKGROUND VIDEO / OVERLAY */
+.bg-video-wrapper {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  background: #000000;
+}
+
+.bg-video {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 100%;
+  height: 100%;
+  min-width: 100%;
+  min-height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+  filter: brightness(0.65);
+}
+
+.bg-video-overlay {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at center, rgba(15, 23, 42, 0.4) 0%, rgba(15, 23, 42, 0.8) 100%);
+}
+
+/* HEADER TOP NAV */
+.login-header {
+  position: relative;
+  z-index: 20;
+  width: 100%;
+  padding: 16px 32px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.login-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-decoration: none;
+}
+
+.login-logo-box {
+  height: 48px;
+  padding: 0 16px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.login-logo-text {
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: #FFFFFF;
+  letter-spacing: -0.3px;
+}
+
+.login-logo-text span {
+  color: #BBF7D0;
+}
+
+.login-brand-meta {
+  display: flex;
+  flex-direction: column;
+}
+
+.login-brand-meta .title {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #A7F3D0;
+}
+
+.login-brand-meta .sub {
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.btn-home-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #FFFFFF;
+  padding: 8px 18px;
+  border-radius: 12px;
+  background: rgba(21, 128, 61, 0.88);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(74, 222, 128, 0.4);
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+
+.btn-home-back:hover {
+  background: #15803D;
+  box-shadow: 0 4px 12px rgba(21, 128, 61, 0.35);
+}
+
+/* MAIN CONTENT BOX */
+.login-main {
+  position: relative;
+  z-index: 20;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 24px 80px;
+}
+
+@media (max-width: 768px) {
+  .login-main {
+    justify-content: center;
+    padding: 16px;
+  }
+}
+
+.login-card {
+  width: 100%;
+  max-width: 380px;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(20px);
+  border-radius: 24px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  padding: 28px;
+}
+
+.login-card-head {
+  margin-bottom: 16px;
+}
+
+.login-card-head h2 {
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: #0F172A;
+  margin: 0 0 4px;
+}
+
+.login-card-head p {
+  font-size: 0.78rem;
+  color: #64748B;
+  margin: 0;
+}
+
+/* ROLE TABS */
+.role-tabs {
+  background: rgba(241, 245, 249, 0.9);
+  padding: 4px;
+  border-radius: 14px;
+  display: flex;
+  gap: 4px;
+  margin-bottom: 16px;
+  border: 1px solid #E2E8F0;
+}
+
+.role-tab-btn {
+  flex: 1;
+  padding: 8px 10px;
+  border-radius: 10px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: none;
+  cursor: pointer;
+  color: #64748B;
+  background: transparent;
+  transition: all 0.2s ease;
+}
+
+.role-tab-btn.active {
+  background: #15803D;
+  color: #FFFFFF;
+  box-shadow: 0 2px 6px rgba(21, 128, 61, 0.3);
+}
+
+/* FORM ELEMENTS */
+.login-form-group {
+  margin-bottom: 14px;
+}
+
+.login-form-group label {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #334155;
+  margin-bottom: 4px;
+}
+
+.input-icon-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.input-icon-wrap i.field-icon {
+  position: absolute;
+  left: 14px;
+  color: #94A3B8;
+  font-size: 0.95rem;
+  pointer-events: none;
+}
+
+.login-input {
+  width: 100%;
+  padding: 10px 14px 10px 40px;
+  background: rgba(248, 250, 252, 0.9);
+  border: 1.5px solid #CBD5E1;
+  border-radius: 12px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #0F172A;
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.login-input:focus {
+  background: #FFFFFF;
+  border-color: #15803D;
+  box-shadow: 0 0 0 3px rgba(21, 128, 61, 0.15);
+}
+
+.eye-btn {
+  position: absolute;
+  right: 12px;
+  background: none;
+  border: none;
+  color: #94A3B8;
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.eye-btn:hover {
+  color: #334155;
+}
+
+.forgot-link-btn {
+  background: none;
+  border: none;
+  color: #15803D;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  margin-top: 4px;
+}
+
+.forgot-link-btn:hover {
+  text-decoration: underline;
+  color: #166534;
+}
+
+.btn-submit-login {
+  width: 100%;
+  margin-top: 6px;
+  padding: 11px;
+  background: #15803D;
+  color: #FFFFFF;
+  font-size: 0.9rem;
+  font-weight: 800;
+  border-radius: 12px;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 6px 16px rgba(21, 128, 61, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.2s ease;
+}
+
+.btn-submit-login:hover {
+  background: #166534;
+  transform: translateY(-1px);
+}
+
+/* DIVIDER & SOCIAL */
+.login-divider {
+  position: relative;
+  margin: 16px 0;
+  text-align: center;
+}
+
+.login-divider::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: #E2E8F0;
+}
+
+.login-divider span {
+  position: relative;
+  background: #FFFFFF;
+  padding: 0 12px;
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: #94A3B8;
+}
+
+.social-btns-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.btn-social {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 9px;
+  border-radius: 12px;
+  border: 1px solid #E2E8F0;
+  background: #FFFFFF;
+  color: #334155;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-social:hover {
+  background: #F8FAFC;
+  border-color: #CBD5E1;
+}
+
+/* REGISTER LINKS */
+.card-register-footer {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid #F1F5F9;
+  text-align: center;
+}
+
+.reg-links-box {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.btn-reg-pill {
+  padding: 9px 12px;
+  border-radius: 12px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+}
+
+.btn-reg-pill.guest {
+  background: #F0FDF4;
+  color: #15803D;
+  border: 1px solid #BBF7D0;
+}
+
+.btn-reg-pill.guest:hover {
+  background: #DCFCE7;
+}
+
+.btn-reg-pill.host {
+  background: #FFFFFF;
+  color: #334155;
+  border: 1px solid #E2E8F0;
+}
+
+.btn-reg-pill.host:hover {
+  background: #F8FAFC;
+  color: #15803D;
+}
+
+/* FORGOT PASSWORD MODAL */
+.modal-overlay-login {
+  position: fixed;
+  inset: 0;
+  z-index: 5000;
+  background: rgba(15, 23, 42, 0.65);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.forgot-modal-card {
+  background: #FFFFFF;
+  border-radius: 20px;
+  max-width: 420px;
+  width: 100%;
+  padding: 24px;
+  position: relative;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.25);
+}
+
+.forgot-modal-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #F1F5F9;
+  border: none;
+  color: #64748B;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.forgot-modal-close:hover {
+  background: #E2E8F0;
+  color: #0F172A;
+}

@@ -1,0 +1,529 @@
+/* ============================================================
+   REGISTER.CSS - Trang đăng ký Homestay Cộng đồng Việt Nam
+   File: src/pages/user/Register/Register.css
+   ============================================================ */
+
+:root {
+  --primary: #15803D;
+  --primary-hover: #166534;
+  --primary-light: #DCFCE7;
+  --font: "Plus Jakarta Sans", sans-serif;
+  --border: #E2E8F0;
+  --input-bg: #F8FAFC;
+  --radius: 10px;
+  --shadow-sm: 0 1px 4px rgba(0,0,0,0.08);
+  --shadow-md: 0 4px 20px rgba(0,0,0,0.1);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--font); background: #F1F5F9; min-height: 100vh; }
+
+/* PAGE LAYOUT */
+.register-page {
+  display: flex;
+  min-height: 100vh;
+}
+
+/* LEFT: Branding */
+.register-branding {
+  width: 42%;
+  flex-shrink: 0;
+  background: url("https://images.unsplash.com/photo-1506905925346-21bda4d32df4?auto=format&fit=crop&w=900&q=80") center/cover no-repeat;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  align-items: stretch;
+}
+
+.branding-overlay {
+  width: 100%;
+  background: linear-gradient(160deg, rgba(10,60,25,0.82) 0%, rgba(21,128,61,0.7) 100%);
+  display: flex;
+  align-items: center;
+  padding: 60px 48px;
+}
+
+.branding-content { color: #fff; }
+
+.brand-logo { display: flex; align-items: center; gap: 12px; }
+.brand-logo-img { height: 44px; width: auto; filter: brightness(0) invert(1); }
+.brand-name { font-size: 1.5rem; font-weight: 800; color: #fff; letter-spacing: -0.5px; }
+.brand-name-sm { font-size: 1.3rem; font-weight: 800; color: var(--primary); }
+
+.branding-headline {
+  font-size: 1.75rem;
+  font-weight: 800;
+  line-height: 1.3;
+  margin-bottom: 14px;
+}
+
+.branding-sub {
+  font-size: 0.95rem;
+  color: rgba(255,255,255,0.85);
+  line-height: 1.6;
+  margin-bottom: 36px;
+}
+
+.branding-stats {
+  display: flex;
+  gap: 28px;
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.stat-num {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #fff;
+}
+
+.stat-label {
+  font-size: 0.75rem;
+  color: rgba(255,255,255,0.75);
+  font-weight: 500;
+}
+
+/* RIGHT: Form Panel */
+.register-form-panel {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 40px 24px;
+}
+
+.form-panel-inner {
+  width: 100%;
+  max-width: 560px;
+}
+
+/* STEP INDICATOR */
+.step-indicator {
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+
+.step-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.step-dot {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  color: #94A3B8;
+  transition: all 0.3s;
+}
+
+.step-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #94A3B8;
+  transition: color 0.3s;
+}
+
+.step-line {
+  flex: 1;
+  height: 2px;
+  background: var(--border);
+  margin-bottom: 22px;
+  transition: background 0.3s;
+}
+
+.step-item.active .step-dot {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+  box-shadow: 0 0 0 4px rgba(21,128,61,0.15);
+}
+
+.step-item.active .step-label { color: var(--primary); }
+
+.step-item.done .step-dot {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+
+.step-item.done .step-label { color: var(--primary); }
+
+.step-line.done { background: var(--primary); }
+
+/* STEP HEADER */
+.step-title {
+  font-size: 1.45rem;
+  font-weight: 800;
+  color: #0F172A;
+  letter-spacing: -0.4px;
+}
+
+.step-subtitle {
+  font-size: 0.88rem;
+  color: #64748B;
+  margin-top: 4px;
+}
+
+/* FORM INPUTS */
+.reg-label {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #334155;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.input-icon-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.input-icon {
+  position: absolute;
+  left: 13px;
+  color: #94A3B8;
+  font-size: 1rem;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.reg-input {
+  width: 100%;
+  background: var(--input-bg);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+  padding: 11px 14px 11px 38px;
+  font-family: var(--font);
+  font-size: 0.92rem;
+  color: #0F172A;
+  font-weight: 500;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  appearance: none;
+}
+
+.reg-input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(21,128,61,0.12);
+  background: #fff;
+}
+
+.reg-input::placeholder { color: #94A3B8; font-weight: 400; }
+
+.reg-select { cursor: pointer; }
+
+/* Password toggle */
+.reg-input-pwd { padding-right: 44px; }
+
+.btn-toggle-pwd {
+  position: absolute;
+  right: 12px;
+  background: none;
+  border: none;
+  color: #94A3B8;
+  font-size: 1rem;
+  cursor: pointer;
+  padding: 4px;
+  z-index: 2;
+}
+
+.btn-toggle-pwd:hover { color: var(--primary); }
+
+/* Hints */
+.reg-hint {
+  font-size: 0.75rem;
+  color: #94A3B8;
+  margin-top: 5px;
+}
+
+.pwd-strength-hint {
+  font-size: 0.75rem;
+  color: #94A3B8;
+  background: #F8FAFC;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+
+/* Checkbox */
+.reg-check { display: flex; gap: 10px; align-items: flex-start; }
+.reg-check .form-check-input { margin-top: 3px; flex-shrink: 0; accent-color: var(--primary); width: 16px; height: 16px; }
+.reg-check-label { font-size: 0.83rem; color: #475569; line-height: 1.5; cursor: pointer; }
+.reg-link { color: var(--primary); text-decoration: none; font-weight: 600; }
+.reg-link:hover { text-decoration: underline; }
+
+/* ACTION BUTTONS */
+.reg-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.btn-reg-next {
+  background: var(--primary);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius);
+  padding: 12px 28px;
+  font-family: var(--font);
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.15s;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  text-decoration: none;
+}
+
+.btn-reg-next:hover {
+  background: var(--primary-hover);
+  color: #fff;
+  transform: translateY(-1px);
+}
+
+.btn-back-login, .btn-back-step {
+  color: #64748B;
+  font-size: 0.88rem;
+  font-weight: 600;
+  text-decoration: none;
+  background: none;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+  padding: 11px 20px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  font-family: var(--font);
+  transition: border-color 0.2s, color 0.2s;
+}
+
+.btn-back-login:hover, .btn-back-step:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+/* STEP 2: OTP VERIFICATION */
+.verify-method-group {
+  display: flex;
+  gap: 12px;
+}
+
+.verify-method-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 2px solid var(--border);
+  border-radius: 12px;
+  background: #fff;
+  cursor: pointer;
+  font-family: var(--font);
+  text-align: left;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.verify-method-btn i {
+  font-size: 1.4rem;
+  color: #94A3B8;
+  flex-shrink: 0;
+  transition: color 0.2s;
+}
+
+.verify-method-btn.active {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(21,128,61,0.12);
+}
+
+.verify-method-btn.active i { color: var(--primary); }
+
+.method-title { font-size: 0.88rem; font-weight: 700; color: #0F172A; }
+.method-desc { font-size: 0.75rem; color: #64748B; margin-top: 2px; }
+
+.otp-info { font-size: 0.88rem; color: #475569; margin-bottom: 20px; }
+
+.otp-inputs {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-start;
+}
+
+.otp-box {
+  width: 52px;
+  height: 58px;
+  text-align: center;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #0F172A;
+  background: var(--input-bg);
+  border: 2px solid var(--border);
+  border-radius: 10px;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  font-family: var(--font);
+}
+
+.otp-box:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(21,128,61,0.12);
+  background: #fff;
+}
+
+.otp-box.filled { border-color: var(--primary); color: var(--primary); }
+
+.otp-resend-row { font-size: 0.82rem; color: #64748B; }
+
+.btn-resend {
+  background: none;
+  border: none;
+  color: var(--primary);
+  font-weight: 700;
+  font-size: 0.82rem;
+  cursor: pointer;
+  font-family: var(--font);
+  padding: 0;
+}
+
+.btn-resend:disabled { color: #94A3B8; cursor: default; }
+
+/* STEP 3: SUCCESS */
+.success-icon {
+  font-size: 4rem;
+  color: var(--primary);
+}
+
+.success-reward {
+  background: var(--primary-light);
+  border: 1.5px solid rgba(21,128,61,0.25);
+  border-radius: 12px;
+  padding: 14px 20px;
+  font-size: 0.9rem;
+  color: var(--primary-hover);
+  font-weight: 600;
+  display: inline-block;
+}
+
+/* LOGIN PROMPT */
+.login-prompt { font-size: 0.85rem; color: #64748B; }
+
+/* RESPONSIVE */
+@media (max-width: 991px) {
+  .register-form-panel { padding: 32px 16px; }
+  .form-panel-inner { max-width: 100%; }
+}
+
+@media (max-width: 480px) {
+  .otp-box { width: 42px; height: 50px; font-size: 1.2rem; }
+  .otp-inputs { gap: 7px; }
+  .verify-method-group { flex-direction: column; }
+  .reg-actions { flex-direction: column-reverse; }
+  .btn-back-login, .btn-back-step, .btn-reg-next { width: 100%; justify-content: center; }
+}
+
+/* FORM SECTION TITLE */
+.form-section-title {
+  font-size: 0.82rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #475569;
+  padding: 10px 0 8px;
+  border-bottom: 1.5px solid var(--border);
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+}
+
+.form-section-title i { color: var(--primary); }
+
+/* ROLE SWITCH TABS */
+.role-switch-container {
+  display: flex;
+  background: #E2E8F0;
+  padding: 4px;
+  border-radius: 12px;
+  gap: 4px;
+}
+
+.role-switch-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 14px;
+  border: none;
+  background: transparent;
+  color: #64748B;
+  font-family: var(--font);
+  font-size: 0.88rem;
+  font-weight: 700;
+  border-radius: 9px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-decoration: none;
+}
+
+.role-switch-btn:hover {
+  color: #0F172A;
+}
+
+.role-switch-btn.active {
+  background: #FFFFFF;
+  color: var(--primary);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+
+/* INTERNATIONAL PHONE INPUT GROUP */
+.phone-input-group {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+  width: 100%;
+}
+
+.phone-code-select {
+  width: 120px;
+  flex-shrink: 0;
+  background: var(--input-bg);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+  padding: 11px 8px;
+  font-family: var(--font);
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #0F172A;
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.phone-code-select:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(21,128,61,0.12);
+  background: #fff;
+}
+
+.phone-number-input {
+  flex: 1;
+  padding-left: 14px !important;
+}

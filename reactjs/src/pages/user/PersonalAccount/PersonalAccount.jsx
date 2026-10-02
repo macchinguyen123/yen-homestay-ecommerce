@@ -1,0 +1,1634 @@
+import React, { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import "./PersonalAccount.css";
+
+const PROVINCES_DATA = [
+  { code: "HN", name: "Hà Nội", wards: ["Ba Đình", "Hoàn Kiếm", "Tây Hồ", "Cầu Giấy"] },
+  { code: "DN", name: "Đà Nẵng", wards: ["Hải Châu", "Sơn Trà", "Ngũ Hành Sơn", "Thanh Khê"] },
+  { code: "HCM", name: "TP. Hồ Chí Minh", wards: ["Quận 1", "Quận 3", "Quận 7", "Bình Thạnh", "Thủ Đức"] },
+  { code: "LD", name: "Lâm Đồng", wards: ["Phường 1 (Đà Lạt)", "Phường 2 (Đà Lạt)", "Phường 10 (Đà Lạt)", "Xã Xuân Thọ"] },
+  { code: "LC", name: "Lào Cai", wards: ["Phường Sa Pa", "Xã Tả Van", "Xã Hầu Thào", "Xã Mường Hoa"] },
+  { code: "TH", name: "Thanh Hóa", wards: ["Thị trấn Cành Nàng", "Xã Thành Lâm (Pù Luông)", "Xã Cổ Lũng"] },
+  { code: "NB", name: "Ninh Bình", wards: ["Xã Ninh Hải (Tam Cốc)", "Xã Trường Yên (Tràng An)", "Xã Ninh Xuân"] }
+];
+
+const INITIAL_VIEWED_LIST = [
+  {
+    id: 1,
+    name: "Han River Glass House",
+    location: "Đà Nẵng",
+    timeAgo: "Vừa xem 15 phút trước",
+    rating: "4.95",
+    reviews: "184",
+    specs: "2 phòng ngủ • 4 khách",
+    amenities: "Bờ sông Hàn · Căn hộ kính panorama · Đặt gần đây",
+    price: "1.150.000đ",
+    img: "https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=600&q=80",
+    isFav: true
+  },
+  {
+    id: 2,
+    name: "The Memory Valley Villa",
+    location: "Đà Lạt",
+    timeAgo: "Vừa xem 2 giờ trước",
+    rating: "4.96",
+    reviews: "340",
+    specs: "3 phòng ngủ • 8 khách",
+    amenities: "Săn mây Đà Lạt · Bể bơi nước ấm · BBQ sân vườn",
+    price: "1.450.000đ",
+    img: "https://images.unsplash.com/photo-1518780664697-55e3ad937233?auto=format&fit=crop&w=600&q=80",
+    isFav: false
+  },
+  {
+    id: 3,
+    name: "Topas Ecolodge Sapa",
+    location: "Sapa",
+    timeAgo: "Xem hôm qua",
+    rating: "4.98",
+    reviews: "310",
+    specs: "Bungalow • 2 khách",
+    amenities: "Bể bơi vô cực nước ấm · Mường Hoa · Đưa đón Limousine",
+    price: "4.590.000đ",
+    img: "https://images.unsplash.com/photo-1571896349842-33c89424de2d?auto=format&fit=crop&w=600&q=80",
+    isFav: true
+  },
+  {
+    id: 4,
+    name: "Tràng An Valley Retreat",
+    location: "Ninh Bình",
+    timeAgo: "Xem 2 ngày trước",
+    rating: "4.96",
+    reviews: "175",
+    specs: "Bungalow núi • 2 khách",
+    amenities: "View núi đá vôi · Khinh khí cầu · Xe đạp dạo đầm sen",
+    price: "1.050.000đ",
+    img: "https://images.unsplash.com/photo-1528127269322-539801943592?auto=format&fit=crop&w=600&q=80",
+    isFav: false
+  },
+  {
+    id: 5,
+    name: "Nhà Rường Cổ Cố Đô",
+    location: "Huế",
+    timeAgo: "Xem 3 ngày trước",
+    rating: "4.94",
+    reviews: "167",
+    specs: "Nhà Rường • 4 khách",
+    amenities: "Cách Đại Nội 350m · Thưởng trà sen · Thử áo dài miễn phí",
+    price: "890.000đ",
+    img: "https://images.unsplash.com/photo-1559592413-7cec4d0cae2b?auto=format&fit=crop&w=600&q=80",
+    isFav: false
+  },
+  {
+    id: 6,
+    name: "Sơn Trà Sunset Villa",
+    location: "Đà Nẵng",
+    timeAgo: "Xem 5 ngày trước",
+    rating: "4.94",
+    reviews: "215",
+    specs: "Villa 4 phòng • 10 khách",
+    amenities: "Bể bơi vô cực view biển · Nướng BBQ sân vườn · VIP",
+    price: "2.750.000đ",
+    img: "https://images.unsplash.com/photo-1580587771525-78b9dba3b914?auto=format&fit=crop&w=600&q=80",
+    isFav: true
+  }
+];
+
+const INITIAL_VOUCHERS = [
+  {
+    id: 1,
+    code: "HANRIVER200",
+    title: "Han River Glass House",
+    location: "Bờ sông Hàn, Đà Nẵng",
+    rating: "4.95",
+    discountText: "Giảm 200K",
+    condText: "Đơn từ 1.5tr · Đặt từ 2 đêm",
+    tag: "🔥 HOT NHẤT",
+    tagClass: "tag-red",
+    img: "https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=600&q=80"
+  },
+  {
+    id: 2,
+    code: "MEMORY180",
+    title: "The Memory Valley Villa",
+    location: "Hồ Tuyền Lâm, Đà Lạt",
+    rating: "4.96",
+    discountText: "Giảm 180K",
+    condText: "Đơn từ 1.2tr · Bể bơi nước ấm",
+    tag: "🔥 HOT NHẤT",
+    tagClass: "tag-orange",
+    img: "https://images.unsplash.com/photo-1518780664697-55e3ad937233?auto=format&fit=crop&w=600&q=80"
+  },
+  {
+    id: 3,
+    code: "TOPASHOT500",
+    title: "Topas Ecolodge Sapa",
+    location: "Mường Hoa, Sapa",
+    rating: "4.98",
+    discountText: "Giảm 500K",
+    condText: "Đơn từ 3.8tr · Bể bơi vô cực",
+    tag: "⚡ SẮP HẾT HẠN",
+    tagClass: "tag-green",
+    img: "https://images.unsplash.com/photo-1571896349842-33c89424de2d?auto=format&fit=crop&w=600&q=80"
+  },
+  {
+    id: 4,
+    code: "SONTRA250",
+    title: "Sơn Trà Sunset Villa",
+    location: "Sơn Trà, Đà Nẵng",
+    rating: "4.94",
+    discountText: "Giảm 250K",
+    condText: "Đơn từ 2.2tr · Hồ bơi view biển",
+    tag: "🎁 ĐẶC QUYỀN VIP",
+    tagClass: "tag-red",
+    img: "https://images.unsplash.com/photo-1580587771525-78b9dba3b914?auto=format&fit=crop&w=600&q=80"
+  }
+];
+
+export default function PersonalAccount() {
+  const navigate = useNavigate();
+
+  // Active Sidebar Tab
+  const [activeTab, setActiveTab] = useState("tab-profile");
+
+  // User Profile State
+  const [profile, setProfile] = useState({
+    fullName: "Lê Hoàng Mai Chi",
+    nickname: "Mai Chi Homestay",
+    cccd: "001203004005",
+    dobDay: "18",
+    dobMonth: "8",
+    dobYear: "1998",
+    gender: "nu",
+    nationality: "VN",
+    street: "123 Đường Lê Lợi",
+    provinceCode: "DN",
+    ward: "Hải Châu",
+    taxCode: "0312345678",
+    bizCode: "41A8012345",
+    avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80",
+    phoneVerified: false,
+    phone: "+84 912 345 678",
+    email: "maichi.lehoang@gmail.com"
+  });
+
+  // Viewed Homestays State
+  const [viewedList, setViewedList] = useState(INITIAL_VIEWED_LIST);
+  const [searchViewed, setSearchViewed] = useState("");
+
+  // Vouchers State
+  const [vouchers, setVouchers] = useState(INITIAL_VOUCHERS);
+  const [redeemCode, setRedeemCode] = useState("");
+
+  // Transactions Filter
+  const [txnFilter, setTxnFilter] = useState("all");
+
+  // Cashback Wallet Balance & Transactions
+  const [balance, setBalance] = useState(350000);
+  const [walletLedger, setWalletLedger] = useState([
+    {
+      id: 1,
+      title: "Hoàn tiền 5% đơn đặt phòng #HS-98234",
+      date: "12/08/2026 10:15 • Pù Luông Eco Garden Homestay",
+      amount: "+65.000 VNĐ",
+      type: "plus",
+      status: "Thành công"
+    },
+    {
+      id: 2,
+      title: "Hoàn tiền 5% đơn đặt phòng #HS-87112",
+      date: "24/05/2026 16:40 • The Memory Valley Villa Đà Lạt",
+      amount: "+72.500 VNĐ",
+      type: "plus",
+      status: "Thành công"
+    },
+    {
+      id: 3,
+      title: "Rút tiền số dư về ngân hàng Vietcombank",
+      date: "01/05/2026 09:30 • Mã giao dịch VCB991203",
+      amount: "-200.000 VNĐ",
+      type: "minus",
+      status: "Đã chuyển khoản"
+    }
+  ]);
+
+  // Modal States
+  const [showPhoneModal, setShowPhoneModal] = useState(false);
+  const [otpInput, setOtpInput] = useState("");
+  const [showPwdModal, setShowPwdModal] = useState(false);
+  const [showPinModal, setShowPinModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [showClearHistoryModal, setShowClearHistoryModal] = useState(false);
+  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
+  const [selectedInvoice, setSelectedInvoice] = useState(null);
+  const [showWithdrawModal, setShowWithdrawModal] = useState(false);
+  const [withdrawForm, setWithdrawForm] = useState({ bank: "Vietcombank", accNum: "991203004005", amount: "100000" });
+  const [termsModalVoucher, setTermsModalVoucher] = useState(null);
+
+  // Toast Notice State
+  const [toast, setToast] = useState({ show: false, title: "", body: "" });
+
+  const triggerToast = (title, body) => {
+    setToast({ show: true, title, body });
+    setTimeout(() => {
+      setToast({ show: false, title: "", body: "" });
+    }, 3500);
+  };
+
+  // Handlers
+  const handleProfileSubmit = (e) => {
+    e.preventDefault();
+    triggerToast("Cập nhật thông tin", "Thông tin cá nhân của bạn đã được lưu thành công!");
+  };
+
+  const handleAvatarChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const url = URL.createObjectURL(file);
+      setProfile((prev) => ({ ...prev, avatar: url }));
+      triggerToast("Cập nhật ảnh", "Đã cập nhật ảnh đại diện mới thành công!");
+    }
+  };
+
+  const handlePhoneVerifySubmit = () => {
+    if (otpInput.length === 6) {
+      setProfile((prev) => ({ ...prev, phoneVerified: true }));
+      setShowPhoneModal(false);
+      setOtpInput("");
+      triggerToast("Xác minh sđt", "Số điện thoại đã được xác minh thành công!");
+    } else {
+      alert("Vui lòng nhập đủ 6 chữ số mã OTP!");
+    }
+  };
+
+  const toggleWishlist = (id) => {
+    setViewedList((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, isFav: !item.isFav } : item))
+    );
+    const target = viewedList.find((i) => i.id === id);
+    if (target) {
+      triggerToast(
+        !target.isFav ? "Đã thêm yêu thích" : "Đã bỏ yêu thích",
+        `${target.name} đã được cập nhật vào danh sách yêu thích.`
+      );
+    }
+  };
+
+  const confirmClearHistory = () => {
+    setViewedList([]);
+    setShowClearHistoryModal(false);
+    triggerToast("Xóa lịch sử", "Đã xóa toàn bộ lịch sử homestay đã xem gần đây.");
+  };
+
+  const handleRedeemVoucher = () => {
+    if (!redeemCode.trim()) {
+      alert("Vui lòng nhập mã ưu đãi!");
+      return;
+    }
+    const newCode = redeemCode.trim().toUpperCase();
+    if (vouchers.some((v) => v.code === newCode)) {
+      triggerToast("Mã đã có", "Mã này đã có trong ví voucher của bạn!");
+      return;
+    }
+    const newVoucher = {
+      id: Date.now(),
+      code: newCode,
+      title: "Ưu Đãi Đặc Biệt " + newCode,
+      location: "Toàn quốc",
+      rating: "5.0",
+      discountText: "Giảm 150K",
+      condText: "Áp dụng cho mọi đơn đặt homestay",
+      tag: "🎁 MỚI THÊM",
+      tagClass: "tag-teal",
+      img: "https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=600&q=80"
+    };
+    setVouchers([newVoucher, ...vouchers]);
+    setRedeemCode("");
+    triggerToast("Thành công", `Đã lưu mã giảm giá ${newCode} vào ví của bạn!`);
+  };
+
+  const copyVoucherCode = (code) => {
+    navigator.clipboard.writeText(code);
+    triggerToast("Đã copy", `Đã sao chép mã ${code} vào bộ nhớ tạm!`);
+  };
+
+  const handleWithdrawSubmit = (e) => {
+    e.preventDefault();
+    const amt = parseInt(withdrawForm.amount, 10);
+    if (isNaN(amt) || amt < 50000) {
+      alert("Số tiền rút tối thiểu là 50.000 VNĐ");
+      return;
+    }
+    if (amt > balance) {
+      alert("Số dư không đủ để thực hiện giao dịch!");
+      return;
+    }
+    setBalance((prev) => prev - amt);
+    const newTxn = {
+      id: Date.now(),
+      title: `Rút tiền về ngân hàng ${withdrawForm.bank}`,
+      date: new Date().toLocaleString("vi-VN") + ` • STK: ${withdrawForm.accNum}`,
+      amount: `-${amt.toLocaleString("vi-VN")} VNĐ`,
+      type: "minus",
+      status: "Đang xử lý"
+    };
+    setWalletLedger([newTxn, ...walletLedger]);
+    setShowWithdrawModal(false);
+    triggerToast("Yêu cầu rút tiền", `Đã gửi yêu cầu rút ${amt.toLocaleString("vi-VN")}đ thành công!`);
+  };
+
+  const openInvoice = (code, name, loc, dates, paid, subTotal, discount, method, status, txnId) => {
+    setSelectedInvoice({ code, name, loc, dates, paid, subTotal, discount, method, status, txnId });
+    setShowInvoiceModal(true);
+  };
+
+  // Filtered lists
+  const currentProvince = PROVINCES_DATA.find((p) => p.code === profile.provinceCode) || PROVINCES_DATA[1];
+
+  const filteredViewed = viewedList.filter((item) =>
+    item.name.toLowerCase().includes(searchViewed.toLowerCase()) ||
+    item.location.toLowerCase().includes(searchViewed.toLowerCase())
+  );
+
+  return (
+    <main class="container py-4 py-md-5">
+      {/* 2-Column Main Layout */}
+      <div className="row g-4">
+        {/* 1. SIDEBAR BÊN TRÁI */}
+        <aside className="col-lg-3">
+          <div className="account-sidebar-card">
+            <div className="sidebar-title">
+              <span className="sidebar-title-dot"></span>
+              Quản lý tài khoản
+            </div>
+
+            <nav className="d-flex flex-column">
+              <button
+                className={`account-nav-item ${activeTab === "tab-profile" ? "active" : ""}`}
+                onClick={() => setActiveTab("tab-profile")}
+              >
+                <i className="bi bi-person-fill"></i>
+                <span className="text-truncate">Thông tin cá nhân</span>
+              </button>
+
+              <button
+                className={`account-nav-item ${activeTab === "tab-viewed" ? "active" : ""}`}
+                onClick={() => setActiveTab("tab-viewed")}
+              >
+                <i className="bi bi-eye-fill text-info"></i>
+                <span className="text-truncate">Sản phẩm bạn đã xem</span>
+              </button>
+
+              <button
+                className={`account-nav-item ${activeTab === "tab-vouchers" ? "active" : ""}`}
+                onClick={() => setActiveTab("tab-vouchers")}
+              >
+                <i className="bi bi-ticket-perforated-fill text-success"></i>
+                <span className="text-truncate">Mã giảm giá</span>
+                <span className="voucher-badge">{vouchers.length}</span>
+              </button>
+
+              <button
+                className={`account-nav-item ${activeTab === "tab-transactions" ? "active" : ""}`}
+                onClick={() => setActiveTab("tab-transactions")}
+              >
+                <i className="bi bi-receipt"></i>
+                <span className="text-truncate">Danh sách giao dịch</span>
+              </button>
+
+              <button
+                className={`account-nav-item ${activeTab === "tab-cashback" ? "active" : ""}`}
+                onClick={() => setActiveTab("tab-cashback")}
+              >
+                <i className="bi bi-cash-coin text-success"></i>
+                <span className="text-truncate">Hoàn tiền</span>
+              </button>
+
+              <hr className="my-2 text-secondary opacity-25" />
+
+              <button
+                type="button"
+                className="account-nav-item logout-item border-0 bg-transparent text-start w-100"
+                onClick={() => setShowLogoutModal(true)}
+              >
+                <i className="bi bi-box-arrow-right"></i>
+                <span className="text-truncate">Đăng xuất</span>
+              </button>
+            </nav>
+          </div>
+
+          <div className="promo-sidebar-card shadow-sm">
+            <h6><i className="bi bi-tree-fill me-1"></i>YÊN Homestay Plus</h6>
+            <p>Tích lũy 5% hoàn tiền cho mỗi chuyến đi trải nghiệm văn hóa bản địa Việt Nam.</p>
+            <Link to="/promotions" className="text-success text-xs fw-bold text-decoration-none">
+              Khám phá thêm ưu đãi &rarr;
+            </Link>
+          </div>
+        </aside>
+
+        {/* 2. KHU VỰC NỘI DUNG BÊN PHẢI */}
+        <section className="col-lg-9">
+          {/* Header */}
+          <div className="mb-4">
+            <h1 className="h3 fw-bold text-dark tracking-tight mb-1">Tài khoản cá nhân</h1>
+            <p className="text-muted mb-0">Quản lý thông tin cá nhân và các hoạt động của bạn trên hệ thống Homestay Cộng đồng</p>
+          </div>
+
+          {/* TAB 1: THÔNG TIN CÁ NHÂN */}
+          {activeTab === "tab-profile" && (
+            <div className="animate-fade-in">
+              <div className="eco-card">
+                <div className="eco-card-title">
+                  <span><i className="bi bi-person-lines-fill text-success me-2"></i>Thông tin cá nhân</span>
+                </div>
+
+                <div className="row g-4 align-items-start">
+                  {/* Avatar Upload */}
+                  <div className="col-md-4 col-lg-3 text-center">
+                    <div className="avatar-wrapper mb-3">
+                      <img src={profile.avatar} alt="Ảnh đại diện" className="avatar-img" />
+                      <label htmlFor="avatarFileInput" className="btn-avatar-edit" title="Thay đổi ảnh đại diện">
+                        <i className="bi bi-camera-fill"></i>
+                      </label>
+                      <input
+                        type="file"
+                        id="avatarFileInput"
+                        accept="image/png, image/jpeg"
+                        className="d-none"
+                        onChange={handleAvatarChange}
+                      />
+                    </div>
+                    <div>
+                      <span className="badge-member mb-2">
+                        <i className="bi bi-patch-check-fill"></i> Thành viên thân thiết
+                      </span>
+                      <p className="text-muted text-xs mb-0">Dung lượng tối đa 5MB<br />Định dạng: .JPEG, .PNG</p>
+                    </div>
+                  </div>
+
+                  {/* Form fields */}
+                  <div className="col-md-8 col-lg-9">
+                    <form onSubmit={handleProfileSubmit} className="row g-3">
+                      {/* Họ & Tên */}
+                      <div className="col-12">
+                        <div className="row align-items-center">
+                          <label className="col-sm-3 form-label-custom mb-1 mb-sm-0">Họ &amp; Tên</label>
+                          <div className="col-sm-9">
+                            <input
+                              type="text"
+                              className="form-control form-control-custom"
+                              value={profile.fullName}
+                              onChange={(e) => setProfile({ ...profile, fullName: e.target.value })}
+                              placeholder="Nhập họ và tên"
+                              required
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Nickname */}
+                      <div className="col-12">
+                        <div className="row align-items-center">
+                          <label className="col-sm-3 form-label-custom mb-1 mb-sm-0">Nickname</label>
+                          <div className="col-sm-9">
+                            <input
+                              type="text"
+                              className="form-control form-control-custom"
+                              value={profile.nickname}
+                              onChange={(e) => setProfile({ ...profile, nickname: e.target.value })}
+                              placeholder="Thêm nickname"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Số CCCD / CMND */}
+                      <div className="col-12">
+                        <div className="row align-items-center">
+                          <label className="col-sm-3 form-label-custom mb-1 mb-sm-0">Số CCCD / CMND</label>
+                          <div className="col-sm-9">
+                            <input
+                              type="text"
+                              className="form-control form-control-custom"
+                              value={profile.cccd}
+                              onChange={(e) => setProfile({ ...profile, cccd: e.target.value })}
+                              placeholder="Nhập 12 số CCCD / CMND"
+                              maxLength="12"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Ngày sinh */}
+                      <div className="col-12">
+                        <div className="row align-items-center">
+                          <label className="col-sm-3 form-label-custom mb-1 mb-sm-0">Ngày sinh</label>
+                          <div className="col-sm-9">
+                            <div className="row g-2">
+                              <div className="col-4">
+                                <select
+                                  className="form-select form-select-custom"
+                                  value={profile.dobDay}
+                                  onChange={(e) => setProfile({ ...profile, dobDay: e.target.value })}
+                                >
+                                  {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
+                                    <option key={d} value={d}>{d}</option>
+                                  ))}
+                                </select>
+                              </div>
+                              <div className="col-4">
+                                <select
+                                  className="form-select form-select-custom"
+                                  value={profile.dobMonth}
+                                  onChange={(e) => setProfile({ ...profile, dobMonth: e.target.value })}
+                                >
+                                  {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+                                    <option key={m} value={m}>Tháng {m < 10 ? `0${m}` : m}</option>
+                                  ))}
+                                </select>
+                              </div>
+                              <div className="col-4">
+                                <select
+                                  className="form-select form-select-custom"
+                                  value={profile.dobYear}
+                                  onChange={(e) => setProfile({ ...profile, dobYear: e.target.value })}
+                                >
+                                  {Array.from({ length: 60 }, (_, i) => 2005 - i).map((y) => (
+                                    <option key={y} value={y}>{y}</option>
+                                  ))}
+                                </select>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Giới tính */}
+                      <div className="col-12">
+                        <div className="row align-items-center">
+                          <label className="col-sm-3 form-label-custom mb-1 mb-sm-0">Giới tính</label>
+                          <div className="col-sm-9">
+                            <div className="d-flex align-items-center gap-4 pt-1">
+                              <div className="form-check">
+                                <input
+                                  className="form-check-input text-success"
+                                  type="radio"
+                                  name="gender"
+                                  id="genderMale"
+                                  value="nam"
+                                  checked={profile.gender === "nam"}
+                                  onChange={(e) => setProfile({ ...profile, gender: e.target.value })}
+                                />
+                                <label className="form-check-label text-sm text-secondary" htmlFor="genderMale">Nam</label>
+                              </div>
+                              <div className="form-check">
+                                <input
+                                  className="form-check-input text-success"
+                                  type="radio"
+                                  name="gender"
+                                  id="genderFemale"
+                                  value="nu"
+                                  checked={profile.gender === "nu"}
+                                  onChange={(e) => setProfile({ ...profile, gender: e.target.value })}
+                                />
+                                <label className="form-check-label text-sm text-secondary" htmlFor="genderFemale">Nữ</label>
+                              </div>
+                              <div className="form-check">
+                                <input
+                                  className="form-check-input text-success"
+                                  type="radio"
+                                  name="gender"
+                                  id="genderOther"
+                                  value="khac"
+                                  checked={profile.gender === "khac"}
+                                  onChange={(e) => setProfile({ ...profile, gender: e.target.value })}
+                                />
+                                <label className="form-check-label text-sm text-secondary" htmlFor="genderOther">Khác</label>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Quốc tịch */}
+                      <div className="col-12">
+                        <div className="row align-items-center">
+                          <label className="col-sm-3 form-label-custom mb-1 mb-sm-0">Quốc tịch</label>
+                          <div className="col-sm-9">
+                            <select
+                              className="form-select form-select-custom"
+                              value={profile.nationality}
+                              onChange={(e) => setProfile({ ...profile, nationality: e.target.value })}
+                            >
+                              <option value="VN">Việt Nam</option>
+                              <option value="US">Mỹ (United States)</option>
+                              <option value="JP">Nhật Bản (Japan)</option>
+                              <option value="KR">Hàn Quốc (Korea)</option>
+                              <option value="FR">Pháp (France)</option>
+                            </select>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Địa chỉ 2 cấp */}
+                      <div className="col-12">
+                        <div className="row align-items-start">
+                          <label className="col-sm-3 form-label-custom mb-1 mb-sm-0 pt-1">Địa chỉ</label>
+                          <div className="col-sm-9">
+                            <input
+                              type="text"
+                              className="form-control form-control-custom mb-2"
+                              placeholder="Số nhà, tên đường"
+                              value={profile.street}
+                              onChange={(e) => setProfile({ ...profile, street: e.target.value })}
+                            />
+                            <div className="row g-2">
+                              <div className="col-6">
+                                <select
+                                  className="form-select form-select-custom"
+                                  value={profile.provinceCode}
+                                  onChange={(e) => {
+                                    const code = e.target.value;
+                                    const p = PROVINCES_DATA.find((item) => item.code === code);
+                                    setProfile({
+                                      ...profile,
+                                      provinceCode: code,
+                                      ward: p ? p.wards[0] : ""
+                                    });
+                                  }}
+                                >
+                                  {PROVINCES_DATA.map((p) => (
+                                    <option key={p.code} value={p.code}>{p.name}</option>
+                                  ))}
+                                </select>
+                              </div>
+                              <div className="col-6">
+                                <select
+                                  className="form-select form-select-custom"
+                                  value={profile.ward}
+                                  onChange={(e) => setProfile({ ...profile, ward: e.target.value })}
+                                >
+                                  {currentProvince.wards.map((w) => (
+                                    <option key={w} value={w}>{w}</option>
+                                  ))}
+                                </select>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Thuế & ĐKKD */}
+                      <div className="col-12">
+                        <div className="row align-items-start">
+                          <label className="col-sm-3 form-label-custom mb-1 mb-sm-0 pt-1">Thuế &amp; ĐKKD</label>
+                          <div className="col-sm-9">
+                            <div className="row g-2">
+                              <div className="col-6">
+                                <input
+                                  type="text"
+                                  className="form-control form-control-custom"
+                                  placeholder="Mã số thuế (MST)"
+                                  value={profile.taxCode}
+                                  onChange={(e) => setProfile({ ...profile, taxCode: e.target.value })}
+                                />
+                              </div>
+                              <div className="col-6">
+                                <input
+                                  type="text"
+                                  className="form-control form-control-custom"
+                                  placeholder="Số Giấy phép ĐKKD"
+                                  value={profile.bizCode}
+                                  onChange={(e) => setProfile({ ...profile, bizCode: e.target.value })}
+                                />
+                              </div>
+                            </div>
+                            <small className="text-muted text-xs d-block mt-1">Thông tin pháp lý dành cho cơ sở kinh doanh Homestay</small>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Save Button */}
+                      <div className="col-12 pt-2">
+                        <div className="row">
+                          <div className="col-sm-9 offset-sm-3">
+                            <button type="submit" className="btn btn-eco-save d-inline-flex align-items-center gap-2">
+                              <i className="bi bi-floppy-fill"></i> Lưu thay đổi
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              </div>
+
+              {/* SĐT & Email Verification */}
+              <div className="eco-card">
+                <div className="d-flex align-items-center justify-content-between mb-4">
+                  <div>
+                    <h2 className="h5 fw-bold text-dark mb-1">Số điện thoại và Email</h2>
+                    <p className="text-xs text-muted mb-0">Xác thực đầy đủ thông tin để tăng cường độ tin cậy khi đặt phòng homestay</p>
+                  </div>
+                  {!profile.phoneVerified && (
+                    <span className="badge badge-warning-custom px-3 py-1.5 rounded-pill text-xs fw-bold">
+                      Cần hoàn tất 1 mục
+                    </span>
+                  )}
+                </div>
+
+                <div className="verification-box">
+                  {/* Phone Item */}
+                  <div className="verification-item">
+                    <div className="d-flex align-items-center gap-3">
+                      <div className="icon-box-amber">
+                        <i className="bi bi-telephone-fill"></i>
+                      </div>
+                      <div>
+                        <div className="d-flex align-items-center gap-2">
+                          <span className="fw-semibold text-dark text-sm">Số điện thoại</span>
+                          {profile.phoneVerified ? (
+                            <span className="badge-verified"><i className="bi bi-check-circle-fill"></i> Đã xác minh</span>
+                          ) : (
+                            <span className="badge-unverified">Chưa xác minh</span>
+                          )}
+                        </div>
+                        <p className="text-muted text-sm mb-0 mt-0.5">{profile.phone}</p>
+                      </div>
+                    </div>
+                    {!profile.phoneVerified ? (
+                      <button type="button" className="btn btn-eco-action" onClick={() => setShowPhoneModal(true)}>
+                        Xác minh ngay
+                      </button>
+                    ) : (
+                      <button type="button" className="btn btn-outline-custom" onClick={() => triggerToast("Số điện thoại", "Số điện thoại của bạn đã xác minh chính chủ.")}>
+                        Đã xác minh
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Email Item */}
+                  <div className="verification-item">
+                    <div className="d-flex align-items-center gap-3">
+                      <div className="icon-box-emerald">
+                        <i className="bi bi-envelope-check-fill"></i>
+                      </div>
+                      <div>
+                        <div className="d-flex align-items-center gap-2">
+                          <span className="fw-semibold text-dark text-sm">Địa chỉ email</span>
+                          <span className="badge-verified"><i className="bi bi-check-circle-fill"></i> Đã xác minh</span>
+                        </div>
+                        <p className="text-muted text-sm mb-0 mt-0.5">{profile.email}</p>
+                      </div>
+                    </div>
+                    <button type="button" className="btn btn-outline-custom" onClick={() => triggerToast("Email", "Địa chỉ email đã được cập nhật thành công!")}>
+                      Cập nhật
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Security Block */}
+              <div className="eco-card mb-0">
+                <h2 className="h5 fw-bold text-dark mb-1">Bảo mật</h2>
+                <p className="text-xs text-muted mb-4">Quản lý phương thức đăng nhập và các thiết lập an toàn cho tài khoản</p>
+
+                <div className="d-flex flex-column">
+                  <div className="security-item">
+                    <div className="d-flex align-items-center gap-3">
+                      <div className="security-icon">
+                        <i className="bi bi-shield-lock-fill"></i>
+                      </div>
+                      <div>
+                        <h3 className="h6 fw-semibold text-dark mb-0">Thiết lập mật khẩu</h3>
+                        <p className="text-xs text-muted mb-0 mt-0.5">Đổi mật khẩu định kỳ để bảo vệ tài khoản và lịch sử đặt phòng của bạn</p>
+                      </div>
+                    </div>
+                    <button type="button" className="btn btn-secondary-custom shrink-0" onClick={() => setShowPwdModal(true)}>
+                      Cập nhật mật khẩu
+                    </button>
+                  </div>
+
+                  <div className="security-item">
+                    <div className="d-flex align-items-center gap-3">
+                      <div className="security-icon">
+                        <i className="bi bi-hash"></i>
+                      </div>
+                      <div>
+                        <h3 className="h6 fw-semibold text-dark mb-0">Thiết lập mã PIN</h3>
+                        <p className="text-xs text-muted mb-0 mt-0.5">Mã PIN 6 chữ số dùng để xác thực nhanh khi hoàn tiền hoặc thanh toán homestay</p>
+                      </div>
+                    </div>
+                    <button type="button" className="btn btn-secondary-custom shrink-0" onClick={() => setShowPinModal(true)}>
+                      Cài đặt mã PIN
+                    </button>
+                  </div>
+
+                  <div className="security-item">
+                    <div className="d-flex align-items-center gap-3">
+                      <div className="security-icon rose">
+                        <i className="bi bi-trash3-fill"></i>
+                      </div>
+                      <div>
+                        <h3 className="h6 fw-semibold text-danger mb-0">Yêu cầu xóa tài khoản</h3>
+                        <p className="text-xs text-muted mb-0 mt-0.5">Xóa vĩnh viễn tài khoản cùng toàn bộ thông tin cá nhân và điểm tích lũy homestay</p>
+                      </div>
+                    </div>
+                    <button type="button" className="btn btn-rose-outline shrink-0" onClick={() => setShowDeleteModal(true)}>
+                      Yêu cầu xóa
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 2: SẢN PHẨM BẠN ĐÃ XEM */}
+          {activeTab === "tab-viewed" && (
+            <div className="animate-fade-in">
+              <div className="eco-card">
+                <div className="d-flex align-items-center justify-content-between flex-wrap gap-3 pb-3 border-bottom mb-4">
+                  <div>
+                    <h2 className="h5 fw-bold text-dark mb-1"><i className="bi bi-eye-fill text-info me-2"></i>Homestay bạn đã xem gần đây</h2>
+                    <p className="text-xs text-muted mb-0">Danh sách homestay bạn vừa xem</p>
+                  </div>
+                  {viewedList.length > 0 && (
+                    <button className="btn btn-sm btn-outline-danger d-inline-flex align-items-center gap-1" onClick={() => setShowClearHistoryModal(true)}>
+                      <i className="bi bi-trash3"></i> Xóa toàn bộ lịch sử
+                    </button>
+                  )}
+                </div>
+
+                <div className="mb-4">
+                  <div className="search-hs-box">
+                    <div className="search-icon-badge">
+                      <i className="bi bi-search"></i>
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="Tìm kiếm trong danh sách đã xem (Topas, Han River, Đà Lạt)..."
+                      value={searchViewed}
+                      onChange={(e) => setSearchViewed(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                {filteredViewed.length === 0 ? (
+                  <div className="text-center py-5">
+                    <i className="bi bi-eye-slash display-4 text-muted mb-3 d-block"></i>
+                    <h5 className="fw-bold text-dark">Chưa có homestay nào trong danh sách đã xem</h5>
+                    <p className="text-muted text-sm mb-3">Hãy dạo quanh trang chủ để khám phá hàng trăm homestay độc đáo nhé!</p>
+                    <Link to="/" className="btn btn-eco-save px-4">Khám phá ngay</Link>
+                  </div>
+                ) : (
+                  <div className="row g-3">
+                    {filteredViewed.map((item) => (
+                      <div key={item.id} className="col-md-6 col-lg-4">
+                        <div className="homestay-card h-100 border rounded-3 overflow-hidden shadow-sm d-flex flex-column bg-white">
+                          <div className="position-relative" style={{ height: "160px" }}>
+                            <span className="position-absolute top-2 start-2 badge bg-dark bg-opacity-75 text-white text-xs z-2">
+                              <i className="bi bi-eye me-1"></i> {item.timeAgo}
+                            </span>
+                            <button
+                              className="position-absolute top-2 end-2 btn btn-light rounded-circle p-1 d-flex align-items-center justify-content-center z-2 border"
+                              style={{ width: "32px", height: "32px" }}
+                              onClick={() => toggleWishlist(item.id)}
+                            >
+                              <i className={`bi ${item.isFav ? "bi-heart-fill text-danger" : "bi-heart"}`}></i>
+                            </button>
+                            <img src={item.img} alt={item.name} className="w-100 h-100 object-fit-cover" />
+                          </div>
+
+                          <div className="p-3 d-flex flex-column flex-grow-1">
+                            <div className="d-flex align-items-center justify-content-between text-xs text-muted mb-1">
+                              <span><i className="bi bi-geo-alt-fill text-success me-1"></i>{item.location}</span>
+                              <span className="text-dark fw-bold"><i className="bi bi-star-fill text-warning me-1"></i>{item.rating} ({item.reviews})</span>
+                            </div>
+
+                            <h3 className="h6 fw-bold text-dark mb-1 text-truncate" title={item.name}>
+                              <Link to="/homestay-detail" className="text-dark text-decoration-none">{item.name}</Link>
+                            </h3>
+                            <p className="text-xs text-muted mb-2">{item.specs}</p>
+
+                            <div className="mt-auto pt-2 border-top d-flex align-items-center justify-content-between">
+                              <div>
+                                <span className="text-xs text-muted d-block">Giá từ:</span>
+                                <strong className="text-success fs-6">{item.price}</strong>
+                              </div>
+                              <Link to="/homestay-detail" className="btn btn-sm btn-eco-save rounded-pill px-3">
+                                Đặt ngay
+                              </Link>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* TAB 3: MÃ GIẢM GIÁ */}
+          {activeTab === "tab-vouchers" && (
+            <div className="animate-fade-in">
+              <div className="voucher-hero-banner mb-4">
+                <div className="d-flex align-items-center justify-content-between flex-wrap gap-3">
+                  <div>
+                    <span className="voucher-hero-badge mb-2 d-inline-block"><i className="bi bi-wallet2 me-1"></i> Ví voucher cá nhân</span>
+                    <h2 className="h4 fw-bold text-white mb-1">Mã Giảm Giá Đã Lưu Trong Ví</h2>
+                    <p className="text-xs text-light mb-0">Bạn có {vouchers.length} voucher khả dụng</p>
+                  </div>
+                  <Link to="/promotions" className="btn-discover">
+                    <i className="bi bi-grid-fill me-1"></i> Khám phá thêm kho mã
+                  </Link>
+                </div>
+              </div>
+
+              {/* Gold Redeem Input */}
+              <div className="eco-card mb-4">
+                <h6 className="fw-bold text-dark mb-2"><i className="bi bi-ticket-perforated-fill text-warning me-2"></i>Kích hoạt mã khuyến mãi mới</h6>
+                <div className="promo-redeem-gold-box">
+                  <i className="bi bi-ticket-perforated-fill text-success"></i>
+                  <input
+                    type="text"
+                    placeholder="Nhập mã ưu đãi (Ví dụ: HANRIVER200, TOPASHOT500)..."
+                    value={redeemCode}
+                    onChange={(e) => setRedeemCode(e.target.value)}
+                  />
+                  <button className="btn-redeem-gold" onClick={handleRedeemVoucher}>Kích hoạt ngay</button>
+                </div>
+              </div>
+
+              {/* Vouchers Grid */}
+              <div className="eco-card">
+                <div className="eco-card-title">
+                  <span><i className="bi bi-bookmark-star-fill text-success me-2"></i>Danh sách mã trong ví của bạn</span>
+                  <span className="badge bg-success text-white">{vouchers.length} Mã khả dụng</span>
+                </div>
+
+                <div className="row g-3">
+                  {vouchers.map((v) => (
+                    <div key={v.id} className="col-md-6 col-lg-4">
+                      <div className="nearby-card compact-card h-100">
+                        <div className="nearby-img-box compact-img-box">
+                          <span className={`nearby-tag ${v.tagClass}`}>{v.tag}</span>
+                          <button className="nearby-heart-btn text-danger" title="Lưu voucher">
+                            <i className="bi bi-heart-fill text-danger"></i>
+                          </button>
+                          <img src={v.img} alt={v.title} />
+                        </div>
+
+                        <div className="nearby-body compact-body">
+                          <div className="nearby-meta-row">
+                            <span className="nearby-location"><i className="bi bi-geo-alt-fill text-danger"></i> {v.location}</span>
+                            <span className="nearby-rating"><i className="bi bi-star-fill text-warning"></i> {v.rating}</span>
+                          </div>
+
+                          <h3 className="nearby-name compact-name" title={v.title}>{v.title}</h3>
+
+                          <div className="compact-voucher-strip">
+                            <div className="strip-left-val">{v.discountText}</div>
+                            <div className="strip-right-code">
+                              <span className="code-pill">{v.code}</span>
+                              <span className="cond-text">{v.condText}</span>
+                            </div>
+                          </div>
+
+                          <div className="card-footer-row mt-3">
+                            <button className="btn btn-sm btn-link text-secondary text-xs text-decoration-none p-0" onClick={() => setTermsModalVoucher(v)}>
+                              Điều kiện
+                            </button>
+                            <div className="d-flex align-items-center gap-2">
+                              <button className="btn btn-sm btn-outline-success fw-bold" onClick={() => copyVoucherCode(v.code)}>
+                                Copy
+                              </button>
+                              <Link to="/homestay-detail" className="btn-view-room">Xem phòng</Link>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 4: DANH SÁCH GIAO DỊCH */}
+          {activeTab === "tab-transactions" && (
+            <div className="animate-fade-in">
+              <div className="eco-card">
+                <div className="eco-card-title">
+                  <span><i className="bi bi-receipt text-success me-2"></i>Lịch sử giao dịch &amp; Đặt phòng</span>
+                  <span className="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25">3 Giao dịch</span>
+                </div>
+
+                <div className="d-flex align-items-center gap-2 mb-4">
+                  <button
+                    className={`btn btn-sm rounded-pill px-3 fw-semibold ${txnFilter === "all" ? "btn-success" : "btn-outline-secondary"}`}
+                    onClick={() => setTxnFilter("all")}
+                  >
+                    Tất cả (3)
+                  </button>
+                  <button
+                    className={`btn btn-sm rounded-pill px-3 fw-semibold ${txnFilter === "success" ? "btn-success" : "btn-outline-secondary"}`}
+                    onClick={() => setTxnFilter("success")}
+                  >
+                    Đã thành công (2)
+                  </button>
+                  <button
+                    className={`btn btn-sm rounded-pill px-3 fw-semibold ${txnFilter === "refund" ? "btn-success" : "btn-outline-secondary"}`}
+                    onClick={() => setTxnFilter("refund")}
+                  >
+                    Đã hoàn hủy (1)
+                  </button>
+                </div>
+
+                <div className="table-responsive">
+                  <table className="table table-hover align-middle text-sm mb-0 border rounded-3 overflow-hidden">
+                    <thead className="table-light">
+                      <tr>
+                        <th>Mã đơn hàng</th>
+                        <th>Tên Homestay</th>
+                        <th>Ngày nhận phòng</th>
+                        <th>Phương thức</th>
+                        <th>Tổng tiền</th>
+                        <th>Trạng thái</th>
+                        <th className="text-end">Thao tác</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(txnFilter === "all" || txnFilter === "success") && (
+                        <tr>
+                          <td><strong className="text-success fw-bold">#HS-98234</strong></td>
+                          <td style={{ maxWidth: "190px" }}>
+                            <span className="fw-bold text-dark d-block text-truncate">Pù Luông Eco Garden</span>
+                            <span className="text-muted text-xs d-block text-truncate"><i className="bi bi-geo-alt-fill text-danger me-1"></i>Bá Thước, Thanh Hóa</span>
+                          </td>
+                          <td>12/08/2026</td>
+                          <td><span className="badge bg-light text-dark border"><i className="bi bi-qr-code-scan me-1 text-success"></i> Chuyển khoản QR</span></td>
+                          <td className="fw-bold text-success">1.300.000đ</td>
+                          <td><span className="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 px-2.5 py-1.5"><i className="bi bi-check-circle-fill me-1"></i> Thành công</span></td>
+                          <td className="text-end">
+                            <button
+                              className="btn btn-sm btn-outline-success fw-bold rounded-3 px-3"
+                              onClick={() => openInvoice("HS-98234", "Pù Luông Eco Garden Homestay", "Bá Thước, Thanh Hóa", "12/08/2026 - 14/08/2026 (2 đêm)", "1.300.000đ", "1.500.000đ", "200.000đ", "Chuyển khoản QR Vietcombank", "Đã xác nhận thanh toán", "VCB9823412")}
+                            >
+                              <i className="bi bi-receipt me-1"></i> Xem hóa đơn
+                            </button>
+                          </td>
+                        </tr>
+                      )}
+                      {(txnFilter === "all" || txnFilter === "success") && (
+                        <tr>
+                          <td><strong className="text-success fw-bold">#HS-87112</strong></td>
+                          <td style={{ maxWidth: "190px" }}>
+                            <span className="fw-bold text-dark d-block text-truncate">The Memory Villa</span>
+                            <span className="text-muted text-xs d-block text-truncate"><i className="bi bi-geo-alt-fill text-danger me-1"></i>Hồ Tuyền Lâm, Đà Lạt</span>
+                          </td>
+                          <td>24/05/2026</td>
+                          <td><span className="badge bg-light text-dark border"><i className="bi bi-credit-card-2-front me-1 text-primary"></i> Thẻ Visa / Master</span></td>
+                          <td className="fw-bold text-success">1.450.000đ</td>
+                          <td><span className="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 px-2.5 py-1.5"><i className="bi bi-check-circle-fill me-1"></i> Thành công</span></td>
+                          <td className="text-end">
+                            <button
+                              className="btn btn-sm btn-outline-success fw-bold rounded-3 px-3"
+                              onClick={() => openInvoice("HS-87112", "The Memory Valley Villa", "Hồ Tuyền Lâm, Đà Lạt", "24/05/2026 - 26/05/2026 (2 đêm)", "1.450.000đ", "1.630.000đ", "180.000đ", "Thẻ Visa Quốc tế (*8899)", "Đã xác nhận thanh toán", "VISA8711200")}
+                            >
+                              <i className="bi bi-receipt me-1"></i> Xem hóa đơn
+                            </button>
+                          </td>
+                        </tr>
+                      )}
+                      {(txnFilter === "all" || txnFilter === "refund") && (
+                        <tr>
+                          <td><strong className="text-muted fw-bold">#HS-76501</strong></td>
+                          <td style={{ maxWidth: "190px" }}>
+                            <span className="fw-bold text-dark d-block text-truncate">Tràng An Retreat</span>
+                            <span className="text-muted text-xs d-block text-truncate"><i className="bi bi-geo-alt-fill text-danger me-1"></i>Tràng An, Ninh Bình</span>
+                          </td>
+                          <td>10/01/2026</td>
+                          <td><span className="badge bg-light text-dark border"><i className="bi bi-wallet2 me-1 text-warning"></i> Ví e-Wallet</span></td>
+                          <td className="fw-bold text-secondary">1.050.000đ</td>
+                          <td><span className="badge bg-secondary bg-opacity-10 text-secondary border px-2.5 py-1.5"><i className="bi bi-arrow-return-left me-1"></i> Đã hoàn tiền</span></td>
+                          <td className="text-end">
+                            <button
+                              className="btn btn-sm btn-outline-secondary fw-bold rounded-3 px-3"
+                              onClick={() => openInvoice("HS-76501", "Tràng An Valley Retreat", "Tràng An, Ninh Bình", "10/01/2026 - 11/01/2026 (1 đêm)", "1.050.000đ", "1.170.000đ", "120.000đ", "Ví e-Wallet YÊN", "Đã hủy & Hoàn trả 100% tiền", "REF7650199")}
+                            >
+                              <i className="bi bi-receipt me-1"></i> Xem hóa đơn
+                            </button>
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 5: VÍ HOÀN TIỀN */}
+          {activeTab === "tab-cashback" && (
+            <div className="animate-fade-in">
+              <div className="wallet-card-hero p-4 mb-4 rounded-4 shadow-sm text-white" style={{ background: "linear-gradient(135deg, #064E3B 0%, #047857 50%, #15803D 100%)" }}>
+                <div className="d-flex align-items-center justify-content-between flex-wrap gap-3 pb-3 border-bottom border-white border-opacity-25">
+                  <div className="d-flex align-items-center gap-3">
+                    <div className="wallet-icon-avatar rounded-circle bg-white bg-opacity-20 d-flex align-items-center justify-content-center" style={{ width: "52px", height: "52px", fontSize: "1.5rem" }}>
+                      <i className="bi bi-wallet2 text-warning"></i>
+                    </div>
+                    <div>
+                      <span className="badge mb-1" style={{ background: "#FEF3C7", color: "#92400E", border: "1px solid #FDE68A", fontWeight: "800", fontSize: "0.75rem", padding: "5px 12px", borderRadius: "50px" }}>
+                        <i className="bi bi-shield-check me-1" style={{ color: "#D97706" }}></i> Ví YÊN Pay • Tài khoản đã xác thực
+                      </span>
+                      <h2 className="h5 fw-bold text-white mb-0">Ví Hoàn Tiền Cá Nhân</h2>
+                    </div>
+                  </div>
+                  <div>
+                    <button className="btn btn-light fw-bold text-success rounded-3 shadow-sm px-3 py-2" onClick={() => setShowWithdrawModal(true)}>
+                      <i className="bi bi-bank me-1"></i> Rút tiền về Ngân hàng
+                    </button>
+                  </div>
+                </div>
+
+                <div className="row g-3 mt-3 align-items-center">
+                  <div className="col-md-5">
+                    <span className="text-xs text-light text-uppercase tracking-wider">Số dư khả dụng</span>
+                    <h2 className="display-6 fw-extrabold text-warning mb-0 mt-1">
+                      {balance.toLocaleString("vi-VN")} <span className="fs-4">VNĐ</span>
+                    </h2>
+                    <small className="text-light opacity-75 text-xs"><i className="bi bi-info-circle me-1"></i>Sử dụng thanh toán phòng hoặc rút về ngân hàng liên kết</small>
+                  </div>
+                  <div className="col-md-7">
+                    <div className="row g-2 text-center">
+                      <div className="col-6">
+                        <div className="p-2.5 rounded-3 bg-white bg-opacity-10 border border-white border-opacity-10">
+                          <span className="text-xs text-light d-block">Tổng tiền hoàn lũy kế</span>
+                          <strong className="text-white fs-6">1.250.000đ</strong>
+                        </div>
+                      </div>
+                      <div className="col-6">
+                        <div className="p-2.5 rounded-3 bg-white bg-opacity-10 border border-white border-opacity-10">
+                          <span className="text-xs text-light d-block">Tỷ lệ hoàn tiền</span>
+                          <strong className="text-warning fs-6">5% / Đơn phòng</strong>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Wallet Utilities */}
+              <div className="row g-3 mb-4">
+                <div className="col-md-6">
+                  <div className="p-3 bg-white border rounded-3 shadow-sm h-100 d-flex align-items-center gap-3">
+                    <div className="icon-box-emerald">
+                      <i className="bi bi-bank2"></i>
+                    </div>
+                    <div>
+                      <span className="fw-bold text-dark text-sm d-block">Ngân hàng liên kết</span>
+                      <small className="text-muted text-xs">Vietcombank •••• 6868 (Chủ tài khoản: Lê Hoàng Mai Chi)</small>
+                    </div>
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="p-3 bg-white border rounded-3 shadow-sm h-100 d-flex align-items-center gap-3">
+                    <div className="icon-box-amber">
+                      <i className="bi bi-shield-lock-fill"></i>
+                    </div>
+                    <div>
+                      <span className="fw-bold text-dark text-sm d-block">Mã PIN Ví bảo mật</span>
+                      <small className="text-success text-xs"><i className="bi bi-check-circle-fill"></i> Đã kích hoạt mã PIN 6 chữ số</small>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Transactions Ledger */}
+              <div className="eco-card mb-0">
+                <div className="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+                  <h6 className="fw-bold text-dark mb-0"><i className="bi bi-journal-text text-success me-2"></i>Lịch sử biến động số dư hoàn tiền</h6>
+                </div>
+
+                <div className="list-group list-group-flush border rounded-3 overflow-hidden">
+                  {walletLedger.map((item) => (
+                    <div key={item.id} className="list-group-item p-3 d-flex align-items-center justify-content-between">
+                      <div className="d-flex align-items-center gap-3">
+                        <div
+                          className={`rounded-circle p-2.5 d-flex align-items-center justify-content-center ${
+                            item.type === "plus" ? "bg-success bg-opacity-10 text-success" : "bg-danger bg-opacity-10 text-danger"
+                          }`}
+                          style={{ width: "42px", height: "42px" }}
+                        >
+                          <i className={`bi ${item.type === "plus" ? "bi-arrow-down-left-circle-fill" : "bi-arrow-up-right-circle-fill"} fs-5`}></i>
+                        </div>
+                        <div>
+                          <span className="fw-bold text-dark text-sm mb-0 d-block">{item.title}</span>
+                          <small className="text-muted text-xs">{item.date}</small>
+                        </div>
+                      </div>
+                      <div className="text-end">
+                        <span className={`fw-extrabold fs-6 d-block ${item.type === "plus" ? "text-success" : "text-danger"}`}>
+                          {item.amount}
+                        </span>
+                        <span className="badge bg-secondary bg-opacity-10 text-secondary text-xs">{item.status}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+        </section>
+      </div>
+
+      {/* --- MODALS --- */}
+
+      {/* 1. Modal Phone OTP */}
+      {showPhoneModal && (
+        <div className="modal show d-block" style={{ backgroundColor: "rgba(0,0,0,0.5)" }} tabindex="-1">
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content rounded-4 border-0 shadow">
+              <div className="modal-header border-0 pb-0">
+                <h5 className="modal-title fw-bold text-dark"><i className="bi bi-shield-check text-success me-2"></i>Xác minh số điện thoại</h5>
+                <button type="button" className="btn-close" onClick={() => setShowPhoneModal(false)}></button>
+              </div>
+              <div className="modal-body py-4">
+                <p className="text-sm text-secondary mb-3">Mã xác thực OTP 6 chữ số đã được gửi tới số <strong>{profile.phone}</strong>.</p>
+                <div className="mb-3">
+                  <label className="form-label text-sm fw-semibold">Nhập mã OTP</label>
+                  <input
+                    type="text"
+                    className="form-control form-control-custom text-center fs-4 tracking-widest"
+                    placeholder="• • • • • •"
+                    maxLength="6"
+                    value={otpInput}
+                    onChange={(e) => setOtpInput(e.target.value)}
+                  />
+                </div>
+                <p className="text-xs text-muted mb-0">Chưa nhận được mã? <a href="#resend" onClick={(e) => { e.preventDefault(); alert('Đã gửi lại mã OTP!'); }} className="text-success fw-semibold">Gửi lại mã (59s)</a></p>
+              </div>
+              <div className="modal-footer border-0 pt-0">
+                <button type="button" className="btn btn-light" onClick={() => setShowPhoneModal(false)}>Hủy</button>
+                <button type="button" className="btn btn-eco-save" onClick={handlePhoneVerifySubmit}>Xác nhận OTP</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 2. Modal Password */}
+      {showPwdModal && (
+        <div className="modal show d-block" style={{ backgroundColor: "rgba(0,0,0,0.5)" }} tabindex="-1">
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content rounded-4 border-0 shadow">
+              <div className="modal-header border-0 pb-0">
+                <h5 className="modal-title fw-bold text-dark"><i className="bi bi-key-fill text-success me-2"></i>Cập nhật mật khẩu</h5>
+                <button type="button" className="btn-close" onClick={() => setShowPwdModal(false)}></button>
+              </div>
+              <div className="modal-body py-3">
+                <div className="mb-3">
+                  <label className="form-label text-sm fw-semibold">Mật khẩu hiện tại</label>
+                  <input type="password" className="form-control form-control-custom" placeholder="••••••••" />
+                </div>
+                <div className="mb-3">
+                  <label className="form-label text-sm fw-semibold">Mật khẩu mới</label>
+                  <input type="password" className="form-control form-control-custom" placeholder="Mật khẩu từ 8 ký tự" />
+                </div>
+                <div className="mb-3">
+                  <label className="form-label text-sm fw-semibold">Xác nhận mật khẩu mới</label>
+                  <input type="password" className="form-control form-control-custom" placeholder="Nhập lại mật khẩu mới" />
+                </div>
+              </div>
+              <div className="modal-footer border-0 pt-0">
+                <button type="button" className="btn btn-light" onClick={() => setShowPwdModal(false)}>Đóng</button>
+                <button
+                  type="button"
+                  className="btn btn-eco-save"
+                  onClick={() => {
+                    setShowPwdModal(false);
+                    triggerToast("Đổi mật khẩu", "Mật khẩu tài khoản đã được thay đổi thành công!");
+                  }}
+                >
+                  Lưu mật khẩu
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 3. Modal PIN */}
+      {showPinModal && (
+        <div className="modal show d-block" style={{ backgroundColor: "rgba(0,0,0,0.5)" }} tabindex="-1">
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content rounded-4 border-0 shadow">
+              <div className="modal-header border-0 pb-0">
+                <h5 className="modal-title fw-bold text-dark"><i className="bi bi-hash text-success me-2"></i>Cài đặt mã PIN thanh toán</h5>
+                <button type="button" className="btn-close" onClick={() => setShowPinModal(false)}></button>
+              </div>
+              <div className="modal-body py-4">
+                <p className="text-sm text-secondary mb-3">Tạo mã PIN 6 chữ số để xác thực nhanh khi hoàn tiền hoặc đặt Homestay nhanh.</p>
+                <div className="mb-3">
+                  <input type="password" className="form-control form-control-custom text-center fs-4" placeholder="• • • • • •" maxLength="6" />
+                </div>
+              </div>
+              <div className="modal-footer border-0 pt-0">
+                <button type="button" className="btn btn-light" onClick={() => setShowPinModal(false)}>Hủy</button>
+                <button
+                  type="button"
+                  className="btn btn-eco-save"
+                  onClick={() => {
+                    setShowPinModal(false);
+                    triggerToast("Mã PIN", "Đã thiết lập mã PIN Ví YÊN Pay thành công!");
+                  }}
+                >
+                  Tạo mã PIN
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 4. Modal Delete Account */}
+      {showDeleteModal && (
+        <div className="modal show d-block" style={{ backgroundColor: "rgba(0,0,0,0.5)" }} tabindex="-1">
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content rounded-4 border-0 shadow">
+              <div className="modal-header border-0 pb-0">
+                <h5 className="modal-title fw-bold text-danger"><i className="bi bi-exclamation-triangle-fill me-2"></i>Cảnh báo xóa tài khoản</h5>
+                <button type="button" className="btn-close" onClick={() => setShowDeleteModal(false)}></button>
+              </div>
+              <div className="modal-body py-3">
+                <p className="text-sm text-secondary">Hành động này sẽ <strong>xóa vĩnh viễn</strong> tài khoản cùng lịch sử đặt homestay và điểm thưởng tích lũy của bạn. Hành động này không thể hoàn tác!</p>
+              </div>
+              <div className="modal-footer border-0 pt-0">
+                <button type="button" className="btn btn-light" onClick={() => setShowDeleteModal(false)}>Hủy bỏ</button>
+                <button
+                  type="button"
+                  className="btn btn-danger fw-semibold"
+                  onClick={() => {
+                    setShowDeleteModal(false);
+                    alert("Yêu cầu xóa tài khoản đã gửi tới ban quản trị.");
+                  }}
+                >
+                  Đồng ý xóa
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 5. Modal Logout Confirmation */}
+      {showLogoutModal && (
+        <div className="modal show d-block" style={{ backgroundColor: "rgba(0,0,0,0.5)" }} tabindex="-1">
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content rounded-4 border-0 shadow">
+              <div className="modal-header border-0 pb-0">
+                <h5 className="modal-title fw-bold text-dark"><i className="bi bi-box-arrow-right text-danger me-2"></i>Xác nhận đăng xuất</h5>
+                <button type="button" className="btn-close" onClick={() => setShowLogoutModal(false)}></button>
+              </div>
+              <div className="modal-body py-4">
+                <p className="text-secondary text-sm mb-0">
+                  Bạn có chắc chắn muốn đăng xuất khỏi tài khoản <strong>YÊN Homestay</strong> không?
+                </p>
+              </div>
+              <div className="modal-footer border-0 pt-0">
+                <button type="button" className="btn btn-light rounded-3 px-4" onClick={() => setShowLogoutModal(false)}>Hủy bỏ</button>
+                <button
+                  type="button"
+                  className="btn btn-danger rounded-3 px-4 fw-semibold d-inline-flex align-items-center gap-2"
+                  onClick={() => {
+                    setShowLogoutModal(false);
+                    navigate("/login");
+                  }}
+                >
+                  <i className="bi bi-box-arrow-right"></i> Đăng xuất
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 6. Modal Clear History */}
+      {showClearHistoryModal && (
+        <div className="modal show d-block" style={{ backgroundColor: "rgba(0,0,0,0.5)" }} tabindex="-1">
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content rounded-4 border-0 shadow">
+              <div className="modal-header border-0 pb-0">
+                <h5 className="modal-title fw-bold text-danger"><i className="bi bi-trash3-fill me-2"></i>Xác nhận xóa lịch sử xem</h5>
+                <button type="button" className="btn-close" onClick={() => setShowClearHistoryModal(false)}></button>
+              </div>
+              <div className="modal-body py-3">
+                <p className="text-sm text-secondary mb-0">Bạn có chắc chắn muốn xóa toàn bộ danh sách Homestay đã xem gần đây không?</p>
+              </div>
+              <div className="modal-footer border-0 pt-0">
+                <button type="button" className="btn btn-light" onClick={() => setShowClearHistoryModal(false)}>Hủy bỏ</button>
+                <button type="button" className="btn btn-danger fw-semibold" onClick={confirmClearHistory}>Đồng ý xóa</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 7. Modal Invoice */}
+      {showInvoiceModal && selectedInvoice && (
+        <div className="modal show d-block" style={{ backgroundColor: "rgba(0,0,0,0.5)" }} tabindex="-1">
+          <div className="modal-dialog modal-dialog-centered modal-lg">
+            <div className="modal-content rounded-4 border-0 shadow-lg">
+              <div className="modal-header bg-light border-bottom p-4">
+                <div className="d-flex align-items-center justify-content-between w-100">
+                  <div className="d-flex align-items-center gap-3">
+                    <div className="bg-success text-white rounded-3 p-2 d-flex align-items-center justify-content-center" style={{ width: "44px", height: "44px" }}>
+                      <i className="bi bi-receipt-cutoff fs-4"></i>
+                    </div>
+                    <div>
+                      <h5 className="fw-extrabold text-dark mb-0">HÓA ĐƠN XÁC NHẬN THANH TOÁN</h5>
+                      <p className="text-xs text-muted mb-0">Mã hóa đơn: <strong className="text-success">#{selectedInvoice.code}</strong> • YÊN Homestay Booking System</p>
+                    </div>
+                  </div>
+                  <button type="button" className="btn-close" onClick={() => setShowInvoiceModal(false)}></button>
+                </div>
+              </div>
+              <div className="modal-body p-4">
+                <div className="row g-3 mb-4 pb-3 border-bottom">
+                  <div className="col-6">
+                    <small className="text-muted text-uppercase text-xs fw-bold">Thông tin khách hàng</small>
+                    <h6 className="fw-bold text-dark mb-1 mt-1">{profile.fullName}</h6>
+                    <p className="text-xs text-muted mb-0"><i className="bi bi-telephone me-1"></i>{profile.phone}</p>
+                    <p className="text-xs text-muted mb-0"><i className="bi bi-envelope me-1"></i>{profile.email}</p>
+                  </div>
+                  <div className="col-6 text-end">
+                    <small className="text-muted text-uppercase text-xs fw-bold">Thông tin thanh toán</small>
+                    <p className="text-xs mb-1 mt-1">Phương thức: <strong className="text-dark">{selectedInvoice.method}</strong></p>
+                    <span className="badge bg-success text-white px-2.5 py-1">{selectedInvoice.status}</span>
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-3 bg-light border mb-4">
+                  <small className="text-muted text-uppercase text-xs fw-bold d-block mb-1">Cơ sở lưu trú homestay</small>
+                  <h5 className="fw-extrabold text-dark mb-1">{selectedInvoice.name}</h5>
+                  <p className="text-xs text-muted mb-0">
+                    <i className="bi bi-geo-alt-fill text-danger me-1"></i>{selectedInvoice.loc} • Thời gian: <strong className="text-dark">{selectedInvoice.dates}</strong>
+                  </p>
+                </div>
+
+                <h6 className="fw-bold text-dark mb-2 text-xs text-uppercase">Chi tiết các khoản phí thanh toán</h6>
+                <div className="table-responsive mb-3">
+                  <table className="table table-bordered align-middle text-sm mb-0">
+                    <thead className="table-light">
+                      <tr>
+                        <th>Hạng mục dịch vụ</th>
+                        <th className="text-end">Đơn giá</th>
+                        <th className="text-end">Thành tiền</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td>Tiền phòng lưu trú homestay</td>
+                        <td className="text-end">{selectedInvoice.subTotal}</td>
+                        <td className="text-end fw-bold">{selectedInvoice.subTotal}</td>
+                      </tr>
+                      <tr>
+                        <td>Phí bảo vệ &amp; Dịch vụ dọn dẹp vệ sinh</td>
+                        <td className="text-end">Miễn phí</td>
+                        <td className="text-end text-success fw-bold">0đ</td>
+                      </tr>
+                      <tr>
+                        <td>Áp dụng Mã giảm giá KH</td>
+                        <td className="text-end text-danger">-{selectedInvoice.discount}</td>
+                        <td className="text-end text-danger fw-bold">-{selectedInvoice.discount}</td>
+                      </tr>
+                      <tr className="table-success bg-opacity-10 fw-bold fs-6">
+                        <td colSpan="2" className="text-end text-dark">TỔNG TIỀN THANH TOÁN CHI TRẢ:</td>
+                        <td className="text-end text-success fs-5">{selectedInvoice.paid}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="p-3 rounded-3 bg-success bg-opacity-10 border border-success border-opacity-25 d-flex align-items-center justify-content-between">
+                  <small className="text-success text-xs"><i className="bi bi-shield-check me-1 fs-6"></i>Hóa đơn điện tử hợp lệ được phát hành bởi Hệ thống Du lịch Homestay YÊN.</small>
+                  <span className="text-xs text-muted">Mã Txn: {selectedInvoice.txnId}</span>
+                </div>
+              </div>
+              <div className="modal-footer bg-light border-top p-3">
+                <button type="button" className="btn btn-outline-secondary fw-semibold" onClick={() => setShowInvoiceModal(false)}>Đóng</button>
+                <button type="button" className="btn btn-outline-success fw-semibold" onClick={() => window.print()}><i className="bi bi-printer me-1"></i> In hóa đơn</button>
+                <button type="button" className="btn btn-eco-save fw-bold" onClick={() => alert('Đã tải file Hóa đơn PDF thành công!')}><i className="bi bi-download me-1"></i> Tải PDF</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 8. Modal Withdraw */}
+      {showWithdrawModal && (
+        <div className="modal show d-block" style={{ backgroundColor: "rgba(0,0,0,0.5)" }} tabindex="-1">
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content rounded-4 border-0 shadow">
+              <div className="modal-header border-0 pb-0">
+                <h5 className="modal-title fw-bold text-dark"><i className="bi bi-bank text-success me-2"></i>Rút tiền số dư về ngân hàng</h5>
+                <button type="button" className="btn-close" onClick={() => setShowWithdrawModal(false)}></button>
+              </div>
+              <form onSubmit={handleWithdrawSubmit}>
+                <div className="modal-body py-3">
+                  <div className="mb-3">
+                    <label className="form-label text-sm fw-semibold">Ngân hàng thụ hưởng</label>
+                    <select
+                      className="form-select form-select-custom"
+                      value={withdrawForm.bank}
+                      onChange={(e) => setWithdrawForm({ ...withdrawForm, bank: e.target.value })}
+                    >
+                      <option value="Vietcombank">Vietcombank (Ngân hàng TMCP Ngoại Thương)</option>
+                      <option value="Techcombank">Techcombank (Ngân hàng Kỹ Thương)</option>
+                      <option value="MBBank">MBBank (Ngân hàng Quân Đội)</option>
+                      <option value="BIDV">BIDV (Ngân hàng Đầu tư &amp; Phát triển)</option>
+                      <option value="VietinBank">VietinBank (Ngân hàng Công Thương)</option>
+                    </select>
+                  </div>
+                  <div className="mb-3">
+                    <label className="form-label text-sm fw-semibold">Số tài khoản nhận tiền</label>
+                    <input
+                      type="text"
+                      className="form-control form-control-custom"
+                      value={withdrawForm.accNum}
+                      onChange={(e) => setWithdrawForm({ ...withdrawForm, accNum: e.target.value })}
+                      required
+                    />
+                  </div>
+                  <div className="mb-3">
+                    <label className="form-label text-sm fw-semibold">Số tiền muốn rút (VNĐ)</label>
+                    <input
+                      type="number"
+                      className="form-control form-control-custom"
+                      value={withdrawForm.amount}
+                      onChange={(e) => setWithdrawForm({ ...withdrawForm, amount: e.target.value })}
+                      min="50000"
+                      max={balance}
+                      required
+                    />
+                    <small className="text-muted text-xs mt-1 d-block">
+                      Số dư hiện tại: <strong className="text-success">{balance.toLocaleString("vi-VN")}đ</strong>
+                    </small>
+                  </div>
+                </div>
+                <div className="modal-footer border-0 pt-0">
+                  <button type="button" className="btn btn-light" onClick={() => setShowWithdrawModal(false)}>Hủy</button>
+                  <button type="submit" className="btn btn-eco-save">Rút ngay</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 9. Modal Voucher Terms */}
+      {termsModalVoucher && (
+        <div className="modal show d-block" style={{ backgroundColor: "rgba(0,0,0,0.5)" }} tabindex="-1">
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content rounded-4 border-0 shadow">
+              <div className="modal-header border-0 pb-0">
+                <h5 className="modal-title fw-bold text-dark"><i className="bi bi-info-circle-fill text-success me-2"></i>Điều kiện sử dụng Voucher</h5>
+                <button type="button" className="btn-close" onClick={() => setTermsModalVoucher(null)}></button>
+              </div>
+              <div className="modal-body py-3">
+                <h6 className="fw-bold text-success">{termsModalVoucher.code} - {termsModalVoucher.discountText}</h6>
+                <p className="text-sm text-secondary mb-2">{termsModalVoucher.title}</p>
+                <ul className="text-xs text-muted mb-0 ps-3">
+                  <li>{termsModalVoucher.condText}</li>
+                  <li>Áp dụng khi thanh toán trực tuyến qua Ví YÊN Pay hoặc Chuyển khoản QR.</li>
+                  <li>Mỗi tài khoản chỉ áp dụng mã 1 lần cho mỗi chuyến đi.</li>
+                  <li>Không áp dụng đồng thời với các chương trình khuyến mãi đặc biệt khác.</li>
+                </ul>
+              </div>
+              <div className="modal-footer border-0 pt-0">
+                <button type="button" className="btn btn-eco-save" onClick={() => setTermsModalVoucher(null)}>Đã hiểu</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Toast Render */}
+      {toast.show && (
+        <div className="toast-container position-fixed bottom-0 end-0 p-3 z-3">
+          <div className="toast toast-eco show border-0" role="alert" aria-live="assertive" aria-atomic="true">
+            <div className="toast-header">
+              <i className="bi bi-check-circle-fill me-2 text-white"></i>
+              <strong className="me-auto text-white">{toast.title}</strong>
+              <small className="text-white-50">vừa xong</small>
+            </div>
+            <div className="toast-body bg-success text-white rounded-bottom">
+              {toast.body}
+            </div>
+          </div>
+        </div>
+      )}
+    </main>
+  );
+}

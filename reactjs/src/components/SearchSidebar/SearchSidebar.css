@@ -1,0 +1,130 @@
+/* Material filter sidebar */
+.search-filter-sidebar {
+  position: sticky;
+  top: 18px;
+  border: 1px solid #dce5de;
+  border-radius: 18px;
+  overflow: hidden;
+  background: #fff;
+  box-shadow: 0 8px 22px rgba(9, 73, 44, 0.08);
+}
+
+.filter-heading {
+  padding: 18px;
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  border-bottom: 1px solid #e5ece6;
+  background: linear-gradient(135deg, #f0f8f1, #fff);
+}
+
+.filter-heading h2 {
+  font-size: 17px;
+  color: #123d2a;
+  margin: 1px 0 4px;
+  font-weight: 700;
+}
+
+.filter-heading p {
+  font-size: 12px;
+  color: #64756a;
+  margin: 0;
+}
+
+.filter-clear {
+  margin-left: auto;
+  border: 0;
+  color: #176b42;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  background: transparent;
+  cursor: pointer;
+  padding: 6px 0;
+}
+
+.filter-clear:hover {
+  text-decoration: underline;
+}
+
+.filter-groups {
+  overflow: auto;
+}
+
+.filter-group {
+  padding: 18px;
+  border-bottom: 1px solid #e5ece6;
+}
+
+.filter-group:last-child {
+  border: 0;
+}
+
+.filter-group h3 {
+  margin: 0 0 12px;
+  font-size: 15px;
+  color: #173c2a;
+  font-weight: 700;
+}
+
+.filter-option {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  margin: 10px 0;
+  cursor: pointer;
+  font-size: 14px;
+  color: #33453a;
+}
+
+.filter-option input {
+  width: 18px;
+  height: 18px;
+  accent-color: #176b42;
+  cursor: pointer;
+}
+
+.filter-option span:nth-child(2) {
+  flex: 1;
+}
+
+.price-range {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.price-range input {
+  min-width: 0;
+  border: 1px solid #bdcbbf;
+  border-radius: 9px;
+  padding: 10px;
+  outline-color: #176b42;
+  font-size: 13px;
+}
+
+.active-filter-summary {
+  margin: 12px 18px 0;
+  padding: 9px 11px;
+  border-radius: 9px;
+  background: #e6f4e8;
+  color: #176b42;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+@media (max-width: 900px) {
+  .search-filter-sidebar {
+    position: static;
+  }
+  .filter-groups {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  .filter-groups {
+    display: block;
+  }
+}
