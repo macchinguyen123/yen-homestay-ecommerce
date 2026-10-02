@@ -1,40 +1,836 @@
-.admin-dashboard .dashboard-header h1 {
-  color: #1E1B4B;
+/* ============================================================
+   ADMIN DASHBOARD CSS - YÊN HOMESTAY MANAGEMENT
+   ============================================================ */
+
+/* Page Header & Welcome Banner */
+.dashboard-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 22px;
+    gap: 16px;
+    flex-wrap: wrap;
 }
 
-.admin-actions {
-  display: flex;
-  gap: 8px;
+.dashboard-title-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
 }
 
-.action-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  height: 32px;
-  padding: 0 12px;
-  border-radius: 8px;
-  font-size: 0.8rem;
-  font-weight: 700;
-  border: none;
-  cursor: pointer;
-  transition: all 0.2s ease;
+.dashboard-badge-live {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 10px;
+    background: #DCFCE7;
+    color: #15803D;
+    font-size: 11.5px;
+    font-weight: 700;
+    border-radius: 999px;
+    width: fit-content;
+    margin-bottom: 4px;
+    border: 1px solid #BBF7D0;
 }
 
-.action-btn.approve {
-  background: #DCFCE7;
-  color: #15803D;
-}
-.action-btn.approve:hover {
-  background: #15803D;
-  color: #FFFFFF;
+.live-pulse-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #16A34A;
+    box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.7);
+    animation: pulseDot 1.8s infinite;
 }
 
-.action-btn.reject {
-  background: #FFE4E6;
-  color: #E11D48;
+@keyframes pulseDot {
+    0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.7); }
+    70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(22, 163, 74, 0); }
+    100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(22, 163, 74, 0); }
 }
-.action-btn.reject:hover {
-  background: #E11D48;
-  color: #FFFFFF;
+
+.dashboard-title {
+    font-size: 22px;
+    font-weight: 800;
+    color: var(--text-main, #0F172A);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.dashboard-title .title-icon {
+    font-size: 26px;
+    color: var(--primary-color, #15803D);
+    background: #DCFCE7;
+    padding: 6px;
+    border-radius: 8px;
+}
+
+.dashboard-subtitle {
+    font-size: 13px;
+    color: var(--text-muted, #64748B);
+}
+
+.dashboard-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.date-filter-group {
+    display: flex;
+    align-items: center;
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 8px;
+    padding: 3px;
+}
+
+.date-filter-btn {
+    padding: 6px 12px;
+    border: none;
+    background: transparent;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: #64748B;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.date-filter-btn:hover {
+    color: #0F172A;
+    background: #F1F5F9;
+}
+
+.date-filter-btn.active {
+    background: var(--primary-color, #15803D);
+    color: #FFFFFF;
+    font-weight: 700;
+}
+
+.btn-dash-action {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: 1px solid #E2E8F0;
+    background: #FFFFFF;
+    color: #0F172A;
+    text-decoration: none;
+}
+
+.btn-dash-action:hover {
+    border-color: var(--primary-color, #15803D);
+    color: var(--primary-color, #15803D);
+    background: #F0FDF4;
+}
+
+.btn-dash-primary {
+    background: var(--primary-color, #15803D);
+    color: #FFFFFF !important;
+    border-color: var(--primary-color, #15803D);
+}
+
+.btn-dash-primary:hover {
+    background: #166534;
+    border-color: #166534;
+}
+
+/* ============================================================
+   9 CORE METRIC CARDS
+   ============================================================ */
+.section-heading-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 14px;
+}
+
+.section-heading-title {
+    font-size: 14px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #64748B;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.section-heading-title .material-symbols-outlined {
+    font-size: 18px;
+    color: var(--primary-color, #15803D);
+}
+
+.metrics-grid-9 {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.metric-card {
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 12px;
+    padding: 18px 20px;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    position: relative;
+    overflow: hidden;
+    text-decoration: none;
+    color: inherit;
+    cursor: pointer;
+}
+
+.metric-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.06);
+    border-color: #CBD5E1;
+}
+
+.metric-card::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 4px;
+    height: 100%;
+    background: var(--card-accent, var(--primary-color, #15803D));
+    opacity: 0.85;
+}
+
+/* Themed accents for 9 metrics */
+.metric-card.m-tourist { --card-accent: #2563EB; }
+.metric-card.m-owner   { --card-accent: #15803D; }
+.metric-card.m-homestay{ --card-accent: #0D9488; }
+.metric-card.m-booking { --card-accent: #D97706; }
+.metric-card.m-trans   { --card-accent: #7C3AED; }
+.metric-card.m-revenue { --card-accent: #059669; }
+.metric-card.m-posts   { --card-accent: #0284C7; }
+.metric-card.m-ads     { --card-accent: #15803D; }
+.metric-card.m-voucher { --card-accent: #EA580C; }
+
+.metric-card-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 12px;
+}
+
+.metric-label-group {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.metric-number-badge {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--card-accent, var(--primary-color, #15803D));
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.metric-name {
+    font-size: 14.5px;
+    font-weight: 800;
+    color: #0F172A;
+}
+
+.metric-icon-box {
+    width: 42px;
+    height: 42px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.04);
+    color: var(--card-accent, var(--primary-color, #15803D));
+    flex-shrink: 0;
+    transition: transform 0.2s ease;
+}
+
+.metric-card:hover .metric-icon-box {
+    transform: scale(1.08);
+}
+
+.m-tourist .metric-icon-box  { background: #EFF6FF; }
+.m-owner .metric-icon-box    { background: #F0FDF4; }
+.m-homestay .metric-icon-box { background: #CCFBF1; }
+.m-booking .metric-icon-box  { background: #FEF3C7; }
+.m-trans .metric-icon-box    { background: #F3E8FF; }
+.m-revenue .metric-icon-box  { background: #ECFDF5; }
+.m-posts .metric-icon-box    { background: #E0F2FE; }
+.m-ads .metric-icon-box      { background: #F0FDF4; }
+.m-voucher .metric-icon-box  { background: #FFEDD5; }
+
+.metric-card-mid {
+    margin-bottom: 12px;
+}
+
+.metric-value {
+    font-size: 26px;
+    font-weight: 800;
+    color: #0F172A;
+    letter-spacing: -0.5px;
+    line-height: 1.2;
+}
+
+.metric-card-bottom {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-top: 10px;
+    border-top: 1px dashed #E2E8F0;
+    font-size: 12px;
+}
+
+.metric-trend {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    font-weight: 700;
+}
+
+.metric-trend.up {
+    color: #16A34A;
+}
+
+.metric-trend.down {
+    color: #DC2626;
+}
+
+.metric-trend.neutral {
+    color: #64748B;
+}
+
+.metric-sub-detail {
+    color: #64748B;
+    font-size: 11.5px;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 170px;
+}
+
+.metric-link-arrow {
+    color: #64748B;
+    font-size: 16px;
+    transition: transform 0.2s ease, color 0.2s ease;
+}
+
+.metric-card:hover .metric-link-arrow {
+    transform: translateX(3px);
+    color: var(--card-accent, var(--primary-color, #15803D));
+}
+
+/* ============================================================
+   CHARTS SECTION (2 COLUMNS: 65% - 35%)
+   ============================================================ */
+.dashboard-charts-row {
+    display: grid;
+    grid-template-columns: 1.85fr 1fr;
+    gap: 20px;
+    margin-bottom: 24px;
+}
+
+.chart-panel-card {
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 12px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+}
+
+.chart-panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.chart-panel-title-group h3 {
+    font-size: 15px;
+    font-weight: 800;
+    color: #0F172A;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.chart-panel-title-group p {
+    font-size: 12px;
+    color: #64748B;
+    margin-top: 2px;
+}
+
+.chart-panel-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.chart-canvas-wrap {
+    position: relative;
+    width: 100%;
+    height: 300px;
+    flex: 1;
+}
+
+/* Mini stat list below doughnut chart */
+.doughnut-stats-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 16px;
+    padding-top: 14px;
+    border-top: 1px solid #E2E8F0;
+}
+
+.doughnut-stat-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12.5px;
+}
+
+.doughnut-stat-name {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #0F172A;
+    font-weight: 600;
+}
+
+.doughnut-stat-num {
+    font-weight: 800;
+    color: #0F172A;
+}
+
+.doughnut-stat-pct {
+    font-size: 11px;
+    color: #64748B;
+    margin-left: 6px;
+}
+
+/* ============================================================
+   LIVE ACTIVITIES & RECENT BOOKINGS / TRANSACTIONS
+   ============================================================ */
+.dashboard-activities-row {
+    display: grid;
+    grid-template-columns: 2fr 1.15fr;
+    gap: 20px;
+    margin-bottom: 24px;
+}
+
+.table-panel-card {
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 12px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+}
+
+.table-panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.panel-tabs-pill {
+    display: flex;
+    background: #F1F5F9;
+    padding: 3px;
+    border-radius: 8px;
+    gap: 4px;
+}
+
+.panel-tab-btn {
+    padding: 6px 12px;
+    border: none;
+    background: transparent;
+    font-size: 12px;
+    font-weight: 700;
+    color: #64748B;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.panel-tab-btn.active {
+    background: #FFFFFF;
+    color: var(--primary-color, #15803D);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+}
+
+.panel-action-link {
+    font-size: 12.5px;
+    font-weight: 700;
+    color: var(--primary-color, #15803D);
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.panel-action-link:hover {
+    color: #166534;
+    text-decoration: underline;
+}
+
+/* Data Table */
+.dash-table-wrap {
+    overflow-x: auto;
+}
+
+.dash-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+
+.dash-table th {
+    text-align: left;
+    padding: 10px 12px;
+    background: #F8FAFC;
+    color: #64748B;
+    font-weight: 700;
+    font-size: 11.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    border-bottom: 1px solid #E2E8F0;
+    white-space: nowrap;
+}
+
+.dash-table td {
+    padding: 12px;
+    border-bottom: 1px solid #F1F5F9;
+    color: #0F172A;
+    vertical-align: middle;
+}
+
+.dash-table tr:hover td {
+    background-color: #F8FAFC;
+}
+
+.cell-code {
+    font-weight: 700;
+    color: var(--primary-color, #15803D);
+    font-family: monospace;
+    font-size: 12px;
+}
+
+.cell-user {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+}
+
+.cell-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: #E2E8F0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 12px;
+    color: #475569;
+    flex-shrink: 0;
+}
+
+.cell-avatar.hs {
+    background: #DCFCE7;
+    color: var(--primary-color, #15803D);
+}
+
+.cell-name-main {
+    font-weight: 700;
+    color: #0F172A;
+    line-height: 1.3;
+}
+
+.cell-name-sub {
+    font-size: 11.5px;
+    color: #64748B;
+}
+
+/* Badges */
+.dash-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px;
+    border-radius: 999px;
+    font-size: 11.5px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.dash-badge.success {
+    background: #DCFCE7;
+    color: #15803D;
+}
+
+.dash-badge.warning {
+    background: #FEF3C7;
+    color: #D97706;
+}
+
+.dash-badge.danger {
+    background: #FEE2E2;
+    color: #B91C1C;
+}
+
+.dash-badge.info {
+    background: #DBEAFE;
+    color: #1D4ED8;
+}
+
+/* Quick Shortcuts Column */
+.quick-shortcuts-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.shortcut-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 14px;
+    border: 1px solid #E2E8F0;
+    border-radius: 10px;
+    text-decoration: none;
+    color: #0F172A;
+    background: #FFFFFF;
+    transition: all 0.2s ease;
+}
+
+.shortcut-item:hover {
+    border-color: var(--primary-color, #15803D);
+    background: #F0FDF4;
+    transform: translateX(3px);
+}
+
+.shortcut-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.shortcut-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #F1F5F9;
+    color: var(--primary-color, #15803D);
+}
+
+.shortcut-info h4 {
+    font-size: 13px;
+    font-weight: 700;
+    color: #0F172A;
+}
+
+.shortcut-info p {
+    font-size: 11.5px;
+    color: #64748B;
+}
+
+.shortcut-arrow {
+    color: #94A3B8;
+    font-size: 18px;
+}
+
+/* System Health Monitor Box */
+.system-health-box {
+    margin-top: 16px;
+    padding: 14px;
+    border-radius: 10px;
+    background: #F8FAFC;
+    border: 1px solid #E2E8F0;
+}
+
+.health-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    font-size: 12px;
+    font-weight: 700;
+    color: #64748B;
+}
+
+.health-status-badge {
+    color: #15803D;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.health-meters {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.health-meter-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 11.5px;
+    color: #0F172A;
+}
+
+.health-meter-val {
+    font-weight: 700;
+    color: #334155;
+}
+
+/* Responsive */
+@media (max-width: 1280px) {
+    .metrics-grid-9 {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    .dashboard-charts-row,
+    .dashboard-activities-row {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 768px) {
+    .metrics-grid-9 {
+        grid-template-columns: 1fr;
+    }
+    .dashboard-header {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .dashboard-toolbar {
+        width: 100%;
+        justify-content: space-between;
+    }
+}
+.dash-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(3px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: 16px;
+}
+
+.dash-modal-overlay.show {
+    display: flex;
+}
+
+.dash-modal-box {
+    background: #FFFFFF;
+    border-radius: 14px;
+    width: 100%;
+    max-width: 650px;
+    max-height: 85vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.18);
+    border: 1px solid var(--border-color);
+}
+
+.dash-modal-header {
+    padding: 18px 20px;
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.dash-modal-header h3 {
+    font-size: 16px;
+    font-weight: 800;
+    color: var(--text-main);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.dash-modal-close-btn {
+    border: none;
+    background: #F1F5F9;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #64748B;
+    transition: background 0.15s ease;
+}
+
+.dash-modal-close-btn:hover {
+    background: #E2E8F0;
+    color: #0F172A;
+}
+
+.dash-modal-body {
+    padding: 20px;
+}
+
+.dash-modal-footer {
+    padding: 14px 20px;
+    border-top: 1px solid var(--border-color);
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+/* Responsive */
+@media (max-width: 1280px) {
+    .metrics-grid-9 {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    .dashboard-charts-row,
+    .dashboard-activities-row {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 768px) {
+    .metrics-grid-9 {
+        grid-template-columns: 1fr;
+    }
+    .dashboard-header {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .dashboard-toolbar {
+        width: 100%;
+        justify-content: space-between;
+    }
 }

@@ -1,0 +1,260 @@
+/* ==========================================================================
+   YÊN HOMESTAY ADMIN - BÁN & CUNG CẤP DỊCH VỤ QUẢNG CÁO STYLESHEET
+   Tone màu chủ đạo: Xanh lá thương hiệu YÊN (#15803D / #166534 / #047857 / #002c1e)
+   ========================================================================== */
+
+/* --- 1. Top Stat Cards Grid (4 Cột Thống Kê Doanh Thu & Dịch Vụ) --- */
+.ads-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 20px;
+    margin-bottom: 28px;
+}
+
+.ads-stat-card {
+    background: #FFFFFF;
+    border: 1px solid var(--border-color, #E2E8F0);
+    border-radius: 12px;
+    padding: 20px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    box-shadow: 0 1px 6px rgba(0, 0, 0, 0.03);
+    transition: var(--transition-fast, 0.2s);
+}
+
+.ads-stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(21, 128, 61, 0.12);
+    border-color: var(--primary-color, #15803D);
+}
+
+.ads-stat-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.ads-stat-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-muted, #64748B);
+}
+
+.ads-stat-value {
+    font-size: 26px;
+    font-weight: 800;
+    color: var(--text-main, #0F172A);
+    line-height: 1.2;
+}
+
+.ads-stat-subtext {
+    font-size: 12px;
+    color: var(--primary-color, #15803D);
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 2px;
+}
+
+.ads-stat-icon-wrapper {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+/* Các sắc thái xanh chủ đạo cho Stat Icons */
+.ads-stat-icon-wrapper.emerald {
+    background-color: #ECFDF5;
+    color: #047857;
+}
+
+.ads-stat-icon-wrapper.green {
+    background-color: #F0FDF4;
+    color: #15803D;
+}
+
+.ads-stat-icon-wrapper.blue {
+    background-color: #E0F2FE;
+    color: #0284C7;
+}
+
+.ads-stat-icon-wrapper.amber {
+    background-color: #FEF3C7;
+    color: #D97706;
+}
+
+.ads-stat-icon-wrapper .material-symbols-outlined {
+    font-size: 26px;
+}
+
+/* --- 2. Placement Badge (Tông màu xanh chủ đạo) --- */
+.placement-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 700;
+    background-color: #F0FDF4;
+    color: #166534;
+    border: 1px solid #BBF7D0;
+}
+
+.placement-badge.hero {
+    background-color: #ECFDF5;
+    color: #065F46;
+    border-color: #A7F3D0;
+}
+
+.placement-badge.top5 {
+    background-color: #F0FDF4;
+    color: #15803D;
+    border-color: #BBF7D0;
+}
+
+.placement-badge.combo {
+    background-color: #FEF3C7;
+    color: #B45309;
+    border-color: #FDE68A;
+}
+
+.placement-badge.popup {
+    background-color: #F0FDFA;
+    color: #0F766E;
+    border-color: #99F6E4;
+}
+
+.placement-badge.festival {
+    background-color: #FFFBEB;
+    color: #B45309;
+    border-color: #FDE68A;
+}
+
+/* CTR / Performance Pill */
+.ctr-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12.5px;
+    font-weight: 700;
+    color: #15803D;
+}
+
+/* Banner Image Thumbnail Preview */
+.banner-thumb {
+    width: 84px;
+    height: 48px;
+    border-radius: 8px;
+    object-fit: cover;
+    background-color: #E2E8F0;
+    flex-shrink: 0;
+    border: 1px solid var(--border-color, #E2E8F0);
+}
+
+/* --- 3. Package & Service Pricing Badges --- */
+.package-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-size: 11.5px;
+    font-weight: 700;
+}
+
+.package-badge.vip {
+    background: #ECFDF5;
+    color: #047857;
+    border: 1px solid #A7F3D0;
+}
+
+.package-badge.hot {
+    background: #FEF3C7;
+    color: #B45309;
+    border: 1px solid #FDE68A;
+}
+
+.package-badge.standard {
+    background: #F0FDF4;
+    color: #15803D;
+    border: 1px solid #BBF7D0;
+}
+
+.package-badge.seasonal {
+    background: #FEF3C7;
+    color: #92400E;
+    border: 1px solid #FDE68A;
+}
+
+.price-tag {
+    font-size: 14px;
+    font-weight: 800;
+    color: #15803D;
+}
+
+.feature-pill {
+    display: inline-block;
+    background: #F0FDF4;
+    border: 1px solid #DCFCE7;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11.5px;
+    color: #166534;
+    font-weight: 600;
+    margin: 2px 2px 2px 0;
+}
+
+.order-code-badge {
+    display: inline-block;
+    background: #F8FAFC;
+    color: #0F172A;
+    font-family: monospace;
+    font-weight: 700;
+    font-size: 12px;
+    padding: 3px 8px;
+    border-radius: 6px;
+    border: 1px solid #E2E8F0;
+}
+
+.host-sub {
+    font-size: 11.5px;
+    color: var(--text-muted, #64748B);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 2px;
+}
+
+/* --- 4. Content Tab Button Active (Xanh lá chuẩn) --- */
+.content-tab-btn.active {
+    background: #FFFFFF;
+    color: #15803D !important;
+    font-weight: 700;
+    box-shadow: 0 1px 4px rgba(21, 128, 61, 0.15);
+    border: 1px solid #DCFCE7;
+}
+
+.content-tab-btn.active .material-symbols-outlined {
+    color: #15803D;
+}
+
+/* Form input focus xanh lá */
+.form-input:focus,
+.form-select:focus {
+    border-color: #15803D !important;
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(21, 128, 61, 0.12) !important;
+}
+
+@media (max-width: 1024px) {
+    .ads-stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
