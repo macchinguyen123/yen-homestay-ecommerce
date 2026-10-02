@@ -1,0 +1,243 @@
+/* ==========================================================================
+   YÊN HOMESTAY - HEADER NAVIGATION (Header.css)
+   ========================================================================== */
+
+:root {
+  --primary-color: #15803D;
+  --primary-hover: #166534;
+  --primary-light: #F0FDF4;
+  --text-main: #1E293B;
+  --text-muted: #64748B;
+  --bg-header: #FFFFFF;
+  --border-color: #E2E8F0;
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.03);
+  --shadow-active: 0 4px 14px rgba(21, 128, 61, 0.25);
+  --transition-fast: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.yen-header {
+  width: 100%;
+  background-color: var(--bg-header);
+  border-bottom: 1px solid var(--border-color);
+  box-shadow: var(--shadow-sm);
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+}
+
+.yen-header-container {
+  width: 100%;
+  max-width: 100%;
+  margin: 0 auto;
+  padding: 0 32px;
+  height: 78px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* Logo Brand */
+.yen-brand-logo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-decoration: none;
+  color: var(--text-main);
+  user-select: none;
+}
+
+.yen-brand-icon {
+  width: 42px;
+  height: 42px;
+  background: linear-gradient(135deg, #15803D 0%, #166534 100%);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #FFFFFF;
+  box-shadow: 0 4px 10px rgba(21, 128, 61, 0.2);
+  transition: var(--transition-fast);
+  font-size: 1.3rem;
+}
+
+.yen-brand-logo:hover .yen-brand-icon {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 14px rgba(21, 128, 61, 0.3);
+}
+
+.yen-brand-text {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.yen-brand-name {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--primary-color);
+  letter-spacing: -0.3px;
+  line-height: 1.1;
+}
+
+.yen-brand-name span {
+  color: #0F172A;
+}
+
+.yen-brand-sub {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  margin-top: 1px;
+}
+
+/* Navigation List */
+.yen-nav-list {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.yen-nav-item {
+  position: relative;
+}
+
+.yen-nav-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 15px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-main);
+  background-color: transparent;
+  text-decoration: none;
+  transition: var(--transition-fast);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.yen-nav-link:hover {
+  background-color: var(--primary-light);
+  color: var(--primary-color);
+}
+
+.yen-nav-link .nav-icon {
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.yen-nav-link.active {
+  background-color: var(--primary-color) !important;
+  color: #FFFFFF !important;
+  box-shadow: var(--shadow-active);
+}
+
+.yen-nav-link.active .nav-icon {
+  color: #FFFFFF;
+}
+
+.yen-noti-badge {
+  background-color: #EF4444;
+  color: #FFFFFF;
+  font-size: 10px;
+  font-weight: 800;
+  padding: 1px 6px;
+  border-radius: 10px;
+  margin-left: 2px;
+  line-height: 1.2;
+}
+
+.yen-nav-link.active .yen-noti-badge {
+  background-color: #FFFFFF;
+  color: #DC2626;
+}
+
+.role-switch-pill {
+  padding: 7px 12px;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.role-switch-pill.owner {
+  background: #FFF7ED;
+  color: #C2410C;
+  border: 1px solid #FFEDD5;
+}
+
+.role-switch-pill.owner:hover {
+  background: #EA580C;
+  color: #FFFFFF;
+}
+
+.role-switch-pill.admin {
+  background: #EFF6FF;
+  color: #1D4ED8;
+  border: 1px solid #DBEAFE;
+}
+
+.role-switch-pill.admin:hover {
+  background: #2563EB;
+  color: #FFFFFF;
+}
+
+/* Mobile Toggle */
+.yen-mobile-toggle {
+  display: none;
+  background: none;
+  border: none;
+  font-size: 24px;
+  color: var(--text-main);
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 8px;
+}
+
+/* Responsive Styles */
+@media (max-width: 1024px) {
+  .yen-nav-link {
+    padding: 8px 12px;
+    font-size: 13.5px;
+  }
+}
+
+@media (max-width: 868px) {
+  .yen-mobile-toggle {
+    display: block;
+  }
+
+  .yen-nav-list {
+    display: none;
+    position: absolute;
+    top: 78px;
+    left: 0;
+    right: 0;
+    background-color: var(--bg-header);
+    flex-direction: column;
+    padding: 12px 16px;
+    gap: 6px;
+    border-bottom: 1px solid var(--border-color);
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.08);
+  }
+
+  .yen-nav-list.show {
+    display: flex;
+  }
+
+  .yen-nav-item {
+    width: 100%;
+  }
+
+  .yen-nav-link {
+    width: 100%;
+    padding: 12px 16px;
+  }
+}

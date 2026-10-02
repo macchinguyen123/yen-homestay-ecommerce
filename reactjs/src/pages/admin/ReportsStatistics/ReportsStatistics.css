@@ -1,0 +1,420 @@
+/* Page Header & Global Toolbar */
+.reports-page-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.reports-page-title-group h1 {
+    font-size: 22px;
+    font-weight: 800;
+    color: #1E293B;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0;
+}
+
+.reports-page-title-group h1 .header-title-icon {
+    font-size: 26px;
+    color: #15803D;
+    background: #DCFCE7;
+    padding: 6px;
+    border-radius: 8px;
+}
+
+.reports-page-subtitle {
+    font-size: 13px;
+    color: #64748B;
+    margin-top: 2px;
+}
+
+.reports-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.date-range-wrap {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background-color: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    padding: 6px 12px;
+    border-radius: 8px;
+    flex-wrap: wrap;
+}
+
+.date-range-wrap .material-symbols-outlined {
+    font-size: 18px;
+    color: #64748B;
+}
+
+.date-range-select {
+    border: none;
+    outline: none;
+    font-size: 13px;
+    font-weight: 600;
+    color: #1E293B;
+    background: transparent;
+    cursor: pointer;
+}
+
+.custom-date-box {
+    display: none;
+    align-items: center;
+    gap: 6px;
+    padding-left: 8px;
+    border-left: 1px solid #E2E8F0;
+}
+
+.custom-date-box.show {
+    display: flex;
+}
+
+.date-lbl {
+    font-size: 12px;
+    font-weight: 600;
+    color: #64748B;
+}
+
+.date-picker-input {
+    border: 1px solid #E2E8F0;
+    border-radius: 6px;
+    padding: 4px 8px;
+    font-size: 12.5px;
+    color: #1E293B;
+    outline: none;
+    font-family: inherit;
+}
+
+.date-picker-input:focus {
+    border-color: #15803D;
+}
+
+.btn-apply-date {
+    background-color: #15803D;
+    color: #FFFFFF;
+    border: none;
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+
+.btn-apply-date:hover {
+    background-color: #166534;
+}
+
+/* Action Buttons */
+.btn-export {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 12px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    border: 1px solid transparent;
+}
+
+.btn-export-excel {
+    background-color: #F0FDF4;
+    color: #166534;
+    border-color: #BBF7D0;
+}
+
+.btn-export-excel:hover {
+    background-color: #DCFCE7;
+}
+
+.btn-export-pdf {
+    background-color: #EFF6FF;
+    color: #1E40AF;
+    border-color: #BFDBFE;
+}
+
+.btn-export-pdf:hover {
+    background-color: #DBEAFE;
+}
+
+/* Sub Navigation Tabs */
+.reports-tabs-nav {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background-color: #FFFFFF;
+    padding: 6px;
+    border-radius: 10px;
+    border: 1px solid #E2E8F0;
+    margin-bottom: 20px;
+    overflow-x: auto;
+}
+
+.reports-tabs-nav::-webkit-scrollbar {
+    height: 4px;
+}
+.reports-tabs-nav::-webkit-scrollbar-thumb {
+    background-color: #CBD5E1;
+    border-radius: 4px;
+}
+
+.tab-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    border-radius: 8px;
+    border: none;
+    background: transparent;
+    color: #64748B;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.15s ease;
+}
+
+.tab-btn .material-symbols-outlined {
+    font-size: 18px;
+    color: #64748B;
+}
+
+.tab-btn:hover {
+    color: #1E293B;
+    background-color: #F1F5F9;
+}
+
+.tab-btn.active {
+    background-color: #15803D;
+    color: #FFFFFF !important;
+    font-weight: 700;
+}
+
+.tab-btn.active .material-symbols-outlined {
+    color: #FFFFFF !important;
+}
+
+/* Tab Panels */
+.tab-panel-content {
+    display: none;
+}
+
+.tab-panel-content.active {
+    display: block;
+}
+
+/* KPI Cards */
+.kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-bottom: 20px;
+}
+
+.kpi-card {
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 10px;
+    padding: 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+}
+
+.kpi-title {
+    font-size: 12px;
+    font-weight: 700;
+    color: #64748B;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+}
+
+.kpi-value {
+    font-size: 22px;
+    font-weight: 800;
+    color: #1E293B;
+    line-height: 1.2;
+    margin-bottom: 6px;
+}
+
+.kpi-trend {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11.5px;
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 12px;
+}
+
+.kpi-trend.up { background-color: #DCFCE7; color: #15803D; }
+.kpi-trend.down { background-color: #FEE2E2; color: #B91C1C; }
+.kpi-trend.neutral { background-color: #F1F5F9; color: #475569; }
+.kpi-trend.info { background-color: #E0F2FE; color: #0369A1; }
+
+.kpi-icon-box {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.kpi-icon-box.green { background: #DCFCE7; color: #15803D; }
+.kpi-icon-box.blue { background: #DBEAFE; color: #1D4ED8; }
+.kpi-icon-box.purple { background: #F3E8FF; color: #7E22CE; }
+.kpi-icon-box.amber { background: #FEF3C7; color: #B45309; }
+.kpi-icon-box.rose { background: #FFE4E6; color: #BE123C; }
+.kpi-icon-box.teal { background: #CCFBF1; color: #0F766E; }
+
+/* Chart Containers */
+.charts-grid-2 {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 16px;
+    margin-bottom: 20px;
+}
+
+.charts-grid-equal {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 20px;
+}
+
+.chart-card {
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 10px;
+    padding: 16px;
+}
+
+.chart-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+}
+
+.chart-card-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: #1E293B;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.chart-card-subtitle {
+    font-size: 12px;
+    color: #64748B;
+}
+
+.chart-container-box {
+    position: relative;
+    width: 100%;
+    height: 280px;
+}
+
+/* Data Tables */
+.table-card {
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 10px;
+    padding: 16px;
+    margin-bottom: 20px;
+}
+
+.table-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+}
+
+.table-card-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: #1E293B;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.table-responsive {
+    width: 100%;
+    overflow-x: auto;
+}
+
+.reports-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    text-align: left;
+}
+
+.reports-table th {
+    background-color: #F8FAFC;
+    color: #475569;
+    font-weight: 700;
+    padding: 10px 12px;
+    border-bottom: 1px solid #E2E8F0;
+}
+
+.reports-table td {
+    padding: 12px;
+    border-bottom: 1px solid #F1F5F9;
+    color: #1E293B;
+}
+
+.reports-table tbody tr:hover {
+    background-color: #F8FAFC;
+}
+
+.rank-badge {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background-color: #E2E8F0;
+    color: #475569;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 12px;
+}
+
+.rank-badge.top-1 { background-color: #FEF08A; color: #854D0E; }
+.rank-badge.top-2 { background-color: #E2E8F0; color: #334155; }
+.rank-badge.top-3 { background-color: #FFEDD5; color: #9A3412; }
+
+.badge-status {
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 11.5px;
+    font-weight: 700;
+    display: inline-block;
+}
+
+.badge-status.success { background: #DCFCE7; color: #15803D; }
+.badge-status.info { background: #E0F2FE; color: #0369A1; }
+
+@media (max-width: 1200px) {
+    .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+    .charts-grid-2, .charts-grid-equal { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 768px) {
+    .kpi-grid { grid-template-columns: 1fr; }
+}

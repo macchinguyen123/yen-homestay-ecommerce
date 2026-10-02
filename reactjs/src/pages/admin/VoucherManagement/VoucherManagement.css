@@ -1,0 +1,476 @@
+/* ==========================================================================
+   YÊN HOMESTAY ADMIN - VOUCHER APPROVAL & DISCOUNT MANAGEMENT STYLESHEET
+   ========================================================================== */
+
+/* --- 1. Voucher Stat Card Accents --- */
+.voucher-stat-icon-wrapper {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.voucher-stat-icon-wrapper.orange {
+    background-color: #FFEDD5;
+    color: #EA580C;
+}
+
+.voucher-stat-icon-wrapper.amber {
+    background-color: #FEF3C7;
+    color: #D97706;
+}
+
+.voucher-stat-icon-wrapper.green {
+    background-color: #F0FDF4;
+    color: #15803D;
+}
+
+.voucher-stat-icon-wrapper.red {
+    background-color: #FEE2E2;
+    color: #DC2626;
+}
+
+.voucher-stat-icon-wrapper.blue {
+    background-color: #E0F2FE;
+    color: #0284C7;
+}
+
+.voucher-stat-icon-wrapper.purple {
+    background-color: #F3E8FF;
+    color: #9333EA;
+}
+
+.voucher-stat-icon-wrapper .material-symbols-outlined {
+    font-size: 26px;
+}
+
+/* --- 2. Coupon Code Badge in Table --- */
+.voucher-code-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    background: #F8FAFC;
+    color: #0F172A;
+    border: 1.5px dashed #CBD5E1;
+    border-radius: 8px;
+    font-family: 'Courier New', Courier, monospace;
+    font-weight: 800;
+    font-size: 13.5px;
+    letter-spacing: 0.5px;
+    transition: all 0.2s ease;
+    cursor: pointer;
+}
+
+.voucher-code-badge:hover {
+    background: #FEF3C7;
+    border-color: #D97706;
+    color: #B45309;
+    transform: scale(1.02);
+}
+
+.voucher-code-badge .copy-icon {
+    font-size: 14px;
+    color: #64748B;
+    opacity: 0.8;
+}
+
+/* --- 3. Host Avatar & Info --- */
+.host-mini-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: #15803D;
+    color: #FFFFFF;
+    font-weight: 800;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+/* --- 4. Discount Value Highlights --- */
+.discount-val-badge {
+    font-weight: 800;
+    color: #15803D;
+    font-size: 13.5px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.discount-condition-sub {
+    font-size: 11.5px;
+    color: #64748B;
+    margin-top: 2px;
+}
+
+/* --- 5. Status Chips for Voucher Approval --- */
+.voucher-status-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 11.5px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.voucher-status-chip.pending {
+    background: #FEF3C7;
+    color: #B45309;
+    border: 1px solid #FDE68A;
+}
+
+.voucher-status-chip.approved {
+    background: #DCFCE7;
+    color: #15803D;
+    border: 1px solid #BBF7D0;
+}
+
+.voucher-status-chip.rejected {
+    background: #FEE2E2;
+    color: #DC2626;
+    border: 1px solid #FECDD3;
+}
+
+/* --- 6. Approval Action Buttons in Table --- */
+.action-btn-group {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 6px;
+}
+
+.btn-approve-sm {
+    background: #15803D;
+    color: #FFFFFF;
+    border: none;
+    border-radius: 6px;
+    padding: 5px 10px;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    transition: background 0.2s ease;
+}
+
+.btn-approve-sm:hover {
+    background: #166534;
+}
+
+.btn-reject-sm {
+    background: #FFFFFF;
+    color: #DC2626;
+    border: 1px solid #FECDD3;
+    border-radius: 6px;
+    padding: 4px 9px;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    transition: all 0.2s ease;
+}
+
+.btn-reject-sm:hover {
+    background: #FEE2E2;
+    border-color: #DC2626;
+}
+
+.btn-rejected-view-sm {
+    background: #F8FAFC;
+    color: #64748B;
+    border: 1px solid #CBD5E1;
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 11.5px;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.btn-rejected-view-sm:hover {
+    background: #F1F5F9;
+    color: #0F172A;
+}
+
+.approved-tag {
+    font-size: 11.5px;
+    color: #15803D;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+/* --- 7. Host Request Banner & Visual Ticket Card in Modal --- */
+.host-request-banner {
+    background: #F8FAFC;
+    border: 1px solid #E2E8F0;
+    border-radius: 12px;
+    padding: 14px 16px;
+}
+
+.host-avatar-badge {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #15803D 0%, #064E3B 100%);
+    color: #FFFFFF;
+    font-weight: 800;
+    font-size: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 6px rgba(21, 128, 61, 0.2);
+}
+
+.voucher-ticket-preview {
+    background: linear-gradient(135deg, #F0FDF4 0%, #DCFCE7 100%);
+    border: 2px dashed #86EFAC;
+    border-radius: 14px;
+    padding: 18px;
+    position: relative;
+    overflow: hidden;
+    margin-bottom: 16px;
+    box-shadow: 0 4px 12px rgba(21, 128, 61, 0.08);
+}
+
+.ticket-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 10px;
+}
+
+.ticket-brand {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.ticket-brand-logo {
+    width: 28px;
+    height: 28px;
+    background: #15803D;
+    color: #FFFFFF;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    font-size: 14px;
+}
+
+.ticket-brand-name {
+    font-size: 13px;
+    font-weight: 800;
+    color: #14532D;
+    letter-spacing: 0.5px;
+}
+
+.ticket-discount-amount {
+    font-size: 24px;
+    font-weight: 800;
+    color: #15803D;
+    line-height: 1.1;
+    margin-bottom: 4px;
+}
+
+.ticket-program-name {
+    font-size: 14px;
+    font-weight: 700;
+    color: #0F172A;
+    margin-bottom: 8px;
+}
+
+.ticket-meta-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px;
+    padding-top: 10px;
+    border-top: 1px dashed #A7F3D0;
+    font-size: 12px;
+    color: #166534;
+}
+
+.ticket-code-pill {
+    background: #FFFFFF;
+    padding: 4px 12px;
+    border-radius: 6px;
+    font-weight: 800;
+    font-family: monospace;
+    font-size: 14px;
+    color: #15803D;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.host-note-box {
+    background: #FFFBEB;
+    border: 1px solid #FDE68A;
+    border-radius: 10px;
+    padding: 12px 14px;
+}
+
+.admin-feedback-box {
+    background: #FEF2F2;
+    border: 1px solid #FECDD3;
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin-top: 12px;
+}
+
+/* Action Button Tooltips & States */
+.action-icon-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    border: 1px solid #E2E8F0;
+    background: #FFFFFF;
+    color: #64748B;
+    display: inline-flex;
+    align-items: center;
+    gap: 0;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.action-icon-btn:hover {
+    color: #15803D;
+    border-color: #15803D;
+    background: #DCFCE7;
+}
+
+/* Modal styles for this component */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(15, 23, 42, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    opacity: 0;
+    pointer-events: none;
+    transition: all 0.3s ease;
+}
+
+.modal-overlay.open {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.modal-container {
+    background: #FFFFFF;
+    border-radius: 12px;
+    width: 90%;
+    max-width: 720px;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    transform: translateY(20px);
+    transition: all 0.3s ease;
+}
+
+.modal-overlay.open .modal-container {
+    transform: translateY(0);
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 24px;
+    border-bottom: 1px solid #E2E8F0;
+}
+
+.modal-title {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.modal-close-btn {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4px;
+    border-radius: 50%;
+    transition: background 0.2s;
+}
+
+.modal-close-btn:hover {
+    background: rgba(0, 0, 0, 0.1);
+}
+
+.modal-body {
+    padding: 24px;
+}
+
+.modal-footer {
+    padding: 16px 24px;
+    border-top: 1px solid #E2E8F0;
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+}
+
+.btn-admin-cancel {
+    background: #F1F5F9;
+    color: #475569;
+    border: 1px solid #CBD5E1;
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-admin-cancel:hover {
+    background: #E2E8F0;
+    color: #1E293B;
+}
+
+.btn-admin-primary {
+    background: #15803D;
+    color: #FFFFFF;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.2s;
+}
+
+.btn-admin-primary:hover {
+    filter: brightness(1.1);
+}

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import './HomestayDetail.css';
 import {
   roomsData, galleryImages, amenitiesData, AMENITY_GROUPS,
@@ -149,10 +150,12 @@ function RoomModal({ room, onClose, onOpenReviews, showToast }) {
     return () => window.removeEventListener('keydown', handler);
   }, [onClose, room.gallery.length]);
 
+  const navigate = useNavigate();
   const handleBook = () => {
     if (!nights || nights <= 0) { showToast('Vui lòng chọn lại ngày nhận - trả phòng hợp lệ!'); return; }
     showToast(`Đang chuyển đến trang xác nhận đặt "${room.name}"...`);
     onClose();
+    navigate('/booking');
   };
 
   const roomReviews = getFilteredReviews(room.reviewGroup, 'all', 'newest').slice(0, 2);

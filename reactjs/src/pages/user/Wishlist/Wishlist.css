@@ -1,0 +1,436 @@
+/* ==========================================================================
+   YÊN Homestay — Wishlist Page Stylesheet
+   Design System: Forest Green (#15803D), Cream (#FCF9F4), Slate (#0F172A)
+   Grid: 4 Homestays Per Row on Desktop
+   ========================================================================== */
+
+:root {
+  --wl-primary: #15803D;
+  --wl-primary-hover: #166534;
+  --wl-primary-soft: #DCFCE7;
+  --wl-dark: #0F172A;
+  --wl-slate: #334155;
+  --wl-muted: #64748B;
+  --wl-bg: #FCF9F4;
+  --wl-card-bg: #FFFFFF;
+  --wl-border: #E2E8F0;
+  --wl-amber: #D97706;
+  --wl-amber-soft: #FEF3C7;
+  --wl-rose: #E11D48;
+  --wl-rose-soft: #FFE4E6;
+}
+
+.wl-main {
+  background-color: var(--wl-bg, #FCF9F4);
+  font-family: 'Plus Jakarta Sans', 'Be Vietnam Pro', sans-serif;
+  color: var(--wl-dark, #0F172A);
+  min-height: calc(100vh - 380px);
+}
+
+/* ── Hero Banner Section (Bo Cong Xuống Sang Trọng) ── */
+.wl-hero-section {
+  position: relative;
+  background: 
+    radial-gradient(ellipse 80% 60% at 70% 40%, rgba(21,128,61,0.35) 0%, transparent 65%),
+    linear-gradient(135deg, #0a1628 0%, #0f172a 55%, #052e16 100%);
+  color: #FFFFFF;
+  padding: 3.5rem 0 4.8rem 0;
+  margin-bottom: 2rem;
+  overflow: hidden;
+}
+
+/* Geometric decoration mesh lines */
+.wl-hero-section::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    repeating-linear-gradient(60deg, rgba(255,255,255,.03) 0px, rgba(255,255,255,.03) 1px, transparent 1px, transparent 60px),
+    repeating-linear-gradient(-60deg, rgba(255,255,255,.03) 0px, rgba(255,255,255,.03) 1px, transparent 1px, transparent 60px);
+  pointer-events: none;
+}
+
+/* Smooth curved bottom mask curve */
+.wl-hero-section::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  right: 0;
+  height: 52px;
+  background: var(--wl-bg, #FCF9F4);
+  clip-path: ellipse(55% 100% at 50% 100%);
+  pointer-events: none;
+  z-index: 3;
+}
+
+.wl-hero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(8px);
+  color: #FEF08A;
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 0.35rem 0.9rem;
+  border-radius: 50px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  margin-bottom: 0.75rem;
+}
+
+.wl-hero-title {
+  font-size: 2.25rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  margin-bottom: 0.5rem;
+  color: #FFFFFF;
+}
+
+.wl-hero-sub {
+  color: #E2E8F0;
+  font-size: 1rem;
+  max-width: 640px;
+  line-height: 1.6;
+}
+
+/* ── Toolbar: Filter & Sort ── */
+.wl-toolbar-card {
+  background: #FFFFFF;
+  border: 1px solid var(--wl-border, #E2E8F0);
+  border-radius: 16px;
+  padding: 1rem 1.25rem;
+  margin-bottom: 1.75rem;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.03);
+}
+
+.wl-pill-btn {
+  background: var(--wl-bg, #FCF9F4);
+  color: var(--wl-slate, #334155);
+  border: 1px solid var(--wl-border, #E2E8F0);
+  border-radius: 50px;
+  padding: 0.45rem 1.1rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.wl-pill-btn:hover {
+  background: var(--wl-primary-soft, #DCFCE7);
+  color: var(--wl-primary, #15803D);
+  border-color: var(--wl-primary, #15803D);
+}
+
+.wl-pill-btn.active {
+  background: var(--wl-primary, #15803D);
+  color: #FFFFFF;
+  border-color: var(--wl-primary, #15803D);
+  box-shadow: 0 4px 12px rgba(21, 128, 61, 0.25);
+}
+
+.wl-sort-select {
+  border: 1px solid var(--wl-border, #E2E8F0);
+  background-color: var(--wl-bg, #FCF9F4);
+  border-radius: 50px;
+  padding: 0.45rem 1.25rem 0.45rem 1rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--wl-dark, #0F172A);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.wl-sort-select:focus {
+  border-color: var(--wl-primary, #15803D);
+  box-shadow: 0 0 0 3px rgba(21, 128, 61, 0.15);
+  outline: none;
+}
+
+/* Hide scrollbar for Chrome, Safari and Opera */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+/* Hide scrollbar for IE, Edge and Firefox */
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* ── 4-Column Homestay Grid ── */
+.wl-homestay-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1.5rem;
+}
+
+@media (max-width: 1200px) {
+  .wl-homestay-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 992px) {
+  .wl-homestay-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 576px) {
+  .wl-homestay-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Homestay Card Component ── */
+.wl-card-col {
+  transition: transform 0.3s ease, opacity 0.3s ease;
+}
+
+.wl-card {
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 18px;
+  overflow: hidden;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  position: relative;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.03);
+}
+
+.wl-card:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 16px 32px rgba(15, 23, 42, 0.08);
+  border-color: rgba(21, 128, 61, 0.3);
+}
+
+/* Card Image Wrapper */
+.wl-card-img-wrap {
+  position: relative;
+  width: 100%;
+  padding-top: 66.66%; /* 3:2 ratio */
+  overflow: hidden;
+  background-color: #F1F5F9;
+}
+
+.wl-card-img {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.6s ease;
+}
+
+.wl-card:hover .wl-card-img {
+  transform: scale(1.08);
+}
+
+/* Top Left Pill Badge */
+.wl-top-badge {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  background: #FFE2E5;
+  color: #E11D48;
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 0.3rem 0.75rem;
+  border-radius: 10px;
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+/* Floating Heart / Remove Button */
+.wl-wishlist-btn {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #FFFFFF;
+  border: none;
+  color: #E11D48;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.05rem;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.12);
+  transition: all 0.2s ease;
+  z-index: 5;
+  cursor: pointer;
+}
+
+.wl-wishlist-btn:hover {
+  background: #E11D48;
+  color: #FFFFFF;
+  transform: scale(1.1);
+}
+
+/* Card Body */
+.wl-card-body {
+  padding: 1.15rem;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  justify-content: space-between;
+}
+
+.wl-card-location {
+  font-size: 0.82rem;
+  color: #64748B;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+}
+
+.wl-card-rating {
+  font-size: 0.82rem;
+  color: #0F172A;
+}
+
+.wl-card-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #0F172A;
+  line-height: 1.35;
+  margin-top: 0.35rem;
+  margin-bottom: 0.4rem;
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.wl-card-specs {
+  font-size: 0.82rem;
+  color: #64748B;
+  font-weight: 500;
+  margin-bottom: 0.85rem;
+  display: flex;
+  align-items: center;
+}
+
+/* Highlight Box (Tiện nghi nổi bật) */
+.wl-feature-box {
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  border-radius: 12px;
+  padding: 0.65rem 0.85rem;
+  margin-bottom: 1rem;
+}
+
+.wl-feature-title {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #475569;
+  margin-bottom: 0.15rem;
+}
+
+.wl-feature-text {
+  font-size: 0.78rem;
+  color: #64748B;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Card Footer & Price */
+.wl-card-footer {
+  border-top: 1px solid #F1F5F9;
+  padding-top: 0.85rem;
+  margin-top: auto;
+}
+
+.wl-price-label {
+  font-size: 0.75rem;
+  color: #94A3B8;
+  font-weight: 500;
+}
+
+.wl-price-val {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: #15803D;
+  line-height: 1.2;
+}
+
+.wl-btn-book {
+  background: #15803D;
+  color: #FFFFFF;
+  border: none;
+  font-size: 0.85rem;
+  font-weight: 600;
+  border-radius: 50px;
+  padding: 0.5rem 1.25rem;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 10px rgba(21, 128, 61, 0.2);
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.wl-btn-book:hover {
+  background: #166534;
+  color: #FFFFFF;
+  box-shadow: 0 6px 16px rgba(21, 128, 61, 0.3);
+}
+
+/* Empty State Box */
+.wl-empty-card {
+  background: #FFFFFF;
+  border: 2px dashed var(--wl-border, #E2E8F0);
+  border-radius: 20px;
+  padding: 4rem 2rem;
+  text-align: center;
+}
+
+.wl-empty-icon {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: var(--wl-rose-soft, #FFE4E6);
+  color: var(--wl-rose, #E11D48);
+  font-size: 2.5rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 1.25rem;
+}
+
+/* Toast Container */
+.wl-toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  background: var(--wl-dark, #0F172A);
+  color: #FFFFFF;
+  padding: 0.85rem 1.35rem;
+  border-radius: 50px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  font-size: 0.88rem;
+  font-weight: 500;
+  z-index: 1080;
+  opacity: 0;
+  transform: translateY(20px);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  pointer-events: none;
+}
+
+.wl-toast.show {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
