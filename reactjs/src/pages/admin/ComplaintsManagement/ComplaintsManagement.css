@@ -1,0 +1,272 @@
+/* ==========================================================================
+   YÊN HOMESTAY ADMIN - COMPLAINTS & DISPUTE MANAGEMENT STYLESHEET
+   ========================================================================== */
+
+/* --- 1. Top Stat Cards Accents --- */
+.dispute-stat-icon-wrapper {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.dispute-stat-icon-wrapper.red {
+    background-color: #FEE2E2;
+    color: #DC2626;
+}
+
+.dispute-stat-icon-wrapper.amber {
+    background-color: #FEF3C7;
+    color: #D97706;
+}
+
+.dispute-stat-icon-wrapper.blue {
+    background-color: #EFF6FF;
+    color: #2563EB;
+}
+
+.dispute-stat-icon-wrapper.purple {
+    background-color: #F3E8FF;
+    color: #7C3AED;
+}
+
+.dispute-stat-icon-wrapper.green {
+    background-color: #F0FDF4;
+    color: #15803D;
+}
+
+.dispute-stat-icon-wrapper .material-symbols-outlined {
+    font-size: 26px;
+}
+
+/* --- 2. Dispute Direction Badges (Khách -> Homestay & Homestay -> Khách) --- */
+.dispute-direction-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 10px;
+    border-radius: 8px;
+    font-size: 11.5px;
+    font-weight: 700;
+    white-space: nowrap;
+    border: 1px solid transparent;
+}
+
+/* Chiều 1: Tourist khiếu nại Homestay */
+.dispute-direction-badge.tourist-to-homestay {
+    background: #EFF6FF;
+    color: #1E40AF;
+    border-color: #BFDBFE;
+}
+
+/* Chiều 2: Homestay khiếu nại Tourist */
+.dispute-direction-badge.homestay-to-tourist {
+    background: #FAF5FF;
+    color: #6B21A8;
+    border-color: #E9D5FF;
+}
+
+/* --- 3. Severity Priority Badges --- */
+.severity-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.severity-badge.urgent {
+    background: #FEE2E2;
+    color: #B91C1C;
+    border: 1px solid #FECACA;
+}
+
+.severity-badge.medium {
+    background: #FEF3C7;
+    color: #B45309;
+    border: 1px solid #FDE68A;
+}
+
+.severity-badge.low {
+    background: #F1F5F9;
+    color: #475569;
+    border: 1px solid #E2E8F0;
+}
+
+/* --- 4. Dispute Status Badges --- */
+.dispute-status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 11.5px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.dispute-status-badge.pending {
+    background: #FEF3C7;
+    color: #D97706;
+}
+
+.dispute-status-badge.investigating {
+    background: #DBEAFE;
+    color: #1D4ED8;
+}
+
+.dispute-status-badge.resolved {
+    background: #DCFCE7;
+    color: #15803D;
+}
+
+.dispute-status-badge.rejected {
+    background: #F1F5F9;
+    color: #64748B;
+}
+
+/* --- 5. Parties involved in dispute --- */
+.dispute-parties-box {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 12.5px;
+}
+
+.party-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.party-label {
+    font-size: 10.5px;
+    font-weight: 700;
+    padding: 1px 5px;
+    border-radius: 4px;
+    text-transform: uppercase;
+}
+
+.party-label.reporter {
+    background: #E0E7FF;
+    color: #3730A3;
+}
+
+.party-label.reported {
+    background: #FEE2E2;
+    color: #991B1B;
+}
+
+.dispute-code-highlight {
+    font-family: monospace;
+    font-weight: 800;
+    color: #15803D;
+    font-size: 13px;
+}
+
+/* --- 6. Evidence Thumbnail list --- */
+.evidence-gallery {
+    display: flex;
+    gap: 8px;
+    margin-top: 6px;
+}
+
+.evidence-thumb {
+    width: 54px;
+    height: 54px;
+    border-radius: 6px;
+    object-fit: cover;
+    border: 1px solid var(--border-color, #E2E8F0);
+    cursor: pointer;
+    transition: transform 0.2s ease;
+}
+
+.evidence-thumb:hover {
+    transform: scale(1.06);
+    border-color: var(--primary-color, #15803D);
+}
+
+/* --- 7. Modal Dispute Resolution View --- */
+.dispute-modal-grid {
+    display: grid;
+    grid-template-columns: 1.2fr 1fr;
+    gap: 20px;
+}
+
+.dispute-card-panel {
+    background: #FFFFFF;
+    border: 1px solid var(--border-color, #E2E8F0);
+    border-radius: 12px;
+    padding: 16px;
+}
+
+.dispute-card-panel.highlight-blue {
+    background: #F8FAFC;
+    border-left: 4px solid #2563EB;
+}
+
+.dispute-card-panel.highlight-purple {
+    background: #FDF4FF;
+    border-left: 4px solid #9333EA;
+}
+
+.dispute-card-panel.resolution-box {
+    background: #F0FDF4;
+    border: 1.5px solid #86EFAC;
+}
+
+/* Timeline */
+.dispute-timeline {
+    position: relative;
+    padding-left: 20px;
+    margin-top: 12px;
+}
+
+.dispute-timeline::before {
+    content: '';
+    position: absolute;
+    top: 4px;
+    bottom: 4px;
+    left: 6px;
+    width: 2px;
+    background: #E2E8F0;
+}
+
+.timeline-step {
+    position: relative;
+    margin-bottom: 14px;
+    font-size: 12.5px;
+}
+
+.timeline-dot {
+    position: absolute;
+    left: -20px;
+    top: 3px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #15803D;
+    border: 2px solid #FFFFFF;
+    box-shadow: 0 0 0 2px #15803D;
+}
+
+.timeline-dot.pending {
+    background: #D97706;
+    box-shadow: 0 0 0 2px #D97706;
+}
+
+.timeline-time {
+    font-size: 11px;
+    color: var(--text-muted, #64748B);
+}
+
+.timeline-desc {
+    font-weight: 600;
+    color: var(--text-main, #0F172A);
+}
