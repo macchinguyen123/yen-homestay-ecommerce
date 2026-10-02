@@ -8,6 +8,10 @@ import AdminLayout from '../layouts/AdminLayout';
 // Pages
 import HomestayDetail from '../pages/user/HomestayDetail/HomestayDetail';
 import OwnerDashboard from '../pages/owner/Dashboard/OwnerDashboard';
+import AddPackage from '../pages/owner/AddPackage/AddPackage';
+import ManageService from '../pages/owner/ManageService/ManageService';
+import ManageBooking from '../pages/owner/ManageBooking/ManageBooking';
+import ManageDiscount from '../pages/owner/ManageDiscount/ManageDiscount';
 import AdminDashboard from '../pages/admin/Dashboard/AdminDashboard';
 import ProtectedRoute from './ProtectedRoute';
 
@@ -24,6 +28,11 @@ export default function AppRoutes() {
       <Route element={<ProtectedRoute allowedRoles={['OWNER', 'ADMIN']} />}>
         <Route element={<OwnerLayout />}>
           <Route path="/owner/dashboard" element={<OwnerDashboard />} />
+          <Route path="/owner/services" element={<ManageService />} />
+          <Route path="/owner/bookings" element={<ManageBooking />} />
+          <Route path="/owner/discounts" element={<ManageDiscount />} />
+          <Route path="/owner/packages" element={<AddPackage />} />
+          <Route path="/owner/add-package" element={<AddPackage />} />
         </Route>
       </Route>
 
