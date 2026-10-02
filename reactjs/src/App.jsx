@@ -1,7 +1,12 @@
-import HomestayDetail from './pages/HomestayDetail/HomestayDetail'
+import { BrowserRouter } from 'react-router-dom';
+import AppRoutes from './routes/AppRoutes';
 
 function App() {
-  return <HomestayDetail />
+  return (
+    <BrowserRouter>
+      <AppRoutes />
+    </BrowserRouter>
+  );
 }
 
-export default App
+export default App;

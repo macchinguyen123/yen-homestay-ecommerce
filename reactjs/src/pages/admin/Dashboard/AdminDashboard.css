@@ -1,0 +1,40 @@
+.admin-dashboard .dashboard-header h1 {
+  color: #1E1B4B;
+}
+
+.admin-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.action-btn.approve {
+  background: #DCFCE7;
+  color: #15803D;
+}
+.action-btn.approve:hover {
+  background: #15803D;
+  color: #FFFFFF;
+}
+
+.action-btn.reject {
+  background: #FFE4E6;
+  color: #E11D48;
+}
+.action-btn.reject:hover {
+  background: #E11D48;
+  color: #FFFFFF;
+}
