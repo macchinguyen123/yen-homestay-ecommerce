@@ -5,9 +5,25 @@ import UserLayout from '../layouts/UserLayout';
 import OwnerLayout from '../layouts/OwnerLayout';
 import AdminLayout from '../layouts/AdminLayout';
 
-// Pages
+// User Pages
+import Homepage from '../pages/user/Homepage/Homepage';
 import HomestayDetail from '../pages/user/HomestayDetail/HomestayDetail';
+import BookingAndPay from '../pages/user/BookingAndPay/BookingAndPay';
+import Bookings from '../pages/user/Bookings/Bookings';
+import CompletePay from '../pages/user/CompletePay/CompletePay';
+import Login from '../pages/user/Login/Login';
+import Register from '../pages/user/Register/Register';
+import Notifications from '../pages/user/Notifications/Notifications';
+import PersonalAccount from '../pages/user/PersonalAccount/PersonalAccount';
+import Promotions from '../pages/user/Promotions/Promotions';
+import SearchResult from '../pages/user/SearchResult/SearchResult';
+import Support from '../pages/user/Support/Support';
+import Wishlist from '../pages/user/Wishlist/Wishlist';
+
+// Owner Pages
 import OwnerDashboard from '../pages/owner/Dashboard/OwnerDashboard';
+
+// Admin Pages
 import AdminDashboard from '../pages/admin/Dashboard/AdminDashboard';
 import AccountManagement from '../pages/admin/AccountManagement/AccountManagement';
 import AccountEdit from '../pages/admin/AccountEdit/AccountEdit';
@@ -19,15 +35,33 @@ import ManageHomestay from '../pages/admin/ManageHomestay/ManageHomestay';
 import ManageTransactions from '../pages/admin/ManageTransactions/ManageTransactions';
 import ReportsStatistics from '../pages/admin/ReportsStatistics/ReportsStatistics';
 import VoucherManagement from '../pages/admin/VoucherManagement/VoucherManagement';
+
 import ProtectedRoute from './ProtectedRoute';
 
 export default function AppRoutes() {
   return (
     <Routes>
-      {/* ── 1. KHU VỰC KHÁCH HÀNG (USER / PUBLIC) ── */}
+      {/* ── 0. TRANG ĐĂNG NHẬP / ĐĂNG KÝ (STANDALONE) ── */}
+      <Route path="/login" element={<Login />} />
+      <Route path="/register" element={<Register />} />
+
+      {/* ── 1. KHU VỰC KHÁCH HÀNG (USER / PUBLIC) ── */}
       <Route element={<UserLayout />}>
-        <Route path="/" element={<HomestayDetail />} />
+        <Route path="/" element={<Homepage />} />
+        <Route path="/homestay" element={<HomestayDetail />} />
         <Route path="/homestay/:id" element={<HomestayDetail />} />
+        <Route path="/booking" element={<BookingAndPay />} />
+        <Route path="/bookings" element={<Bookings />} />
+        <Route path="/complete-pay" element={<CompletePay />} />
+        <Route path="/booking/complete" element={<CompletePay />} />
+        <Route path="/notifications" element={<Notifications />} />
+        <Route path="/account" element={<PersonalAccount />} />
+        <Route path="/personal-account" element={<PersonalAccount />} />
+        <Route path="/promotions" element={<Promotions />} />
+        <Route path="/search" element={<SearchResult />} />
+        <Route path="/search-result" element={<SearchResult />} />
+        <Route path="/support" element={<Support />} />
+        <Route path="/wishlist" element={<Wishlist />} />
       </Route>
 
       {/* ── 2. KHU VỰC CHỦ HOMESTAY (OWNER / HOST) ── */}

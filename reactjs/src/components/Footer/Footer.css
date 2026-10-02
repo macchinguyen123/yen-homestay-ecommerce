@@ -1,0 +1,281 @@
+/* ==========================================================================
+   YÊN HOMESTAY - USER FOOTER (Footer.css)
+   ========================================================================== */
+
+.th-footer {
+  background-color: #15803D;
+  color: #f1f5f9;
+  font-family: 'Plus Jakarta Sans', 'Segoe UI', Roboto, sans-serif;
+  font-size: 15px;
+  line-height: 1.6;
+  padding-top: 60px;
+  box-sizing: border-box;
+  margin-top: auto;
+}
+
+.th-footer * {
+  box-sizing: border-box;
+}
+
+.th-footer-container {
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 0 24px 48px 24px;
+  display: grid;
+  grid-template-columns: 1.15fr 1.4fr 1.05fr 1.15fr;
+  gap: 32px;
+}
+
+/* CỘT 1 - BRAND */
+.th-col-brand .th-brand-logo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.th-footer-logo-brand {
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: #ffffff;
+  text-decoration: none;
+  letter-spacing: -0.5px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.th-footer-logo-brand span {
+  color: #fef08a;
+}
+
+.th-brand-desc {
+  color: #e2e8f0;
+  font-size: 13.5px;
+  margin: 0 0 20px 0;
+  line-height: 1.7;
+}
+
+/* HOTLINE */
+.th-hotline-box {
+  background: rgba(0, 0, 0, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 10px 14px;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  display: inline-block;
+}
+
+.th-hotline-label {
+  display: block;
+  font-size: 12px;
+  color: #d1d5db;
+}
+
+.th-hotline-number {
+  font-size: 18px;
+  font-weight: 700;
+  color: #fef08a;
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.th-hotline-number:hover {
+  text-decoration: underline;
+  color: #ffffff;
+}
+
+/* SOCIAL */
+.th-social-links {
+  display: flex;
+  gap: 14px;
+}
+
+.th-social-links a {
+  color: #e2e8f0;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.th-social-links a:hover {
+  color: #fef08a;
+}
+
+/* TITLE */
+.th-footer-title {
+  color: #ffffff;
+  font-size: 16px;
+  font-weight: 700;
+  margin: 0 0 20px 0;
+  position: relative;
+  padding-bottom: 10px;
+}
+
+.th-footer-title::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 32px;
+  height: 2px;
+  background-color: #fef08a;
+}
+
+/* MENU */
+.th-footer-menu {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.th-footer-menu li {
+  margin-bottom: 10px;
+}
+
+.th-footer-menu a {
+  display: inline-block;
+  color: #e2e8f0;
+  text-decoration: none;
+  font-size: 13.5px;
+  white-space: nowrap;
+  transition: color 0.2s ease, transform 0.2s ease;
+}
+
+.th-footer-menu a:hover {
+  color: #ffffff;
+  transform: translateX(4px);
+}
+
+/* THANH TOÁN & CAM KẾT */
+.th-pay-desc {
+  color: #e2e8f0;
+  font-size: 13.5px;
+  margin: 0 0 16px 0;
+  line-height: 1.65;
+}
+
+.th-payment-tags {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-bottom: 20px;
+  max-width: 250px;
+}
+
+.th-badge {
+  width: 100%;
+  height: 44px;
+  padding: 6px 10px;
+  background-color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: #0F172A;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.th-badge:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 5px 12px rgba(0, 0, 0, 0.18);
+}
+
+.th-pay-tag-vnpay { color: #005BAA; }
+.th-pay-tag-momo { color: #A50064; }
+.th-pay-tag-napas { color: #1E293B; }
+.th-pay-tag-card { color: #1A1F71; }
+
+.th-commitment-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #fef08a;
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.th-leaf-icon {
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+/* FOOTER BOTTOM */
+.th-footer-bottom {
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
+  padding: 20px 24px;
+  background-color: #0d5c2e;
+}
+
+.th-footer-bottom-inner {
+  max-width: 1240px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.th-copyright {
+  margin: 0;
+  font-size: 12.5px;
+  color: #cbd5e1;
+}
+
+.th-legal-links {
+  display: flex;
+  gap: 20px;
+}
+
+.th-legal-links a {
+  color: #cbd5e1;
+  text-decoration: none;
+  font-size: 12.5px;
+  transition: color 0.2s ease;
+}
+
+.th-legal-links a:hover {
+  color: #ffffff;
+}
+
+@media (max-width: 1024px) {
+  .th-footer-container {
+    grid-template-columns: 1fr 1fr;
+    gap: 36px 32px;
+  }
+}
+
+@media (max-width: 680px) {
+  .th-footer {
+    padding-top: 40px;
+  }
+  .th-footer-container {
+    grid-template-columns: 1fr;
+    gap: 32px;
+    padding: 0 20px 40px 20px;
+  }
+  .th-footer-menu a {
+    white-space: normal;
+  }
+  .th-payment-tags {
+    max-width: 260px;
+  }
+  .th-footer-bottom {
+    padding: 18px 20px;
+  }
+  .th-footer-bottom-inner {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .th-legal-links {
+    flex-wrap: wrap;
+    gap: 10px 18px;
+  }
+}
