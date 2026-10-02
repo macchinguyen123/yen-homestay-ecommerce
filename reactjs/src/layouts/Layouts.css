@@ -1,0 +1,203 @@
+/* ── USER LAYOUT ───────────────────────────────────── */
+.user-header {
+  background: #FFFFFF;
+  border-bottom: 1px solid #E2E8F0;
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+}
+
+.header-container {
+  width: 80%;
+  max-width: 80%;
+  margin: 0 auto;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+}
+
+.brand-logo {
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: #15803D;
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.brand-logo span {
+  color: #0F172A;
+  font-weight: 700;
+}
+
+.header-nav {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.nav-link {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #64748B;
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.nav-link:hover, .nav-link.active {
+  color: #15803D;
+}
+
+.nav-link.role-switch {
+  padding: 6px 14px;
+  border-radius: 9999px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.nav-link.role-switch.owner {
+  background: #FEF3C7;
+  color: #B45309;
+}
+
+.nav-link.role-switch.admin {
+  background: #EEF2FF;
+  color: #4338CA;
+}
+
+.user-footer {
+  background: #0F172A;
+  color: #94A3B8;
+  padding: 24px 0;
+  text-align: center;
+  font-size: 0.85rem;
+}
+
+/* ── ROLE LAYOUTS (OWNER & ADMIN) ─────────────────── */
+.role-layout {
+  display: flex;
+  min-height: 100vh;
+}
+
+.role-sidebar {
+  width: 260px;
+  background: #0F172A;
+  color: #FFFFFF;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+
+.sidebar-brand {
+  padding: 24px;
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: #4ADE80;
+  border-bottom: 1px solid #1E293B;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sidebar-brand span {
+  color: #FFFFFF;
+}
+
+.sidebar-menu {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+}
+
+.sidebar-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  color: #94A3B8;
+  text-decoration: none;
+  font-size: 0.9rem;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.sidebar-item:hover, .sidebar-item.active {
+  background: #1E293B;
+  color: #FFFFFF;
+}
+
+.sidebar-item.active {
+  color: #4ADE80;
+}
+
+.sidebar-footer {
+  padding: 16px;
+  border-top: 1px solid #1E293B;
+}
+
+.sidebar-item.switch-user {
+  background: #1E293B;
+  color: #E2E8F0;
+}
+
+.role-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.role-topbar {
+  height: 64px;
+  background: #FFFFFF;
+  border-bottom: 1px solid #E2E8F0;
+  padding: 0 28px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.topbar-title {
+  font-weight: 700;
+  color: #64748B;
+  font-size: 0.9rem;
+}
+
+.topbar-user {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #0F172A;
+}
+
+.topbar-user img {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.admin-badge {
+  background: #4338CA;
+  color: #FFFFFF;
+  padding: 4px 12px;
+  border-radius: 9999px;
+  font-size: 0.78rem;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.role-main {
+  flex: 1;
+}
