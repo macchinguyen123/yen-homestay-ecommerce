@@ -22,10 +22,16 @@ import Wishlist from '../pages/user/Wishlist/Wishlist';
 
 // Owner Pages
 import OwnerDashboard from '../pages/owner/Dashboard/OwnerDashboard';
-import AddPackage from '../pages/owner/AddPackage/AddPackage';
+import ManageHomestay from '../pages/owner/ManageHomestay/ManageHomestay';
+import ManageRoom from '../pages/owner/ManageRoom/ManageRoom';
 import ManageService from '../pages/owner/ManageService/ManageService';
 import ManageBooking from '../pages/owner/ManageBooking/ManageBooking';
+import ManageMission from '../pages/owner/ManageMission/ManageMission';
+import ManageReviews from '../pages/owner/ManageReviews/ManageReviews';
 import ManageDiscount from '../pages/owner/ManageDiscount/ManageDiscount';
+import ManageRevenue from '../pages/owner/ManageRevenue/ManageRevenue';
+import AddPackage from '../pages/owner/AddPackage/AddPackage';
+import Settings from '../pages/owner/Settings/Settings';
 
 // Admin Pages
 import AdminDashboard from '../pages/admin/Dashboard/AdminDashboard';
@@ -35,7 +41,7 @@ import AdsManagement from '../pages/admin/AdsManagement/AdsManagement';
 import ComplaintsManagement from '../pages/admin/ComplaintsManagement/ComplaintsManagement';
 import HomestayEdit from '../pages/admin/HomestayEdit/HomestayEdit';
 import LocalContent from '../pages/admin/LocalContent/LocalContent';
-import ManageHomestay from '../pages/admin/ManageHomestay/ManageHomestay';
+import AdminManageHomestay from '../pages/admin/ManageHomestay/ManageHomestay';
 import ManageTransactions from '../pages/admin/ManageTransactions/ManageTransactions';
 import ReportsStatistics from '../pages/admin/ReportsStatistics/ReportsStatistics';
 import VoucherManagement from '../pages/admin/VoucherManagement/VoucherManagement';
@@ -71,12 +77,21 @@ export default function AppRoutes() {
       {/* ── 2. KHU VỰC CHỦ HOMESTAY (OWNER / HOST) ── */}
       <Route element={<ProtectedRoute allowedRoles={['OWNER', 'ADMIN']} />}>
         <Route element={<OwnerLayout />}>
+          <Route path="/owner" element={<Navigate to="/owner/dashboard" replace />} />
           <Route path="/owner/dashboard" element={<OwnerDashboard />} />
+          <Route path="/owner/homestays" element={<ManageHomestay />} />
+          <Route path="/owner/homestay" element={<ManageHomestay />} />
+          <Route path="/owner/rooms" element={<ManageRoom />} />
+          <Route path="/owner/manage-room" element={<ManageRoom />} />
           <Route path="/owner/services" element={<ManageService />} />
           <Route path="/owner/bookings" element={<ManageBooking />} />
+          <Route path="/owner/missions" element={<ManageMission />} />
+          <Route path="/owner/reviews" element={<ManageReviews />} />
           <Route path="/owner/discounts" element={<ManageDiscount />} />
+          <Route path="/owner/revenue" element={<ManageRevenue />} />
           <Route path="/owner/packages" element={<AddPackage />} />
           <Route path="/owner/add-package" element={<AddPackage />} />
+          <Route path="/owner/settings" element={<Settings />} />
         </Route>
       </Route>
 
@@ -88,7 +103,7 @@ export default function AppRoutes() {
           <Route path="/admin/accounts/edit" element={<AccountEdit />} />
           <Route path="/admin/ads" element={<AdsManagement />} />
           <Route path="/admin/complaints" element={<ComplaintsManagement />} />
-          <Route path="/admin/homestays" element={<ManageHomestay />} />
+          <Route path="/admin/homestays" element={<AdminManageHomestay />} />
           <Route path="/admin/homestays/edit" element={<HomestayEdit />} />
           <Route path="/admin/local-content" element={<LocalContent />} />
           <Route path="/admin/transactions" element={<ManageTransactions />} />
