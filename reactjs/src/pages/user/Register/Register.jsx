@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { authService } from '../../../services/authService';
 import './Register.css';
+
+
 
 const PROVINCES_DATA = [
   { code: 'HN', name: 'Hà Nội', wards: ['Ba Đình', 'Hoàn Kiếm', 'Tây Hồ', 'Cầu Giấy', 'Đống Đa'] },
@@ -161,14 +164,29 @@ export default function Register() {
     }
   };
 
-  const handleConfirmOtp = () => {
+  const handleConfirmOtp = async () => {
     const code = otpDigits.join('');
     if (code.length < 6) {
       alert('Vui lòng nhập đủ 6 chữ số mã OTP!');
       return;
     }
-    setStep(3);
+
+    const payload = {
+      fullName: role === 'guest' ? guestForm.name : hostForm.name,
+      email: role === 'guest' ? guestForm.email : hostForm.email,
+      phoneNumber: role === 'guest' ? (guestForm.phoneCode + guestForm.phone) : (hostForm.phoneCode + hostForm.phone),
+      password: role === 'guest' ? guestForm.pwd : hostForm.pwd,
+      role: role === 'host' ? 'OWNER' : 'USER',
+    };
+
+    const res = await authService.register(payload);
+    if (res.success) {
+      setStep(3);
+    } else {
+      alert(res.message || 'Đăng ký thất bại. Vui lòng kiểm tra lại thông tin!');
+    }
   };
+
 
   const handleResendOtp = () => {
     setCountdown(60);

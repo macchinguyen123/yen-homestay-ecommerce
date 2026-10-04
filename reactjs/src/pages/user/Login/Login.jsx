@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { authService } from '../../../services/authService';
 import './Login.css';
+
 
 export default function Login() {
   const navigate = useNavigate();
@@ -11,15 +13,16 @@ export default function Login() {
 
   // Input fields
   const [username, setUsername] = useState('maichi.lehoang@gmail.com');
-  const [password, setPassword] = useState('••••••••••••');
+  const [password, setPassword] = useState('123456');
   const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   // Forgot password modal
   const [forgotModalOpen, setForgotModalOpen] = useState(false);
   const [resetInput, setResetInput] = useState('');
 
   // Toast notice
-  const [toast, setToast] = useState({ show: false, msg: '' });
+  const [toast, setToast] = useState({ show: false, msg: '', type: 'success' });
 
   useEffect(() => {
     const roleParam = searchParams.get('role');
@@ -30,45 +33,69 @@ export default function Login() {
     }
   }, [searchParams]);
 
-  const showToast = (msg) => {
-    setToast({ show: true, msg });
-    setTimeout(() => setToast({ show: false, msg: '' }), 2800);
+  const showToast = (msg, type = 'success') => {
+    setToast({ show: true, msg, type });
+    setTimeout(() => setToast({ show: false, msg: '', type: 'success' }), 3200);
   };
 
   const handleSwitchRole = (role) => {
     setActiveRole(role);
     if (role === 'owner') {
       setUsername('chuhoang.homestay@gmail.com');
+      setPassword('123456');
     } else {
       setUsername('maichi.lehoang@gmail.com');
+      setPassword('123456');
     }
   };
 
-  const handleLoginSubmit = (e) => {
+  const handleLoginSubmit = async (e) => {
     e.preventDefault();
     if (!username.trim() || !password.trim()) {
-      showToast('Vui lòng điền đầy đủ Email/SĐT và Mật khẩu!');
+      showToast('Vui lòng điền đầy đủ Email/SĐT và Mật khẩu!', 'error');
       return;
     }
 
-    try {
-      sessionStorage.setItem('isLoggedIn', 'true');
-      sessionStorage.setItem('userName', username);
-      sessionStorage.setItem('userRole', activeRole === 'owner' ? 'OWNER' : 'USER');
-    } catch (err) {}
+    setIsLoading(true);
+    const result = await authService.login({
+      username: username.trim(),
+      password: password,
+      role: activeRole,
+    });
+    setIsLoading(false);
 
-    showToast(`Đăng nhập thành công với vai trò ${activeRole === 'owner' ? 'Chủ Homestay' : 'Khách thuê'}!`);
+    if (result.success) {
+      showToast(result.message || 'Đăng nhập thành công!');
 
-    setTimeout(() => {
-      if (activeRole === 'owner') {
-        navigate('/owner/dashboard');
-      } else {
-        navigate('/');
-      }
-    }, 1200);
+      setTimeout(() => {
+        const userRole = result.user?.role || (activeRole === 'owner' ? 'OWNER' : 'USER');
+        if (userRole === 'OWNER') {
+          navigate('/owner/dashboard');
+        } else if (userRole === 'ADMIN') {
+          navigate('/admin/dashboard');
+        } else {
+          navigate('/');
+        }
+      }, 1200);
+    } else {
+      showToast(result.message || 'Đăng nhập không thành công!', 'error');
+    }
+  };
+
+
+  const handleTestDb = async () => {
+    setIsLoading(true);
+    const result = await authService.testDbConnection();
+    setIsLoading(false);
+    if (result.status === 'SUCCESS') {
+      showToast(`✅ Kết nối Supabase THÀNH CÔNG! DB: ${result.databaseName} (${result.totalUsersInDb} tài khoản)`);
+    } else {
+      showToast(`⚠️ Status: ${result.status} - ${result.message}`, 'error');
+    }
   };
 
   const handleResetSubmit = (e) => {
+
     e.preventDefault();
     if (!resetInput.trim()) {
       showToast('Vui lòng nhập Email hoặc SĐT đăng ký!');
@@ -122,7 +149,16 @@ export default function Login() {
           <div className="login-card-head">
             <h2>Đăng nhập tài khoản</h2>
             <p>Chào mừng bạn quay trở lại với Homestay Việt Nam</p>
+            <button
+              type="button"
+              className="btn btn-sm btn-outline-success mt-2"
+              onClick={handleTestDb}
+              style={{ fontSize: '0.78rem', borderRadius: 20, padding: '4px 12px' }}
+            >
+              <i className="bi bi-database-check me-1" /> Kiểm tra kết nối Supabase DB
+            </button>
           </div>
+
 
           {/* ROLE SWITCHER TABS */}
           <div className="role-tabs">
@@ -194,9 +230,13 @@ export default function Login() {
               </div>
             </div>
 
-            <button type="submit" className="btn-submit-login">
-              <span>Đăng nhập</span>
-              <i className="bi bi-arrow-right" />
+            <button type="submit" className="btn-submit-login" disabled={isLoading}>
+              <span>{isLoading ? 'Đang xử lý kết nối...' : 'Đăng nhập'}</span>
+              {isLoading ? (
+                <span className="spinner-border spinner-border-sm ms-2" role="status" aria-hidden="true"></span>
+              ) : (
+                <i className="bi bi-arrow-right" />
+              )}
             </button>
           </form>
 
@@ -308,10 +348,11 @@ export default function Login() {
       )}
 
       {/* Toast Notice */}
-      <div className={`toast-notice ${toast.show ? 'show' : ''}`}>
-        <i className="bi bi-check-circle-fill" />
+      <div className={`toast-notice ${toast.show ? 'show' : ''}`} style={toast.type === 'error' ? { background: '#FEF2F2', border: '1px solid #FECACA', color: '#991B1B' } : {}}>
+        <i className={`bi ${toast.type === 'error' ? 'bi-exclamation-triangle-fill' : 'bi-check-circle-fill'}`} style={toast.type === 'error' ? { color: '#DC2626' } : {}} />
         <span>{toast.msg}</span>
       </div>
     </div>
   );
 }
+
