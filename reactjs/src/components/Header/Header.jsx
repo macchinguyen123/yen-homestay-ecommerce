@@ -1,9 +1,23 @@
-import { useState } from 'react';
-import { NavLink, Link } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { NavLink, Link, useNavigate } from 'react-router-dom';
+import { authService } from '../../services/authService';
 import './Header.css';
 
 export default function Header() {
+  const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [user, setUser] = useState(null);
+
+  useEffect(() => {
+    setUser(authService.getCurrentUser());
+  }, []);
+
+  const handleLogout = () => {
+    authService.logout();
+    setUser(null);
+    closeMobileMenu();
+    navigate('/login');
+  };
 
   const toggleMobileMenu = () => {
     setMobileMenuOpen((prev) => !prev);
@@ -12,6 +26,7 @@ export default function Header() {
   const closeMobileMenu = () => {
     setMobileMenuOpen(false);
   };
+
 
   return (
     <header className="yen-header">
@@ -130,16 +145,32 @@ export default function Header() {
               </NavLink>
             </li>
 
-            <li className="yen-nav-item">
-              <NavLink
-                to="/login"
-                className={({ isActive }) => `yen-nav-link ${isActive ? 'active' : ''}`}
-                onClick={closeMobileMenu}
-              >
-                <i className="bi bi-person-circle nav-icon" />
-                <span>Đăng nhập</span>
-              </NavLink>
-            </li>
+            {user ? (
+              <li className="yen-nav-item">
+                <button
+                  type="button"
+                  className="yen-nav-link"
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#E11D48' }}
+                  onClick={handleLogout}
+                  title="Đăng xuất"
+                >
+                  <i className="bi bi-box-arrow-right nav-icon" />
+                  <span>Đăng xuất ({user.fullName?.split(' ')[0] || user.email})</span>
+                </button>
+              </li>
+            ) : (
+              <li className="yen-nav-item">
+                <NavLink
+                  to="/login"
+                  className={({ isActive }) => `yen-nav-link ${isActive ? 'active' : ''}`}
+                  onClick={closeMobileMenu}
+                >
+                  <i className="bi bi-person-circle nav-icon" />
+                  <span>Đăng nhập</span>
+                </NavLink>
+              </li>
+            )}
+
 
             <li className="yen-nav-item">
               <Link
