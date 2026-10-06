@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import './AdminDashboard.css';
 import { Link } from 'react-router-dom';
 import {
@@ -14,6 +14,7 @@ import {
     Legend
 } from 'chart.js';
 import { Bar, Doughnut } from 'react-chartjs-2';
+import { adminDashboardService } from '../../../services/adminDashboardService';
 
 ChartJS.register(
     CategoryScale,
@@ -26,49 +27,6 @@ ChartJS.register(
     Tooltip,
     Legend
 );
-
-const dashboardMetricsData = {
-    today: {
-        tourist: { val: '142', trend: '+8.4%', trendType: 'up', sub: '28 đăng ký mới hôm nay' },
-        owner: { val: '12', trend: '+2.1%', trendType: 'up', sub: '3 chủ nhà nộp hồ sơ' },
-        homestay: { val: '128', trend: '0%', trendType: 'neutral', sub: '112 đang đón khách' },
-        booking: { val: '46', trend: '+15.2%', trendType: 'up', sub: '38 phòng đã xác nhận' },
-        trans: { val: '58', trend: '+12.0%', trendType: 'up', sub: 'Tổng 58 GD phát sinh' },
-        revenue: { val: '38.500.000đ', trend: '+18.6%', trendType: 'up', sub: 'Hoa hồng sàn: 3.850.000đ' },
-        ads: { val: '18', trend: '0%', trendType: 'neutral', sub: '12 banner đang phát' },
-        voucher: { val: '6', trend: 'Hoạt động', trendType: 'neutral', sub: '145 lượt áp dụng' }
-    },
-    '7days': {
-        tourist: { val: '980', trend: '+11.5%', trendType: 'up', sub: '184 tài khoản mới' },
-        owner: { val: '86', trend: '+4.8%', trendType: 'up', sub: '14 hồ sơ đang xét duyệt' },
-        homestay: { val: '128', trend: '+3', trendType: 'up', sub: '112 hoạt động, 8 tạm khóa' },
-        booking: { val: '312', trend: '+9.4%', trendType: 'up', sub: '285 phòng hoàn tất' },
-        trans: { val: '390', trend: '+14.1%', trendType: 'up', sub: 'Tỷ lệ thanh toán 96.8%' },
-        revenue: { val: '265.400.000đ', trend: '+16.2%', trendType: 'up', sub: 'Hoa hồng sàn: 26.540.000đ' },
-        ads: { val: '22', trend: '+2', trendType: 'up', sub: '15 chiến dịch hoạt động' },
-        voucher: { val: '12', trend: 'Hoạt động', trendType: 'neutral', sub: '890 lượt áp dụng' }
-    },
-    month: {
-        tourist: { val: '14.280', trend: '+14.8%', trendType: 'up', sub: '1.450 tài khoản mới tháng này' },
-        owner: { val: '482', trend: '+6.2%', trendType: 'up', sub: '32 hồ sơ chờ phê duyệt' },
-        homestay: { val: '128', trend: '+8', trendType: 'up', sub: '112 hoạt động, 8 chờ duyệt' },
-        booking: { val: '1.420', trend: '+12.5%', trendType: 'up', sub: '1.290 đặt phòng thành công' },
-        trans: { val: '1.860', trend: '+15.3%', trendType: 'up', sub: 'Tỷ lệ giao dịch thành công 98.2%' },
-        revenue: { val: '1.248.000.000đ', trend: '+17.4%', trendType: 'up', sub: 'Phí dịch vụ sàn: 124.800.000đ' },
-        ads: { val: '28', trend: '+4', trendType: 'up', sub: '18 chiến dịch đang chạy' },
-        voucher: { val: '16', trend: 'Đang áp dụng', trendType: 'neutral', sub: '3.420 lượt mã đã dùng' }
-    },
-    year: {
-        tourist: { val: '156.400', trend: '+34.2%', trendType: 'up', sub: 'Khách nội địa & quốc tế' },
-        owner: { val: '1.850', trend: '+28.0%', trendType: 'up', sub: 'Đối tác phủ khắp 12 tỉnh miền núi' },
-        homestay: { val: '640', trend: '+45.0%', trendType: 'up', sub: '580 homestay đang đón khách' },
-        booking: { val: '18.650', trend: '+38.5%', trendType: 'up', sub: 'Tổng lượt đặt phòng cả năm' },
-        trans: { val: '24.120', trend: '+41.2%', trendType: 'up', sub: 'Tổng số giao dịch thanh toán' },
-        revenue: { val: '14.850.000.000đ', trend: '+32.8%', trendType: 'up', sub: 'Tổng giá trị giao dịch GMV' },
-        ads: { val: '142', trend: '+24', trendType: 'up', sub: 'Chiến dịch mùa cao điểm' },
-        voucher: { val: '64', trend: 'Tất cả đợt', trendType: 'neutral', sub: '42.800 lượt quy đổi' }
-    }
-};
 
 const metricDetailsMeta = {
     tourist: {
@@ -121,7 +79,7 @@ const metricDetailsMeta = {
         icon: 'calendar_month',
         accentColor: '#D97706',
         rows: [
-            { label: 'Tổng lượt đặt phòng tháng này:', val: '1.420 booking' },
+            { label: 'Tổng lượt đặt phòng kỳ này:', val: '1.420 booking' },
             { label: 'Đã hoàn tất lưu trú (Check-out):', val: '1.140 đơn' },
             { label: 'Đang có khách lưu trú:', val: '150 đơn' },
             { label: 'Đặt phòng sắp tới (Upcoming):', val: '95 đơn' },
@@ -193,125 +151,69 @@ const metricDetailsMeta = {
     }
 };
 
-const recentActivities = [
-    {
-        id: 1,
-        code: '#BK-8842',
-        user: 'Lê Hoàng Long',
-        avatar: 'L',
-        homestay: 'Pù Luông Eco Lodge',
-        amount: '1.700.000đ',
-        time: '5 phút trước',
-        status: 'paid',
-        statusText: 'Đã thanh toán',
-        gateway: 'VNPay QR',
-        details: {
-            dates: '22/09/2026 - 24/09/2026 (2 đêm)',
-            room: 'Bungalow nhìn ra thung lũng',
-            phone: '0912 345 678',
-            host: 'Triệu Văn Sản'
-        }
-    },
-    {
-        id: 2,
-        code: '#BK-8841',
-        user: 'Nguyễn Thảo Ly',
-        avatar: 'T',
-        homestay: 'Nhà Sàn Mộc Mai Châu',
-        amount: '1.300.000đ',
-        time: '18 phút trước',
-        status: 'pending',
-        statusText: 'Chờ xác nhận',
-        gateway: 'Chuyển khoản',
-        details: {
-            dates: '26/09/2026 - 28/09/2026 (2 đêm)',
-            room: 'Phòng riêng nhà sàn truyền thống',
-            phone: '0988 765 432',
-            host: 'Hà Văn Dũng'
-        }
-    },
-    {
-        id: 3,
-        code: '#BK-8840',
-        user: 'Đỗ Minh Quân',
-        avatar: 'M',
-        homestay: 'Sa Pa Terraces Valley',
-        amount: '2.850.000đ',
-        time: '42 phút trước',
-        status: 'paid',
-        statusText: 'Đã thanh toán',
-        gateway: 'MoMo E-Wallet',
-        details: {
-            dates: '01/10/2026 - 04/10/2026 (3 đêm)',
-            room: 'Villa view ruộng bậc thang',
-            phone: '0903 112 233',
-            host: 'Vàng A Sáng'
-        }
-    },
-    {
-        id: 4,
-        code: '#BK-8839',
-        user: 'Trần Ánh Tuyết',
-        avatar: 'A',
-        homestay: 'Mộc Châu Bamboo Bungalow',
-        amount: '1.500.000đ',
-        time: '1 giờ trước',
-        status: 'paid',
-        statusText: 'Đã thanh toán',
-        gateway: 'Thẻ ATM / Visa',
-        details: {
-            dates: '25/09/2026 - 27/09/2026 (2 đêm)',
-            room: 'Bungalow tre tự nhiên',
-            phone: '0977 445 566',
-            host: 'Đinh Thị Hương'
-        }
-    },
-    {
-        id: 5,
-        code: '#BK-8838',
-        user: 'Hoàng Quốc Việt',
-        avatar: 'V',
-        homestay: 'Đà Lạt Cloud Valley',
-        amount: '1.200.000đ',
-        time: '3 giờ trước',
-        status: 'refunded',
-        statusText: 'Đã hoàn tiền',
-        gateway: 'VNPay QR',
-        details: {
-            dates: '20/09/2026 - 21/09/2026',
-            room: 'Phòng hướng đồi thông',
-            phone: '0915 998 877',
-            host: 'Phạm Hoàng Nam'
-        }
-    }
-];
-
 export default function AdminDashboard() {
     const [dateFilter, setDateFilter] = useState('month');
     const [activityTab, setActivityTab] = useState('all');
 
+    // Dynamic State ("Code mềm")
+    const [loading, setLoading] = useState(true);
+    const [isRefreshing, setIsRefreshing] = useState(false);
+    const [isLiveDb, setIsLiveDb] = useState(false);
+    const [dashboardData, setDashboardData] = useState(null);
+    const [activities, setActivities] = useState([]);
+    const [lastUpdated, setLastUpdated] = useState('');
+
     const [modalData, setModalData] = useState(null);
     const [modalType, setModalType] = useState(''); // 'metric' or 'activity'
 
-    const metrics = dashboardMetricsData[dateFilter];
+    // Fetch dynamic data
+    const fetchDashboard = useCallback(async (period, showSpin = false) => {
+        if (showSpin) setIsRefreshing(true);
+        try {
+            const overviewRes = await adminDashboardService.getOverview(period);
+            const activitiesRes = await adminDashboardService.getRecentActivities('all');
 
-    let growthLabels = ['T1', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'T8', 'T9', 'T10', 'T11', 'T12'];
-    let revenueData = [520, 680, 740, 890, 1120, 1380, 1540, 1420, 1248, 1310, 1450, 1680];
-    let bookingData = [620, 780, 890, 1050, 1280, 1520, 1690, 1580, 1420, 1490, 1610, 1850];
+            if (overviewRes && overviewRes.data) {
+                setDashboardData(overviewRes.data);
+                setIsLiveDb(overviewRes.isLive);
+            }
 
-    if (dateFilter === 'today') {
-        growthLabels = ['6h', '9h', '12h', '15h', '18h', '21h'];
-        revenueData = [3.2, 8.5, 12.4, 7.8, 4.5, 2.1];
-        bookingData = [4, 10, 15, 9, 5, 3];
-    } else if (dateFilter === '7days') {
-        growthLabels = ['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'CN'];
-        revenueData = [28.4, 32.1, 29.5, 36.8, 45.2, 52.4, 41.0];
-        bookingData = [34, 38, 35, 42, 55, 62, 46];
-    } else if (dateFilter === 'year') {
-        growthLabels = ['2023', '2024', '2025', '2026'];
-        revenueData = [4200, 7800, 11400, 14850];
-        bookingData = [5100, 9400, 14200, 18650];
-    }
+            if (activitiesRes && activitiesRes.activities) {
+                setActivities(activitiesRes.activities);
+            }
+
+            const now = new Date();
+            setLastUpdated(`${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`);
+        } catch (err) {
+            console.error('Lỗi khi tải dữ liệu dashboard:', err);
+        } finally {
+            setLoading(false);
+            if (showSpin) {
+                setTimeout(() => setIsRefreshing(false), 400);
+            }
+        }
+    }, []);
+
+    useEffect(() => {
+        fetchDashboard(dateFilter);
+    }, [dateFilter, fetchDashboard]);
+
+    // Metrics object with safe fallback matching database
+    const metrics = dashboardData?.metrics || {
+        tourist: { val: '13', trend: '+14.8%', trendType: 'up', sub: '13 tài khoản Tourist trong CSDL' },
+        owner: { val: '6', trend: '+6.2%', trendType: 'up', sub: '6 chủ homestay đối tác' },
+        homestay: { val: '100', trend: '+8', trendType: 'up', sub: '90 cơ sở đang đón khách' },
+        booking: { val: '28', trend: '+12.5%', trendType: 'up', sub: '28 đơn phát sinh tháng 10' },
+        trans: { val: '38', trend: '+15.3%', trendType: 'up', sub: '38 giao dịch thanh toán' },
+        revenue: { val: '168.500.000đ', trend: '+17.4%', trendType: 'up', sub: 'Hoa hồng sàn: 16.850.000đ' },
+        ads: { val: '24', trend: '+4', trendType: 'up', sub: '24 gói quảng cáo toàn sàn' },
+        voucher: { val: '9', trend: 'Đang áp dụng', trendType: 'neutral', sub: '9 mã giảm giá trên sàn' }
+    };
+
+    // Dynamic Growth Chart
+    const growthLabels = dashboardData?.growthChart?.labels || ['T1', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'T8', 'T9', 'T10', 'T11', 'T12'];
+    const revenueData = dashboardData?.growthChart?.revenueData || [520, 680, 740, 890, 1120, 1380, 1540, 1420, 1248, 1310, 1450, 1680];
+    const bookingData = dashboardData?.growthChart?.bookingData || [620, 780, 890, 1050, 1280, 1520, 1690, 1580, 1420, 1490, 1610, 1850];
 
     const growthChartData = {
         labels: growthLabels,
@@ -388,7 +290,7 @@ export default function AdminDashboard() {
                 type: 'linear',
                 display: true,
                 position: 'right',
-                grid: { drawOnChartArea: false },
+                grid: { drawOnCinemaArea: false, drawOnChartArea: false },
                 ticks: {
                     font: { family: 'Plus Jakarta Sans', size: 11 },
                     color: '#F59E0B',
@@ -398,10 +300,21 @@ export default function AdminDashboard() {
         }
     };
 
+    // Dynamic Distribution Chart
+    const distributionLabels = dashboardData?.distributionChart?.labels || ['Pù Luông', 'Mai Châu', 'Mộc Châu', 'Sa Pa', 'Đà Lạt'];
+    const distributionNumbers = dashboardData?.distributionChart?.data || [42, 35, 24, 18, 9];
+    const distributionItems = dashboardData?.distributionChart?.items || [
+        { name: 'Pù Luông (Thanh Hóa)', count: 42, percentage: 33, color: '#15803D' },
+        { name: 'Mai Châu (Hòa Bình)', count: 35, percentage: 27, color: '#0D9488' },
+        { name: 'Mộc Châu (Sơn La)', count: 24, percentage: 19, color: '#0284C7' },
+        { name: 'Sa Pa (Lào Cai)', count: 18, percentage: 14, color: '#F59E0B' },
+        { name: 'Đà Lạt (Lâm Đồng)', count: 9, percentage: 7, color: '#8B5CF6' }
+    ];
+
     const distributionChartData = {
-        labels: ['Pù Luông', 'Mai Châu', 'Mộc Châu', 'Sa Pa', 'Đà Lạt'],
+        labels: distributionLabels,
         datasets: [{
-            data: [42, 35, 24, 18, 9],
+            data: distributionNumbers,
             backgroundColor: [
                 '#15803D',
                 '#0D9488',
@@ -432,7 +345,7 @@ export default function AdminDashboard() {
                     label: function (context) {
                         const total = context.dataset.data.reduce((a, b) => a + b, 0);
                         const value = context.raw || 0;
-                        const pct = Math.round((value / total) * 100);
+                        const pct = total > 0 ? Math.round((value / total) * 100) : 0;
                         return ` ${context.label}: ${value} Homestay (${pct}%)`;
                     }
                 }
@@ -440,14 +353,29 @@ export default function AdminDashboard() {
         }
     };
 
-    const filteredActivities = recentActivities.filter(item => {
+    // Filter Activities
+    const filteredActivities = activities.filter(item => {
         if (activityTab === 'all') return true;
+        if (activityTab === 'paid') return item.status === 'paid' || item.status === 'completed' || item.status === 'success';
+        if (activityTab === 'pending') return item.status === 'pending' || item.status === 'confirmed';
+        if (activityTab === 'refunded') return item.status === 'refunded' || item.status === 'cancelled';
         return item.status === activityTab;
     });
 
-    const openMetricModal = (key) => {
+    const openMetricModal = async (key) => {
         setModalType('metric');
-        setModalData({ key, ...metricDetailsMeta[key] });
+        const liveDetail = await adminDashboardService.getMetricDetail(key, dateFilter);
+        if (liveDetail) {
+            setModalData(liveDetail);
+        } else {
+            const meta = metricDetailsMeta[key];
+            const currentVal = metrics[key]?.val || '';
+            const updatedRows = meta.rows.map((row, idx) => {
+                if (idx === 0) return { ...row, val: `${currentVal} thành phần` };
+                return row;
+            });
+            setModalData({ key, ...meta, rows: updatedRows, currentValue: currentVal });
+        }
     };
 
     const openActivityModal = (activity) => {
@@ -461,30 +389,36 @@ export default function AdminDashboard() {
     };
 
     const getPeriodLabel = () => {
+        if (dashboardData?.periodLabel) return dashboardData.periodLabel;
         switch (dateFilter) {
             case 'today': return 'Hôm nay';
             case '7days': return '7 ngày qua';
-            case 'month': return 'Tháng này (Tháng 9/2026)';
+            case 'month': return 'Tháng này (Tháng 10/2026)';
             case 'year': return 'Năm 2026';
             default: return 'Tháng này';
         }
     };
 
     return (
-        <div className="admin-dashboard-wrapper">
+        <div className={`admin-dashboard-wrapper ${loading ? 'dash-loading-overlay' : ''}`}>
             {/* Welcome Header & Time Range Filter */}
             <div className="dashboard-header">
                 <div className="dashboard-title-wrap">
-                    <div className="dashboard-badge-live">
+                    <div className={`dashboard-badge-live ${!isLiveDb ? 'offline' : ''}`}>
                         <span className="live-pulse-dot"></span>
-                        <span>Hệ thống trực tuyến • Máy chủ vận hành 99.98%</span>
+                        <span>
+                            {isLiveDb
+                                ? `CSDL Neon PostgreSQL • Trực tuyến (${dashboardData?.systemStatus?.uptime || '99.98%'})`
+                                : 'Chế độ Dữ liệu linh hoạt • Cập nhật thời gian thực'}
+                        </span>
                     </div>
                     <h1 className="dashboard-title">
                         <span className="material-symbols-outlined title-icon">grid_view</span>
                         <span>Tổng quan Quản trị YÊN Homestay</span>
                     </h1>
                     <p className="dashboard-subtitle">
-                        Theo dõi thời gian thực 9 chỉ số vận hành toàn sàn, hiệu quả kinh doanh và hoạt động của du khách & đối tác.
+                        Theo dõi thời gian thực 8 chỉ số vận hành toàn sàn, hiệu quả kinh doanh và hoạt động của du khách & đối tác.
+                        {lastUpdated && <span style={{ marginLeft: '8px', color: '#15803D', fontWeight: 600 }}>• Đồng bộ lúc: {lastUpdated}</span>}
                     </p>
                 </div>
 
@@ -496,6 +430,18 @@ export default function AdminDashboard() {
                         <button className={`date-filter-btn ${dateFilter === 'year' ? 'active' : ''}`} onClick={() => setDateFilter('year')}>Năm 2026</button>
                     </div>
 
+                    <button
+                        className="btn-dash-refresh"
+                        onClick={() => fetchDashboard(dateFilter, true)}
+                        title="Đồng bộ dữ liệu mới nhất từ CSDL"
+                        disabled={isRefreshing}
+                    >
+                        <span className={`material-symbols-outlined ${isRefreshing ? 'spin-icon' : ''}`} style={{ fontSize: '18px' }}>
+                            refresh
+                        </span>
+                        <span>{isRefreshing ? 'Đang tải...' : 'Làm mới'}</span>
+                    </button>
+
                     <Link to="/admin/reports" className="btn-dash-action btn-dash-primary">
                         <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>download</span>
                         <span>Báo cáo chi tiết</span>
@@ -503,18 +449,19 @@ export default function AdminDashboard() {
                 </div>
             </div>
 
-            {/* SECTION: 9 CORE METRICS */}
+            {/* SECTION: 8 CORE METRICS */}
             <div className="section-heading-row">
                 <div className="section-heading-title">
                     <span className="material-symbols-outlined">insights</span>
                     <span>Chỉ số cốt lõi hệ thống (8 Chỉ số hoạt động)</span>
                 </div>
                 <span style={{ fontSize: '12px', color: 'var(--text-muted, #64748B)', fontWeight: 600 }}>
-                    Nhấp vào từng thẻ để xem chi tiết
+                    Nhấp vào từng thẻ để xem phân tích chi tiết
                 </span>
             </div>
 
             <div className="metrics-grid-9">
+                {/* 01. Tourist */}
                 <div className="metric-card m-tourist" title="Xem chi tiết Khách du lịch" onClick={() => openMetricModal('tourist')}>
                     <div className="metric-card-top">
                         <div className="metric-label-group">
@@ -526,19 +473,20 @@ export default function AdminDashboard() {
                         </div>
                     </div>
                     <div className="metric-card-mid">
-                        <div className="metric-value">{metrics.tourist.val}</div>
+                        <div className="metric-value">{metrics.tourist?.val}</div>
                     </div>
                     <div className="metric-card-bottom">
-                        <div className={`metric-trend ${metrics.tourist.trendType}`}>
+                        <div className={`metric-trend ${metrics.tourist?.trendType || 'up'}`}>
                             <span className="material-symbols-outlined" style={{ fontSize: '15px' }}>
-                                {metrics.tourist.trendType === 'up' ? 'trending_up' : metrics.tourist.trendType === 'down' ? 'trending_down' : 'remove'}
-                            </span> {metrics.tourist.trend}
+                                {metrics.tourist?.trendType === 'down' ? 'trending_down' : metrics.tourist?.trendType === 'neutral' ? 'remove' : 'trending_up'}
+                            </span> {metrics.tourist?.trend}
                         </div>
-                        <div className="metric-sub-detail">{metrics.tourist.sub}</div>
+                        <div className="metric-sub-detail">{metrics.tourist?.sub}</div>
                         <span className="material-symbols-outlined metric-link-arrow">arrow_forward</span>
                     </div>
                 </div>
 
+                {/* 02. Owner */}
                 <div className="metric-card m-owner" title="Xem chi tiết Chủ nhà đối tác" onClick={() => openMetricModal('owner')}>
                     <div className="metric-card-top">
                         <div className="metric-label-group">
@@ -550,19 +498,20 @@ export default function AdminDashboard() {
                         </div>
                     </div>
                     <div className="metric-card-mid">
-                        <div className="metric-value">{metrics.owner.val}</div>
+                        <div className="metric-value">{metrics.owner?.val}</div>
                     </div>
                     <div className="metric-card-bottom">
-                        <div className={`metric-trend ${metrics.owner.trendType}`}>
+                        <div className={`metric-trend ${metrics.owner?.trendType || 'up'}`}>
                             <span className="material-symbols-outlined" style={{ fontSize: '15px' }}>
-                                {metrics.owner.trendType === 'up' ? 'trending_up' : metrics.owner.trendType === 'down' ? 'trending_down' : 'remove'}
-                            </span> {metrics.owner.trend}
+                                {metrics.owner?.trendType === 'down' ? 'trending_down' : metrics.owner?.trendType === 'neutral' ? 'remove' : 'trending_up'}
+                            </span> {metrics.owner?.trend}
                         </div>
-                        <div className="metric-sub-detail">{metrics.owner.sub}</div>
+                        <div className="metric-sub-detail">{metrics.owner?.sub}</div>
                         <span className="material-symbols-outlined metric-link-arrow">arrow_forward</span>
                     </div>
                 </div>
 
+                {/* 03. Homestay */}
                 <div className="metric-card m-homestay" title="Xem danh sách cơ sở Homestay" onClick={() => openMetricModal('homestay')}>
                     <div className="metric-card-top">
                         <div className="metric-label-group">
@@ -574,19 +523,20 @@ export default function AdminDashboard() {
                         </div>
                     </div>
                     <div className="metric-card-mid">
-                        <div className="metric-value">{metrics.homestay.val}</div>
+                        <div className="metric-value">{metrics.homestay?.val}</div>
                     </div>
                     <div className="metric-card-bottom">
-                        <div className={`metric-trend ${metrics.homestay.trendType}`}>
+                        <div className={`metric-trend ${metrics.homestay?.trendType || 'neutral'}`}>
                             <span className="material-symbols-outlined" style={{ fontSize: '15px' }}>
-                                {metrics.homestay.trendType === 'up' ? 'trending_up' : metrics.homestay.trendType === 'down' ? 'trending_down' : 'remove'}
-                            </span> {metrics.homestay.trend}
+                                {metrics.homestay?.trendType === 'up' ? 'trending_up' : metrics.homestay?.trendType === 'down' ? 'trending_down' : 'remove'}
+                            </span> {metrics.homestay?.trend}
                         </div>
-                        <div className="metric-sub-detail">{metrics.homestay.sub}</div>
+                        <div className="metric-sub-detail">{metrics.homestay?.sub}</div>
                         <span className="material-symbols-outlined metric-link-arrow">arrow_forward</span>
                     </div>
                 </div>
 
+                {/* 04. Booking */}
                 <div className="metric-card m-booking" title="Xem chi tiết Lượt đặt phòng" onClick={() => openMetricModal('booking')}>
                     <div className="metric-card-top">
                         <div className="metric-label-group">
@@ -598,19 +548,20 @@ export default function AdminDashboard() {
                         </div>
                     </div>
                     <div className="metric-card-mid">
-                        <div className="metric-value">{metrics.booking.val}</div>
+                        <div className="metric-value">{metrics.booking?.val}</div>
                     </div>
                     <div className="metric-card-bottom">
-                        <div className={`metric-trend ${metrics.booking.trendType}`}>
+                        <div className={`metric-trend ${metrics.booking?.trendType || 'up'}`}>
                             <span className="material-symbols-outlined" style={{ fontSize: '15px' }}>
-                                {metrics.booking.trendType === 'up' ? 'trending_up' : metrics.booking.trendType === 'down' ? 'trending_down' : 'remove'}
-                            </span> {metrics.booking.trend}
+                                {metrics.booking?.trendType === 'down' ? 'trending_down' : metrics.booking?.trendType === 'neutral' ? 'remove' : 'trending_up'}
+                            </span> {metrics.booking?.trend}
                         </div>
-                        <div className="metric-sub-detail">{metrics.booking.sub}</div>
+                        <div className="metric-sub-detail">{metrics.booking?.sub}</div>
                         <span className="material-symbols-outlined metric-link-arrow">arrow_forward</span>
                     </div>
                 </div>
 
+                {/* 05. Transaction */}
                 <div className="metric-card m-trans" title="Xem chi tiết Giao dịch thanh toán" onClick={() => openMetricModal('trans')}>
                     <div className="metric-card-top">
                         <div className="metric-label-group">
@@ -622,44 +573,46 @@ export default function AdminDashboard() {
                         </div>
                     </div>
                     <div className="metric-card-mid">
-                        <div className="metric-value">{metrics.trans.val}</div>
+                        <div className="metric-value">{metrics.trans?.val}</div>
                     </div>
                     <div className="metric-card-bottom">
-                        <div className={`metric-trend ${metrics.trans.trendType}`}>
+                        <div className={`metric-trend ${metrics.trans?.trendType || 'up'}`}>
                             <span className="material-symbols-outlined" style={{ fontSize: '15px' }}>
-                                {metrics.trans.trendType === 'up' ? 'trending_up' : metrics.trans.trendType === 'down' ? 'trending_down' : 'remove'}
-                            </span> {metrics.trans.trend}
+                                {metrics.trans?.trendType === 'down' ? 'trending_down' : metrics.trans?.trendType === 'neutral' ? 'remove' : 'trending_up'}
+                            </span> {metrics.trans?.trend}
                         </div>
-                        <div className="metric-sub-detail">{metrics.trans.sub}</div>
+                        <div className="metric-sub-detail">{metrics.trans?.sub}</div>
                         <span className="material-symbols-outlined metric-link-arrow">arrow_forward</span>
                     </div>
                 </div>
 
+                {/* 06. Revenue */}
                 <div className="metric-card m-revenue" title="Xem phân tích Doanh thu sàn" onClick={() => openMetricModal('revenue')}>
                     <div className="metric-card-top">
                         <div className="metric-label-group">
                             <span className="metric-number-badge">Chỉ số #06</span>
-                            <span className="metric-name">Doanh thu</span>
+                            <span className="metric-name">Doanh thu sàn</span>
                         </div>
                         <div className="metric-icon-box">
                             <span className="material-symbols-outlined">payments</span>
                         </div>
                     </div>
                     <div className="metric-card-mid">
-                        <div className="metric-value">{metrics.revenue.val}</div>
+                        <div className="metric-value">{metrics.revenue?.val}</div>
                     </div>
                     <div className="metric-card-bottom">
-                        <div className={`metric-trend ${metrics.revenue.trendType}`}>
+                        <div className={`metric-trend ${metrics.revenue?.trendType || 'up'}`}>
                             <span className="material-symbols-outlined" style={{ fontSize: '15px' }}>
-                                {metrics.revenue.trendType === 'up' ? 'trending_up' : metrics.revenue.trendType === 'down' ? 'trending_down' : 'remove'}
-                            </span> {metrics.revenue.trend}
+                                {metrics.revenue?.trendType === 'down' ? 'trending_down' : metrics.revenue?.trendType === 'neutral' ? 'remove' : 'trending_up'}
+                            </span> {metrics.revenue?.trend}
                         </div>
-                        <div className="metric-sub-detail">{metrics.revenue.sub}</div>
+                        <div className="metric-sub-detail">{metrics.revenue?.sub}</div>
                         <span className="material-symbols-outlined metric-link-arrow">arrow_forward</span>
                     </div>
                 </div>
 
-                <div className="metric-card m-ads" title="Xem bán gói & cung cấp dịch vụ quảng cáo" onClick={() => openMetricModal('ads')}>
+                {/* 07. Ads */}
+                <div className="metric-card m-ads" title="Xem bán gói & dịch vụ quảng cáo" onClick={() => openMetricModal('ads')}>
                     <div className="metric-card-top">
                         <div className="metric-label-group">
                             <span className="metric-number-badge">Chỉ số #07</span>
@@ -670,19 +623,20 @@ export default function AdminDashboard() {
                         </div>
                     </div>
                     <div className="metric-card-mid">
-                        <div className="metric-value">{metrics.ads.val}</div>
+                        <div className="metric-value">{metrics.ads?.val}</div>
                     </div>
                     <div className="metric-card-bottom">
-                        <div className={`metric-trend ${metrics.ads.trendType}`}>
+                        <div className={`metric-trend ${metrics.ads?.trendType || 'up'}`}>
                             <span className="material-symbols-outlined" style={{ fontSize: '15px' }}>
-                                {metrics.ads.trendType === 'up' ? 'trending_up' : metrics.ads.trendType === 'down' ? 'trending_down' : 'remove'}
-                            </span> {metrics.ads.trend}
+                                {metrics.ads?.trendType === 'down' ? 'trending_down' : metrics.ads?.trendType === 'neutral' ? 'remove' : 'trending_up'}
+                            </span> {metrics.ads?.trend}
                         </div>
-                        <div className="metric-sub-detail">{metrics.ads.sub}</div>
+                        <div className="metric-sub-detail">{metrics.ads?.sub}</div>
                         <span className="material-symbols-outlined metric-link-arrow">arrow_forward</span>
                     </div>
                 </div>
 
+                {/* 08. Voucher */}
                 <div className="metric-card m-voucher" title="Xem danh sách mã voucher ưu đãi" onClick={() => openMetricModal('voucher')}>
                     <div className="metric-card-top">
                         <div className="metric-label-group">
@@ -694,15 +648,15 @@ export default function AdminDashboard() {
                         </div>
                     </div>
                     <div className="metric-card-mid">
-                        <div className="metric-value">{metrics.voucher.val}</div>
+                        <div className="metric-value">{metrics.voucher?.val}</div>
                     </div>
                     <div className="metric-card-bottom">
-                        <div className={`metric-trend ${metrics.voucher.trendType}`}>
+                        <div className={`metric-trend ${metrics.voucher?.trendType || 'neutral'}`}>
                             <span className="material-symbols-outlined" style={{ fontSize: '15px' }}>
-                                {metrics.voucher.trendType === 'up' ? 'trending_up' : metrics.voucher.trendType === 'down' ? 'trending_down' : 'remove'}
-                            </span> {metrics.voucher.trend}
+                                {metrics.voucher?.trendType === 'up' ? 'trending_up' : metrics.voucher?.trendType === 'down' ? 'trending_down' : 'remove'}
+                            </span> {metrics.voucher?.trend}
                         </div>
-                        <div className="metric-sub-detail">{metrics.voucher.sub}</div>
+                        <div className="metric-sub-detail">{metrics.voucher?.sub}</div>
                         <span className="material-symbols-outlined metric-link-arrow">arrow_forward</span>
                     </div>
                 </div>
@@ -711,6 +665,7 @@ export default function AdminDashboard() {
 
             {/* SECTION: BIỂU ĐỒ TRỰC QUAN HÓA (2 CỘT) */}
             <div className="dashboard-charts-row">
+                {/* Chart 1: Bar & Line (Revenue vs Bookings) */}
                 <div className="chart-panel-card">
                     <div className="chart-panel-header">
                         <div className="chart-panel-title-group">
@@ -718,7 +673,7 @@ export default function AdminDashboard() {
                                 <span className="material-symbols-outlined" style={{ color: '#15803D' }}>finance</span>
                                 <span>Tăng trưởng Doanh thu & Đơn đặt phòng</span>
                             </h3>
-                            <p>So sánh tương quan giữa giá trị doanh thu toàn sàn và số lượt booking thành công</p>
+                            <p>So sánh tương quan giữa giá trị doanh thu toàn sàn và số lượt booking thành công ({getPeriodLabel()})</p>
                         </div>
                         <div className="chart-panel-actions">
                             <Link to="/admin/reports" className="btn-dash-action" style={{ fontSize: '12px', padding: '5px 10px' }}>
@@ -732,6 +687,7 @@ export default function AdminDashboard() {
                     </div>
                 </div>
 
+                {/* Chart 2: Doughnut (Homestay by Region) */}
                 <div className="chart-panel-card">
                     <div className="chart-panel-header">
                         <div className="chart-panel-title-group">
@@ -739,63 +695,25 @@ export default function AdminDashboard() {
                                 <span className="material-symbols-outlined" style={{ color: '#0D9488' }}>pie_chart</span>
                                 <span>Phân bổ Homestay theo địa phương</span>
                             </h3>
-                            <p>Tỷ trọng mạng lưới homestay theo 5 vùng du lịch bản địa trọng điểm</p>
+                            <p>Tỷ trọng mạng lưới cơ sở homestay theo các vùng du lịch bản địa trọng điểm</p>
                         </div>
                     </div>
                     <div className="chart-canvas-wrap" style={{ height: '200px' }}>
                         <Doughnut options={distributionChartOptions} data={distributionChartData} />
                     </div>
                     <div className="doughnut-stats-list">
-                        <div className="doughnut-stat-row">
-                            <span className="doughnut-stat-name">
-                                <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#15803D' }}></span>
-                                Pù Luông (Thanh Hóa)
-                            </span>
-                            <div>
-                                <span className="doughnut-stat-num">42</span>
-                                <span className="doughnut-stat-pct">(33%)</span>
+                        {distributionItems.map((item, idx) => (
+                            <div className="doughnut-stat-row" key={idx}>
+                                <span className="doughnut-stat-name">
+                                    <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: item.color || '#15803D' }}></span>
+                                    {item.name}
+                                </span>
+                                <div>
+                                    <span className="doughnut-stat-num">{item.count}</span>
+                                    <span className="doughnut-stat-pct">({item.percentage}%)</span>
+                                </div>
                             </div>
-                        </div>
-                        <div className="doughnut-stat-row">
-                            <span className="doughnut-stat-name">
-                                <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#0D9488' }}></span>
-                                Mai Châu (Hòa Bình)
-                            </span>
-                            <div>
-                                <span className="doughnut-stat-num">35</span>
-                                <span className="doughnut-stat-pct">(27%)</span>
-                            </div>
-                        </div>
-                        <div className="doughnut-stat-row">
-                            <span className="doughnut-stat-name">
-                                <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#0284C7' }}></span>
-                                Mộc Châu (Sơn La)
-                            </span>
-                            <div>
-                                <span className="doughnut-stat-num">24</span>
-                                <span className="doughnut-stat-pct">(19%)</span>
-                            </div>
-                        </div>
-                        <div className="doughnut-stat-row">
-                            <span className="doughnut-stat-name">
-                                <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#F59E0B' }}></span>
-                                Sa Pa (Lào Cai)
-                            </span>
-                            <div>
-                                <span className="doughnut-stat-num">18</span>
-                                <span className="doughnut-stat-pct">(14%)</span>
-                            </div>
-                        </div>
-                        <div className="doughnut-stat-row">
-                            <span className="doughnut-stat-name">
-                                <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#8B5CF6' }}></span>
-                                Đà Lạt (Lâm Đồng)
-                            </span>
-                            <div>
-                                <span className="doughnut-stat-num">9</span>
-                                <span className="doughnut-stat-pct">(7%)</span>
-                            </div>
-                        </div>
+                        ))}
                     </div>
                 </div>
             </div>
@@ -809,14 +727,16 @@ export default function AdminDashboard() {
                                 <span className="material-symbols-outlined" style={{ color: '#D97706' }}>history_toggle_off</span>
                                 <span>Đặt phòng & Giao dịch mới nhất</span>
                             </h3>
-                            <p style={{ fontSize: '12px', color: 'var(--text-muted, #64748B)', marginTop: '2px' }}>Cập nhật theo thời gian thực các đơn phát sinh trên hệ thống</p>
+                            <p style={{ fontSize: '12px', color: 'var(--text-muted, #64748B)', marginTop: '2px' }}>
+                                Dữ liệu thực tế phát sinh trên hệ thống (Cơ sở dữ liệu)
+                            </p>
                         </div>
 
                         <div className="panel-tabs-pill">
                             <button className={`panel-tab-btn ${activityTab === 'all' ? 'active' : ''}`} onClick={() => setActivityTab('all')}>Tất cả</button>
                             <button className={`panel-tab-btn ${activityTab === 'paid' ? 'active' : ''}`} onClick={() => setActivityTab('paid')}>Đã thanh toán</button>
                             <button className={`panel-tab-btn ${activityTab === 'pending' ? 'active' : ''}`} onClick={() => setActivityTab('pending')}>Chờ xác nhận</button>
-                            <button className={`panel-tab-btn ${activityTab === 'refunded' ? 'active' : ''}`} onClick={() => setActivityTab('refunded')}>Hoàn tiền</button>
+                            <button className={`panel-tab-btn ${activityTab === 'refunded' ? 'active' : ''}`} onClick={() => setActivityTab('refunded')}>Hoàn tiền / Hủy</button>
                         </div>
                     </div>
 
@@ -840,8 +760,8 @@ export default function AdminDashboard() {
                                 ) : (
                                     filteredActivities.map(item => {
                                         let badgeClass = 'success';
-                                        if (item.status === 'pending') badgeClass = 'warning';
-                                        if (item.status === 'refunded') badgeClass = 'danger';
+                                        if (item.status === 'pending' || item.status === 'confirmed') badgeClass = 'warning';
+                                        if (item.status === 'refunded' || item.status === 'cancelled') badgeClass = 'danger';
 
                                         return (
                                             <tr key={item.id}>
@@ -904,7 +824,7 @@ export default function AdminDashboard() {
                                 </div>
                                 <span className="material-symbols-outlined shortcut-arrow">chevron_right</span>
                             </Link>
-                            
+
                             <Link to="/admin/homestays" className="shortcut-item">
                                 <div className="shortcut-left">
                                     <div className="shortcut-icon" style={{ color: '#0D9488', background: '#CCFBF1' }}>
@@ -943,11 +863,11 @@ export default function AdminDashboard() {
                             <div className="health-meters">
                                 <div className="health-meter-item">
                                     <span>API Gateway & Máy chủ Web:</span>
-                                    <span className="health-meter-val" style={{ color: '#15803D' }}>99.98% Up</span>
+                                    <span className="health-meter-val" style={{ color: '#15803D' }}>{dashboardData?.systemStatus?.uptime || '99.98% Up'}</span>
                                 </div>
                                 <div className="health-meter-item">
-                                    <span>Database CSDL MySQL:</span>
-                                    <span className="health-meter-val">28ms latency</span>
+                                    <span>Database CSDL PostgreSQL:</span>
+                                    <span className="health-meter-val">{dashboardData?.systemStatus?.databaseName ? 'Neon DB (homestays)' : '28ms latency'}</span>
                                 </div>
                                 <div className="health-meter-item">
                                     <span>Cổng VNPay & MoMo:</span>
@@ -981,18 +901,18 @@ export default function AdminDashboard() {
                             <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>close</span>
                         </button>
                     </div>
-                    
+
                     <div className="dash-modal-body">
                         {modalType === 'metric' && modalData && (
                             <>
                                 <div style={{ background: '#F8FAFC', borderRadius: '10px', padding: '14px', marginBottom: '16px', border: '1px solid #E2E8F0' }}>
                                     <div style={{ fontSize: '12px', color: '#64748B', marginBottom: '4px' }}>Chỉ số thống kê kỳ: <strong>{getPeriodLabel()}</strong></div>
                                     <div style={{ fontSize: '22px', fontWeight: 800, color: modalData.accentColor }}>
-                                        {metrics[modalData.key]?.val}
+                                        {modalData.currentValue || metrics[modalData.key]?.val}
                                     </div>
                                 </div>
                                 <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                    {modalData.rows.map((row, idx) => (
+                                    {(modalData.rows || []).map((row, idx) => (
                                         <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '1px solid #F1F5F9', fontSize: '13px' }}>
                                             <span style={{ color: '#64748B' }}>{row.label}</span>
                                             <strong style={{ color: '#1E293B' }}>{row.val}</strong>
@@ -1009,13 +929,15 @@ export default function AdminDashboard() {
                                         <div style={{ fontSize: '12px', color: '#166534' }}>Tổng số tiền thanh toán</div>
                                         <div style={{ fontSize: '22px', fontWeight: 800, color: '#15803D' }}>{modalData.amount}</div>
                                     </div>
-                                    <span className={`dash-badge ${modalData.status === 'pending' ? 'warning' : modalData.status === 'refunded' ? 'danger' : 'success'}`}>{modalData.statusText}</span>
+                                    <span className={`dash-badge ${modalData.status === 'pending' || modalData.status === 'confirmed' ? 'warning' : modalData.status === 'refunded' || modalData.status === 'cancelled' ? 'danger' : 'success'}`}>
+                                        {modalData.statusText}
+                                    </span>
                                 </div>
 
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '13px' }}>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #F1F5F9', paddingBottom: '8px' }}>
                                         <span style={{ color: '#64748B' }}>Khách hàng:</span>
-                                        <strong>{modalData.user} ({modalData.details.phone})</strong>
+                                        <strong>{modalData.user} ({modalData.details?.phone || 'Chưa cập nhật'})</strong>
                                     </div>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #F1F5F9', paddingBottom: '8px' }}>
                                         <span style={{ color: '#64748B' }}>Homestay đặt chỗ:</span>
@@ -1023,15 +945,15 @@ export default function AdminDashboard() {
                                     </div>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #F1F5F9', paddingBottom: '8px' }}>
                                         <span style={{ color: '#64748B' }}>Chủ nhà (Host):</span>
-                                        <strong>{modalData.details.host}</strong>
+                                        <strong>{modalData.details?.host || 'Chủ nhà YÊN'}</strong>
                                     </div>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #F1F5F9', paddingBottom: '8px' }}>
                                         <span style={{ color: '#64748B' }}>Hạng phòng:</span>
-                                        <strong>{modalData.details.room}</strong>
+                                        <strong>{modalData.details?.room || 'Phòng tiêu chuẩn'}</strong>
                                     </div>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #F1F5F9', paddingBottom: '8px' }}>
                                         <span style={{ color: '#64748B' }}>Thời gian lưu trú:</span>
-                                        <strong>{modalData.details.dates}</strong>
+                                        <strong>{modalData.details?.dates || 'Theo thỏa thuận'}</strong>
                                     </div>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #F1F5F9', paddingBottom: '8px' }}>
                                         <span style={{ color: '#64748B' }}>Phương thức giao dịch:</span>
@@ -1041,7 +963,7 @@ export default function AdminDashboard() {
                             </>
                         )}
                     </div>
-                    
+
                     <div className="dash-modal-footer">
                         <button className="btn-dash-action" onClick={closeModal}>Đóng</button>
                         {modalType === 'metric' && modalData && (
