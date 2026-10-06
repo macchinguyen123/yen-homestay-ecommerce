@@ -1,6 +1,8 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import "./PersonalAccount.css";
+import { userService } from "../../../services/userService";
+import { authService } from "../../../services/authService";
 
 const PROVINCES_DATA = [
   { code: "HN", name: "Hà Nội", wards: ["Ba Đình", "Hoàn Kiếm", "Tây Hồ", "Cầu Giấy"] },
@@ -156,17 +158,17 @@ export default function PersonalAccount() {
     nickname: "Mai Chi Homestay",
     cccd: "001203004005",
     dobDay: "18",
-    dobMonth: "8",
+    dobMonth: "08",
     dobYear: "1998",
     gender: "nu",
-    nationality: "VN",
+    nationality: "",
     street: "123 Đường Lê Lợi",
-    provinceCode: "DN",
-    ward: "Hải Châu",
+    provinceCode: "",
+    ward: "",
     taxCode: "0312345678",
     bizCode: "41A8012345",
     avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80",
-    phoneVerified: false,
+    phoneVerified: true,
     phone: "+84 912 345 678",
     email: "maichi.lehoang@gmail.com"
   });
@@ -235,29 +237,146 @@ export default function PersonalAccount() {
     }, 3500);
   };
 
+  // Loading & Saving States
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [pwdForm, setPwdForm] = useState({ currentPassword: "", newPassword: "", confirmPassword: "" });
+
+  // Load user profile from Spring Boot backend (Neon PostgreSQL)
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      setLoading(true);
+      const currentUser = authService.getCurrentUser();
+      const userId = currentUser?.id || 1; // Fallback to 1 if no logged in user in localStorage
+
+      const res = await userService.getUserProfile(userId);
+      if (res.success && res.data) {
+        setProfile((prev) => ({
+          ...prev,
+          fullName: res.data.fullName || prev.fullName,
+          nickname: res.data.nickname || "",
+          cccd: res.data.cccd || "",
+          dobDay: res.data.dobDay || "18",
+          dobMonth: res.data.dobMonth || "08",
+          dobYear: res.data.dobYear || "1998",
+          gender: res.data.gender || "nu",
+          nationality: res.data.nationality || "VN",
+          street: res.data.street || "",
+          provinceCode: res.data.provinceCode || "",
+          ward: res.data.ward || "",
+          taxCode: res.data.taxCode || "",
+          bizCode: res.data.bizCode || "",
+          avatar: res.data.avatar || prev.avatar,
+          phoneVerified: res.data.phoneVerified !== undefined ? res.data.phoneVerified : true,
+          phone: res.data.phoneNumber || prev.phone,
+          email: res.data.email || prev.email,
+        }));
+      }
+      setLoading(false);
+    };
+
+    fetchUserProfile();
+  }, []);
+
   // Handlers
-  const handleProfileSubmit = (e) => {
+  const handleProfileSubmit = async (e) => {
     e.preventDefault();
-    triggerToast("Cập nhật thông tin", "Thông tin cá nhân của bạn đã được lưu thành công!");
+    setSaving(true);
+    const currentUser = authService.getCurrentUser();
+    const userId = currentUser?.id || 1;
+
+    const payload = {
+      fullName: profile.fullName,
+      nickname: profile.nickname,
+      cccd: profile.cccd,
+      dobDay: profile.dobDay,
+      dobMonth: profile.dobMonth,
+      dobYear: profile.dobYear,
+      gender: profile.gender,
+      nationality: profile.nationality,
+      street: profile.street,
+      provinceCode: profile.provinceCode,
+      ward: profile.ward,
+      taxCode: profile.taxCode,
+      bizCode: profile.bizCode,
+      avatar: profile.avatar,
+      phoneNumber: profile.phone,
+      phoneVerified: profile.phoneVerified,
+    };
+
+    const res = await userService.updateUserProfile(userId, payload);
+    setSaving(false);
+
+    if (res.success) {
+      if (currentUser) {
+        const updatedUser = {
+          ...currentUser,
+          fullName: profile.fullName,
+          avatar: profile.avatar,
+          phoneNumber: profile.phone,
+        };
+        localStorage.setItem("user", JSON.stringify(updatedUser));
+        sessionStorage.setItem("userName", profile.fullName);
+      }
+      triggerToast("Cập nhật thông tin", "Thông tin cá nhân đã lưu thành công vào cơ sở dữ liệu Neon PostgreSQL!");
+    } else {
+      triggerToast("Lỗi kết nối", res.error || "Không thể lưu thông tin lên máy chủ!");
+    }
   };
 
-  const handleAvatarChange = (e) => {
+  const handleAvatarChange = async (e) => {
     const file = e.target.files[0];
     if (file) {
       const url = URL.createObjectURL(file);
       setProfile((prev) => ({ ...prev, avatar: url }));
+
+      const currentUser = authService.getCurrentUser();
+      const userId = currentUser?.id || 1;
+      await userService.updateUserProfile(userId, { avatar: url });
+
+      if (currentUser) {
+        localStorage.setItem("user", JSON.stringify({ ...currentUser, avatar: url }));
+      }
       triggerToast("Cập nhật ảnh", "Đã cập nhật ảnh đại diện mới thành công!");
     }
   };
 
-  const handlePhoneVerifySubmit = () => {
+  const handlePhoneVerifySubmit = async () => {
     if (otpInput.length === 6) {
-      setProfile((prev) => ({ ...prev, phoneVerified: true }));
+      const currentUser = authService.getCurrentUser();
+      const userId = currentUser?.id || 1;
+
+      const res = await userService.verifyPhone(userId, profile.phone);
+      if (res.success) {
+        setProfile((prev) => ({ ...prev, phoneVerified: true }));
+      }
       setShowPhoneModal(false);
       setOtpInput("");
       triggerToast("Xác minh sđt", "Số điện thoại đã được xác minh thành công!");
     } else {
       alert("Vui lòng nhập đủ 6 chữ số mã OTP!");
+    }
+  };
+
+  const handlePasswordSubmit = async () => {
+    if (!pwdForm.currentPassword || !pwdForm.newPassword) {
+      alert("Vui lòng điền đầy đủ mật khẩu hiện tại và mật khẩu mới!");
+      return;
+    }
+    if (pwdForm.newPassword !== pwdForm.confirmPassword) {
+      alert("Mật khẩu xác nhận không trùng khớp!");
+      return;
+    }
+    const currentUser = authService.getCurrentUser();
+    const userId = currentUser?.id || 1;
+
+    const res = await userService.changePassword(userId, pwdForm.currentPassword, pwdForm.newPassword);
+    if (res.success) {
+      setShowPwdModal(false);
+      setPwdForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
+      triggerToast("Đổi mật khẩu", res.message);
+    } else {
+      alert(res.message);
     }
   };
 
@@ -343,7 +462,7 @@ export default function PersonalAccount() {
   };
 
   // Filtered lists
-  const currentProvince = PROVINCES_DATA.find((p) => p.code === profile.provinceCode) || PROVINCES_DATA[1];
+  const currentProvince = PROVINCES_DATA.find((p) => p.code === profile.provinceCode);
 
   const filteredViewed = viewedList.filter((item) =>
     item.name.toLowerCase().includes(searchViewed.toLowerCase()) ||
@@ -351,95 +470,92 @@ export default function PersonalAccount() {
   );
 
   return (
-    <main class="container py-4 py-md-5">
+    <main className="container py-4 py-md-5">
+      {/* Header at top */}
+      <div className="account-header-box mb-4 mb-md-5">
+        <h1 className="h3 fw-bold text-dark tracking-tight mb-2">Tài khoản cá nhân</h1>
+        <p className="text-muted mb-0">Quản lý thông tin cá nhân và các hoạt động của bạn trên hệ thống Homestay Cộng đồng</p>
+      </div>
+
       {/* 2-Column Main Layout */}
-      <div className="row g-4">
+      <div className="account-page-grid">
         {/* 1. SIDEBAR BÊN TRÁI */}
-        <aside className="col-lg-3">
+        <aside className="account-sidebar-wrapper">
           <div className="account-sidebar-card">
             <div className="sidebar-title">
               <span className="sidebar-title-dot"></span>
               Quản lý tài khoản
             </div>
 
-            <nav className="d-flex flex-column">
+            <nav className="sidebar-nav-container">
               <button
+                type="button"
                 className={`account-nav-item ${activeTab === "tab-profile" ? "active" : ""}`}
                 onClick={() => setActiveTab("tab-profile")}
               >
-                <i className="bi bi-person-fill"></i>
-                <span className="text-truncate">Thông tin cá nhân</span>
+                <i className="bi bi-person-fill nav-item-icon"></i>
+                <span className="nav-item-label">Thông tin cá nhân</span>
               </button>
 
               <button
+                type="button"
                 className={`account-nav-item ${activeTab === "tab-viewed" ? "active" : ""}`}
                 onClick={() => setActiveTab("tab-viewed")}
               >
-                <i className="bi bi-eye-fill text-info"></i>
-                <span className="text-truncate">Sản phẩm bạn đã xem</span>
+                <i className="bi bi-eye-fill nav-item-icon"></i>
+                <span className="nav-item-label">Sản phẩm bạn đã xem</span>
               </button>
 
               <button
+                type="button"
                 className={`account-nav-item ${activeTab === "tab-vouchers" ? "active" : ""}`}
                 onClick={() => setActiveTab("tab-vouchers")}
               >
-                <i className="bi bi-ticket-perforated-fill text-success"></i>
-                <span className="text-truncate">Mã giảm giá</span>
+                <i className="bi bi-ticket-perforated-fill nav-item-icon"></i>
+                <span className="nav-item-label">Mã giảm giá</span>
                 <span className="voucher-badge">{vouchers.length}</span>
               </button>
 
               <button
+                type="button"
                 className={`account-nav-item ${activeTab === "tab-transactions" ? "active" : ""}`}
                 onClick={() => setActiveTab("tab-transactions")}
               >
-                <i className="bi bi-receipt"></i>
-                <span className="text-truncate">Danh sách giao dịch</span>
+                <i className="bi bi-card-list nav-item-icon"></i>
+                <span className="nav-item-label">Danh sách giao dịch</span>
               </button>
-
-              <button
-                className={`account-nav-item ${activeTab === "tab-cashback" ? "active" : ""}`}
-                onClick={() => setActiveTab("tab-cashback")}
-              >
-                <i className="bi bi-cash-coin text-success"></i>
-                <span className="text-truncate">Hoàn tiền</span>
-              </button>
-
-              <hr className="my-2 text-secondary opacity-25" />
 
               <button
                 type="button"
-                className="account-nav-item logout-item border-0 bg-transparent text-start w-100"
+                className={`account-nav-item ${activeTab === "tab-cashback" ? "active" : ""}`}
+                onClick={() => setActiveTab("tab-cashback")}
+              >
+                <i className="bi bi-cash-coin nav-item-icon"></i>
+                <span className="nav-item-label">Hoàn tiền</span>
+              </button>
+
+              <div className="sidebar-divider"></div>
+
+              <button
+                type="button"
+                className="account-nav-item logout-item"
                 onClick={() => setShowLogoutModal(true)}
               >
-                <i className="bi bi-box-arrow-right"></i>
-                <span className="text-truncate">Đăng xuất</span>
+                <i className="bi bi-box-arrow-right nav-item-icon"></i>
+                <span className="nav-item-label">Đăng xuất</span>
               </button>
             </nav>
-          </div>
-
-          <div className="promo-sidebar-card shadow-sm">
-            <h6><i className="bi bi-tree-fill me-1"></i>YÊN Homestay Plus</h6>
-            <p>Tích lũy 5% hoàn tiền cho mỗi chuyến đi trải nghiệm văn hóa bản địa Việt Nam.</p>
-            <Link to="/promotions" className="text-success text-xs fw-bold text-decoration-none">
-              Khám phá thêm ưu đãi &rarr;
-            </Link>
           </div>
         </aside>
 
         {/* 2. KHU VỰC NỘI DUNG BÊN PHẢI */}
-        <section className="col-lg-9">
-          {/* Header */}
-          <div className="mb-4">
-            <h1 className="h3 fw-bold text-dark tracking-tight mb-1">Tài khoản cá nhân</h1>
-            <p className="text-muted mb-0">Quản lý thông tin cá nhân và các hoạt động của bạn trên hệ thống Homestay Cộng đồng</p>
-          </div>
-
+        <section className="account-content-wrapper">
           {/* TAB 1: THÔNG TIN CÁ NHÂN */}
           {activeTab === "tab-profile" && (
             <div className="animate-fade-in">
               <div className="eco-card">
                 <div className="eco-card-title">
-                  <span><i className="bi bi-person-lines-fill text-success me-2"></i>Thông tin cá nhân</span>
+                  <span><i className="bi bi-person-fill text-success me-2"></i>Thông tin cá nhân</span>
                 </div>
 
                 <div className="row g-4 align-items-start">
@@ -454,15 +570,15 @@ export default function PersonalAccount() {
                         type="file"
                         id="avatarFileInput"
                         accept="image/png, image/jpeg"
-                        className="d-none"
+                        style={{ display: "none" }}
                         onChange={handleAvatarChange}
                       />
                     </div>
                     <div>
                       <span className="badge-member mb-2">
-                        <i className="bi bi-patch-check-fill"></i> Thành viên thân thiết
+                        <i className="bi bi-check-circle-fill text-success me-1"></i> Thành viên thân thiết
                       </span>
-                      <p className="text-muted text-xs mb-0">Dung lượng tối đa 5MB<br />Định dạng: .JPEG, .PNG</p>
+                      <p className="text-muted text-xs mb-0 mt-2">Dung lượng tối đa 5MB<br />Định dạng: .JPEG, .PNG</p>
                     </div>
                   </div>
 
@@ -531,7 +647,7 @@ export default function PersonalAccount() {
                                   value={profile.dobDay}
                                   onChange={(e) => setProfile({ ...profile, dobDay: e.target.value })}
                                 >
-                                  {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
+                                  {Array.from({ length: 31 }, (_, i) => (i + 1).toString().padStart(2, "0")).map((d) => (
                                     <option key={d} value={d}>{d}</option>
                                   ))}
                                 </select>
@@ -542,8 +658,8 @@ export default function PersonalAccount() {
                                   value={profile.dobMonth}
                                   onChange={(e) => setProfile({ ...profile, dobMonth: e.target.value })}
                                 >
-                                  {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
-                                    <option key={m} value={m}>Tháng {m < 10 ? `0${m}` : m}</option>
+                                  {Array.from({ length: 12 }, (_, i) => (i + 1).toString().padStart(2, "0")).map((m) => (
+                                    <option key={m} value={m}>Tháng {m}</option>
                                   ))}
                                 </select>
                               </div>
@@ -554,7 +670,7 @@ export default function PersonalAccount() {
                                   onChange={(e) => setProfile({ ...profile, dobYear: e.target.value })}
                                 >
                                   {Array.from({ length: 60 }, (_, i) => 2005 - i).map((y) => (
-                                    <option key={y} value={y}>{y}</option>
+                                    <option key={y} value={y.toString()}>{y}</option>
                                   ))}
                                 </select>
                               </div>
@@ -569,9 +685,9 @@ export default function PersonalAccount() {
                           <label className="col-sm-3 form-label-custom mb-1 mb-sm-0">Giới tính</label>
                           <div className="col-sm-9">
                             <div className="d-flex align-items-center gap-4 pt-1">
-                              <div className="form-check">
+                              <div className="form-check custom-radio-item">
                                 <input
-                                  className="form-check-input text-success"
+                                  className="form-check-input custom-radio-input"
                                   type="radio"
                                   name="gender"
                                   id="genderMale"
@@ -579,11 +695,11 @@ export default function PersonalAccount() {
                                   checked={profile.gender === "nam"}
                                   onChange={(e) => setProfile({ ...profile, gender: e.target.value })}
                                 />
-                                <label className="form-check-label text-sm text-secondary" htmlFor="genderMale">Nam</label>
+                                <label className="form-check-label text-sm text-secondary ms-1" htmlFor="genderMale">Nam</label>
                               </div>
-                              <div className="form-check">
+                              <div className="form-check custom-radio-item">
                                 <input
-                                  className="form-check-input text-success"
+                                  className="form-check-input custom-radio-input"
                                   type="radio"
                                   name="gender"
                                   id="genderFemale"
@@ -591,11 +707,11 @@ export default function PersonalAccount() {
                                   checked={profile.gender === "nu"}
                                   onChange={(e) => setProfile({ ...profile, gender: e.target.value })}
                                 />
-                                <label className="form-check-label text-sm text-secondary" htmlFor="genderFemale">Nữ</label>
+                                <label className="form-check-label text-sm text-secondary ms-1" htmlFor="genderFemale">Nữ</label>
                               </div>
-                              <div className="form-check">
+                              <div className="form-check custom-radio-item">
                                 <input
-                                  className="form-check-input text-success"
+                                  className="form-check-input custom-radio-input"
                                   type="radio"
                                   name="gender"
                                   id="genderOther"
@@ -603,7 +719,7 @@ export default function PersonalAccount() {
                                   checked={profile.gender === "khac"}
                                   onChange={(e) => setProfile({ ...profile, gender: e.target.value })}
                                 />
-                                <label className="form-check-label text-sm text-secondary" htmlFor="genderOther">Khác</label>
+                                <label className="form-check-label text-sm text-secondary ms-1" htmlFor="genderOther">Khác</label>
                               </div>
                             </div>
                           </div>
@@ -620,6 +736,7 @@ export default function PersonalAccount() {
                               value={profile.nationality}
                               onChange={(e) => setProfile({ ...profile, nationality: e.target.value })}
                             >
+                              <option value="">-- Chọn Quốc tịch --</option>
                               <option value="VN">Việt Nam</option>
                               <option value="US">Mỹ (United States)</option>
                               <option value="JP">Nhật Bản (Japan)</option>
@@ -630,10 +747,10 @@ export default function PersonalAccount() {
                         </div>
                       </div>
 
-                      {/* Địa chỉ 2 cấp */}
+                      {/* Địa chỉ */}
                       <div className="col-12">
                         <div className="row align-items-start">
-                          <label className="col-sm-3 form-label-custom mb-1 mb-sm-0 pt-1">Địa chỉ</label>
+                          <label className="col-sm-3 form-label-custom mb-1 mb-sm-0 pt-2">Địa chỉ</label>
                           <div className="col-sm-9">
                             <input
                               type="text"
@@ -657,6 +774,7 @@ export default function PersonalAccount() {
                                     });
                                   }}
                                 >
+                                  <option value="">-- Chọn Tỉnh / Thành phố --</option>
                                   {PROVINCES_DATA.map((p) => (
                                     <option key={p.code} value={p.code}>{p.name}</option>
                                   ))}
@@ -668,7 +786,8 @@ export default function PersonalAccount() {
                                   value={profile.ward}
                                   onChange={(e) => setProfile({ ...profile, ward: e.target.value })}
                                 >
-                                  {currentProvince.wards.map((w) => (
+                                  <option value="">-- Chọn Phường / Xã --</option>
+                                  {currentProvince?.wards?.map((w) => (
                                     <option key={w} value={w}>{w}</option>
                                   ))}
                                 </select>
@@ -678,42 +797,21 @@ export default function PersonalAccount() {
                         </div>
                       </div>
 
-                      {/* Thuế & ĐKKD */}
-                      <div className="col-12">
-                        <div className="row align-items-start">
-                          <label className="col-sm-3 form-label-custom mb-1 mb-sm-0 pt-1">Thuế &amp; ĐKKD</label>
-                          <div className="col-sm-9">
-                            <div className="row g-2">
-                              <div className="col-6">
-                                <input
-                                  type="text"
-                                  className="form-control form-control-custom"
-                                  placeholder="Mã số thuế (MST)"
-                                  value={profile.taxCode}
-                                  onChange={(e) => setProfile({ ...profile, taxCode: e.target.value })}
-                                />
-                              </div>
-                              <div className="col-6">
-                                <input
-                                  type="text"
-                                  className="form-control form-control-custom"
-                                  placeholder="Số Giấy phép ĐKKD"
-                                  value={profile.bizCode}
-                                  onChange={(e) => setProfile({ ...profile, bizCode: e.target.value })}
-                                />
-                              </div>
-                            </div>
-                            <small className="text-muted text-xs d-block mt-1">Thông tin pháp lý dành cho cơ sở kinh doanh Homestay</small>
-                          </div>
-                        </div>
-                      </div>
-
                       {/* Save Button */}
-                      <div className="col-12 pt-2">
+                      <div className="col-12 pt-3">
                         <div className="row">
                           <div className="col-sm-9 offset-sm-3">
-                            <button type="submit" className="btn btn-eco-save d-inline-flex align-items-center gap-2">
-                              <i className="bi bi-floppy-fill"></i> Lưu thay đổi
+                            <button type="submit" className="btn btn-eco-save d-inline-flex align-items-center gap-2" disabled={saving}>
+                              {saving ? (
+                                <>
+                                  <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                                  Đang lưu...
+                                </>
+                              ) : (
+                                <>
+                                  <i className="bi bi-floppy-fill"></i> Lưu thay đổi
+                                </>
+                              )}
                             </button>
                           </div>
                         </div>
@@ -884,38 +982,52 @@ export default function PersonalAccount() {
                   <div className="row g-3">
                     {filteredViewed.map((item) => (
                       <div key={item.id} className="col-md-6 col-lg-4">
-                        <div className="homestay-card h-100 border rounded-3 overflow-hidden shadow-sm d-flex flex-column bg-white">
-                          <div className="position-relative" style={{ height: "160px" }}>
-                            <span className="position-absolute top-2 start-2 badge bg-dark bg-opacity-75 text-white text-xs z-2">
+                        <div className="homestay-card h-100">
+                          <div className="card-img-wrapper">
+                            <span className="card-top-tag">
                               <i className="bi bi-eye me-1"></i> {item.timeAgo}
                             </span>
                             <button
-                              className="position-absolute top-2 end-2 btn btn-light rounded-circle p-1 d-flex align-items-center justify-content-center z-2 border"
-                              style={{ width: "32px", height: "32px" }}
+                              type="button"
+                              className={`card-wishlist-btn ${item.isFav ? "active" : ""}`}
                               onClick={() => toggleWishlist(item.id)}
+                              title="Yêu thích"
                             >
                               <i className={`bi ${item.isFav ? "bi-heart-fill text-danger" : "bi-heart"}`}></i>
                             </button>
-                            <img src={item.img} alt={item.name} className="w-100 h-100 object-fit-cover" />
+                            <img src={item.img} alt={item.name} />
                           </div>
 
-                          <div className="p-3 d-flex flex-column flex-grow-1">
-                            <div className="d-flex align-items-center justify-content-between text-xs text-muted mb-1">
-                              <span><i className="bi bi-geo-alt-fill text-success me-1"></i>{item.location}</span>
-                              <span className="text-dark fw-bold"><i className="bi bi-star-fill text-warning me-1"></i>{item.rating} ({item.reviews})</span>
+                          <div className="card-body">
+                            <div className="card-location-rating">
+                              <span className="card-location">
+                                <i className="bi bi-geo-alt-fill text-success me-1"></i> {item.location}
+                              </span>
+                              <span className="card-rating">
+                                <i className="bi bi-star-fill text-warning me-1"></i> {item.rating}{" "}
+                                <span className="review-count">({item.reviews})</span>
+                              </span>
                             </div>
 
-                            <h3 className="h6 fw-bold text-dark mb-1 text-truncate" title={item.name}>
-                              <Link to="/homestay-detail" className="text-dark text-decoration-none">{item.name}</Link>
+                            <h3 className="card-title">
+                              <Link to="/homestay-detail">{item.name}</Link>
                             </h3>
-                            <p className="text-xs text-muted mb-2">{item.specs}</p>
 
-                            <div className="mt-auto pt-2 border-top d-flex align-items-center justify-content-between">
-                              <div>
-                                <span className="text-xs text-muted d-block">Giá từ:</span>
-                                <strong className="text-success fs-6">{item.price}</strong>
+                            <div className="card-specs">
+                              <span>{item.specs}</span>
+                            </div>
+
+                            <div className="card-amenities-box">
+                              <span className="amenities-label">Tiện nghi nổi bật:</span>
+                              <p className="amenities-items">{item.amenities}</p>
+                            </div>
+
+                            <div className="card-footer-row">
+                              <div className="card-price-group">
+                                <span className="price-label">Giá từ:</span>
+                                <span className="card-price">{item.price}</span>
                               </div>
-                              <Link to="/homestay-detail" className="btn btn-sm btn-eco-save rounded-pill px-3">
+                              <Link to="/homestay-detail" className="btn-view-room">
                                 Đặt ngay
                               </Link>
                             </div>
@@ -970,41 +1082,46 @@ export default function PersonalAccount() {
                 <div className="row g-3">
                   {vouchers.map((v) => (
                     <div key={v.id} className="col-md-6 col-lg-4">
-                      <div className="nearby-card compact-card h-100">
-                        <div className="nearby-img-box compact-img-box">
-                          <span className={`nearby-tag ${v.tagClass}`}>{v.tag}</span>
-                          <button className="nearby-heart-btn text-danger" title="Lưu voucher">
+                      <div className="voucher-card-item h-100">
+                        <div className="voucher-card-img-wrapper">
+                          <span className={`voucher-tag ${v.tagClass}`}>{v.tag}</span>
+                          <button type="button" className="voucher-wishlist-btn" title="Lưu voucher">
                             <i className="bi bi-heart-fill text-danger"></i>
                           </button>
                           <img src={v.img} alt={v.title} />
                         </div>
 
-                        <div className="nearby-body compact-body">
-                          <div className="nearby-meta-row">
-                            <span className="nearby-location"><i className="bi bi-geo-alt-fill text-danger"></i> {v.location}</span>
-                            <span className="nearby-rating"><i className="bi bi-star-fill text-warning"></i> {v.rating}</span>
+                        <div className="voucher-card-body">
+                          <div className="voucher-meta-row">
+                            <span className="voucher-location">
+                              <i className="bi bi-geo-alt-fill text-danger me-1"></i> {v.location}
+                            </span>
+                            <span className="voucher-rating">
+                              <i className="bi bi-star-fill text-warning me-1"></i> {v.rating}
+                            </span>
                           </div>
 
-                          <h3 className="nearby-name compact-name" title={v.title}>{v.title}</h3>
+                          <h3 className="voucher-title" title={v.title}>{v.title}</h3>
 
-                          <div className="compact-voucher-strip">
-                            <div className="strip-left-val">{v.discountText}</div>
-                            <div className="strip-right-code">
-                              <span className="code-pill">{v.code}</span>
-                              <span className="cond-text">{v.condText}</span>
+                          <div className="voucher-strip-box">
+                            <div className="voucher-strip-left">{v.discountText}</div>
+                            <div className="voucher-strip-right">
+                              <span className="voucher-code-label">MÃ: {v.code}</span>
+                              <span className="voucher-cond-text">{v.condText}</span>
                             </div>
                           </div>
 
-                          <div className="card-footer-row mt-3">
-                            <button className="btn btn-sm btn-link text-secondary text-xs text-decoration-none p-0" onClick={() => setTermsModalVoucher(v)}>
-                              Điều kiện
+                          <div className="voucher-card-footer">
+                            <button
+                              type="button"
+                              className="btn btn-voucher-copy fw-bold"
+                              onClick={() => copyVoucherCode(v.code)}
+                            >
+                              <i className="bi bi-clipboard me-1"></i> Copy
                             </button>
-                            <div className="d-flex align-items-center gap-2">
-                              <button className="btn btn-sm btn-outline-success fw-bold" onClick={() => copyVoucherCode(v.code)}>
-                                Copy
-                              </button>
-                              <Link to="/homestay-detail" className="btn-view-room">Xem phòng</Link>
-                            </div>
+                            <Link to="/homestay-detail" className="btn btn-voucher-use fw-bold">
+                              Xem phòng
+                            </Link>
                           </div>
                         </div>
                       </div>
@@ -1018,112 +1135,133 @@ export default function PersonalAccount() {
           {/* TAB 4: DANH SÁCH GIAO DỊCH */}
           {activeTab === "tab-transactions" && (
             <div className="animate-fade-in">
+              {/* Header Banner */}
+              <div className="txn-hero-banner mb-4">
+                <div className="d-flex align-items-center justify-content-between flex-wrap gap-3">
+                  <div>
+                    <span className="txn-hero-badge mb-2 d-inline-block">
+                      <i className="bi bi-receipt me-1"></i> Lịch sử đặt phòng
+                    </span>
+                    <h2 className="h4 fw-bold text-white mb-1">Danh Sách Giao Dịch</h2>
+                    <p className="text-xs mb-0" style={{color:"#DCFCE7"}}>Toàn bộ lịch sử đặt phòng và thanh toán của bạn</p>
+                  </div>
+                  <div className="txn-summary-chips">
+                    <div className="txn-chip txn-chip-success">
+                      <i className="bi bi-check-circle-fill"></i>
+                      <span>2 Thành công</span>
+                    </div>
+                    <div className="txn-chip txn-chip-refund">
+                      <i className="bi bi-arrow-return-left"></i>
+                      <span>1 Hoàn tiền</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               <div className="eco-card">
                 <div className="eco-card-title">
-                  <span><i className="bi bi-receipt text-success me-2"></i>Lịch sử giao dịch &amp; Đặt phòng</span>
-                  <span className="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25">3 Giao dịch</span>
+                  <span><i className="bi bi-card-list text-success me-2"></i>Lịch sử giao dịch &amp; Đặt phòng</span>
+                  <span className="txn-count-badge">3 Giao dịch</span>
                 </div>
 
-                <div className="d-flex align-items-center gap-2 mb-4">
+                {/* Filter Bar */}
+                <div className="txn-filter-bar mb-4">
                   <button
-                    className={`btn btn-sm rounded-pill px-3 fw-semibold ${txnFilter === "all" ? "btn-success" : "btn-outline-secondary"}`}
+                    className={`txn-filter-btn ${txnFilter === "all" ? "active" : ""}`}
                     onClick={() => setTxnFilter("all")}
                   >
-                    Tất cả (3)
+                    <i className="bi bi-grid-3x2-gap-fill me-1"></i> Tất cả (3)
                   </button>
                   <button
-                    className={`btn btn-sm rounded-pill px-3 fw-semibold ${txnFilter === "success" ? "btn-success" : "btn-outline-secondary"}`}
+                    className={`txn-filter-btn ${txnFilter === "success" ? "active" : ""}`}
                     onClick={() => setTxnFilter("success")}
                   >
-                    Đã thành công (2)
+                    <i className="bi bi-check-circle-fill me-1"></i> Thành công (2)
                   </button>
                   <button
-                    className={`btn btn-sm rounded-pill px-3 fw-semibold ${txnFilter === "refund" ? "btn-success" : "btn-outline-secondary"}`}
+                    className={`txn-filter-btn ${txnFilter === "refund" ? "active" : ""}`}
                     onClick={() => setTxnFilter("refund")}
                   >
-                    Đã hoàn hủy (1)
+                    <i className="bi bi-arrow-return-left me-1"></i> Đã hoàn hủy (1)
                   </button>
                 </div>
 
-                <div className="table-responsive">
-                  <table className="table table-hover align-middle text-sm mb-0 border rounded-3 overflow-hidden">
-                    <thead className="table-light">
-                      <tr>
-                        <th>Mã đơn hàng</th>
-                        <th>Tên Homestay</th>
-                        <th>Ngày nhận phòng</th>
-                        <th>Phương thức</th>
-                        <th>Tổng tiền</th>
-                        <th>Trạng thái</th>
-                        <th className="text-end">Thao tác</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {(txnFilter === "all" || txnFilter === "success") && (
-                        <tr>
-                          <td><strong className="text-success fw-bold">#HS-98234</strong></td>
-                          <td style={{ maxWidth: "190px" }}>
-                            <span className="fw-bold text-dark d-block text-truncate">Pù Luông Eco Garden</span>
-                            <span className="text-muted text-xs d-block text-truncate"><i className="bi bi-geo-alt-fill text-danger me-1"></i>Bá Thước, Thanh Hóa</span>
-                          </td>
-                          <td>12/08/2026</td>
-                          <td><span className="badge bg-light text-dark border"><i className="bi bi-qr-code-scan me-1 text-success"></i> Chuyển khoản QR</span></td>
-                          <td className="fw-bold text-success">1.300.000đ</td>
-                          <td><span className="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 px-2.5 py-1.5"><i className="bi bi-check-circle-fill me-1"></i> Thành công</span></td>
-                          <td className="text-end">
-                            <button
-                              className="btn btn-sm btn-outline-success fw-bold rounded-3 px-3"
-                              onClick={() => openInvoice("HS-98234", "Pù Luông Eco Garden Homestay", "Bá Thước, Thanh Hóa", "12/08/2026 - 14/08/2026 (2 đêm)", "1.300.000đ", "1.500.000đ", "200.000đ", "Chuyển khoản QR Vietcombank", "Đã xác nhận thanh toán", "VCB9823412")}
-                            >
-                              <i className="bi bi-receipt me-1"></i> Xem hóa đơn
-                            </button>
-                          </td>
-                        </tr>
-                      )}
-                      {(txnFilter === "all" || txnFilter === "success") && (
-                        <tr>
-                          <td><strong className="text-success fw-bold">#HS-87112</strong></td>
-                          <td style={{ maxWidth: "190px" }}>
-                            <span className="fw-bold text-dark d-block text-truncate">The Memory Villa</span>
-                            <span className="text-muted text-xs d-block text-truncate"><i className="bi bi-geo-alt-fill text-danger me-1"></i>Hồ Tuyền Lâm, Đà Lạt</span>
-                          </td>
-                          <td>24/05/2026</td>
-                          <td><span className="badge bg-light text-dark border"><i className="bi bi-credit-card-2-front me-1 text-primary"></i> Thẻ Visa / Master</span></td>
-                          <td className="fw-bold text-success">1.450.000đ</td>
-                          <td><span className="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 px-2.5 py-1.5"><i className="bi bi-check-circle-fill me-1"></i> Thành công</span></td>
-                          <td className="text-end">
-                            <button
-                              className="btn btn-sm btn-outline-success fw-bold rounded-3 px-3"
-                              onClick={() => openInvoice("HS-87112", "The Memory Valley Villa", "Hồ Tuyền Lâm, Đà Lạt", "24/05/2026 - 26/05/2026 (2 đêm)", "1.450.000đ", "1.630.000đ", "180.000đ", "Thẻ Visa Quốc tế (*8899)", "Đã xác nhận thanh toán", "VISA8711200")}
-                            >
-                              <i className="bi bi-receipt me-1"></i> Xem hóa đơn
-                            </button>
-                          </td>
-                        </tr>
-                      )}
-                      {(txnFilter === "all" || txnFilter === "refund") && (
-                        <tr>
-                          <td><strong className="text-muted fw-bold">#HS-76501</strong></td>
-                          <td style={{ maxWidth: "190px" }}>
-                            <span className="fw-bold text-dark d-block text-truncate">Tràng An Retreat</span>
-                            <span className="text-muted text-xs d-block text-truncate"><i className="bi bi-geo-alt-fill text-danger me-1"></i>Tràng An, Ninh Bình</span>
-                          </td>
-                          <td>10/01/2026</td>
-                          <td><span className="badge bg-light text-dark border"><i className="bi bi-wallet2 me-1 text-warning"></i> Ví e-Wallet</span></td>
-                          <td className="fw-bold text-secondary">1.050.000đ</td>
-                          <td><span className="badge bg-secondary bg-opacity-10 text-secondary border px-2.5 py-1.5"><i className="bi bi-arrow-return-left me-1"></i> Đã hoàn tiền</span></td>
-                          <td className="text-end">
-                            <button
-                              className="btn btn-sm btn-outline-secondary fw-bold rounded-3 px-3"
-                              onClick={() => openInvoice("HS-76501", "Tràng An Valley Retreat", "Tràng An, Ninh Bình", "10/01/2026 - 11/01/2026 (1 đêm)", "1.050.000đ", "1.170.000đ", "120.000đ", "Ví e-Wallet YÊN", "Đã hủy & Hoàn trả 100% tiền", "REF7650199")}
-                            >
-                              <i className="bi bi-receipt me-1"></i> Xem hóa đơn
-                            </button>
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
+                {/* Transaction Cards */}
+                <div className="txn-list">
+                  {(txnFilter === "all" || txnFilter === "success") && (
+                    <div className="txn-row-card txn-status-success">
+                      <div className="txn-row-left">
+                        <div className="txn-order-col">
+                          <span className="txn-order-id">#HS-98234</span>
+                          <span className="txn-date-pill"><i className="bi bi-calendar3 me-1"></i>12/08/2026</span>
+                        </div>
+                        <div className="txn-info-col">
+                          <span className="txn-name">Pù Luông Eco Garden</span>
+                          <span className="txn-loc"><i className="bi bi-geo-alt-fill me-1 text-danger"></i>Bá Thước, Thanh Hóa</span>
+                        </div>
+                        <div className="txn-method-col">
+                          <span className="txn-method-badge"><i className="bi bi-qr-code-scan me-1 text-success"></i>Chuyển khoản QR</span>
+                        </div>
+                      </div>
+                      <div className="txn-row-right">
+                        <span className="txn-amount txn-amount-success">1.300.000đ</span>
+                        <span className="txn-status-badge status-success"><i className="bi bi-check-circle-fill me-1"></i>Thành công</span>
+                        <button className="btn-txn-invoice" onClick={() => openInvoice("HS-98234", "Pù Luông Eco Garden Homestay", "Bá Thước, Thanh Hóa", "12/08/2026 - 14/08/2026 (2 đêm)", "1.300.000đ", "1.500.000đ", "200.000đ", "Chuyển khoản QR Vietcombank", "Đã xác nhận thanh toán", "VCB9823412")}>
+                          <i className="bi bi-receipt me-1"></i> Xem hóa đơn
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {(txnFilter === "all" || txnFilter === "success") && (
+                    <div className="txn-row-card txn-status-success">
+                      <div className="txn-row-left">
+                        <div className="txn-order-col">
+                          <span className="txn-order-id">#HS-87112</span>
+                          <span className="txn-date-pill"><i className="bi bi-calendar3 me-1"></i>24/05/2026</span>
+                        </div>
+                        <div className="txn-info-col">
+                          <span className="txn-name">The Memory Villa</span>
+                          <span className="txn-loc"><i className="bi bi-geo-alt-fill me-1 text-danger"></i>Hồ Tuyền Lâm, Đà Lạt</span>
+                        </div>
+                        <div className="txn-method-col">
+                          <span className="txn-method-badge"><i className="bi bi-credit-card-2-front me-1 text-primary"></i>Thẻ Visa / Master</span>
+                        </div>
+                      </div>
+                      <div className="txn-row-right">
+                        <span className="txn-amount txn-amount-success">1.450.000đ</span>
+                        <span className="txn-status-badge status-success"><i className="bi bi-check-circle-fill me-1"></i>Thành công</span>
+                        <button className="btn-txn-invoice" onClick={() => openInvoice("HS-87112", "The Memory Valley Villa", "Hồ Tuyền Lâm, Đà Lạt", "24/05/2026 - 26/05/2026 (2 đêm)", "1.450.000đ", "1.630.000đ", "180.000đ", "Thẻ Visa Quốc tế (*8899)", "Đã xác nhận thanh toán", "VISA8711200")}>
+                          <i className="bi bi-receipt me-1"></i> Xem hóa đơn
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {(txnFilter === "all" || txnFilter === "refund") && (
+                    <div className="txn-row-card txn-status-refund">
+                      <div className="txn-row-left">
+                        <div className="txn-order-col">
+                          <span className="txn-order-id txn-order-muted">#HS-76501</span>
+                          <span className="txn-date-pill"><i className="bi bi-calendar3 me-1"></i>10/01/2026</span>
+                        </div>
+                        <div className="txn-info-col">
+                          <span className="txn-name">Tràng An Retreat</span>
+                          <span className="txn-loc"><i className="bi bi-geo-alt-fill me-1 text-danger"></i>Tràng An, Ninh Bình</span>
+                        </div>
+                        <div className="txn-method-col">
+                          <span className="txn-method-badge"><i className="bi bi-wallet2 me-1 text-warning"></i>Ví e-Wallet</span>
+                        </div>
+                      </div>
+                      <div className="txn-row-right">
+                        <span className="txn-amount txn-amount-refund">1.050.000đ</span>
+                        <span className="txn-status-badge status-refund"><i className="bi bi-arrow-return-left me-1"></i>Đã hoàn tiền</span>
+                        <button className="btn-txn-invoice btn-txn-invoice-muted" onClick={() => openInvoice("HS-76501", "Tràng An Valley Retreat", "Tràng An, Ninh Bình", "10/01/2026 - 11/01/2026 (1 đêm)", "1.050.000đ", "1.170.000đ", "120.000đ", "Ví e-Wallet YÊN", "Đã hủy & Hoàn trả 100% tiền", "REF7650199")}>
+                          <i className="bi bi-receipt me-1"></i> Xem hóa đơn
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -1132,107 +1270,125 @@ export default function PersonalAccount() {
           {/* TAB 5: VÍ HOÀN TIỀN */}
           {activeTab === "tab-cashback" && (
             <div className="animate-fade-in">
-              <div className="wallet-card-hero p-4 mb-4 rounded-4 shadow-sm text-white" style={{ background: "linear-gradient(135deg, #064E3B 0%, #047857 50%, #15803D 100%)" }}>
-                <div className="d-flex align-items-center justify-content-between flex-wrap gap-3 pb-3 border-bottom border-white border-opacity-25">
-                  <div className="d-flex align-items-center gap-3">
-                    <div className="wallet-icon-avatar rounded-circle bg-white bg-opacity-20 d-flex align-items-center justify-content-center" style={{ width: "52px", height: "52px", fontSize: "1.5rem" }}>
-                      <i className="bi bi-wallet2 text-warning"></i>
+              {/* Hero Banner Card */}
+              <div className="wallet-hero-card">
+                <div className="wallet-hero-top">
+                  <div className="wallet-hero-brand">
+                    <div className="wallet-hero-icon-wrapper">
+                      <i className="bi bi-wallet2"></i>
                     </div>
                     <div>
-                      <span className="badge mb-1" style={{ background: "#FEF3C7", color: "#92400E", border: "1px solid #FDE68A", fontWeight: "800", fontSize: "0.75rem", padding: "5px 12px", borderRadius: "50px" }}>
-                        <i className="bi bi-shield-check me-1" style={{ color: "#D97706" }}></i> Ví YÊN Pay • Tài khoản đã xác thực
-                      </span>
-                      <h2 className="h5 fw-bold text-white mb-0">Ví Hoàn Tiền Cá Nhân</h2>
+                      <div className="wallet-verified-badge">
+                        <i className="bi bi-shield-check"></i>
+                        <span>Ví YÊN Pay • Đã xác thực</span>
+                      </div>
+                      <h2 className="wallet-hero-title">Ví Hoàn Tiền Cá Nhân</h2>
                     </div>
                   </div>
-                  <div>
-                    <button className="btn btn-light fw-bold text-success rounded-3 shadow-sm px-3 py-2" onClick={() => setShowWithdrawModal(true)}>
-                      <i className="bi bi-bank me-1"></i> Rút tiền về Ngân hàng
-                    </button>
-                  </div>
+                  <button className="btn-withdraw-action" onClick={() => setShowWithdrawModal(true)}>
+                    <i className="bi bi-bank me-2"></i>
+                    <span>Rút tiền về Ngân hàng</span>
+                  </button>
                 </div>
 
-                <div className="row g-3 mt-3 align-items-center">
-                  <div className="col-md-5">
-                    <span className="text-xs text-light text-uppercase tracking-wider">Số dư khả dụng</span>
-                    <h2 className="display-6 fw-extrabold text-warning mb-0 mt-1">
-                      {balance.toLocaleString("vi-VN")} <span className="fs-4">VNĐ</span>
-                    </h2>
-                    <small className="text-light opacity-75 text-xs"><i className="bi bi-info-circle me-1"></i>Sử dụng thanh toán phòng hoặc rút về ngân hàng liên kết</small>
+                <div className="wallet-hero-body">
+                  <div className="wallet-main-stat">
+                    <span className="wallet-stat-label">
+                      <i className="bi bi-piggy-bank me-1"></i> SỐ DƯ KHẢ DỤNG
+                    </span>
+                    <div className="wallet-balance-display">
+                      <span className="wallet-balance-number">{balance.toLocaleString("vi-VN")}</span>
+                      <span className="wallet-balance-currency">VNĐ</span>
+                    </div>
+                    <p className="wallet-balance-note">
+                      <i className="bi bi-info-circle me-1.5"></i>
+                      Dùng để thanh toán đặt phòng hoặc rút tiền trực tiếp về ngân hàng
+                    </p>
                   </div>
-                  <div className="col-md-7">
-                    <div className="row g-2 text-center">
-                      <div className="col-6">
-                        <div className="p-2.5 rounded-3 bg-white bg-opacity-10 border border-white border-opacity-10">
-                          <span className="text-xs text-light d-block">Tổng tiền hoàn lũy kế</span>
-                          <strong className="text-white fs-6">1.250.000đ</strong>
-                        </div>
-                      </div>
-                      <div className="col-6">
-                        <div className="p-2.5 rounded-3 bg-white bg-opacity-10 border border-white border-opacity-10">
-                          <span className="text-xs text-light d-block">Tỷ lệ hoàn tiền</span>
-                          <strong className="text-warning fs-6">5% / Đơn phòng</strong>
-                        </div>
-                      </div>
+
+                  <div className="wallet-sub-stats">
+                    <div className="wallet-sub-stat-card">
+                      <span className="sub-stat-title">TỔNG HOÀN LŨY KẾ</span>
+                      <span className="sub-stat-value text-emerald">1.250.000đ</span>
+                    </div>
+                    <div className="wallet-sub-stat-card">
+                      <span className="sub-stat-title">TỶ LỆ HOÀN TIỀN</span>
+                      <span className="sub-stat-badge">5% / Đơn phòng</span>
                     </div>
                   </div>
                 </div>
               </div>
 
-              {/* Wallet Utilities */}
-              <div className="row g-3 mb-4">
-                <div className="col-md-6">
-                  <div className="p-3 bg-white border rounded-3 shadow-sm h-100 d-flex align-items-center gap-3">
-                    <div className="icon-box-emerald">
-                      <i className="bi bi-bank2"></i>
-                    </div>
-                    <div>
-                      <span className="fw-bold text-dark text-sm d-block">Ngân hàng liên kết</span>
-                      <small className="text-muted text-xs">Vietcombank •••• 6868 (Chủ tài khoản: Lê Hoàng Mai Chi)</small>
-                    </div>
+              {/* Bank & PIN Information Cards */}
+              <div className="wallet-info-grid">
+                <div className="wallet-info-card">
+                  <div className="wallet-info-icon bg-emerald-light">
+                    <i className="bi bi-bank2 text-emerald"></i>
                   </div>
+                  <div className="wallet-info-content">
+                    <span className="wallet-info-label">Ngân hàng liên kết</span>
+                    <h6 className="wallet-info-title">Vietcombank •••• 6868</h6>
+                    <span className="wallet-info-sub">Chủ tài khoản: <strong>Lê Hoàng Mai Chi</strong></span>
+                  </div>
+                  <span className="wallet-status-pill pill-success">
+                    <i className="bi bi-check-circle-fill me-1"></i>Đã liên kết
+                  </span>
                 </div>
-                <div className="col-md-6">
-                  <div className="p-3 bg-white border rounded-3 shadow-sm h-100 d-flex align-items-center gap-3">
-                    <div className="icon-box-amber">
-                      <i className="bi bi-shield-lock-fill"></i>
-                    </div>
-                    <div>
-                      <span className="fw-bold text-dark text-sm d-block">Mã PIN Ví bảo mật</span>
-                      <small className="text-success text-xs"><i className="bi bi-check-circle-fill"></i> Đã kích hoạt mã PIN 6 chữ số</small>
-                    </div>
+
+                <div className="wallet-info-card">
+                  <div className="wallet-info-icon bg-amber-light">
+                    <i className="bi bi-shield-lock-fill text-amber"></i>
                   </div>
+                  <div className="wallet-info-content">
+                    <span className="wallet-info-label">Bảo mật giao dịch</span>
+                    <h6 className="wallet-info-title">Mã PIN Ví 6 chữ số</h6>
+                    <span className="wallet-info-sub">Xác thực nhanh khi hoàn tiền & rút tiền</span>
+                  </div>
+                  <span className="wallet-status-pill pill-amber">
+                    <i className="bi bi-shield-check me-1"></i>Đã kích hoạt
+                  </span>
                 </div>
               </div>
 
               {/* Transactions Ledger */}
-              <div className="eco-card mb-0">
-                <div className="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
-                  <h6 className="fw-bold text-dark mb-0"><i className="bi bi-journal-text text-success me-2"></i>Lịch sử biến động số dư hoàn tiền</h6>
+              <div className="wallet-ledger-card">
+                <div className="wallet-ledger-header">
+                  <div className="d-flex align-items-center gap-2">
+                    <div className="ledger-header-icon">
+                      <i className="bi bi-journal-text"></i>
+                    </div>
+                    <div>
+                      <h5 className="ledger-title">Lịch sử biến động số dư</h5>
+                      <span className="ledger-subtitle">Các giao dịch nhận hoàn tiền và rút tiền</span>
+                    </div>
+                  </div>
+                  <span className="ledger-count-badge">{walletLedger.length} giao dịch</span>
                 </div>
 
-                <div className="list-group list-group-flush border rounded-3 overflow-hidden">
+                <div className="wallet-ledger-list">
                   {walletLedger.map((item) => (
-                    <div key={item.id} className="list-group-item p-3 d-flex align-items-center justify-content-between">
-                      <div className="d-flex align-items-center gap-3">
-                        <div
-                          className={`rounded-circle p-2.5 d-flex align-items-center justify-content-center ${
-                            item.type === "plus" ? "bg-success bg-opacity-10 text-success" : "bg-danger bg-opacity-10 text-danger"
-                          }`}
-                          style={{ width: "42px", height: "42px" }}
-                        >
-                          <i className={`bi ${item.type === "plus" ? "bi-arrow-down-left-circle-fill" : "bi-arrow-up-right-circle-fill"} fs-5`}></i>
+                    <div key={item.id} className={`wallet-ledger-item ${item.type}`}>
+                      <div className="ledger-item-left">
+                        <div className={`ledger-type-circle ${item.type}`}>
+                          <i className={`bi ${item.type === "plus" ? "bi-arrow-down-left" : "bi-arrow-up-right"}`}></i>
                         </div>
-                        <div>
-                          <span className="fw-bold text-dark text-sm mb-0 d-block">{item.title}</span>
-                          <small className="text-muted text-xs">{item.date}</small>
+                        <div className="ledger-item-details">
+                          <div className="ledger-item-title">{item.title}</div>
+                          <div className="ledger-item-date">
+                            <i className="bi bi-clock me-1"></i>
+                            {item.date}
+                          </div>
                         </div>
                       </div>
-                      <div className="text-end">
-                        <span className={`fw-extrabold fs-6 d-block ${item.type === "plus" ? "text-success" : "text-danger"}`}>
+
+                      <div className="ledger-item-right">
+                        <div className={`ledger-amount ${item.type}`}>
                           {item.amount}
+                        </div>
+                        <span className={`ledger-status-tag ${item.type}`}>
+                          <i className={`bi ${item.type === "plus" ? "bi-check-circle-fill" : "bi-arrow-right-circle-fill"} me-1`}></i>
+                          {item.status}
                         </span>
-                        <span className="badge bg-secondary bg-opacity-10 text-secondary text-xs">{item.status}</span>
                       </div>
                     </div>
                   ))}
@@ -1290,15 +1446,33 @@ export default function PersonalAccount() {
               <div className="modal-body py-3">
                 <div className="mb-3">
                   <label className="form-label text-sm fw-semibold">Mật khẩu hiện tại</label>
-                  <input type="password" className="form-control form-control-custom" placeholder="••••••••" />
+                  <input
+                    type="password"
+                    className="form-control form-control-custom"
+                    placeholder="••••••••"
+                    value={pwdForm.currentPassword}
+                    onChange={(e) => setPwdForm({ ...pwdForm, currentPassword: e.target.value })}
+                  />
                 </div>
                 <div className="mb-3">
                   <label className="form-label text-sm fw-semibold">Mật khẩu mới</label>
-                  <input type="password" className="form-control form-control-custom" placeholder="Mật khẩu từ 8 ký tự" />
+                  <input
+                    type="password"
+                    className="form-control form-control-custom"
+                    placeholder="Mật khẩu từ 8 ký tự"
+                    value={pwdForm.newPassword}
+                    onChange={(e) => setPwdForm({ ...pwdForm, newPassword: e.target.value })}
+                  />
                 </div>
                 <div className="mb-3">
                   <label className="form-label text-sm fw-semibold">Xác nhận mật khẩu mới</label>
-                  <input type="password" className="form-control form-control-custom" placeholder="Nhập lại mật khẩu mới" />
+                  <input
+                    type="password"
+                    className="form-control form-control-custom"
+                    placeholder="Nhập lại mật khẩu mới"
+                    value={pwdForm.confirmPassword}
+                    onChange={(e) => setPwdForm({ ...pwdForm, confirmPassword: e.target.value })}
+                  />
                 </div>
               </div>
               <div className="modal-footer border-0 pt-0">
@@ -1306,10 +1480,7 @@ export default function PersonalAccount() {
                 <button
                   type="button"
                   className="btn btn-eco-save"
-                  onClick={() => {
-                    setShowPwdModal(false);
-                    triggerToast("Đổi mật khẩu", "Mật khẩu tài khoản đã được thay đổi thành công!");
-                  }}
+                  onClick={handlePasswordSubmit}
                 >
                   Lưu mật khẩu
                 </button>
@@ -1402,6 +1573,7 @@ export default function PersonalAccount() {
                   type="button"
                   className="btn btn-danger rounded-3 px-4 fw-semibold d-inline-flex align-items-center gap-2"
                   onClick={() => {
+                    authService.logout();
                     setShowLogoutModal(false);
                     navigate("/login");
                   }}
