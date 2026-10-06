@@ -114,23 +114,52 @@ export default function Homepage() {
   const [wishlist, setWishlist] = useState(new Set());
   const [toast, setToast] = useState({ show: false, msg: '' });
 
+  // Dynamic Data State
+  const [homeData, setHomeData] = useState({
+    heroSlides: HERO_SLIDES,
+    experiences: EXPERIENCES,
+    combos: COMBOS,
+    festivals: FESTIVALS,
+    hotHomestays: HOT_HOMESTAYS,
+    favoritesHomestays: FAVORITES_HOMESTAYS
+  });
+  const [isLoading, setIsLoading] = useState(true);
+
   const expGridRef = useRef(null);
+
+  // Fetch dynamic data
+  useEffect(() => {
+    fetch('http://localhost:8081/api/public/home')
+      .then(res => res.json())
+      .then(data => {
+        if (data.heroSlides) {
+          setHomeData(data);
+        }
+        setIsLoading(false);
+      })
+      .catch(err => {
+        console.warn('Failed to fetch dynamic home data, using fallback:', err);
+        setIsLoading(false);
+      });
+  }, []);
 
   // Hero slider auto-play
   useEffect(() => {
+    if (homeData.heroSlides.length === 0) return;
     const timer = setInterval(() => {
-      setCurrentSlide((prev) => (prev + 1) % HERO_SLIDES.length);
+      setCurrentSlide((prev) => (prev + 1) % homeData.heroSlides.length);
     }, 5500);
     return () => clearInterval(timer);
-  }, []);
+  }, [homeData.heroSlides.length]);
 
   // Combo slider auto-play
   useEffect(() => {
+    if (homeData.combos.length === 0) return;
     const timer = setInterval(() => {
-      setComboIndex((prev) => (prev + 1) % COMBOS.length);
+      setComboIndex((prev) => (prev + 1) % homeData.combos.length);
     }, 4500);
     return () => clearInterval(timer);
-  }, []);
+  }, [homeData.combos.length]);
 
   const triggerToast = (msg) => {
     setToast({ show: true, msg });
@@ -165,12 +194,12 @@ export default function Homepage() {
     }
   };
 
-  const filteredFavorites = FAVORITES_HOMESTAYS.filter((h) => {
+  const filteredFavorites = homeData.favoritesHomestays.filter((h) => {
     if (favCityFilter === 'all') return true;
     return h.city === favCityFilter;
   });
 
-  const activeFestData = FESTIVALS[activeFestivalKey] || FESTIVALS.diff;
+  const activeFestData = homeData.festivals[activeFestivalKey] || homeData.festivals.diff || FESTIVALS.diff;
 
   return (
     <div className="homepage-wrapper">
@@ -178,7 +207,7 @@ export default function Homepage() {
       <section className="hero-section">
         <div className="hero-slider-wrapper">
           <div className="hero-slider">
-            {HERO_SLIDES.map((slide, i) => (
+            {homeData.heroSlides.map((slide, i) => (
               <div key={slide.id} className={`hero-slide ${i === currentSlide ? 'active' : ''}`}>
                 <img src={slide.img} alt={slide.title} className="hero-slide-img" />
               </div>
@@ -335,20 +364,20 @@ export default function Homepage() {
           <button
             type="button"
             className="slider-arrow prev"
-            onClick={() => setCurrentSlide((prev) => (prev - 1 + HERO_SLIDES.length) % HERO_SLIDES.length)}
+            onClick={() => setCurrentSlide((prev) => (prev - 1 + homeData.heroSlides.length) % homeData.heroSlides.length)}
           >
             <i className="bi bi-chevron-left" />
           </button>
           <button
             type="button"
             className="slider-arrow next"
-            onClick={() => setCurrentSlide((prev) => (prev + 1) % HERO_SLIDES.length)}
+            onClick={() => setCurrentSlide((prev) => (prev + 1) % homeData.heroSlides.length)}
           >
             <i className="bi bi-chevron-right" />
           </button>
 
           <div className="slider-dots">
-            {HERO_SLIDES.map((_, i) => (
+            {homeData.heroSlides.map((_, i) => (
               <span
                 key={i}
                 className={`dot ${i === currentSlide ? 'active' : ''}`}
@@ -368,29 +397,48 @@ export default function Homepage() {
               <h2 className="section-title">Ý Tưởng Trải Nghiệm Bản Địa</h2>
               <p className="section-subtitle">Chạm vào nét mộc mạc, yên bình và hòa mình cùng thiên nhiên, đời sống làng quê</p>
             </div>
-            <div className="exp-slider-nav">
-              <button type="button" className="exp-nav-btn" onClick={() => scrollExperience(-1)}><i className="bi bi-chevron-left" /></button>
-              <button type="button" className="exp-nav-btn" onClick={() => scrollExperience(1)}><i className="bi bi-chevron-right" /></button>
-            </div>
           </div>
 
-          <div className="experience-grid" ref={expGridRef}>
-            {EXPERIENCES.map((exp) => (
-              <div key={exp.id} className="experience-card" onClick={() => navigate('/booking')}>
-                <div className="exp-img-wrapper">
-                  <img src={exp.img} alt={exp.title} loading="lazy" />
-                  <span className="exp-badge">{exp.tag}</span>
-                </div>
-                <div className="exp-content">
-                  <h4 className="exp-title">{exp.title}</h4>
-                  <p className="exp-desc">{exp.desc}</p>
-                  <div className="exp-action">
-                    <span>Khám phá ngay</span>
-                    <i className="bi bi-arrow-right" />
+          <div className="experience-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '16px', paddingBottom: '12px' }}>
+            {homeData.experiences.slice(0, 12).map((exp) => {
+              // Guess icon from title if not provided
+              let iconClass = 'bi-tree';
+              const t = (exp.title || '').toLowerCase();
+              if (t.includes('nông') || t.includes('trại')) iconClass = 'bi-brightness-high';
+              else if (t.includes('sông') || t.includes('nước')) iconClass = 'bi-water';
+              else if (t.includes('nhà quê')) iconClass = 'bi-house';
+              else if (t.includes('ẩm thực') || t.includes('ăn')) iconClass = 'bi-cup-hot';
+              else if (t.includes('nghề')) iconClass = 'bi-brush';
+              else if (t.includes('thiên nhiên')) iconClass = 'bi-compass';
+              else if (t.includes('đời sống')) iconClass = 'bi-basket';
+              else if (t.includes('văn hóa')) iconClass = 'bi-music-note-beamed';
+              else if (t.includes('khám phá')) iconClass = 'bi-bicycle';
+              else if (t.includes('nghỉ dưỡng') || t.includes('thư giãn')) iconClass = 'bi-cloud-sun';
+              else if (t.includes('bản địa')) iconClass = 'bi-people';
+
+              return (
+                <div key={exp.id} className="experience-card" onClick={() => navigate('/booking')}>
+                  <div className="exp-img-wrapper">
+                    <img src={exp.img} alt={exp.title} loading="lazy" />
+                    <span className="exp-badge">
+                      <i className={`bi ${iconClass}`} style={{ marginRight: '4px' }} />
+                      {exp.tag || exp.title}
+                    </span>
+                  </div>
+                  <div className="exp-content">
+                    <h4 className="exp-title">
+                      <i className={`bi ${iconClass}`} style={{ color: '#15803D', marginRight: '6px' }} />
+                      {exp.title}
+                    </h4>
+                    <p className="exp-desc">{exp.desc}</p>
+                    <div className="exp-action">
+                      <span>Khám phá ngay</span>
+                      <i className="bi bi-arrow-right" />
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </section>
@@ -407,7 +455,7 @@ export default function Homepage() {
           </div>
 
           <div className="combo-fullwidth-wrap">
-            {COMBOS.map((c, idx) => {
+            {homeData.combos.map((c, idx) => {
               if (idx !== comboIndex) return null;
               return (
                 <div key={c.id} className="combo-card-banner">
@@ -432,14 +480,14 @@ export default function Homepage() {
                   <button
                     type="button"
                     className="combo-nav-btn combo-prev"
-                    onClick={() => setComboIndex((prev) => (prev - 1 + COMBOS.length) % COMBOS.length)}
+                    onClick={() => setComboIndex((prev) => (prev - 1 + homeData.combos.length) % homeData.combos.length)}
                   >
                     <i className="bi bi-chevron-left" />
                   </button>
                   <button
                     type="button"
                     className="combo-nav-btn combo-next"
-                    onClick={() => setComboIndex((prev) => (prev + 1) % COMBOS.length)}
+                    onClick={() => setComboIndex((prev) => (prev + 1) % homeData.combos.length)}
                   >
                     <i className="bi bi-chevron-right" />
                   </button>
@@ -448,7 +496,7 @@ export default function Homepage() {
             })}
 
             <div className="combo-pagination">
-              {COMBOS.map((_, idx) => (
+              {homeData.combos.map((_, idx) => (
                 <span
                   key={idx}
                   className={`combo-dot ${idx === comboIndex ? 'active' : ''}`}
@@ -550,7 +598,7 @@ export default function Homepage() {
           <p className="section-subtitle">Top 4 căn homestay được khách hàng chốt phòng liên tục trong 24 giờ qua</p>
 
           <div className="hot-grid">
-            {HOT_HOMESTAYS.map((h) => (
+            {homeData.hotHomestays.map((h) => (
               <div key={h.id} className="homestay-card">
                 <div className="card-img-wrapper">
                   <span className="card-top-tag tag-hot"><i className="bi bi-fire" /> {h.tag}</span>

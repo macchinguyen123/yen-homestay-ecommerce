@@ -9,7 +9,11 @@ import vn.edu.hcmuaf.fit.springboot.dto.RegisterRequest;
 import vn.edu.hcmuaf.fit.springboot.model.User;
 import vn.edu.hcmuaf.fit.springboot.repository.UserRepository;
 
+import vn.edu.hcmuaf.fit.springboot.model.VerificationToken;
+import vn.edu.hcmuaf.fit.springboot.repository.VerificationTokenRepository;
+
 import jakarta.annotation.PostConstruct;
+import java.time.LocalDateTime;
 import java.util.Optional;
 
 @Service
@@ -18,6 +22,8 @@ public class AuthService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final VerificationTokenRepository tokenRepository;
+    private final EmailService emailService;
 
     @PostConstruct
     public void initDefaultUsers() {
@@ -88,7 +94,7 @@ public class AuthService {
         if (!user.getActive()) {
             return LoginResponse.builder()
                     .success(false)
-                    .message("Tài khoản của bạn đã bị khóa hoặc tạm ngưng!")
+                    .message("Tài khoản chưa được kích hoạt hoặc đã bị khóa! Vui lòng kiểm tra email của bạn để kích hoạt.")
                     .build();
         }
 
@@ -131,18 +137,56 @@ public class AuthService {
                 .fullName(request.getFullName())
                 .password(passwordEncoder.encode(request.getPassword()))
                 .role(targetRole)
-                .active(true)
+                .active(false) // Account is inactive until verified
                 .build();
 
         userRepository.save(newUser);
 
+        // Generate verification token
+        VerificationToken verificationToken = new VerificationToken(newUser);
+        tokenRepository.save(verificationToken);
+
+        // Send verification email
+        String verifyUrl = "http://localhost:3000/verify?token=" + verificationToken.getToken();
+        emailService.sendVerificationEmail(newUser.getEmail(), verifyUrl);
+
         return LoginResponse.builder()
                 .success(true)
-                .message("Đăng ký tài khoản thành công!")
+                .message("Đăng ký thành công! Vui lòng kiểm tra email để kích hoạt tài khoản.")
                 .id(newUser.getId())
                 .email(newUser.getEmail())
                 .fullName(newUser.getFullName())
                 .role(newUser.getRole())
+                .build();
+    }
+
+    public LoginResponse verifyEmail(String token) {
+        Optional<VerificationToken> tokenOpt = tokenRepository.findByToken(token);
+        
+        if (tokenOpt.isEmpty()) {
+            return LoginResponse.builder()
+                    .success(false)
+                    .message("Mã xác nhận không hợp lệ hoặc không tồn tại!")
+                    .build();
+        }
+        
+        VerificationToken verificationToken = tokenOpt.get();
+        if (verificationToken.getExpiryDate().isBefore(LocalDateTime.now())) {
+            return LoginResponse.builder()
+                    .success(false)
+                    .message("Mã xác nhận đã hết hạn! Vui lòng đăng ký lại hoặc yêu cầu gửi lại email.")
+                    .build();
+        }
+        
+        User user = verificationToken.getUser();
+        user.setActive(true);
+        userRepository.save(user);
+        
+        tokenRepository.delete(verificationToken);
+        
+        return LoginResponse.builder()
+                .success(true)
+                .message("Kích hoạt tài khoản thành công! Bạn có thể đăng nhập ngay bây giờ.")
                 .build();
     }
 }
