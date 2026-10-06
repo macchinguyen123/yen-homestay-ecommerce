@@ -30,6 +30,22 @@ public class DbConnectionTestRunner implements CommandLineRunner {
             log.info("📌 DB Version: {}", version != null && version.length() > 60 ? version.substring(0, 60) + "..." : version);
             log.info("----------------------------------------------------------------");
 
+            // Đảm bảo tài khoản mẫu có mặt trong bảng users của CSDL Neon PostgreSQL
+            try {
+                Integer maichiCount = jdbcTemplate.queryForObject("SELECT count(*) FROM users WHERE email = 'maichi.lehoang@gmail.com'", Integer.class);
+                if (maichiCount != null && maichiCount == 0) {
+                    jdbcTemplate.update("INSERT INTO users (user_id, email, password_hash, full_name, phone, role, status) VALUES ((SELECT COALESCE(MAX(user_id), 0) + 1 FROM users), 'maichi.lehoang@gmail.com', '12345678', 'Lê Hoàng Mai Chi', '0912345678', 'TOURIST', 'ACTIVE')");
+                    log.info("✅ Đã khởi tạo tài khoản maichi.lehoang@gmail.com trong bảng users");
+                }
+                Integer chuhoangCount = jdbcTemplate.queryForObject("SELECT count(*) FROM users WHERE email = 'chuhoang.homestay@gmail.com'", Integer.class);
+                if (chuhoangCount != null && chuhoangCount == 0) {
+                    jdbcTemplate.update("INSERT INTO users (user_id, email, password_hash, full_name, phone, role, status) VALUES ((SELECT COALESCE(MAX(user_id), 0) + 1 FROM users), 'chuhoang.homestay@gmail.com', '12345678', 'Nguyễn Văn Hoàng (Chủ Homestay)', '0987654321', 'OWNER', 'ACTIVE')");
+                    log.info("✅ Đã khởi tạo tài khoản chuhoang.homestay@gmail.com trong bảng users");
+                }
+            } catch (Exception e) {
+                log.warn("Lỗi kiểm tra/thêm tài khoản mẫu vào CSDL: {}", e.getMessage());
+            }
+
             String[] tables = {
                 "users", "categories", "homestays", "homestay_images", "rooms", 
                 "room_images", "extra_amenities", "guest_tasks", "ad_packages", 

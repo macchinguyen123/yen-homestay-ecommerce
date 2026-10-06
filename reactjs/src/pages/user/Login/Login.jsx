@@ -60,35 +60,45 @@ export default function Login() {
 
   const handleLogin = async (e) => {
     e.preventDefault();
+    if (!username.trim() || !password.trim()) {
+      alert('Vui lòng nhập đầy đủ Email/SĐT và Mật khẩu!');
+      return;
+    }
+
     try {
-      sessionStorage.setItem('isLoggedIn', 'true');
-      sessionStorage.setItem('userName', username);
-      sessionStorage.setItem('userRole', activeRole === 'owner' ? 'host' : 'guest');
-
-      const roleStr = activeRole === 'owner' ? 'OWNER' : 'USER';
-      localStorage.setItem('user_role', roleStr);
-      localStorage.setItem(
-        'user',
-        JSON.stringify({
-          email: username,
-          fullName: activeRole === 'owner' ? 'Nguyễn Văn Hoàng (Chủ Homestay)' : 'Lê Hoàng Mai Chi',
-          role: roleStr,
-        })
-      );
-
-      // Async backend auth (silent failover safe)
-      authService.login({
-        username,
-        password: password === '••••••••••••' ? '123456' : password,
+      // Gửi yêu cầu xác thực trực tiếp tới CSDL thông qua API
+      const result = await authService.login({
+        username: username.trim(),
+        password: password === '••••••••••••' ? '12345678' : password,
         role: activeRole,
-      }).catch(() => {});
-    } catch (err) {}
+      });
 
-    // Chuyển hướng
-    if (activeRole === 'owner') {
-      navigate('/owner/dashboard');
-    } else {
-      navigate('/');
+      if (result && result.success && result.user) {
+        // Lưu thông tin người dùng thực tế lấy từ CSDL (fullName, role, email, ...)
+        const dbUser = result.user;
+        const userRole = (dbUser.role || (activeRole === 'owner' ? 'OWNER' : 'USER')).toUpperCase();
+
+        sessionStorage.setItem('isLoggedIn', 'true');
+        sessionStorage.setItem('userName', dbUser.fullName || dbUser.email);
+        sessionStorage.setItem('userRole', userRole === 'OWNER' ? 'host' : 'guest');
+
+        localStorage.setItem('user_role', userRole);
+        localStorage.setItem('user', JSON.stringify(dbUser));
+
+        // Chuyển hướng chính xác theo vai trò trong CSDL
+        if (userRole === 'ADMIN') {
+          navigate('/admin/dashboard');
+        } else if (userRole === 'OWNER') {
+          navigate('/owner/dashboard');
+        } else {
+          navigate('/');
+        }
+      } else {
+        // Thông báo lỗi chuẩn từ CSDL nếu tài khoản hoặc mật khẩu sai
+        alert(result?.message || 'Tài khoản hoặc mật khẩu không chính xác!');
+      }
+    } catch (err) {
+      alert('Lỗi kết nối máy chủ hoặc cơ sở dữ liệu!');
     }
   };
 
@@ -275,7 +285,13 @@ export default function Login() {
                 navigate('/');
               }}
             >
-              <svg className="w-4 h-4" viewBox="0 0 24 24">
+              <svg
+                className="w-4 h-4"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                style={{ width: 16, height: 16, minWidth: 16, minHeight: 16, flexShrink: 0, display: 'inline-block' }}
+              >
                 <path
                   d="M12 5c1.6 0 3 .6 4.1 1.6l3.1-3.1C17.3 1.7 14.8 1 12 1 7.5 1 3.7 3.6 1.9 7.3l3.7 2.9C6.5 7.4 9 5 12 5z"
                   fill="#EA4335"
