@@ -12,4 +12,11 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
     Optional<Booking> findByBookingCode(String bookingCode);
     List<Booking> findByTouristId(Long touristId);
     List<Booking> findByHomestayId(Long homestayId);
+    long countByStatusIgnoreCase(String status);
+    List<Booking> findTop10ByOrderByCreatedAtDesc();
+    List<Booking> findTop10ByStatusIgnoreCaseOrderByCreatedAtDesc(String status);
+
+    @org.springframework.data.jpa.repository.Query("SELECT COALESCE(SUM(b.totalPrice), 0) FROM Booking b WHERE UPPER(b.status) IN ('PAID', 'COMPLETED', 'SUCCESS')")
+    java.math.BigDecimal sumTotalRevenue();
 }
+

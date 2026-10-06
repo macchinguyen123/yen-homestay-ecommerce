@@ -10,4 +10,9 @@ import java.util.List;
 public interface HomestayAdRepository extends JpaRepository<HomestayAd, Long> {
     List<HomestayAd> findByOwnerId(Long ownerId);
     List<HomestayAd> findByHomestayId(Long homestayId);
+    long countByStatusIgnoreCase(String status);
+
+    @org.springframework.data.jpa.repository.Query("SELECT COALESCE(SUM(a.pricePaid), 0) FROM HomestayAd a")
+    java.math.BigDecimal sumAdRevenue();
 }
+

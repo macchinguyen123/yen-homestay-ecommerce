@@ -12,4 +12,9 @@ public interface HomestayRepository extends JpaRepository<Homestay, Long> {
     List<Homestay> findByCategoryId(Long categoryId);
     List<Homestay> findByCity(String city);
     List<Homestay> findByStatus(String status);
+    long countByStatusIgnoreCase(String status);
+
+    @org.springframework.data.jpa.repository.Query("SELECT h.city, COUNT(h) FROM Homestay h WHERE h.city IS NOT NULL AND h.city != '' GROUP BY h.city ORDER BY COUNT(h) DESC")
+    List<Object[]> countHomestaysByCity();
 }
+

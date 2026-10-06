@@ -12,6 +12,7 @@ import vn.edu.hcmuaf.fit.springboot.model.User;
 import vn.edu.hcmuaf.fit.springboot.repository.CategoryRepository;
 import vn.edu.hcmuaf.fit.springboot.repository.UserRepository;
 
+import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -52,6 +53,29 @@ public class TestDbController {
             response.put("message", "Lỗi kết nối tới cơ sở dữ liệu Neon: " + e.getMessage());
             return ResponseEntity.internalServerError().body(response);
         }
+    }
+
+    @GetMapping("/db-summary")
+    public ResponseEntity<Map<String, Object>> getDbSummary() {
+        Map<String, Object> map = new HashMap<>();
+        try {
+            map.put("totalUsers", jdbcTemplate.queryForObject("SELECT count(*) FROM users", Long.class));
+            map.put("tourists", jdbcTemplate.queryForObject("SELECT count(*) FROM users WHERE UPPER(role) = 'TOURIST'", Long.class));
+            map.put("owners", jdbcTemplate.queryForObject("SELECT count(*) FROM users WHERE UPPER(role) = 'OWNER'", Long.class));
+            map.put("homestays", jdbcTemplate.queryForObject("SELECT count(*) FROM homestays", Long.class));
+            map.put("homestaysActive", jdbcTemplate.queryForObject("SELECT count(*) FROM homestays WHERE UPPER(status) = 'ACTIVE'", Long.class));
+            map.put("bookings", jdbcTemplate.queryForObject("SELECT count(*) FROM bookings", Long.class));
+            map.put("bookingRevenue", jdbcTemplate.queryForObject("SELECT COALESCE(SUM(total_price), 0) FROM bookings", BigDecimal.class));
+            map.put("payments", jdbcTemplate.queryForObject("SELECT count(*) FROM payments", Long.class));
+            map.put("paymentRevenue", jdbcTemplate.queryForObject("SELECT COALESCE(SUM(amount), 0) FROM payments", BigDecimal.class));
+            map.put("vouchers", jdbcTemplate.queryForObject("SELECT count(*) FROM vouchers", Long.class));
+            map.put("ads", jdbcTemplate.queryForObject("SELECT count(*) FROM homestay_ads", Long.class));
+            map.put("topCities", jdbcTemplate.queryForList("SELECT city, count(*) as count FROM homestays GROUP BY city ORDER BY count(*) DESC LIMIT 5"));
+            map.put("bookingStatuses", jdbcTemplate.queryForList("SELECT status, count(*) as count FROM bookings GROUP BY status"));
+        } catch (Exception e) {
+            map.put("error", e.getMessage());
+        }
+        return ResponseEntity.ok(map);
     }
 
     @GetMapping("/categories")
