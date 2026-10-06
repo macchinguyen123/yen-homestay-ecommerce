@@ -434,36 +434,45 @@
 .exp-nav-btn:hover { background: var(--primary-color); color: #FFF; border-color: var(--primary-color); }
 
 .experience-grid {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
   gap: 16px;
-  overflow-x: auto;
-  scroll-behavior: smooth;
   padding-bottom: 12px;
 }
 
-.experience-grid::-webkit-scrollbar { display: none; }
+@media (max-width: 1024px) {
+  .experience-grid { grid-template-columns: repeat(4, 1fr); }
+}
+
+@media (max-width: 768px) {
+  .experience-grid { grid-template-columns: repeat(3, 1fr); }
+}
+
+@media (max-width: 480px) {
+  .experience-grid { grid-template-columns: repeat(2, 1fr); }
+}
 
 .experience-card {
-  min-width: 220px;
   background: #FFFFFF;
-  border: 1px solid #E2E8F0;
-  border-radius: 16px;
+  border: 1px solid #E5E7EB;
+  border-radius: 10px;
   overflow: hidden;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.02);
   cursor: pointer;
-  transition: all 0.25s ease;
-  flex-shrink: 0;
+  transition: all 0.2s ease;
+  display: flex;
+  flex-direction: column;
 }
 
 .experience-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 12px 24px rgba(0,0,0,0.08);
-  border-color: #BBF7D0;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  border-color: #D1D5DB;
 }
 
 .exp-img-wrapper {
   position: relative;
-  height: 140px;
+  height: 110px;
   overflow: hidden;
 }
 
@@ -478,39 +487,47 @@
 
 .exp-badge {
   position: absolute;
-  top: 10px;
-  left: 10px;
-  background: rgba(15, 23, 42, 0.7);
+  top: 8px;
+  left: 8px;
+  background: rgba(0, 0, 0, 0.55);
   color: #FFF;
   font-size: 0.72rem;
-  font-weight: 700;
+  font-weight: 600;
   padding: 3px 8px;
-  border-radius: 6px;
-  backdrop-filter: blur(4px);
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
 }
 
 .exp-content {
-  padding: 14px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
 }
 
 .exp-title {
   font-size: 0.95rem;
-  font-weight: 800;
-  color: #0F172A;
-  margin-bottom: 4px;
+  font-weight: 700;
+  color: #111827;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: flex-start;
+  line-height: 1.3;
 }
 
 .exp-desc {
-  font-size: 0.78rem;
-  color: #64748B;
-  line-height: 1.4;
-  margin-bottom: 10px;
+  font-size: 0.8rem;
+  color: #6B7280;
+  line-height: 1.45;
+  margin-bottom: 16px;
+  flex: 1;
 }
 
 .exp-action {
-  font-size: 0.78rem;
-  font-weight: 700;
-  color: var(--primary-color);
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #15803D;
   display: flex;
   align-items: center;
   justify-content: space-between;

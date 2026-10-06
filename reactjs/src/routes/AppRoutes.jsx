@@ -13,6 +13,7 @@ import Bookings from '../pages/user/Bookings/Bookings';
 import CompletePay from '../pages/user/CompletePay/CompletePay';
 import Login from '../pages/user/Login/Login';
 import Register from '../pages/user/Register/Register';
+import Verify from '../pages/user/Verify/Verify';
 import Notifications from '../pages/user/Notifications/Notifications';
 import PersonalAccount from '../pages/user/PersonalAccount/PersonalAccount';
 import Promotions from '../pages/user/Promotions/Promotions';
@@ -54,6 +55,7 @@ export default function AppRoutes() {
       {/* ── 0. TRANG ĐĂNG NHẬP / ĐĂNG KÝ (STANDALONE) ── */}
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
+      <Route path="/verify" element={<Verify />} />
 
       {/* ── 1. KHU VỰC KHÁCH HÀNG (USER / PUBLIC) ── */}
       <Route element={<UserLayout />}>

@@ -110,7 +110,7 @@ export default function Register() {
   const currentGuestProvince = PROVINCES_DATA.find((p) => p.code === guestForm.provinceCode);
 
   // Form submission handler
-  const handleStep1Submit = (e) => {
+  const handleStep1Submit = async (e) => {
     e.preventDefault();
     if (role === 'guest') {
       if (!guestForm.name || !guestForm.email || !guestForm.phone || !guestForm.pwd) {
@@ -139,9 +139,21 @@ export default function Register() {
         return;
       }
     }
-    setStep(2);
-    setCountdown(60);
-    setCanResend(false);
+
+    const payload = {
+      fullName: role === 'guest' ? guestForm.name : hostForm.name,
+      email: role === 'guest' ? guestForm.email : hostForm.email,
+      phoneNumber: role === 'guest' ? (guestForm.phoneCode + guestForm.phone) : (hostForm.phoneCode + hostForm.phone),
+      password: role === 'guest' ? guestForm.pwd : hostForm.pwd,
+      role: role === 'host' ? 'OWNER' : 'USER',
+    };
+
+    const res = await authService.register(payload);
+    if (res.success) {
+      setStep(3);
+    } else {
+      alert(res.message || 'Đăng ký thất bại. Vui lòng kiểm tra lại thông tin!');
+    }
   };
 
   const handleOtpChange = (index, val) => {
@@ -247,19 +259,18 @@ export default function Register() {
             </div>
           )}
 
-          {/* Step Indicator */}
           <div className="step-indicator mb-4">
             <div className={`step-item ${step >= 1 ? 'active' : ''} ${step > 1 ? 'done' : ''}`}>
               <div className="step-dot"><i className="bi bi-person-fill"></i></div>
               <span className="step-label">Thông tin</span>
             </div>
             <div className={`step-line ${step > 1 ? 'done' : ''}`}></div>
-            <div className={`step-item ${step >= 2 ? 'active' : ''} ${step > 2 ? 'done' : ''}`}>
-              <div className="step-dot"><i className="bi bi-shield-check"></i></div>
-              <span className="step-label">Xác minh</span>
-            </div>
-            <div className={`step-line ${step > 2 ? 'done' : ''}`}></div>
             <div className={`step-item ${step === 3 ? 'active done' : ''}`}>
+              <div className="step-dot"><i className="bi bi-envelope-check-fill"></i></div>
+              <span className="step-label">Xác thực Email</span>
+            </div>
+            <div className={`step-line ${step === 3 ? 'done' : ''}`}></div>
+            <div className={`step-item ${step === 3 ? 'active' : ''}`}>
               <div className="step-dot"><i className="bi bi-check-lg"></i></div>
               <span className="step-label">Hoàn tất</span>
             </div>
@@ -831,28 +842,24 @@ export default function Register() {
           {/* ==================== BƯỚC 3: COMPLETE ==================== */}
           {step === 3 && (
             <div className="register-step text-center">
-              <div className="success-icon mb-3"><i className="bi bi-patch-check-fill"></i></div>
+              <div className="success-icon mb-3 text-warning" style={{ fontSize: '4rem' }}><i className="bi bi-envelope-paper-heart"></i></div>
               <h1 className="step-title mb-2">Đăng ký thành công!</h1>
-              <p className="step-subtitle mb-2">
-                {role === 'guest' ? 'Chào mừng bạn đến với YÊN Homestay!' : 'Hồ sơ chủ nhà của bạn đã được khởi tạo thành công.'}
+              <p className="step-subtitle mb-3" style={{ fontSize: '1.1rem', lineHeight: '1.5' }}>
+                Chúng tôi đã gửi một email xác thực đến địa chỉ <strong className="text-success">{role === 'guest' ? guestForm.email : hostForm.email}</strong>. 
+                <br/>Vui lòng kiểm tra hộp thư đến (và thư mục Spam) để kích hoạt tài khoản của bạn.
               </p>
+              
               <div className="success-reward mb-4">
-                <i className="bi bi-gift-fill me-2"></i>Bạn vừa nhận được <strong>100 điểm Eco</strong> chào mừng thành viên mới!
+                <i className="bi bi-info-circle-fill me-2 text-primary"></i>Bạn cần kích hoạt tài khoản trước khi đăng nhập!
               </div>
 
               <div className="d-flex flex-column gap-2">
-                <Link to="/" className="btn-reg-next w-100 text-center justify-content-center gap-2">
+                <Link to="/login" className="btn-reg-next w-100 text-center justify-content-center gap-2">
+                  <i className="bi bi-box-arrow-in-right"></i> Đi đến trang Đăng nhập
+                </Link>
+                <Link to="/" className="btn-back-step w-100 text-center justify-content-center gap-2">
                   <i className="bi bi-house-fill"></i> Về trang chủ
                 </Link>
-                {role === 'guest' ? (
-                  <Link to="/account" className="btn-back-step w-100 text-center justify-content-center gap-2">
-                    <i className="bi bi-person-fill"></i> Quản lý tài khoản
-                  </Link>
-                ) : (
-                  <Link to="/owner/dashboard" className="btn-back-step w-100 text-center justify-content-center gap-2">
-                    <i className="bi bi-speedometer2"></i> Truy cập Dashboard Chủ nhà
-                  </Link>
-                )}
               </div>
             </div>
           )}

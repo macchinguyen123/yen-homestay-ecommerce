@@ -90,6 +90,24 @@ export const authService = {
   },
 
   /**
+   * Xác thực email bằng token
+   */
+  async verifyEmail(token) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/verify?token=${token}`);
+      const data = await response.json();
+      if (response.ok && data.success) {
+        return { success: true, message: data.message || 'Xác thực thành công!' };
+      } else {
+        return { success: false, message: data.message || 'Xác thực không thành công.' };
+      }
+    } catch (error) {
+      console.warn('Backend error during verify fallback:', error);
+      return { success: false, message: 'Lỗi kết nối tới server!' };
+    }
+  },
+
+  /**
    * Lấy thông tin user đang đăng nhập
    */
   getCurrentUser() {
