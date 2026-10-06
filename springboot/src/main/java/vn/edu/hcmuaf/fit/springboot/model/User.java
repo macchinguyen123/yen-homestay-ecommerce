@@ -32,6 +32,46 @@ public class User {
 
     private String avatar;
 
+    @Column(name = "nickname")
+    private String nickname;
+
+    @Column(name = "cccd")
+    private String cccd;
+
+    @Column(name = "dob_day")
+    private String dobDay;
+
+    @Column(name = "dob_month")
+    private String dobMonth;
+
+    @Column(name = "dob_year")
+    private String dobYear;
+
+    @Column(name = "gender")
+    private String gender;
+
+    @Column(name = "nationality")
+    private String nationality;
+
+    @Column(name = "street")
+    private String street;
+
+    @Column(name = "province_code")
+    private String provinceCode;
+
+    @Column(name = "ward")
+    private String ward;
+
+    @Column(name = "tax_code")
+    private String taxCode;
+
+    @Column(name = "biz_code")
+    private String bizCode;
+
+    @Column(name = "phone_verified")
+    @Builder.Default
+    private Boolean phoneVerified = false;
+
     @Column(nullable = false)
     private String role; // 'USER', 'OWNER', 'ADMIN'
 

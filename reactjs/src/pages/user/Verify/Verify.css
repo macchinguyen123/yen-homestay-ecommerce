@@ -1,0 +1,59 @@
+.verify-page-wrapper {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #f0fdf4 0%, #e2e8f0 100%);
+  padding: 20px;
+}
+
+.verify-card {
+  background: #ffffff;
+  border-radius: 24px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.08);
+  border: 1px solid #e2e8f0;
+  padding: 36px 32px;
+  width: 100%;
+  max-width: 440px;
+}
+
+.text-emerald {
+  color: #059669 !important;
+}
+
+.success-icon-wrapper {
+  font-size: 3.5rem;
+  color: #10b981;
+  line-height: 1;
+}
+
+.form-control-otp {
+  font-size: 1.75rem !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.35em !important;
+  height: 56px !important;
+  border-radius: 14px !important;
+  border: 2px solid #e2e8f0 !important;
+  color: #0f172a !important;
+  transition: all 0.2s ease !important;
+}
+
+.form-control-otp:focus {
+  border-color: #10b981 !important;
+  box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.15) !important;
+}
+
+.btn-eco-primary {
+  background: #15803d !important;
+  color: #ffffff !important;
+  border-radius: 12px !important;
+  border: none !important;
+  box-shadow: 0 4px 14px rgba(21, 128, 61, 0.25) !important;
+  transition: all 0.2s ease !important;
+}
+
+.btn-eco-primary:hover {
+  background: #166534 !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 6px 18px rgba(21, 128, 61, 0.35) !important;
+}
