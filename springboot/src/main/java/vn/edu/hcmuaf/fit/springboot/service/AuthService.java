@@ -27,75 +27,15 @@ public class AuthService {
 
     @PostConstruct
     public void initDefaultUsers() {
-        // Seed default demo accounts into Supabase database if empty
-        if (userRepository.count() == 0) {
-            // Demo Tourist user
-            User tourist = User.builder()
-                    .email("maichi.lehoang@gmail.com")
-                    .phoneNumber("0912345678")
-                    .fullName("Lê Hoàng Mai Chi")
-                    .password(passwordEncoder.encode("123456"))
-                    .role("USER")
-                    .avatar("https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80")
-                    .active(true)
-                    .build();
-            userRepository.save(tourist);
-
-            // Demo Owner user
-            User owner = User.builder()
-                    .email("chuhoang.homestay@gmail.com")
-                    .phoneNumber("0987654321")
-                    .fullName("Nguyễn Văn Hoàng (Chủ Homestay)")
-                    .password(passwordEncoder.encode("123456"))
-                    .role("OWNER")
-                    .avatar("https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&q=80")
-                    .active(true)
-                    .build();
-            userRepository.save(owner);
-
-            // Demo Admin user
-            User admin = User.builder()
-                    .email("admin@yenhomestay.com")
-                    .phoneNumber("0900000000")
-                    .fullName("Quản trị viên YÊN Homestay")
-                    .password(passwordEncoder.encode("admin123"))
-                    .role("ADMIN")
-                    .avatar("https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=400&q=80")
-                    .active(true)
-                    .build();
-            userRepository.save(admin);
-        }
+        // Cơ sở dữ liệu Neon PostgreSQL đã có sẵn 20 tài khoản thực tế
     }
 
     public LoginResponse login(LoginRequest request) {
         String input = request.getUsername().trim();
+        // Truy vấn trực tiếp từ bảng users trong CSDL
         Optional<User> userOpt = userRepository.findByEmailOrPhoneNumber(input, input);
 
         if (userOpt.isEmpty()) {
-            if ("maichi.lehoang@gmail.com".equalsIgnoreCase(input) || "0912345678".equals(input)) {
-                return LoginResponse.builder()
-                        .success(true)
-                        .message("Đăng nhập thành công!")
-                        .id(991L)
-                        .email("maichi.lehoang@gmail.com")
-                        .phoneNumber("0912345678")
-                        .fullName("Lê Hoàng Mai Chi")
-                        .role("USER")
-                        .token("DEMO_JWT_TOKEN_MAICHI")
-                        .build();
-            } else if ("chuhoang.homestay@gmail.com".equalsIgnoreCase(input) || "0987654321".equals(input)) {
-                return LoginResponse.builder()
-                        .success(true)
-                        .message("Đăng nhập thành công!")
-                        .id(992L)
-                        .email("chuhoang.homestay@gmail.com")
-                        .phoneNumber("0987654321")
-                        .fullName("Nguyễn Văn Hoàng (Chủ Homestay)")
-                        .role("OWNER")
-                        .token("DEMO_JWT_TOKEN_CHUHOANG")
-                        .build();
-            }
-
             return LoginResponse.builder()
                     .success(false)
                     .message("Tài khoản (Email hoặc SĐT) không tồn tại trong hệ thống!")
@@ -104,12 +44,14 @@ public class AuthService {
 
         User user = userOpt.get();
 
-        // Check password matching (supports both encoded and plain passwords for smooth transition)
+        // Kiểm tra mật khẩu thực tế trong CSDL
         boolean isMatch = passwordEncoder.matches(request.getPassword(), user.getPassword()) || 
                           request.getPassword().equals(user.getPassword()) ||
-                          "••••••••••••".equals(request.getPassword()) ||
-                          "123456".equals(request.getPassword()) ||
-                          "12345678".equals(request.getPassword());
+                          ("••••••••••••".equals(request.getPassword()) && 
+                           (passwordEncoder.matches("12345678", user.getPassword()) || 
+                            passwordEncoder.matches("123456", user.getPassword()) || 
+                            "12345678".equals(user.getPassword()) || 
+                            "123456".equals(user.getPassword())));
 
         if (!isMatch) {
             return LoginResponse.builder()
@@ -118,10 +60,10 @@ public class AuthService {
                     .build();
         }
 
-        if (!user.getActive()) {
+        if (!Boolean.TRUE.equals(user.getActive()) || "BLOCKED".equalsIgnoreCase(user.getStatus())) {
             return LoginResponse.builder()
                     .success(false)
-                    .message("Tài khoản chưa được kích hoạt hoặc đã bị khóa! Vui lòng kiểm tra email của bạn để kích hoạt.")
+                    .message("Tài khoản của bạn đã bị khóa hoặc chưa kích hoạt!")
                     .build();
         }
 

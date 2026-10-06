@@ -461,17 +461,40 @@
   padding: 8px 12px;
   border-radius: 12px;
   border: 1px solid #E2E8F0;
-  background: transparent;
+  background: #FFFFFF;
   color: #334155;
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
+  line-height: 1;
 }
 
 .login-root .grid.grid-cols-2 button:hover {
   border-color: #CBD5E1;
   background-color: #F8FAFC;
+}
+
+.login-root .grid.grid-cols-2 button svg,
+.login-root svg.w-4 {
+  width: 16px !important;
+  height: 16px !important;
+  min-width: 16px !important;
+  min-height: 16px !important;
+  max-width: 16px !important;
+  max-height: 16px !important;
+  display: inline-block !important;
+  vertical-align: middle !important;
+  flex-shrink: 0 !important;
+}
+
+.login-root .grid.grid-cols-2 button i.bi-facebook {
+  font-size: 14px !important;
+  color: #2563EB !important;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* 9. BOTTOM REGISTRATION LINKS */
