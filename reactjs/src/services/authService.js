@@ -42,25 +42,8 @@ export const authService = {
         return { success: false, message: data.message || 'Đăng nhập thất bại. Vui lòng thử lại!' };
       }
     } catch (error) {
-      console.warn('Backend server not reachable or network error, fallback to offline demo auth:', error);
-      // Fallback cho demo nếu server backend chưa được bật ở local
-      const mockRole = role === 'owner' ? 'OWNER' : 'USER';
-      const mockName = username.includes('chuhoang') ? 'Nguyễn Văn Hoàng (Chủ Homestay)' : 'Lê Hoàng Mai Chi';
-      const mockData = {
-        id: 10,
-        email: username,
-        fullName: mockName,
-        role: mockRole,
-        token: 'MOCK_TOKEN_OFFLINE',
-      };
-      
-      localStorage.setItem('user', JSON.stringify(mockData));
-      localStorage.setItem('user_role', mockRole);
-      sessionStorage.setItem('isLoggedIn', 'true');
-      sessionStorage.setItem('userName', mockName);
-      sessionStorage.setItem('userRole', mockRole);
-
-      return { success: true, message: `Đăng nhập (Demo Mode) thành công với tài khoản ${mockName}!`, user: mockData };
+      console.error('Backend server not reachable or network error:', error);
+      return { success: false, message: 'Lỗi kết nối máy chủ cơ sở dữ liệu (Spring Boot 8080)!' };
     }
   },
 
