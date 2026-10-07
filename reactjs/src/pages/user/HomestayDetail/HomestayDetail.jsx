@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import './HomestayDetail.css';
 import { authService } from '../../../services/authService';
 import { viewedHistoryService } from '../../../services/viewedHistoryService';
@@ -157,7 +157,14 @@ function RoomModal({ room, onClose, onOpenReviews, showToast }) {
     if (!nights || nights <= 0) { showToast('Vui lòng chọn lại ngày nhận - trả phòng hợp lệ!'); return; }
     showToast(`Đang chuyển đến trang xác nhận đặt "${room.name}"...`);
     onClose();
-    navigate('/booking');
+    navigate(`/booking?roomId=${room.id}&checkin=${checkin}&checkout=${checkout}&guests=${guests}`, {
+      state: {
+        roomId: room.id,
+        checkin,
+        checkout,
+        guests,
+      },
+    });
   };
 
   const roomReviews = getFilteredReviews(room.reviewGroup, 'all', 'newest').slice(0, 2);
@@ -621,6 +628,7 @@ function AmenitiesDrawer({ open, onClose }) {
 // ─── MAIN PAGE ─────────────────────────────────────────────────
 export default function HomestayDetail() {
   const { id } = useParams();
+  const [searchParams] = useSearchParams();
   const [lightbox, setLightbox] = useState(null);
   const [activeRoomIdx, setActiveRoomIdx] = useState(null);
   const [reviewsDrawer, setReviewsDrawer] = useState({ open: false, group: 'all' });
@@ -635,6 +643,19 @@ export default function HomestayDetail() {
   const roomsSectionRef = useRef(null);
   const reviewsSectionRef = useRef(null);
   const toastTimer = useRef(null);
+
+  // Mở trực tiếp modal chi tiết phòng nếu có param ?room=... hoặc /room/:id
+  useEffect(() => {
+    const roomParam = searchParams.get('room') || searchParams.get('roomId') || id;
+    if (roomParam) {
+      const idx = roomsData.findIndex((r) => r.id === roomParam || String(r.id) === String(roomParam));
+      if (idx !== -1) {
+        setActiveRoomIdx(idx);
+      } else if (!isNaN(roomParam) && Number(roomParam) >= 0 && Number(roomParam) < roomsData.length) {
+        setActiveRoomIdx(Number(roomParam));
+      }
+    }
+  }, [id, searchParams]);
 
   // Tự động lưu lịch sử sản phẩm đã xem của user
   useEffect(() => {
@@ -735,13 +756,13 @@ export default function HomestayDetail() {
       <section className="detail-gallery-section">
         <div className="hd-container">
           <div className="gallery-wrap">
-            <div className="gallery-grid" onClick={() => setLightbox({ images: galleryImages, index: 0 })}>
-              <div className="gallery-main">
+            <div className="gallery-grid">
+              <div className="gallery-main" onClick={() => setLightbox({ images: galleryImages, index: 0 })}>
                 <img src={galleryImages[0]} alt="Toàn cảnh The Pine Hill Retreat" />
               </div>
               <div className="gallery-side">
                 {galleryImages.slice(1, 5).map((src, i) => (
-                  <div key={i} className="gallery-thumb">
+                  <div key={i} className="gallery-thumb" onClick={() => setLightbox({ images: galleryImages, index: i + 1 })}>
                     <img src={src} alt={`Ảnh ${i + 2}`} />
                   </div>
                 ))}

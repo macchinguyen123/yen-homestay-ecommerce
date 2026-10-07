@@ -62,6 +62,12 @@ export default function AppRoutes() {
         <Route path="/" element={<Homepage />} />
         <Route path="/homestay" element={<HomestayDetail />} />
         <Route path="/homestay/:id" element={<HomestayDetail />} />
+        <Route path="/room" element={<HomestayDetail />} />
+        <Route path="/room/:id" element={<HomestayDetail />} />
+        <Route path="/room-detail" element={<HomestayDetail />} />
+        <Route path="/room-detail/:id" element={<HomestayDetail />} />
+        <Route path="/chi-tiet-phong" element={<HomestayDetail />} />
+        <Route path="/chi-tiet-phong/:id" element={<HomestayDetail />} />
         <Route path="/booking" element={<BookingAndPay />} />
         <Route path="/bookings" element={<Bookings />} />
         <Route path="/complete-pay" element={<CompletePay />} />

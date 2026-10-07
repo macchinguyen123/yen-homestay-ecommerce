@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import './BookingAndPay.css';
 
 const SERVICE_FEE_RATE = 0.05;
@@ -98,6 +98,8 @@ function qrSvgSvg(seedStr, color) {
 
 export default function BookingAndPay() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
   const todayStr = toInputDate(new Date());
 
   // Dates initial
@@ -108,6 +110,26 @@ export default function BookingAndPay() {
   const [checkin, setCheckin] = useState(toInputDate(defaultCheckinDate));
   const [checkout, setCheckout] = useState(toInputDate(defaultCheckoutDate));
   const [guests, setGuests] = useState(2);
+
+  // Read passed booking details from HomestayDetail / Room Modal
+  useEffect(() => {
+    const passedRoomId = searchParams.get('roomId') || location.state?.roomId;
+    if (passedRoomId && ROOM_CATALOG[passedRoomId]) {
+      setRoom(ROOM_CATALOG[passedRoomId]);
+    }
+    const passedCheckin = searchParams.get('checkin') || location.state?.checkin;
+    if (passedCheckin) {
+      setCheckin(passedCheckin);
+    }
+    const passedCheckout = searchParams.get('checkout') || location.state?.checkout;
+    if (passedCheckout) {
+      setCheckout(passedCheckout);
+    }
+    const passedGuests = searchParams.get('guests') || location.state?.guests;
+    if (passedGuests) {
+      setGuests(Number(passedGuests));
+    }
+  }, [searchParams, location.state]);
 
   // Form Contact
   const [fullName, setFullName] = useState('');
