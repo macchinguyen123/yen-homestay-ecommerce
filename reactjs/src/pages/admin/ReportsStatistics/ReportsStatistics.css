@@ -1,3 +1,9 @@
+/* Spin animation for loading icon */
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
 /* Page Header & Global Toolbar */
 .reports-page-header {
     display: flex;
@@ -36,12 +42,13 @@
     display: flex;
     align-items: center;
     gap: 10px;
+    flex-wrap: wrap;
 }
 
 .date-range-wrap {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 8px;
     background-color: #FFFFFF;
     border: 1px solid #E2E8F0;
     padding: 6px 12px;
@@ -65,15 +72,12 @@
 }
 
 .custom-date-box {
-    display: none;
+    display: flex;
     align-items: center;
     gap: 6px;
     padding-left: 8px;
     border-left: 1px solid #E2E8F0;
-}
-
-.custom-date-box.show {
-    display: flex;
+    flex-wrap: wrap;
 }
 
 .date-lbl {
@@ -83,17 +87,19 @@
 }
 
 .date-picker-input {
-    border: 1px solid #E2E8F0;
+    border: 1px solid #CBD5E1;
     border-radius: 6px;
     padding: 4px 8px;
     font-size: 12.5px;
     color: #1E293B;
     outline: none;
     font-family: inherit;
+    background-color: #F8FAFC;
 }
 
 .date-picker-input:focus {
     border-color: #15803D;
+    background-color: #FFFFFF;
 }
 
 .btn-apply-date {
@@ -101,11 +107,14 @@
     color: #FFFFFF;
     border: none;
     border-radius: 6px;
-    padding: 4px 10px;
+    padding: 5px 12px;
     font-size: 12px;
     font-weight: 700;
     cursor: pointer;
     transition: background 0.15s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
 }
 
 .btn-apply-date:hover {
@@ -180,6 +189,7 @@
     font-weight: 600;
     cursor: pointer;
     white-space: nowrap;
+    flex-shrink: 0;
     transition: all 0.15s ease;
 }
 
