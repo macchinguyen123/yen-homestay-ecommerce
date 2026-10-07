@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Link, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
+import { authService } from '../../../services/authService';
+import { bookingService } from '../../../services/bookingService';
 import './BookingAndPay.css';
 
 const SERVICE_FEE_RATE = 0.05;
@@ -333,6 +335,28 @@ export default function BookingAndPay() {
         localStorage.setItem('yenBookings', JSON.stringify(list));
       } catch (e) {
         console.error('Save booking error:', e);
+      }
+
+      // Lưu đơn vào CSDL thật khi có homestayId/roomId thật và người dùng đã đăng nhập
+      const realUser = authService.getCurrentUser();
+      const hsId = Number(searchParams.get('homestayId') || location.state?.homestayId);
+      const rmId = Number(searchParams.get('roomId') || location.state?.roomId);
+      if (realUser?.id && hsId) {
+        bookingService.createBooking({
+          touristId: realUser.id,
+          homestayId: hsId,
+          roomId: Number.isFinite(rmId) && rmId > 0 ? rmId : null,
+          checkInDate: checkin,
+          checkOutDate: checkout,
+          guestsCount: guests,
+          totalPrice: grandTotal,
+          discountAmount: discount,
+          paymentType: payPlan === 'deposit' ? 'DEPOSIT' : 'FULL',
+          depositAmount: payNow,
+          remainingAmount: payLater,
+          depositStatus: 'PAID',
+          status: 'CONFIRMED',
+        }).catch((err) => console.error('Create booking error:', err));
       }
 
       navigate(`/complete-pay?code=${bookingCode}`);

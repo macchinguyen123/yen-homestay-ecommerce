@@ -10,4 +10,6 @@ import java.util.List;
 public interface ReportRepository extends JpaRepository<Report, Long> {
     List<Report> findByReporterId(Long reporterId);
     List<Report> findByReportedHomestayId(Long homestayId);
+    java.util.Optional<Report> findFirstByBookingId(Long bookingId);
+    List<Report> findByBookingId(Long bookingId);
 }

@@ -109,7 +109,7 @@ export default function Header() {
 
             <li className="yen-nav-item">
               <NavLink
-                to="/booking"
+                to="/bookings"
                 className={({ isActive }) => `yen-nav-link ${isActive ? 'active' : ''}`}
                 onClick={closeMobileMenu}
               >
