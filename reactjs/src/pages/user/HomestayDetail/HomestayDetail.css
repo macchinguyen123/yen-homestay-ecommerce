@@ -477,10 +477,10 @@ body {
     padding: 22px 24px; margin-bottom: 26px;
     background: var(--light-bg); border: 1px solid var(--border-color); border-radius: var(--radius-lg);
 }
-.rating-score { text-align: center; padding-right: 32px; border-right: 1px solid var(--border-color); }
-.rating-score b { display: block; font-size: 2.8rem; font-weight: 800; color: var(--dark-color); line-height: 1; letter-spacing: -1px; }
+.rating-overview .rating-score { text-align: center; padding-right: 32px; border-right: 1px solid var(--border-color); }
+.rating-overview .rating-score b { display: block; font-size: 2.8rem; font-weight: 800; color: var(--dark-color); line-height: 1; letter-spacing: -1px; }
 .rating-stars { margin: 8px 0 4px; color: var(--star-color); font-size: 0.8rem; display: flex; justify-content: center; gap: 2px; }
-.rating-score span { font-size: 0.82rem; font-weight: 700; color: var(--primary-color); }
+.rating-overview .rating-score span { font-size: 0.82rem; font-weight: 700; color: var(--primary-color); }
 
 .rating-breakdown { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 28px; }
 .rating-bar-row {
@@ -525,6 +525,23 @@ body {
     background: var(--primary-light); border: 1px solid var(--primary-tag-border);
     padding: 2px 10px; border-radius: var(--radius-full);
 }
+
+.review-owner-reply {
+    margin-top: 12px; padding: 12px 14px; background: #F8FAFC;
+    border-left: 3px solid var(--primary-color); border-radius: 6px; font-size: 0.85rem;
+}
+.review-owner-reply strong {
+    display: flex; align-items: center; gap: 6px;
+    color: var(--primary-color); font-size: 0.82rem; margin-bottom: 4px;
+}
+.review-owner-reply p { margin: 0; color: #475569; line-height: 1.5; }
+
+.rv-empty-state {
+    text-align: center; padding: 36px 16px; background: #F8FAFC;
+    border-radius: 12px; border: 1px dashed #CBD5E1; color: var(--text-muted); margin-bottom: 20px;
+}
+.rv-empty-state i { font-size: 2rem; color: #94A3B8; display: block; margin-bottom: 8px; }
+.rv-empty-state p { margin: 0; font-size: 0.92rem; }
 
 /* 4.7 Vị trí */
 .location-note { font-size: 0.92rem; color: var(--text-muted); margin-bottom: 16px; display: flex; align-items: flex-start; gap: 6px; line-height: 1.5; }
@@ -949,7 +966,7 @@ body {
     .rules-grid,
     .rating-breakdown { grid-template-columns: 1fr; }
     .rating-overview { grid-template-columns: 1fr; gap: 18px; }
-    .rating-score { padding-right: 0; padding-bottom: 18px; border-right: none; border-bottom: 1px solid var(--border-color); }
+    .rating-overview .rating-score { padding-right: 0; padding-bottom: 18px; border-right: none; border-bottom: 1px solid var(--border-color); }
     .host-profile-block { flex-direction: column; }
     .detail-side-col { display: none; }
     .mobile-booking-bar { display: flex; }

@@ -208,10 +208,10 @@
 
 /* ── REVIEWS ──────────────────────────────────────────────── */
 .rating-overview { display: grid; grid-template-columns: 170px 1fr; gap: 32px; align-items: center; padding: 22px 24px; margin-bottom: 26px; background: var(--light-bg); border: 1px solid var(--border-color); border-radius: var(--radius-lg); }
-.rating-score { text-align: center; padding-right: 32px; border-right: 1px solid var(--border-color); }
-.rating-score b { display: block; font-size: 2.8rem; font-weight: 800; color: var(--dark-color); line-height: 1; letter-spacing: -1px; }
+.rating-overview .rating-score { text-align: center; padding-right: 32px; border-right: 1px solid var(--border-color); }
+.rating-overview .rating-score b { display: block; font-size: 2.8rem; font-weight: 800; color: var(--dark-color); line-height: 1; letter-spacing: -1px; }
 .rating-stars { margin: 8px 0 4px; color: var(--star-color); font-size: 0.8rem; display: flex; justify-content: center; gap: 2px; }
-.rating-score span { font-size: 0.82rem; font-weight: 700; color: var(--primary-color); }
+.rating-overview .rating-score span { font-size: 0.82rem; font-weight: 700; color: var(--primary-color); }
 .rating-breakdown { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 28px; }
 .rating-bar-row { display: grid; grid-template-columns: 88px 1fr 28px; align-items: center; gap: 10px; font-size: 0.85rem; color: var(--text-main); font-weight: 600; }
 .rating-bar { height: 6px; background: var(--border-color); border-radius: var(--radius-full); overflow: hidden; }

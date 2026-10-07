@@ -70,6 +70,8 @@ public class TestDbController {
             map.put("paymentRevenue", jdbcTemplate.queryForObject("SELECT COALESCE(SUM(amount), 0) FROM payments", BigDecimal.class));
             map.put("vouchers", jdbcTemplate.queryForObject("SELECT count(*) FROM vouchers", Long.class));
             map.put("ads", jdbcTemplate.queryForObject("SELECT count(*) FROM homestay_ads", Long.class));
+            map.put("reviews", jdbcTemplate.queryForObject("SELECT count(*) FROM reviews", Long.class));
+            map.put("sampleReviews", jdbcTemplate.queryForList("SELECT * FROM reviews LIMIT 10"));
             map.put("topCities", jdbcTemplate.queryForList("SELECT city, count(*) as count FROM homestays GROUP BY city ORDER BY count(*) DESC LIMIT 5"));
             map.put("bookingStatuses", jdbcTemplate.queryForList("SELECT status, count(*) as count FROM bookings GROUP BY status"));
         } catch (Exception e) {
