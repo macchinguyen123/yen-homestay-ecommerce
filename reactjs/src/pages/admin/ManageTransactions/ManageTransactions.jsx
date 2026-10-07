@@ -1,61 +1,112 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import './ManageTransactions.css';
-
-const initialTransactions = [
-    { id: 1, txCode: "#GD-88201", bookingCode: "#BK-9042", guest: "Trần Minh Khoa", guestPhone: "0903 123 456", homestay: "Pù Luông Eco Lodge", owner: "Triệu Văn Sản", total: "1.700.000đ", deposit: "850.000đ (50%)", netPayout: "1.564.000đ", gateway: "VNPay QR", gatewayClass: "vnpay", status: "escrow", statusText: "Giữ cọc YÊN", traceId: "VNP-992019482" },
-    { id: 2, txCode: "#GD-88198", bookingCode: "#BK-8102", guest: "Lê Thị Mai", guestPhone: "0918 776 554", homestay: "Mộc Châu Bamboo Bungalow", owner: "Đinh Thị Hương", total: "1.500.000đ", deposit: "1.500.000đ (100%)", netPayout: "1.380.000đ", gateway: "Ví MoMo", gatewayClass: "momo", status: "refund-pending", statusText: "Chờ hoàn tiền", traceId: "MOMO-77281049" },
-    { id: 3, txCode: "#GD-88170", bookingCode: "#BK-7410", guest: "Phạm Quốc Huy", guestPhone: "0977 889 001", homestay: "Sa Pa Terraces Valley", owner: "Vàng A Sáng", total: "2.800.000đ", deposit: "1.400.000đ (50%)", netPayout: "2.576.000đ", gateway: "VietQR", gatewayClass: "vietqr", status: "payout-ready", statusText: "Chờ giải ngân", traceId: "MB-88392019" },
-    { id: 4, txCode: "#GD-88155", bookingCode: "#BK-6021", guest: "Nguyễn Vũ Long", guestPhone: "0908 991 223", homestay: "Nhà Sàn Mộc Mai Châu", owner: "Nguyễn Văn An", total: "1.300.000đ", deposit: "650.000đ (50%)", netPayout: "1.196.000đ", gateway: "VNPay QR", gatewayClass: "vnpay", status: "completed", statusText: "Hoàn tất", traceId: "VNP-88102394" },
-    { id: 5, txCode: "#GD-88140", bookingCode: "#BK-5912", guest: "Hoàng Anh Tuấn", guestPhone: "0934 556 778", homestay: "Đà Lạt Cloud Valley", owner: "Phạm Hoàng Nam", total: "2.400.000đ", deposit: "1.200.000đ (50%)", netPayout: "2.208.000đ", gateway: "VietQR", gatewayClass: "vietqr", status: "refund-pending", statusText: "Chờ hoàn tiền", traceId: "VCB-9910248" }
-];
+import { adminTransactionService } from '../../../services/adminTransactionService';
 
 export default function ManageTransactions() {
-    const [transactions, setTransactions] = useState(initialTransactions);
+    const [transactions, setTransactions] = useState([]);
+    const [stats, setStats] = useState({
+        yenFeeMonth: '34.800.000đ',
+        escrowDepositTotal: '68.500.000đ',
+        refundRequestsCount: 2,
+        payoutPendingCount: 5,
+        totalCount: 24,
+        escrowCount: 14,
+        refundCount: 2,
+        payoutCount: 5,
+        completedCount: 3
+    });
     const [filterStatus, setFilterStatus] = useState('all');
     const [searchTerm, setSearchTerm] = useState('');
     const [gateway, setGateway] = useState('all');
+    const [page, setPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
+    const [totalElements, setTotalElements] = useState(0);
+    const [loading, setLoading] = useState(false);
 
     const [activeModal, setActiveModal] = useState(null);
     const [currentTx, setCurrentTx] = useState(null);
+    const [traceRefInput, setTraceRefInput] = useState('');
+    const [actionMessage, setActionMessage] = useState(null);
 
-    const filteredData = transactions.filter(item => {
-        let matchTab = true;
-        if (filterStatus === 'escrow') matchTab = (item.status === 'escrow');
-        else if (filterStatus === 'refund') matchTab = (item.status === 'refund-pending');
-        else if (filterStatus === 'payout') matchTab = (item.status === 'payout-ready');
-        
-        const matchSearch = item.txCode.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                            item.bookingCode.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                            item.guest.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                            item.homestay.toLowerCase().includes(searchTerm.toLowerCase());
-        const matchGateway = gateway === 'all' || item.gatewayClass === gateway;
-        return matchTab && matchSearch && matchGateway;
-    });
+    const fetchTransactions = useCallback(async () => {
+        setLoading(true);
+        const res = await adminTransactionService.getTransactions(filterStatus, searchTerm, gateway, page, 10);
+        if (res) {
+            setTransactions(res.content || []);
+            setTotalPages(res.totalPages || 1);
+            setTotalElements(res.totalElements || 0);
+            if (res.stats) {
+                setStats(res.stats);
+            }
+        }
+        setLoading(false);
+    }, [filterStatus, searchTerm, gateway, page]);
+
+    useEffect(() => {
+        fetchTransactions();
+    }, [fetchTransactions]);
+
+    const handleFilterChange = (status) => {
+        setFilterStatus(status);
+        setPage(1);
+    };
+
+    const handleSearchChange = (e) => {
+        setSearchTerm(e.target.value);
+        setPage(1);
+    };
+
+    const handleGatewayChange = (e) => {
+        setGateway(e.target.value);
+        setPage(1);
+    };
 
     const openModal = (modalName, tx) => {
         setCurrentTx(tx);
+        setTraceRefInput(tx ? (tx.traceId || '') : '');
         setActiveModal(modalName);
     };
 
     const closeModal = () => {
         setActiveModal(null);
         setCurrentTx(null);
+        setTraceRefInput('');
     };
 
-    const confirmRefund = () => {
+    const confirmRefund = async () => {
         if (!currentTx) return;
-        setTransactions(prev => prev.map(t => 
-            t.id === currentTx.id ? { ...t, status: 'refunded', statusText: 'Đã hoàn tiền' } : t
-        ));
+        setLoading(true);
+        const res = await adminTransactionService.updateTransactionStatus(currentTx.id, {
+            status: 'refunded',
+            traceId: traceRefInput || currentTx.traceId
+        });
+        if (res.success) {
+            setActionMessage('Đã duyệt hoàn tiền thành công!');
+            setTimeout(() => setActionMessage(null), 3000);
+            await fetchTransactions();
+        } else {
+            alert(res.message || 'Có lỗi xảy ra khi duyệt hoàn tiền');
+        }
         closeModal();
+        setLoading(false);
     };
 
-    const confirmPayout = () => {
+    const confirmPayout = async () => {
         if (!currentTx) return;
-        setTransactions(prev => prev.map(t => 
-            t.id === currentTx.id ? { ...t, status: 'completed', statusText: 'Hoàn tất' } : t
-        ));
+        setLoading(true);
+        const res = await adminTransactionService.updateTransactionStatus(currentTx.id, {
+            status: 'completed',
+            traceId: traceRefInput || currentTx.traceId
+        });
+        if (res.success) {
+            setActionMessage('Đã giải ngân cho chủ nhà thành công!');
+            setTimeout(() => setActionMessage(null), 3000);
+            await fetchTransactions();
+        } else {
+            alert(res.message || 'Có lỗi xảy ra khi giải ngân');
+        }
         closeModal();
+        setLoading(false);
     };
 
     return (
@@ -67,31 +118,48 @@ export default function ManageTransactions() {
                 </div>
             </div>
 
+            {actionMessage && (
+                <div style={{
+                    padding: '12px 16px',
+                    backgroundColor: '#DEF7EC',
+                    color: '#03543F',
+                    borderRadius: '8px',
+                    marginBottom: '16px',
+                    fontWeight: '600',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px'
+                }}>
+                    <span className="material-symbols-outlined">check_circle</span>
+                    {actionMessage}
+                </div>
+            )}
+
             <div className="financial-stats-grid">
                 <div className="f-stat-card emerald">
                     <div>
-                        <div className="f-stat-val">34.800.000đ</div>
-                        <div className="f-stat-lbl">Phí sàn YÊN (Tháng 9)</div>
+                        <div className="f-stat-val">{stats.yenFeeMonth}</div>
+                        <div className="f-stat-lbl">Phí sàn YÊN (8%)</div>
                     </div>
                     <span className="material-symbols-outlined f-stat-icon">account_balance_wallet</span>
                 </div>
                 <div className="f-stat-card indigo">
                     <div>
-                        <div className="f-stat-val">68.500.000đ</div>
+                        <div className="f-stat-val">{stats.escrowDepositTotal}</div>
                         <div className="f-stat-lbl">Tiền cọc đang giữ</div>
                     </div>
                     <span className="material-symbols-outlined f-stat-icon">lock_clock</span>
                 </div>
                 <div className="f-stat-card amber">
                     <div>
-                        <div className="f-stat-val">2 Đơn</div>
+                        <div className="f-stat-val">{stats.refundRequestsCount} Đơn</div>
                         <div className="f-stat-lbl">Yêu cầu hoàn tiền</div>
                     </div>
                     <span className="material-symbols-outlined f-stat-icon">assignment_return</span>
                 </div>
                 <div className="f-stat-card blue">
                     <div>
-                        <div className="f-stat-val">5 Đơn</div>
+                        <div className="f-stat-val">{stats.payoutPendingCount} Đơn</div>
                         <div className="f-stat-lbl">Chờ giải ngân Owner</div>
                     </div>
                     <span className="material-symbols-outlined f-stat-icon">payments</span>
@@ -101,26 +169,26 @@ export default function ManageTransactions() {
             {/* Filter Bar */}
             <div className="tx-filter-bar">
                 <div className="tx-filter-chips">
-                    <button className={`tx-chip ${filterStatus === 'all' ? 'active' : ''}`} onClick={() => setFilterStatus('all')}>
-                        Tất cả <span className="tx-chip-badge">24</span>
+                    <button className={`tx-chip ${filterStatus === 'all' ? 'active' : ''}`} onClick={() => handleFilterChange('all')}>
+                        Tất cả <span className="tx-chip-badge">{stats.totalCount}</span>
                     </button>
-                    <button className={`tx-chip ${filterStatus === 'escrow' ? 'active' : ''}`} onClick={() => setFilterStatus('escrow')}>
-                        Quản lý tiền cọc <span className="tx-chip-badge">14</span>
+                    <button className={`tx-chip ${filterStatus === 'escrow' ? 'active' : ''}`} onClick={() => handleFilterChange('escrow')}>
+                        Quản lý tiền cọc <span className="tx-chip-badge">{stats.escrowCount}</span>
                     </button>
-                    <button className={`tx-chip ${filterStatus === 'refund' ? 'active' : ''}`} onClick={() => setFilterStatus('refund')}>
-                        Xác nhận hoàn tiền <span className="tx-chip-badge">2</span>
+                    <button className={`tx-chip ${filterStatus === 'refund' ? 'active' : ''}`} onClick={() => handleFilterChange('refund')}>
+                        Xác nhận hoàn tiền <span className="tx-chip-badge">{stats.refundCount}</span>
                     </button>
-                    <button className={`tx-chip ${filterStatus === 'payout' ? 'active' : ''}`} onClick={() => setFilterStatus('payout')}>
-                        Thanh toán Owner <span className="tx-chip-badge">5</span>
+                    <button className={`tx-chip ${filterStatus === 'payout' ? 'active' : ''}`} onClick={() => handleFilterChange('payout')}>
+                        Thanh toán Owner <span className="tx-chip-badge">{stats.payoutCount}</span>
                     </button>
                 </div>
 
                 <div className="tx-filter-right">
                     <div className="tx-search-wrap">
                         <span className="material-symbols-outlined">search</span>
-                        <input type="text" placeholder="Tìm mã GD, tên khách, homestay..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                        <input type="text" placeholder="Tìm mã GD, tên khách, homestay..." value={searchTerm} onChange={handleSearchChange} />
                     </div>
-                    <select className="tx-select" value={gateway} onChange={(e) => setGateway(e.target.value)}>
+                    <select className="tx-select" value={gateway} onChange={handleGatewayChange}>
                         <option value="all">Tất cả phương thức</option>
                         <option value="vnpay">VNPay QR</option>
                         <option value="momo">Ví MoMo</option>
@@ -143,10 +211,12 @@ export default function ManageTransactions() {
                         </tr>
                     </thead>
                     <tbody>
-                        {filteredData.length === 0 ? (
+                        {loading ? (
+                            <tr><td colSpan="6" style={{ textAlign: 'center', color: '#64748B', padding: '24px' }}>Đang tải dữ liệu giao dịch...</td></tr>
+                        ) : transactions.length === 0 ? (
                             <tr><td colSpan="6" style={{ textAlign: 'center', color: '#94A3B8', padding: '24px' }}>Không tìm thấy giao dịch phù hợp.</td></tr>
                         ) : (
-                            filteredData.map(item => (
+                            transactions.map(item => (
                                 <tr key={item.id}>
                                     <td>
                                         <div className="tx-title-main">{item.txCode}</div>
@@ -174,12 +244,12 @@ export default function ManageTransactions() {
                                             <button className="tx-btn tx-btn-secondary" onClick={() => openModal('detail', item)}>
                                                 <span className="material-symbols-outlined" style={{ fontSize: '15px' }}>visibility</span> Xem
                                             </button>
-                                            {item.status === 'refund-pending' && (
+                                            {(item.status === 'refund-pending' || item.status === 'refund') && (
                                                 <button className="tx-btn tx-btn-refund" onClick={() => openModal('refund', item)}>
                                                     <span className="material-symbols-outlined" style={{ fontSize: '15px' }}>replay</span> Hoàn tiền
                                                 </button>
                                             )}
-                                            {item.status === 'payout-ready' && (
+                                            {(item.status === 'payout-ready' || item.status === 'payout') && (
                                                 <button className="tx-btn tx-btn-payout" onClick={() => openModal('payout', item)}>
                                                     <span className="material-symbols-outlined" style={{ fontSize: '15px' }}>payments</span> Giải ngân
                                                 </button>
@@ -192,6 +262,36 @@ export default function ManageTransactions() {
                     </tbody>
                 </table>
             </div>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '16px', padding: '0 4px' }}>
+                    <div style={{ fontSize: '13px', color: '#64748B' }}>
+                        Hiển thị {transactions.length} trên tổng số {totalElements} giao dịch
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                        <button
+                            disabled={page <= 1}
+                            onClick={() => setPage(prev => Math.max(1, prev - 1))}
+                            className="tx-btn tx-btn-secondary"
+                            style={{ opacity: page <= 1 ? 0.5 : 1, cursor: page <= 1 ? 'not-allowed' : 'pointer' }}
+                        >
+                            Trang trước
+                        </button>
+                        <span style={{ display: 'flex', alignItems: 'center', padding: '0 8px', fontSize: '13px', fontWeight: '600' }}>
+                            Trang {page} / {totalPages}
+                        </span>
+                        <button
+                            disabled={page >= totalPages}
+                            onClick={() => setPage(prev => Math.min(totalPages, prev + 1))}
+                            className="tx-btn tx-btn-secondary"
+                            style={{ opacity: page >= totalPages ? 0.5 : 1, cursor: page >= totalPages ? 'not-allowed' : 'pointer' }}
+                        >
+                            Trang sau
+                        </button>
+                    </div>
+                </div>
+            )}
 
             {/* Modals */}
             {activeModal === 'detail' && currentTx && (
@@ -207,7 +307,7 @@ export default function ManageTransactions() {
                                     <h5><span className="material-symbols-outlined" style={{ fontSize: '18px', color: '#15803D' }}>receipt</span> Bảng kê Tài chính</h5>
                                     <div className="bill-row"><span>Mã Booking:</span> <strong>{currentTx.bookingCode}</strong></div>
                                     <div className="bill-row"><span>Giá phòng:</span> <span>{currentTx.total}</span></div>
-                                    <div className="bill-row"><span>Phí dịch vụ sàn YÊN (8%):</span> <span>136.000đ</span></div>
+                                    <div className="bill-row"><span>Phí dịch vụ sàn YÊN (8%):</span> <span>{currentTx.platformFee || '136.000đ'}</span></div>
                                     <div className="bill-row total"><span>Tổng thanh toán:</span> <span style={{ color: '#15803D' }}>{currentTx.total}</span></div>
                                     <div className="bill-row" style={{ marginTop: '8px', background: '#EEF2FF', padding: '6px 8px', borderRadius: '6px' }}>
                                         <span>Tiền cọc YÊN giữ:</span> <strong style={{ color: '#4338CA' }}>{currentTx.deposit}</strong>
@@ -240,20 +340,26 @@ export default function ManageTransactions() {
                             <div className="bill-card" style={{ borderColor: '#FED7AA', background: '#FFF7ED', marginBottom: '14px' }}>
                                 <h5 style={{ color: '#C2410C' }}><span className="material-symbols-outlined" style={{ fontSize: '18px' }}>warning</span> Yêu cầu hủy phòng</h5>
                                 <div className="bill-row"><span>Khách hàng:</span> <strong>{currentTx.guest} ({currentTx.guestPhone})</strong></div>
-                                <div className="bill-row"><span>Lý do hủy:</span> <span>Bão thời tiết tại Mộc Châu, hủy trước 48h</span></div>
+                                <div className="bill-row"><span>Lý do hủy:</span> <span>{currentTx.refundReason || 'Hủy phòng theo quy định'}</span></div>
                                 <div className="bill-row total" style={{ color: '#C2410C' }}><span>Số tiền duyệt hoàn:</span> <span>{currentTx.total}</span></div>
                             </div>
 
                             <div className="bank-info-box">
                                 <div style={{ fontSize: '12px', fontWeight: 700, color: '#64748B', marginBottom: '4px' }}>NHẬN TIỀN HOÀN (Ví MoMo / NH):</div>
-                                <div className="bank-name">Ví Điện Tử MoMo / Ngân Hàng MB Bank</div>
-                                <div className="bank-acc">0918776554</div>
+                                <div className="bank-name">{currentTx.guestBankInfo || 'Ví Điện Tử MoMo / MB Bank'}</div>
+                                <div className="bank-acc">{currentTx.guestPhone}</div>
                                 <div className="bank-holder">{currentTx.guest.toUpperCase()}</div>
                             </div>
 
                             <div style={{ marginTop: '14px' }}>
                                 <label style={{ fontSize: '12.5px', fontWeight: 600, color: '#334155', display: 'block', marginBottom: '4px' }}>Mã giao dịch hoàn tiền (Trace Reference):</label>
-                                <input type="text" placeholder="MOMO-REF-88392" style={{ width: '100%', padding: '8px 12px', border: '1px solid #CBD5E1', borderRadius: '6px', fontSize: '13px' }} />
+                                <input
+                                    type="text"
+                                    placeholder="MOMO-REF-88392"
+                                    value={traceRefInput}
+                                    onChange={e => setTraceRefInput(e.target.value)}
+                                    style={{ width: '100%', padding: '8px 12px', border: '1px solid #CBD5E1', borderRadius: '6px', fontSize: '13px' }}
+                                />
                             </div>
                         </div>
                         <div className="modal-foot">
@@ -278,15 +384,26 @@ export default function ManageTransactions() {
                                 <h5 style={{ color: '#15803D' }}><span className="material-symbols-outlined" style={{ fontSize: '18px' }}>verified</span> Khách đã hoàn tất trả phòng</h5>
                                 <div className="bill-row"><span>Homestay:</span> <strong>{currentTx.homestay}</strong></div>
                                 <div className="bill-row"><span>Chủ nhà thụ hưởng:</span> <strong>{currentTx.owner}</strong></div>
-                                <div className="bill-row"><span>Phí sàn YÊN (8%):</span> <span style={{ color: '#DC2626' }}>-136.000đ</span></div>
+                                <div className="bill-row"><span>Phí sàn YÊN (8%):</span> <span style={{ color: '#DC2626' }}>-{currentTx.platformFee || '136.000đ'}</span></div>
                                 <div className="bill-row total" style={{ color: '#15803D', fontSize: '15px' }}><span>Thực chuyển cho Chủ nhà:</span> <span>{currentTx.netPayout}</span></div>
                             </div>
 
                             <div className="bank-info-box">
                                 <div style={{ fontSize: '12px', fontWeight: 700, color: '#64748B', marginBottom: '4px' }}>TÀI KHOẢN NGÂN HÀNG CHỦ NHÀ:</div>
-                                <div className="bank-name">Ngân Hàng MB Bank</div>
+                                <div className="bank-name">{currentTx.ownerBankInfo || 'Ngân Hàng MB Bank'}</div>
                                 <div className="bank-acc">9704 2200 8891 002</div>
                                 <div className="bank-holder">{currentTx.owner.toUpperCase()}</div>
+                            </div>
+
+                            <div style={{ marginTop: '14px' }}>
+                                <label style={{ fontSize: '12.5px', fontWeight: 600, color: '#334155', display: 'block', marginBottom: '4px' }}>Mã giao dịch giải ngân (Trace Reference):</label>
+                                <input
+                                    type="text"
+                                    placeholder="MB-PAYOUT-99102"
+                                    value={traceRefInput}
+                                    onChange={e => setTraceRefInput(e.target.value)}
+                                    style={{ width: '100%', padding: '8px 12px', border: '1px solid #CBD5E1', borderRadius: '6px', fontSize: '13px' }}
+                                />
                             </div>
                         </div>
                         <div className="modal-foot">
@@ -302,3 +419,4 @@ export default function ManageTransactions() {
         </div>
     );
 }
+
