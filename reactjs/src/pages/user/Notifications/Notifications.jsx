@@ -72,7 +72,7 @@ const INITIAL_NOTIFICATIONS = [
       { label: 'Hạn sử dụng:', val: '31/10/2026 (Còn 40 ngày)' }
     ],
     mainActionText: 'Áp dụng mã & Đặt Đà Lạt',
-    mainActionUrl: '/booking'
+    mainActionUrl: '/bookings'
   },
   {
     id: 'noti-104',

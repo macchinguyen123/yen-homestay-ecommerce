@@ -900,3 +900,32 @@
 .severity-opt input:checked + .sev-tag.low { background: #15803D; color: #FFF; border-color: #15803D; }
 .severity-opt input:checked + .sev-tag.medium { background: #D97706; color: #FFF; border-color: #D97706; }
 .severity-opt input:checked + .sev-tag.high { background: #E11D48; color: #FFF; border-color: #E11D48; }
+
+/* Toast thông báo (hiển thị trên cả modal) */
+.bk-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 32px;
+  transform: translate(-50%, 20px);
+  background: #0F172A;
+  color: #fff;
+  padding: 12px 22px;
+  border-radius: 12px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+  z-index: 99999;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: all 0.25s ease;
+}
+.bk-toast.show {
+  opacity: 1;
+  visibility: visible;
+  transform: translate(-50%, 0);
+}
+.bk-toast i { color: #4ADE80; }

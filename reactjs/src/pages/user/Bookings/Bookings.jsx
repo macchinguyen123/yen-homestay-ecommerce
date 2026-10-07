@@ -1,132 +1,21 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
+import { authService } from '../../../services/authService';
+import { bookingService } from '../../../services/bookingService';
 import './Bookings.css';
 
-const INITIAL_BOOKINGS = [
-  {
-    id: 'BK-2026-8892',
-    code: 'YEN-2026-8892',
-    homestayName: 'The Memory Valley Villa',
-    homestayImg: 'https://images.unsplash.com/photo-1518780664697-55e3ad937233?auto=format&fit=crop&w=600&q=80',
-    location: 'Hồ Tuyền Lâm, Đà Lạt',
-    roomType: 'Villa 3 phòng ngủ view thung lũng',
-    checkIn: '22/09/2026',
-    checkOut: '25/09/2026',
-    nights: 3,
-    guests: '6 người lớn · 2 trẻ em',
-    totalPrice: '4.350.000đ',
-    payStatus: 'Đã thanh toán VNPAY (100%)',
-    status: 'active', // 'active', 'upcoming', 'completed', 'complaint'
-    task: {
-      id: 'TASK-8892',
-      title: 'Danh sách việc cần làm tại Homestay',
-      rewardText: '🎁 Quà tặng trực tiếp từ Homestay',
-      status: 'pending',
-      checklist: [
-        { id: 1, text: 'Chụp ảnh phòng ở thực tế & nội thất homestay', done: false },
-        { id: 2, text: 'Chụp ảnh check-in khuôn viên & cảnh quan xung quanh', done: false },
-        { id: 3, text: 'Đăng nhận xét & đánh giá trải nghiệm homestay', done: false }
-      ],
-      userReview: null
-    }
-  },
-  {
-    id: 'BK-2026-7714',
-    code: 'YEN-2026-7714',
-    homestayName: 'Han River Glass House',
-    homestayImg: 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=600&q=80',
-    location: 'Bờ sông Hàn, Đà Nẵng',
-    roomType: 'Căn hộ kính view toàn cảnh bờ sông Hàn',
-    checkIn: '15/10/2026',
-    checkOut: '18/10/2026',
-    nights: 3,
-    guests: '4 người lớn',
-    totalPrice: '3.450.000đ',
-    payStatus: 'Đã cọc 30% (VietQR)',
-    status: 'upcoming',
-    task: {
-      id: 'TASK-7714',
-      title: 'Danh sách việc cần làm tại Homestay',
-      rewardText: '🎁 Quà tặng trực tiếp từ Homestay',
-      status: 'pending',
-      checklist: [
-        { id: 1, text: 'Chụp ảnh phòng kính view toàn cảnh Sông Hàn', done: false },
-        { id: 2, text: 'Chụp ảnh check-in khoảnh khắc ngắm hoàng hôn', done: false },
-        { id: 3, text: 'Đánh giá chất lượng dịch vụ & độ sạch của phòng', done: false }
-      ],
-      userReview: null
-    }
-  },
-  {
-    id: 'BK-2026-5021',
-    code: 'YEN-2026-5021',
-    homestayName: 'Hội An Ancient Town Retreat',
-    homestayImg: 'https://images.unsplash.com/photo-1523731407965-2430cd12f5e4?auto=format&fit=crop&w=600&q=80',
-    location: 'Phố cổ Hội An, Quảng Nam',
-    roomType: 'Phòng suite view phố cổ đèn lồng',
-    checkIn: '10/07/2026',
-    checkOut: '13/07/2026',
-    nights: 3,
-    guests: '2 người lớn',
-    totalPrice: '2.850.000đ',
-    payStatus: 'Đã thanh toán (MoMo)',
-    status: 'complaint',
-    complaint: {
-      id: 'KN-5021',
-      ticketCode: 'KN-5021-A',
-      typeText: 'Chất lượng phòng ở',
-      severity: 'medium',
-      content: 'Phòng có mùi ẩm, điều hòa không hoạt động trong suốt kỳ lưu trú.',
-      statusText: 'Đang xử lý'
-    },
-    task: {
-      id: 'TASK-5021',
-      title: 'Danh sách việc cần làm tại Homestay',
-      rewardText: '🎁 Quà tặng trực tiếp từ Homestay',
-      status: 'pending',
-      checklist: [
-        { id: 1, text: 'Chụp ảnh phòng suite view phố cổ', done: false },
-        { id: 3, text: 'Đăng bài nhận xét trải nghiệm', done: false }
-      ],
-      userReview: null
-    }
-  },
-  {
-    id: 'BK-2026-6540',
-    code: 'YEN-2026-6540',
-    homestayName: 'Topas Ecolodge Sapa',
-    homestayImg: 'https://images.unsplash.com/photo-1571896349842-33c89424de2d?auto=format&fit=crop&w=600&q=80',
-    location: 'Mường Hoa, Sapa',
-    roomType: 'Bungalow thung lũng Mường Hoa',
-    checkIn: '05/08/2026',
-    checkOut: '08/08/2026',
-    nights: 3,
-    guests: '2 người lớn',
-    totalPrice: '13.770.000đ',
-    payStatus: 'Đã thanh toán (Thẻ Visa)',
-    status: 'completed',
-    task: {
-      id: 'TASK-6540',
-      title: 'Danh sách việc cần làm tại Homestay',
-      rewardText: '🎁 Đã nhận quà tặng từ Homestay',
-      status: 'completed',
-      checklist: [
-        { id: 1, text: 'Chụp ảnh Bungalow view thung lũng Mường Hoa', done: true },
-        { id: 2, text: 'Chụp ảnh check-in biển mây Sapa', done: true },
-        { id: 3, text: 'Đăng bài nhận xét & đánh giá trải nghiệm Sapa', done: true }
-      ],
-      userReview: {
-        rating: 5,
-        title: 'Chuyến săn mây tuyệt vời nhất năm!',
-        content: 'Cảnh quan thung lũng Mường Hoa quá đẹp. Chủ nhà YÊN hỗ trợ xe Limousine tận tình, phòng ốc sạch sẽ ấm cúng.',
-        createdAt: '09/08/2026'
-      }
-    }
-  }
-];
+const mapBooking = (b) => ({
+  ...b,
+  code: b.bookingCode,
+  homestayImg: b.homestayImage,
+  complaint: b.complaint ? { ...b.complaint } : null,
+});
 
 export default function Bookings() {
-  const [userBookings, setUserBookings] = useState(INITIAL_BOOKINGS);
+  const currentUser = authService.getCurrentUser();
+  const userId = currentUser?.id;
+  const [userBookings, setUserBookings] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [currentFilter, setCurrentFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [toast, setToast] = useState({ show: false, msg: '' });
@@ -151,6 +40,16 @@ export default function Bookings() {
     setToast({ show: true, msg });
     setTimeout(() => setToast({ show: false, msg: '' }), 3200);
   };
+
+  const loadBookings = useCallback(async () => {
+    if (!userId) { setUserBookings([]); setLoading(false); return; }
+    setLoading(true);
+    const data = await bookingService.getUserBookings(userId);
+    setUserBookings(data.map(mapBooking));
+    setLoading(false);
+  }, [userId]);
+
+  useEffect(() => { loadBookings(); }, [loadBookings]);
 
   // Stats calculation
   const stats = useMemo(() => {
@@ -193,37 +92,31 @@ export default function Bookings() {
     setReviewContent('');
   };
 
-  const handleTaskSubmit = (e) => {
+  const handleTaskSubmit = async (e) => {
     e.preventDefault();
     if (!reviewContent.trim() || reviewContent.trim().length < 10) {
       showToast('Vui lòng nhập nội dung đánh giá chi tiết tối thiểu 10 ký tự!');
       return;
     }
-
-    setUserBookings((prev) =>
-      prev.map((b) => {
-        if (b.id === activeTaskBkId) {
-          return {
-            ...b,
-            task: {
-              ...b.task,
-              status: 'completed',
-              checklist: b.task.checklist.map((item) => ({ ...item, done: true })),
-              userReview: {
-                rating: starRating,
-                title: reviewTitle || 'Đánh giá tuyệt vời!',
-                content: reviewContent,
-                createdAt: 'Hôm nay',
-              },
-            },
-          };
-        }
-        return b;
-      })
-    );
-
-    setTaskModalOpen(false);
-    showToast('Đã hoàn thành danh sách nhiệm vụ & gửi đánh giá!');
+    const bk = userBookings.find((b) => b.id === activeTaskBkId);
+    if (!bk) return;
+    try {
+      const res = await bookingService.submitReview({
+        bookingId: bk.id,
+        touristId: userId,
+        homestayId: bk.homestayId,
+        taskId: bk.task?.id,
+        rating: starRating,
+        title: reviewTitle,
+        comment: reviewContent,
+      });
+      if (!res?.success) { showToast(res?.message || 'Gửi đánh giá thất bại!'); return; }
+      setTaskModalOpen(false);
+      showToast('Đã hoàn thành danh sách nhiệm vụ & gửi đánh giá!');
+      loadBookings();
+    } catch (err) {
+      showToast('Không kết nối được máy chủ!');
+    }
   };
 
   // Complaint Modal Handler
@@ -235,7 +128,7 @@ export default function Bookings() {
     setCmpContact('');
   };
 
-  const handleComplaintSubmit = (e) => {
+  const handleComplaintSubmit = async (e) => {
     e.preventDefault();
     if (!cmpType) { showToast('Vui lòng chọn loại vấn đề!'); return; }
     if (!cmpContent.trim() || cmpContent.trim().length < 20) {
@@ -243,31 +136,24 @@ export default function Bookings() {
       return;
     }
     if (!cmpContact.trim()) { showToast('Vui lòng nhập SĐT/Email để nhận phản hồi!'); return; }
-
-    const ticketCode = 'KN-' + activeCmpBkId.replace('BK-', '') + '-' + Math.floor(100 + Math.random() * 900);
-
-    setUserBookings((prev) =>
-      prev.map((b) => {
-        if (b.id === activeCmpBkId) {
-          return {
-            ...b,
-            status: 'complaint',
-            complaint: {
-              id: ticketCode,
-              ticketCode,
-              typeText: cmpType,
-              severity: cmpSeverity,
-              content: cmpContent,
-              statusText: 'Đang xử lý',
-            },
-          };
-        }
-        return b;
-      })
-    );
-
-    setComplaintModalOpen(false);
-    showToast(`Khiếu nại đã gửi thành công! Mã ticket: ${ticketCode}`);
+    const bk = userBookings.find((b) => b.id === activeCmpBkId);
+    if (!bk) return;
+    try {
+      const res = await bookingService.submitComplaint({
+        bookingId: bk.id,
+        reporterId: userId,
+        reportedHomestayId: bk.homestayId,
+        reportType: cmpType,
+        severity: cmpSeverity,
+        content: cmpContent + '\n[Liên hệ: ' + cmpContact + ']',
+      });
+      if (!res?.success) { showToast(res?.message || 'Gửi khiếu nại thất bại!'); return; }
+      setComplaintModalOpen(false);
+      showToast('Khiếu nại đã gửi thành công! Mã ticket: ' + res.ticketCode);
+      loadBookings();
+    } catch (err) {
+      showToast('Không kết nối được máy chủ!');
+    }
   };
 
   const activeTaskBk = userBookings.find((b) => b.id === activeTaskBkId);
@@ -282,10 +168,10 @@ export default function Bookings() {
           <aside className="bk-sidebar-col">
             <div className="bk-user-profile-card">
               <div className="d-flex align-items-center gap-3 mb-3" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80"
+                <img src={currentUser?.avatar || `https://ui-avatars.com/api/?background=15803D&color=fff&name=${encodeURIComponent(currentUser?.fullName || 'K')}`}
                   alt="Avatar" className="bk-avatar-img" />
                 <div>
-                  <h2 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0F172A', margin: 0 }}>Lê Hoàng Mai Chi</h2>
+                  <h2 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0F172A', margin: 0 }}>{currentUser?.fullName || 'Khách'}</h2>
                   <span className="badge-member-tag" style={{ marginTop: 4 }}>
                     <i className="bi bi-house-heart-fill text-success" /> Du khách YÊN
                   </span>
@@ -356,9 +242,9 @@ export default function Bookings() {
               {filteredBookings.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '48px 20px', background: '#FFFFFF', borderRadius: 18, border: '1.5px dashed #CBD5E1' }}>
                   <i className="bi bi-calendar-x" style={{ fontSize: '2.5rem', color: '#94A3B8', display: 'block', marginBottom: 12 }} />
-                  <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0F172A', marginBottom: 6 }}>Chưa có lịch sử phòng đặt trong mục này</h3>
+                  <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0F172A', marginBottom: 6 }}>{loading ? 'Đang tải lịch sử đặt phòng...' : !userId ? 'Vui lòng đăng nhập để xem lịch sử đặt phòng' : userBookings.length === 0 ? 'Bạn chưa có chuyến đi nào' : 'Chưa có lịch sử phòng đặt trong mục này'}</h3>
                   <p style={{ fontSize: '0.88rem', color: '#64748B', marginBottom: 18 }}>Hãy khám phá các homestay sinh thái tuyệt đẹp và đặt chuyến đi ngay hôm nay!</p>
-                  <Link to="/" className="btn-complete-mission" style={{ display: 'inline-flex', textDecoration: 'none' }}>
+                  <Link to={userId ? "/" : "/login"} className="btn-complete-mission" style={{ display: 'inline-flex', textDecoration: 'none' }}>
                     <i className="bi bi-compass" /> Khám phá Homestay ngay
                   </Link>
                 </div>
@@ -379,6 +265,7 @@ export default function Bookings() {
                         {bk.status === 'upcoming' && <span className="status-badge status-upcoming"><i className="bi bi-clock-history" /> SẮP NHẬN PHÒNG</span>}
                         {bk.status === 'completed' && <span className="status-badge status-completed"><i className="bi bi-check-circle-fill" /> ĐÃ HOÀN THÀNH</span>}
                         {bk.status === 'complaint' && <span className="status-badge status-complaint"><i className="bi bi-exclamation-triangle-fill" /> Khiếu nại ({bk.complaint?.statusText})</span>}
+                        {bk.status === 'cancelled' && <span className="status-badge status-complaint"><i className="bi bi-x-circle-fill" /> ĐÃ HỦY</span>}
                       </div>
 
                       <div className="bk-card-body">
@@ -462,7 +349,7 @@ export default function Bookings() {
                           <button type="button" className="btn-complaint-trigger" onClick={() => openComplaintModal(bk.id)}>
                             <i className="bi bi-exclamation-triangle-fill" /> {bk.status === 'complaint' ? 'Xem khiếu nại' : 'Khiếu nại'}
                           </button>
-                          <Link to="/homestay/doi" className="btn-action-ghost">Xem phòng</Link>
+                          <Link to={`/homestay/${bk.homestayId}`} className="btn-action-ghost">Xem phòng</Link>
                         </div>
                       </div>
                     </div>
@@ -612,3 +499,4 @@ export default function Bookings() {
     </div>
   );
 }
+
