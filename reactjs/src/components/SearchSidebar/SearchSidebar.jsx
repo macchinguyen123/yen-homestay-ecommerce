@@ -39,28 +39,20 @@ export default function SearchSidebar({
   return (
     <aside className="search-filter-sidebar" aria-label="Bộ lọc tìm kiếm">
       <div className="filter-heading">
-        <i className="bi bi-sliders fs-5 text-success"></i>
+        <span className="material-symbols-outlined text-success">tune</span>
         <div>
           <h2>Bộ lọc tìm kiếm</h2>
           <p>Chọn theo nhu cầu lưu trú</p>
         </div>
-        {totalActiveFilters > 0 && (
-          <button id="clear-filters" className="filter-clear" type="button" onClick={onClearFilters}>
-            Xóa lọc ({totalActiveFilters})
-          </button>
-        )}
+        <button id="clear-filters" className="filter-clear" type="button" onClick={onClearFilters}>
+          Xóa lọc
+        </button>
       </div>
-
-      {totalActiveFilters > 0 && (
-        <div id="active-filter-summary" className="active-filter-summary">
-          Đang áp dụng {totalActiveFilters} tiêu chí lọc
-        </div>
-      )}
 
       <div id="search-filter-groups" className="filter-groups" aria-live="polite">
         {/* Khoảng giá */}
         <section className="filter-group">
-          <h3>Giá mỗi đêm (VNĐ)</h3>
+          <h3>Giá mỗi đêm</h3>
           <div className="price-range">
             <input
               id="filter-min-price"
@@ -84,17 +76,22 @@ export default function SearchSidebar({
         {/* Dịch vụ & trải nghiệm */}
         {allServices.length > 0 && (
           <section className="filter-group">
-            <h3>Dịch vụ &amp; Trải nghiệm</h3>
-            {allServices.map((service) => (
-              <label key={service} className="filter-option">
-                <input
-                  type="checkbox"
-                  checked={selectedServices.includes(service)}
-                  onChange={() => handleToggle(selectedServices, setSelectedServices, service)}
-                />
-                <span>{service}</span>
-              </label>
-            ))}
+            <h3>Dịch vụ &amp; trải nghiệm</h3>
+            {allServices.map((item) => {
+              const val = typeof item === 'object' ? item.name : item;
+              const count = typeof item === 'object' ? item.count : null;
+              return (
+                <label key={val} className="filter-option">
+                  <input
+                    type="checkbox"
+                    checked={selectedServices.includes(val)}
+                    onChange={() => handleToggle(selectedServices, setSelectedServices, val)}
+                  />
+                  <span>{val}</span>
+                  {count !== null && count !== undefined && <small>{count}</small>}
+                </label>
+              );
+            })}
           </section>
         )}
 
@@ -102,16 +99,21 @@ export default function SearchSidebar({
         {allRoomAmenities.length > 0 && (
           <section className="filter-group">
             <h3>Tiện nghi phòng</h3>
-            {allRoomAmenities.map((roomAmenity) => (
-              <label key={roomAmenity} className="filter-option">
-                <input
-                  type="checkbox"
-                  checked={selectedRoomAmenities.includes(roomAmenity)}
-                  onChange={() => handleToggle(selectedRoomAmenities, setSelectedRoomAmenities, roomAmenity)}
-                />
-                <span>{roomAmenity}</span>
-              </label>
-            ))}
+            {allRoomAmenities.map((item) => {
+              const val = typeof item === 'object' ? item.name : item;
+              const count = typeof item === 'object' ? item.count : null;
+              return (
+                <label key={val} className="filter-option">
+                  <input
+                    type="checkbox"
+                    checked={selectedRoomAmenities.includes(val)}
+                    onChange={() => handleToggle(selectedRoomAmenities, setSelectedRoomAmenities, val)}
+                  />
+                  <span>{val}</span>
+                  {count !== null && count !== undefined && <small>{count}</small>}
+                </label>
+              );
+            })}
           </section>
         )}
 
@@ -119,16 +121,21 @@ export default function SearchSidebar({
         {allAmenities.length > 0 && (
           <section className="filter-group">
             <h3>Tiện nghi homestay</h3>
-            {allAmenities.map((amenity) => (
-              <label key={amenity} className="filter-option">
-                <input
-                  type="checkbox"
-                  checked={selectedAmenities.includes(amenity)}
-                  onChange={() => handleToggle(selectedAmenities, setSelectedAmenities, amenity)}
-                />
-                <span>{amenity}</span>
-              </label>
-            ))}
+            {allAmenities.map((item) => {
+              const val = typeof item === 'object' ? item.name : item;
+              const count = typeof item === 'object' ? item.count : null;
+              return (
+                <label key={val} className="filter-option">
+                  <input
+                    type="checkbox"
+                    checked={selectedAmenities.includes(val)}
+                    onChange={() => handleToggle(selectedAmenities, setSelectedAmenities, val)}
+                  />
+                  <span>{val}</span>
+                  {count !== null && count !== undefined && <small>{count}</small>}
+                </label>
+              );
+            })}
           </section>
         )}
 
@@ -136,16 +143,21 @@ export default function SearchSidebar({
         {allTravelGroups.length > 0 && (
           <section className="filter-group">
             <h3>Nhóm du lịch phù hợp</h3>
-            {allTravelGroups.map((group) => (
-              <label key={group} className="filter-option">
-                <input
-                  type="checkbox"
-                  checked={selectedTravelGroups.includes(group)}
-                  onChange={() => handleToggle(selectedTravelGroups, setSelectedTravelGroups, group)}
-                />
-                <span>{group}</span>
-              </label>
-            ))}
+            {allTravelGroups.map((item) => {
+              const val = typeof item === 'object' ? item.name : item;
+              const count = typeof item === 'object' ? item.count : null;
+              return (
+                <label key={val} className="filter-option">
+                  <input
+                    type="checkbox"
+                    checked={selectedTravelGroups.includes(val)}
+                    onChange={() => handleToggle(selectedTravelGroups, setSelectedTravelGroups, val)}
+                  />
+                  <span>{val}</span>
+                  {count !== null && count !== undefined && <small>{count}</small>}
+                </label>
+              );
+            })}
           </section>
         )}
       </div>

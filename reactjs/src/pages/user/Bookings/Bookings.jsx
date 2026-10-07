@@ -506,7 +506,7 @@ export default function Bookings() {
               </div>
             ) : (
               <form onSubmit={handleTaskSubmit}>
-                <div className="rating-section">
+                <div className="bk-rating-section">
                   <div style={{ fontSize: '0.88rem', fontWeight: 700, marginBottom: 8 }}>1. Chọn số sao đánh giá trải nghiệm</div>
                   <div className="star-rating-box">
                     {[1, 2, 3, 4, 5].map((s) => (

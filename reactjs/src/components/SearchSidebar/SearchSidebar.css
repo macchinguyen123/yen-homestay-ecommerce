@@ -88,6 +88,12 @@
   flex: 1;
 }
 
+.filter-option small {
+  color: #68796e;
+  font-size: 12px;
+  margin-left: auto;
+}
+
 .price-range {
   display: grid;
   grid-template-columns: 1fr 1fr;
