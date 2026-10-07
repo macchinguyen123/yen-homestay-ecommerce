@@ -174,7 +174,7 @@ export default function PersonalAccount() {
   });
 
   // Viewed Homestays State
-  const [viewedList, setViewedList] = useState(INITIAL_VIEWED_LIST);
+  const [viewedList, setViewedList] = useState([]);
   const [searchViewed, setSearchViewed] = useState("");
 
   // Vouchers State
@@ -247,7 +247,7 @@ export default function PersonalAccount() {
     const fetchUserProfile = async () => {
       setLoading(true);
       const currentUser = authService.getCurrentUser();
-      const userId = currentUser?.id || 1; // Fallback to 1 if no logged in user in localStorage
+      const userId = currentUser?.id || 10; // Fallback to User ID 10
 
       const res = await userService.getUserProfile(userId);
       if (res.success && res.data) {
@@ -277,6 +277,21 @@ export default function PersonalAccount() {
 
     fetchUserProfile();
   }, []);
+
+  // Load viewed history from Spring Boot backend (Neon PostgreSQL)
+  useEffect(() => {
+    const fetchViewedHistory = async () => {
+      const currentUser = authService.getCurrentUser();
+      const userId = currentUser?.id || 10;
+
+      const res = await viewedHistoryService.getViewedHistory(userId);
+      if (res.success && Array.isArray(res.data)) {
+        setViewedList(res.data);
+      }
+    };
+
+    fetchViewedHistory();
+  }, [activeTab]);
 
   // Handlers
   const handleProfileSubmit = async (e) => {
@@ -393,7 +408,11 @@ export default function PersonalAccount() {
     }
   };
 
-  const confirmClearHistory = () => {
+  const confirmClearHistory = async () => {
+    const currentUser = authService.getCurrentUser();
+    if (currentUser && currentUser.id) {
+      await viewedHistoryService.clearViewedHistory(currentUser.id);
+    }
     setViewedList([]);
     setShowClearHistoryModal(false);
     triggerToast("Xóa lịch sử", "Đã xóa toàn bộ lịch sử homestay đã xem gần đây.");
@@ -995,7 +1014,9 @@ export default function PersonalAccount() {
                             >
                               <i className={`bi ${item.isFav ? "bi-heart-fill text-danger" : "bi-heart"}`}></i>
                             </button>
-                            <img src={item.img} alt={item.name} />
+                            <Link to={`/homestay/${item.homestayId || item.id}`}>
+                              <img src={item.img} alt={item.name} />
+                            </Link>
                           </div>
 
                           <div className="card-body">
@@ -1005,12 +1026,12 @@ export default function PersonalAccount() {
                               </span>
                               <span className="card-rating">
                                 <i className="bi bi-star-fill text-warning me-1"></i> {item.rating}{" "}
-                                <span className="review-count">({item.reviews})</span>
+                                <span className="review-count">({item.reviews || 120})</span>
                               </span>
                             </div>
 
                             <h3 className="card-title">
-                              <Link to="/homestay-detail">{item.name}</Link>
+                              <Link to={`/homestay/${item.homestayId || item.id}`}>{item.name}</Link>
                             </h3>
 
                             <div className="card-specs">
@@ -1027,7 +1048,7 @@ export default function PersonalAccount() {
                                 <span className="price-label">Giá từ:</span>
                                 <span className="card-price">{item.price}</span>
                               </div>
-                              <Link to="/homestay-detail" className="btn-view-room">
+                              <Link to={`/homestay/${item.homestayId || item.id}`} className="btn-view-room">
                                 Đặt ngay
                               </Link>
                             </div>

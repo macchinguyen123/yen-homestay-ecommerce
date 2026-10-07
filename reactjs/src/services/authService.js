@@ -47,7 +47,7 @@ export const authService = {
       const mockRole = role === 'owner' ? 'OWNER' : 'USER';
       const mockName = username.includes('chuhoang') ? 'Nguyễn Văn Hoàng (Chủ Homestay)' : 'Lê Hoàng Mai Chi';
       const mockData = {
-        id: 1,
+        id: 10,
         email: username,
         fullName: mockName,
         role: mockRole,
