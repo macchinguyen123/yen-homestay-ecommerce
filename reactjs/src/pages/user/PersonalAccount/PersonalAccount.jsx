@@ -470,7 +470,7 @@ export default function PersonalAccount() {
   );
 
   return (
-    <main className="container py-4 py-md-5">
+    <main className="container py-4 py-md-5 personal-account-page">
       {/* Header at top */}
       <div className="account-header-box mb-4 mb-md-5">
         <h1 className="h3 fw-bold text-dark tracking-tight mb-2">Tài khoản cá nhân</h1>
