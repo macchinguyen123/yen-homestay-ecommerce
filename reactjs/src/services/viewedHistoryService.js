@@ -1,4 +1,4 @@
-const API_BASE_URL = 'http://localhost:8080/api/users';
+const API_BASE_URL = 'http://localhost:8081/api/users';
 
 export const viewedHistoryService = {
   /**

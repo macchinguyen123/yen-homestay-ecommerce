@@ -3,15 +3,15 @@
    ========================================================================== */
 
 :root {
-  --primary-color: #15803D;
-  --primary-hover: #166534;
+  --primary-color: #498553;
+  --primary-hover: #3E734A;
   --primary-light: #F0FDF4;
-  --text-main: #1E293B;
+  --text-main: #334155;
   --text-muted: #64748B;
   --bg-header: #FFFFFF;
   --border-color: #E2E8F0;
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.03);
-  --shadow-active: 0 4px 14px rgba(21, 128, 61, 0.25);
+  --shadow-active: 0 4px 14px rgba(73, 133, 83, 0.25);
   --transition-fast: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
@@ -40,56 +40,19 @@
 .yen-brand-logo {
   display: flex;
   align-items: center;
-  gap: 12px;
   text-decoration: none;
-  color: var(--text-main);
   user-select: none;
 }
 
-.yen-brand-icon {
-  width: 42px;
-  height: 42px;
-  background: linear-gradient(135deg, #15803D 0%, #166534 100%);
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #FFFFFF;
-  box-shadow: 0 4px 10px rgba(21, 128, 61, 0.2);
-  transition: var(--transition-fast);
-  font-size: 1.3rem;
+.yen-logo-img {
+  height: 52px; /* Increased slightly to fit header nicely */
+  width: auto;
+  object-fit: contain;
+  transition: transform 0.2s ease;
 }
 
-.yen-brand-logo:hover .yen-brand-icon {
-  transform: translateY(-1px);
-  box-shadow: 0 6px 14px rgba(21, 128, 61, 0.3);
-}
-
-.yen-brand-text {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-}
-
-.yen-brand-name {
-  font-size: 22px;
-  font-weight: 800;
-  color: var(--primary-color);
-  letter-spacing: -0.3px;
-  line-height: 1.1;
-}
-
-.yen-brand-name span {
-  color: #0F172A;
-}
-
-.yen-brand-sub {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.8px;
-  margin-top: 1px;
+.yen-brand-logo:hover .yen-logo-img {
+  transform: translateY(-1px) scale(1.02);
 }
 
 /* Navigation List */

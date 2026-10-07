@@ -1,134 +1,84 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { authService } from '../../../services/authService';
 import './ManageHomestay.css';
-
-const defaultList = [
-    {
-        id: 1,
-        code: "#HS-1042",
-        name: "Homestay Nhà Trình Tường Hà Giang",
-        host: "Nguyễn Văn Minh",
-        hostId: "USR001",
-        phone: "0912 345 678",
-        email: "nguyenvanminh@email.com",
-        region: "Hà Giang",
-        price: "450.000đ",
-        date: "15/01/2026",
-        status: "active",
-        statusText: "Đang hoạt động",
-        rooms: 5,
-        img: "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?auto=format&fit=crop&w=400&q=80",
-    },
-    {
-        id: 2,
-        code: "#HS-2073",
-        name: "Sapa Valley Retreat",
-        host: "Trần Thị Lan",
-        hostId: "USR002",
-        phone: "0934 567 890",
-        email: "tranthilan@email.com",
-        region: "Sapa",
-        price: "680.000đ",
-        date: "03/03/2026",
-        status: "pending",
-        statusText: "Chờ duyệt",
-        rooms: 8,
-        img: "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?auto=format&fit=crop&w=400&q=80",
-    },
-    {
-        id: 3,
-        code: "#HS-3018",
-        name: "Đà Lạt Pine Garden",
-        host: "Lê Quang Huy",
-        hostId: "USR003",
-        phone: "0901 234 567",
-        email: "lequanghuy@email.com",
-        region: "Đà Lạt",
-        price: "750.000đ",
-        date: "10/02/2026",
-        status: "active",
-        statusText: "Đang hoạt động",
-        rooms: 6,
-        img: "https://images.unsplash.com/photo-1571896349842-33c89424de2d?auto=format&fit=crop&w=400&q=80",
-    },
-    {
-        id: 4,
-        code: "#HS-4055",
-        name: "Hội An River House",
-        host: "Phạm Thị Thu",
-        hostId: "USR004",
-        phone: "0978 654 321",
-        email: "phamthithu@email.com",
-        region: "Hội An",
-        price: "890.000đ",
-        date: "20/04/2026",
-        status: "pending",
-        statusText: "Chờ duyệt",
-        rooms: 10,
-        img: "https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?auto=format&fit=crop&w=400&q=80",
-    },
-    {
-        id: 5,
-        code: "#HS-4821",
-        name: "Mộc Châu Cloud Farm",
-        host: "Hoàng Đức Anh",
-        hostId: "USR005",
-        phone: "0856 789 012",
-        email: "hoanganh@email.com",
-        region: "Mai Châu",
-        price: "420.000đ",
-        date: "28/04/2026",
-        status: "active",
-        statusText: "Đang hoạt động",
-        rooms: 7,
-        img: "https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=400&q=80",
-    },
-    {
-        id: 6,
-        code: "#HS-5109",
-        name: "Mai Châu Green Lodge",
-        host: "Bùi Văn Nam",
-        hostId: "USR006",
-        phone: "0915 667 889",
-        email: "buivannam@email.com",
-        region: "Mai Châu",
-        price: "550.000đ",
-        date: "01/05/2026",
-        status: "suspended",
-        statusText: "Tạm khóa",
-        rooms: 4,
-        img: "https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=400&q=80",
-    }
-];
 
 export default function ManageHomestay() {
     const navigate = useNavigate();
-    const [list, setList] = useState(defaultList);
+    const [list, setList] = useState([]);
+    const [loading, setLoading] = useState(true);
     const [filterStatus, setFilterStatus] = useState('all');
     const [searchTerm, setSearchTerm] = useState('');
     const [filterRegion, setFilterRegion] = useState('all');
 
-    const handleAction = (id, newStatus, newStatusText) => {
-        setList(prev => prev.map(item => {
-            if (item.id === id) {
-                return { ...item, status: newStatus, statusText: newStatusText };
+    const fetchHomestays = async () => {
+        setLoading(true);
+        try {
+            const token = localStorage.getItem('token');
+            const response = await fetch('http://localhost:8081/api/admin/homestays', {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+            if (response.ok) {
+                const data = await response.json();
+                setList(data);
             }
-            return item;
-        }));
+        } catch (error) {
+            console.error('Error fetching homestays:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchHomestays();
+    }, []);
+
+    const handleAction = async (id, newStatus, newStatusText) => {
+        if (!window.confirm(`Bạn có chắc muốn chuyển trạng thái sang "${newStatusText}"?`)) return;
+
+        try {
+            const token = localStorage.getItem('token');
+            const response = await fetch(`http://localhost:8081/api/admin/homestays/${id}/status`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ status: newStatus })
+            });
+
+            if (response.ok) {
+                // Update local state instead of refetching for performance
+                setList(prev => prev.map(item => {
+                    if (item.id === id) {
+                        return { ...item, status: newStatus, statusText: newStatusText };
+                    }
+                    return item;
+                }));
+            } else {
+                alert('Có lỗi xảy ra khi cập nhật trạng thái');
+            }
+        } catch (error) {
+            console.error('Error updating status:', error);
+            alert('Lỗi kết nối máy chủ');
+        }
     };
 
     const filteredData = list.filter(item => {
         const matchStatus = filterStatus === 'all' || item.status === filterStatus;
-        const matchSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase())
-            || item.host.toLowerCase().includes(searchTerm.toLowerCase())
-            || item.code.toLowerCase().includes(searchTerm.toLowerCase());
-        const matchRegion = filterRegion === 'all' || item.region === filterRegion;
+        const matchSearch = (item.name || '').toLowerCase().includes(searchTerm.toLowerCase())
+            || (item.host || '').toLowerCase().includes(searchTerm.toLowerCase())
+            || (item.code || '').toLowerCase().includes(searchTerm.toLowerCase());
+        const matchRegion = filterRegion === 'all' || (item.region || '').toLowerCase().includes(filterRegion.toLowerCase());
         return matchStatus && matchSearch && matchRegion;
     });
 
     const activeCount = list.filter(x => x.status === 'active').length;
     const pendingCount = list.filter(x => x.status === 'pending').length;
     const suspendedCount = list.filter(x => x.status === 'suspended').length;
+    const rejectedCount = list.filter(x => x.status === 'rejected').length;
 
     return (
         <div className="manage-homestay-wrapper">
@@ -168,12 +118,19 @@ export default function ManageHomestay() {
                         </div>
                         <span className="material-symbols-outlined stat-icon">schedule</span>
                     </div>
-                    <div className="stat-box red">
+                    <div className="stat-box gray">
                         <div>
                             <div className="stat-num">{suspendedCount}</div>
                             <div className="stat-lbl">Tạm khóa</div>
                         </div>
-                        <span className="material-symbols-outlined stat-icon">block</span>
+                        <span className="material-symbols-outlined stat-icon">lock</span>
+                    </div>
+                    <div className="stat-box red">
+                        <div>
+                            <div className="stat-num">{rejectedCount}</div>
+                            <div className="stat-lbl">Bị từ chối</div>
+                        </div>
+                        <span className="material-symbols-outlined stat-icon">cancel</span>
                     </div>
                 </div>
 
@@ -217,7 +174,15 @@ export default function ManageHomestay() {
                             </tr>
                         </thead>
                         <tbody>
-                            {filteredData.length === 0 ? (
+                            {loading ? (
+                                <tr>
+                                    <td colSpan="7" style={{ textAlign: 'center', padding: '50px' }}>
+                                        <div className="spinner-border text-success" role="status">
+                                            <span className="visually-hidden">Loading...</span>
+                                        </div>
+                                    </td>
+                                </tr>
+                            ) : filteredData.length === 0 ? (
                                 <tr>
                                     <td colSpan="7" style={{ textAlign: 'center', color: '#94A3B8', padding: '30px' }}>Không tìm thấy dữ liệu phù hợp.</td>
                                 </tr>

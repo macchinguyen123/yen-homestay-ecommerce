@@ -10,7 +10,7 @@
  * - 9 Vouchers
  */
 
-const API_BASE_URL = 'http://localhost:8080/api/admin/dashboard';
+const API_BASE_URL = 'http://localhost:8081/api/admin/dashboard';
 
 // Dữ liệu đồng bộ chuẩn theo CSDL Neon PostgreSQL
 const FALLBACK_METRICS = {

@@ -69,11 +69,11 @@ export default function Login() {
       if (result && result.success && result.user) {
         // Lưu thông tin người dùng thực tế lấy từ CSDL (fullName, role, email, ...)
         const dbUser = result.user;
-        const userRole = (dbUser.role || (activeRole === 'owner' ? 'OWNER' : 'USER')).toUpperCase();
+        const userRole = (dbUser.role || (activeRole === 'admin' ? 'ADMIN' : activeRole === 'owner' ? 'OWNER' : 'USER')).toUpperCase();
 
         sessionStorage.setItem('isLoggedIn', 'true');
         sessionStorage.setItem('userName', dbUser.fullName || dbUser.email);
-        sessionStorage.setItem('userRole', userRole === 'OWNER' ? 'host' : 'guest');
+        sessionStorage.setItem('userRole', userRole === 'OWNER' ? 'host' : userRole === 'ADMIN' ? 'admin' : 'guest');
 
         localStorage.setItem('user_role', userRole);
         localStorage.setItem('user', JSON.stringify(dbUser));
@@ -149,7 +149,7 @@ export default function Login() {
             <p className="login-card-subtitle">Chào mừng bạn quay trở lại với Homestay Việt Nam</p>
           </div>
 
-          {/* Role Switcher Tabs (Khách thuê / Chủ Homestay) */}
+          {/* Role Switcher Tabs (Khách thuê / Chủ Homestay / Admin) */}
           <div className="login-role-tabs">
             <button
               className={`login-role-tab ${activeRole === 'tourist' ? 'active' : ''}`}
@@ -169,6 +169,15 @@ export default function Login() {
               <i className="bi bi-house-heart-fill" />
               <span>Chủ Homestay</span>
             </button>
+            <button
+              className={`login-role-tab ${activeRole === 'admin' ? 'active' : ''}`}
+              id="tab-admin"
+              onClick={() => switchRole('admin')}
+              type="button"
+            >
+              <i className="bi bi-shield-lock-fill" />
+              <span>Admin</span>
+            </button>
           </div>
 
           {/* Form Inputs */}
@@ -186,7 +195,9 @@ export default function Login() {
                   className="login-input"
                   id="username-input"
                   placeholder={
-                    activeRole === 'owner'
+                    activeRole === 'admin'
+                      ? 'admin@yenhomestay.com'
+                      : activeRole === 'owner'
                       ? 'chuhoang.homestay@gmail.com hoặc 0987...'
                       : 'maichi.lehoang@gmail.com hoặc 0912...'
                   }

@@ -4,7 +4,7 @@
  * API Endpoints: /api/admin/users
  */
 
-const API_BASE_URL = 'http://localhost:8080/api/admin/users';
+const API_BASE_URL = 'http://localhost:8081/api/admin/users';
 
 export const adminUserService = {
     // 1. Thống kê số lượng tài khoản theo vai trò & trạng thái

@@ -10,7 +10,7 @@
 .btn-add-new:hover { background: #166534; }
 
 /* Action column */
-.action-col { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.action-col { display: flex; gap: 6px; align-items: center; flex-wrap: nowrap; white-space: nowrap; }
 
 /* Page Header */
 .page-header {
@@ -35,7 +35,7 @@
 
 .stats-row {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(5, 1fr);
     gap: 16px;
     margin-bottom: 20px;
 }
@@ -71,6 +71,7 @@
 .stat-box.orange .stat-icon { color: #EA580C; }
 .stat-box.green .stat-icon { color: #16A34A; }
 .stat-box.red .stat-icon { color: #DC2626; }
+.stat-box.gray .stat-icon { color: #64748B; }
 
 /* Filter Bar */
 .filter-bar {
@@ -83,11 +84,13 @@
     justify-content: space-between;
     align-items: center;
     gap: 12px;
+    flex-wrap: wrap;
 }
 
 .filter-chips {
     display: flex;
     gap: 6px;
+    flex-wrap: wrap;
 }
 
 .chip-btn {
@@ -117,6 +120,7 @@
     display: flex;
     gap: 10px;
     align-items: center;
+    flex-wrap: wrap;
 }
 
 .search-input-wrap {
