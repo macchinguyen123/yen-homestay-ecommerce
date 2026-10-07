@@ -2381,16 +2381,16 @@ button:active::after,
 }
 
 /* 3. MUI Outlined Input & Select Form System */
-input[type="text"],
-input[type="number"],
-input[type="password"],
-input[type="email"],
-select,
-.form-control,
-.form-select,
-.form-control-custom,
-.form-select-custom,
-.MuiOutlinedInput-input {
+.personal-account-page input[type="text"],
+.personal-account-page input[type="number"],
+.personal-account-page input[type="password"],
+.personal-account-page input[type="email"],
+.personal-account-page select,
+.personal-account-page .form-control,
+.personal-account-page .form-select,
+.personal-account-page .form-control-custom,
+.personal-account-page .form-select-custom,
+.personal-account-page .MuiOutlinedInput-input {
   font-family: inherit !important;
   font-size: 0.875rem !important;
   font-weight: 500 !important;
@@ -2406,9 +2406,9 @@ select,
   width: 100% !important;
 }
 
-select,
-.form-select,
-.form-select-custom {
+.personal-account-page select,
+.personal-account-page .form-select,
+.personal-account-page .form-select-custom {
   padding-right: 32px !important;
   background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='rgba(0,0,0,0.54)'%3e%3cpath d='M7 10l5 5 5-5z'/%3e%3c/svg%3e") !important;
   background-repeat: no-repeat !important;
@@ -2599,15 +2599,15 @@ form > .col-12:last-child {
 }
 
 /* Height & Padding for inputs & selects */
-input[type="text"],
-input[type="number"],
-input[type="password"],
-input[type="email"],
-select,
-.form-control,
-.form-select,
-.form-control-custom,
-.form-select-custom {
+.personal-account-page input[type="text"],
+.personal-account-page input[type="number"],
+.personal-account-page input[type="password"],
+.personal-account-page input[type="email"],
+.personal-account-page select,
+.personal-account-page .form-control,
+.personal-account-page .form-select,
+.personal-account-page .form-control-custom,
+.personal-account-page .form-select-custom {
   height: 46px !important;
   min-height: 46px !important;
   padding: 10px 16px !important;

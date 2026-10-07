@@ -1,11 +1,16 @@
 /* ==========================================================================
    YÊN HOMESTAY ADMIN - ACCOUNT EDIT & DETAIL VIEW STYLESHEET
+   File: opencms-core-master/.../admin/CSS/account_edit.css
+   Chủ đề: Chỉnh sửa chi tiết tài khoản người dùng đầy đủ như trang cá nhân
+   Tone màu: Xanh lá thương hiệu YÊN (#15803D / #166534 / #002c1e)
    ========================================================================== */
 
 .account-edit-wrapper {
-    padding: 24px 32px 60px 32px;
-    max-width: 1400px;
-    margin: 0 auto;
+    padding: 0 0 32px 0;
+    max-width: 100%;
+    width: 100%;
+    margin: 0;
+    box-sizing: border-box;
 }
 
 /* --- 1. Top Breadcrumb & Navigation --- */
@@ -14,18 +19,18 @@
     align-items: center;
     gap: 8px;
     font-size: 13px;
-    color: var(--text-muted);
+    color: var(--text-muted, #64748B);
     margin-bottom: 16px;
 }
 
 .breadcrumb-nav a {
-    color: var(--text-muted);
+    color: var(--text-muted, #64748B);
     text-decoration: none;
-    transition: var(--transition-fast);
+    transition: var(--transition-fast, 0.2s);
 }
 
 .breadcrumb-nav a:hover {
-    color: var(--primary-color);
+    color: var(--primary-color, #15803D);
 }
 
 .breadcrumb-nav .separator {
@@ -34,7 +39,7 @@
 }
 
 .breadcrumb-nav .current {
-    color: var(--primary-color);
+    color: var(--primary-color, #15803D);
     font-weight: 700;
 }
 
@@ -49,6 +54,8 @@
     border-radius: 12px;
     padding: 18px 24px;
     box-shadow: 0 1px 6px rgba(0, 0, 0, 0.03);
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .edit-header-left {
@@ -67,13 +74,14 @@
     background: #F1F5F9;
     color: var(--text-main, #0F172A);
     text-decoration: none;
-    transition: var(--transition-fast);
+    transition: var(--transition-fast, 0.2s);
     border: 1px solid #E2E8F0;
+    cursor: pointer;
 }
 
 .btn-back-link:hover {
     background: #E2E8F0;
-    color: var(--primary-color);
+    color: var(--primary-color, #15803D);
 }
 
 .edit-title-group h1 {
@@ -98,44 +106,17 @@
     gap: 12px;
 }
 
-.btn-admin-cancel {
-    padding: 8px 16px;
-    border-radius: 6px;
-    font-weight: 600;
-    font-size: 14px;
-    background: #F1F5F9;
-    color: #475569;
-    border: 1px solid #CBD5E1;
-    cursor: pointer;
-}
-
-.btn-admin-primary {
-    padding: 8px 16px;
-    border-radius: 6px;
-    font-weight: 600;
-    font-size: 14px;
-    background: var(--primary-color, #15803D);
-    color: #FFF;
-    border: none;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-}
-
-.btn-admin-primary:hover {
-    opacity: 0.9;
-}
-
 /* --- 3. Layout Grid (2 Cột: Cột trái Hồ sơ & KYC, Cột phải Form Chi tiết) --- */
 .edit-layout-grid {
     display: grid;
-    grid-template-columns: 360px 1fr;
+    grid-template-columns: 340px 1fr;
     gap: 24px;
     align-items: start;
+    width: 100%;
+    box-sizing: border-box;
 }
 
-@media (max-width: 1024px) {
+@media (max-width: 1100px) {
     .edit-layout-grid {
         grid-template-columns: 1fr;
     }
@@ -190,64 +171,77 @@
 }
 
 .avatar-large-container {
-    position: relative;
-    width: 110px;
-    height: 110px;
-    margin-bottom: 14px;
+    position: relative !important;
+    width: 110px !important;
+    height: 110px !important;
+    margin: 0 auto 16px auto !important;
+    display: block !important;
 }
 
 .avatar-large-img {
-    width: 100%;
-    height: 100%;
-    border-radius: 50%;
-    object-fit: cover;
-    border: 3px solid #DCFCE7;
-    box-shadow: 0 4px 12px rgba(21, 128, 61, 0.15);
+    width: 100% !important;
+    height: 100% !important;
+    border-radius: 50% !important;
+    object-fit: cover !important;
+    border: 3px solid #DCFCE7 !important;
+    box-shadow: 0 4px 12px rgba(21, 128, 61, 0.15) !important;
+    display: block !important;
 }
 
 .avatar-large-fallback {
-    width: 100%;
-    height: 100%;
-    border-radius: 50%;
-    background: linear-gradient(135deg, #15803D 0%, #166534 100%);
-    color: #FFFFFF;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 38px;
-    font-weight: 800;
-    border: 3px solid #DCFCE7;
-    box-shadow: 0 4px 12px rgba(21, 128, 61, 0.15);
+    width: 100% !important;
+    height: 100% !important;
+    border-radius: 50% !important;
+    background: linear-gradient(135deg, #15803D 0%, #166534 100%) !important;
+    color: #FFFFFF !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    font-size: 38px !important;
+    font-weight: 800 !important;
+    border: 3px solid #DCFCE7 !important;
+    box-shadow: 0 4px 12px rgba(21, 128, 61, 0.15) !important;
 }
 
 .btn-avatar-camera {
-    position: absolute;
-    bottom: 2px;
-    right: 2px;
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-    background: var(--primary-color, #15803D);
-    color: #FFFFFF;
-    border: 2px solid #FFFFFF;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
-    transition: var(--transition-fast, 0.2s);
+    position: absolute !important;
+    bottom: 2px !important;
+    right: 2px !important;
+    left: auto !important;
+    top: auto !important;
+    transform: none !important;
+    width: 32px !important;
+    height: 32px !important;
+    min-width: 32px !important;
+    max-width: 32px !important;
+    border-radius: 50% !important;
+    background: var(--primary-color, #15803D) !important;
+    color: #FFFFFF !important;
+    border: 2px solid #FFFFFF !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    cursor: pointer !important;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2) !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    line-height: 1 !important;
+    transition: var(--transition-fast, 0.2s) !important;
+    z-index: 10 !important;
 }
 
 .btn-avatar-camera:hover {
-    background: var(--primary-hover, #166534);
-    transform: scale(1.08);
+    background: var(--primary-hover, #166534) !important;
+    transform: scale(1.08) !important;
 }
 
 .user-display-name {
-    font-size: 18px;
-    font-weight: 800;
-    color: var(--text-main, #0F172A);
-    margin-bottom: 4px;
+    font-size: 18px !important;
+    font-weight: 800 !important;
+    color: var(--text-main, #0F172A) !important;
+    margin-top: 4px !important;
+    margin-bottom: 4px !important;
+    line-height: 1.3 !important;
 }
 
 .user-display-nickname {
@@ -294,6 +288,25 @@
 .meta-info-item .val {
     font-weight: 700;
     color: var(--text-main, #0F172A);
+}
+
+/* User status badge */
+.user-status-badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 11.5px;
+    font-weight: 700;
+}
+
+.user-status-badge.active {
+    background: #DCFCE7;
+    color: #15803D;
+}
+
+.user-status-badge.blocked {
+    background: #FEE2E2;
+    color: #DC2626;
 }
 
 /* KYC Checklist */
@@ -369,6 +382,13 @@
     margin-bottom: 16px;
 }
 
+.form-grid-3 {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
 .form-row-full {
     margin-bottom: 16px;
 }
@@ -394,12 +414,19 @@
     color: var(--text-main, #0F172A);
     background-color: #FFFFFF;
     transition: var(--transition-fast, 0.2s);
+    box-sizing: border-box;
 }
 
 .form-field-control:focus {
     border-color: var(--primary-color, #15803D) !important;
     outline: none;
     box-shadow: 0 0 0 3px rgba(21, 128, 61, 0.12) !important;
+}
+
+.form-field-control:disabled {
+    background-color: #F1F5F9;
+    color: #64748B;
+    cursor: not-allowed;
 }
 
 /* Gender Radio Buttons */
@@ -426,26 +453,153 @@
     cursor: pointer;
 }
 
-/* Floating Sticky Save Bar */
-.sticky-save-bar {
-    position: sticky;
-    bottom: 20px;
-    background: #FFFFFF;
-    border: 1px solid var(--border-color, #E2E8F0);
-    border-radius: 12px;
-    padding: 14px 24px;
+/* Homestay ownership chip list */
+.homestay-chip-list {
     display: flex;
-    align-items: center;
-    justify-content: space-between;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
-    z-index: 50;
-    margin-top: 32px;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 10px;
 }
 
-.sticky-save-bar .info-text {
+.homestay-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: #F0FDF4;
+    border: 1px solid #BBF7D0;
+    color: #15803D;
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 12.5px;
+    font-weight: 700;
+    transition: all 0.15s ease;
+}
+
+.homestay-chip:hover {
+    background: #DCFCE7;
+    border-color: #86EFAC;
+}
+
+.homestay-chip .chip-remove-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: rgba(21, 128, 61, 0.15);
+    color: #15803D;
+    cursor: pointer;
+    border: none;
+    padding: 0;
+    margin-left: 2px;
+    font-size: 12px;
+    line-height: 1;
+}
+
+.homestay-chip .chip-remove-btn:hover {
+    background: #DC2626;
+    color: #FFFFFF;
+}
+
+/* Floating Sticky Save Bar */
+.account-edit-wrapper .sticky-save-bar {
+    position: sticky !important;
+    bottom: 20px !important;
+    left: auto !important;
+    right: auto !important;
+    top: auto !important;
+    background: #FFFFFF !important;
+    border: 1px solid var(--border-color, #E2E8F0) !important;
+    border-radius: 12px !important;
+    padding: 14px 24px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08) !important;
+    z-index: 50 !important;
+    margin-top: 24px !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+}
+
+.account-edit-wrapper .sticky-save-bar .info-text {
     font-size: 13px;
     color: var(--text-muted, #64748B);
     display: flex;
     align-items: center;
     gap: 6px;
+}
+
+/* Button Admin Styles */
+.btn-admin-cancel {
+    color: #475569;
+    cursor: pointer;
+    background: #F1F5F9;
+    border: 1px solid #CBD5E1;
+    border-radius: 8px;
+    padding: 9px 18px;
+    font-size: 13.5px;
+    font-weight: 600;
+    transition: all 0.2s;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn-admin-cancel:hover {
+    color: #1E293B;
+    background: #E2E8F0;
+}
+
+.btn-admin-primary {
+    color: #FFFFFF;
+    cursor: pointer;
+    background: #15803D;
+    border: none;
+    border-radius: 8px;
+    align-items: center;
+    gap: 6px;
+    padding: 9px 20px;
+    font-size: 13.5px;
+    font-weight: 700;
+    transition: all 0.2s;
+    display: inline-flex;
+    box-shadow: 0 2px 8px rgba(21, 128, 61, 0.2);
+}
+
+.btn-admin-primary:hover {
+    background: #166534;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(21, 128, 61, 0.3);
+}
+
+/* Toast Message */
+.admin-toast {
+    position: fixed;
+    top: 24px;
+    right: 24px;
+    background: #064E3B;
+    color: #FFFFFF;
+    padding: 14px 20px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+    z-index: 99999;
+    transform: translateY(-20px);
+    opacity: 0;
+    pointer-events: none;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.admin-toast.show {
+    transform: translateY(0);
+    opacity: 1;
+    pointer-events: auto;
 }
