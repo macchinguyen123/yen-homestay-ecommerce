@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { NavLink, Link, useNavigate } from 'react-router-dom';
 import { authService } from '../../services/authService';
+import logoImg from '../../assets/logo.png';
 import './Header.css';
 
 export default function Header() {
@@ -33,13 +34,7 @@ export default function Header() {
       <div className="yen-header-container">
         {/* Brand Logo YÊN */}
         <Link to="/" className="yen-brand-logo" title="YÊN - Homestay Booking" onClick={closeMobileMenu}>
-          <div className="yen-brand-icon">
-            <i className="bi bi-house-heart-fill" />
-          </div>
-          <div className="yen-brand-text">
-            <span className="yen-brand-name">YÊN <span>Homestay</span></span>
-            <span className="yen-brand-sub">Du lịch sinh thái bản địa</span>
-          </div>
+          <img src={logoImg} alt="YÊN Logo" className="yen-logo-img" />
         </Link>
 
         {/* Mobile Toggle Button */}
@@ -64,28 +59,6 @@ export default function Header() {
               >
                 <i className="bi bi-house-door nav-icon" />
                 <span>Trang chủ</span>
-              </NavLink>
-            </li>
-
-            <li className="yen-nav-item">
-              <NavLink
-                to="/booking"
-                className={({ isActive }) => `yen-nav-link ${isActive ? 'active' : ''}`}
-                onClick={closeMobileMenu}
-              >
-                <i className="bi bi-calendar-event nav-icon" />
-                <span>Đặt phòng & Thanh toán</span>
-              </NavLink>
-            </li>
-
-            <li className="yen-nav-item">
-              <NavLink
-                to="/bookings"
-                className={({ isActive }) => `yen-nav-link ${isActive ? 'active' : ''}`}
-                onClick={closeMobileMenu}
-              >
-                <i className="bi bi-calendar-check nav-icon" />
-                <span>Đơn phòng & Nhiệm vụ</span>
               </NavLink>
             </li>
 
@@ -118,7 +91,7 @@ export default function Header() {
                 onClick={closeMobileMenu}
               >
                 <i className="bi bi-heart nav-icon" />
-                <span>Wishlist</span>
+                <span>Yêu thích</span>
               </NavLink>
             </li>
 
@@ -136,63 +109,51 @@ export default function Header() {
 
             <li className="yen-nav-item">
               <NavLink
-                to="/account"
+                to="/booking"
                 className={({ isActive }) => `yen-nav-link ${isActive ? 'active' : ''}`}
                 onClick={closeMobileMenu}
               >
-                <i className="bi bi-person-fill-gear nav-icon" />
-                <span>Tài khoản</span>
+                <i className="bi bi-calendar-event nav-icon" />
+                <span>Đặt phòng</span>
               </NavLink>
             </li>
 
-            {user ? (
+            <li className="yen-nav-item">
+              <NavLink
+                to={user ? "/account" : "/login"}
+                className={({ isActive }) => `yen-nav-link ${isActive ? 'active' : ''}`}
+                onClick={closeMobileMenu}
+              >
+                <i className="bi bi-person-circle nav-icon" />
+                <span>{user ? (user.fullName?.split(' ')[0] || user.email) : "Tài khoản"}</span>
+              </NavLink>
+            </li>
+
+            {user?.role === 'OWNER' && (
               <li className="yen-nav-item">
-                <button
-                  type="button"
-                  className="yen-nav-link"
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#E11D48' }}
-                  onClick={handleLogout}
-                  title="Đăng xuất"
-                >
-                  <i className="bi bi-box-arrow-right nav-icon" />
-                  <span>Đăng xuất ({user.fullName?.split(' ')[0] || user.email})</span>
-                </button>
-              </li>
-            ) : (
-              <li className="yen-nav-item">
-                <NavLink
-                  to="/login"
-                  className={({ isActive }) => `yen-nav-link ${isActive ? 'active' : ''}`}
+                <Link
+                  to="/owner/dashboard"
+                  className="yen-nav-link role-switch-pill owner"
                   onClick={closeMobileMenu}
                 >
-                  <i className="bi bi-person-circle nav-icon" />
-                  <span>Đăng nhập</span>
-                </NavLink>
+                  <i className="bi bi-person-workspace nav-icon" />
+                  <span>Chủ nhà</span>
+                </Link>
               </li>
             )}
 
-
-            <li className="yen-nav-item">
-              <Link
-                to="/owner/dashboard"
-                className="yen-nav-link role-switch-pill owner"
-                onClick={closeMobileMenu}
-              >
-                <i className="bi bi-person-workspace nav-icon" />
-                <span>Chủ nhà</span>
-              </Link>
-            </li>
-
-            <li className="yen-nav-item">
-              <Link
-                to="/admin/dashboard"
-                className="yen-nav-link role-switch-pill admin"
-                onClick={closeMobileMenu}
-              >
-                <i className="bi bi-shield-lock nav-icon" />
-                <span>Admin</span>
-              </Link>
-            </li>
+            {user?.role === 'ADMIN' && (
+              <li className="yen-nav-item">
+                <Link
+                  to="/admin/dashboard"
+                  className="yen-nav-link role-switch-pill admin"
+                  onClick={closeMobileMenu}
+                >
+                  <i className="bi bi-shield-lock nav-icon" />
+                  <span>Admin</span>
+                </Link>
+              </li>
+            )}
           </ul>
         </nav>
       </div>

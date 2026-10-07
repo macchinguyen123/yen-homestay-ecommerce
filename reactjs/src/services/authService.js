@@ -1,4 +1,4 @@
-const API_BASE_URL = 'http://localhost:8080/api/auth';
+const API_BASE_URL = 'http://localhost:8081/api/auth';
 
 /**
  * Service xử lý đăng nhập & phân quyền với Backend Spring Boot & Supabase DB
@@ -118,7 +118,7 @@ export const authService = {
    */
   async testDbConnection() {
     try {
-      const response = await fetch('http://localhost:8080/api/public/test-db');
+      const response = await fetch('http://localhost:8081/api/public/test-db');
       const data = await response.json();
       return data;
     } catch (err) {

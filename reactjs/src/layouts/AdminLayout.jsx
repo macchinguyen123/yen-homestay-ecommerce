@@ -24,9 +24,12 @@ export default function AdminLayout() {
             {/* SIDEBAR QUẢN TRỊ ADMIN */}
             <aside className="admin-sidebar">
                 <div className="sidebar-header">
-                    {/* Placeholder for Logo, since we don't have the exact image */}
-                    <div style={{ color: '#fff', fontSize: '24px', fontWeight: '800', letterSpacing: '2px', fontFamily: 'Plus Jakarta Sans' }}>
-                        YÊN<span style={{ color: '#81b099', fontSize: '14px', marginLeft: '8px', letterSpacing: '0' }}>Admin</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }} onClick={() => navigate('/admin/dashboard')}>
+                        <img src="/logo_white.png" alt="YÊN Homestay Logo" style={{ height: '32px', width: 'auto', objectFit: 'contain' }} />
+                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                            <span style={{ color: '#A7F3D0', fontSize: '13px', fontWeight: '700', lineHeight: '1.2' }}>YÊN Homestay</span>
+                            <span style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '11px', fontWeight: '500', letterSpacing: '0.5px' }}>Admin Panel</span>
+                        </div>
                     </div>
                 </div>
 
