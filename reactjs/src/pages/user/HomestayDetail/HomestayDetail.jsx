@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import './HomestayDetail.css';
+import { authService } from '../../../services/authService';
+import { viewedHistoryService } from '../../../services/viewedHistoryService';
 import {
   roomsData, galleryImages, amenitiesData, AMENITY_GROUPS,
   experiencesData, EXPERIENCE_CATEGORIES, EXPERIENCE_COSTS, EXPERIENCE_PREVIEW_IDS,
@@ -618,6 +620,7 @@ function AmenitiesDrawer({ open, onClose }) {
 
 // ─── MAIN PAGE ─────────────────────────────────────────────────
 export default function HomestayDetail() {
+  const { id } = useParams();
   const [lightbox, setLightbox] = useState(null);
   const [activeRoomIdx, setActiveRoomIdx] = useState(null);
   const [reviewsDrawer, setReviewsDrawer] = useState({ open: false, group: 'all' });
@@ -632,6 +635,27 @@ export default function HomestayDetail() {
   const roomsSectionRef = useRef(null);
   const reviewsSectionRef = useRef(null);
   const toastTimer = useRef(null);
+
+  // Tự động lưu lịch sử sản phẩm đã xem của user
+  useEffect(() => {
+    const recordUserView = async () => {
+      const currentUser = authService.getCurrentUser();
+      const userId = currentUser?.id || 10;
+
+      let targetHomestayId = 1;
+      if (id) {
+        if (!isNaN(id)) {
+          targetHomestayId = Number(id);
+        } else if (id.includes("memory")) targetHomestayId = 2;
+        else if (id.includes("topas") || id.includes("sapa")) targetHomestayId = 3;
+        else if (id.includes("trangan") || id.includes("ninhbinh")) targetHomestayId = 4;
+        else if (id.includes("nharuong") || id.includes("hue")) targetHomestayId = 5;
+        else if (id.includes("sontra")) targetHomestayId = 6;
+      }
+      await viewedHistoryService.recordView(userId, targetHomestayId);
+    };
+    recordUserView();
+  }, [id]);
 
   const anyOpen = lightbox || activeRoomIdx !== null || reviewsDrawer.open || expDrawer || amDrawer;
   useEffect(() => {
