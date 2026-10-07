@@ -88,25 +88,6 @@ export default function Register() {
   const [showPwdHost, setShowPwdHost] = useState(false);
   const [showPwdConfirmHost, setShowPwdConfirmHost] = useState(false);
 
-  // OTP State (Step 2)
-  const [otpMethod, setOtpMethod] = useState('email'); // 'email' | 'phone'
-  const [otpDigits, setOtpDigits] = useState(['', '', '', '', '', '']);
-  const [countdown, setCountdown] = useState(60);
-  const [canResend, setCanResend] = useState(false);
-
-  // Countdown timer effect for Step 2
-  useEffect(() => {
-    let timer;
-    if (step === 2 && countdown > 0) {
-      timer = setInterval(() => {
-        setCountdown((prev) => prev - 1);
-      }, 1000);
-    } else if (countdown === 0) {
-      setCanResend(true);
-    }
-    return () => clearInterval(timer);
-  }, [step, countdown]);
-
   const currentGuestProvince = PROVINCES_DATA.find((p) => p.code === guestForm.provinceCode);
 
   // Form submission handler
@@ -156,55 +137,8 @@ export default function Register() {
     }
   };
 
-  const handleOtpChange = (index, val) => {
-    if (val.length > 1) val = val.slice(-1);
-    const newDigits = [...otpDigits];
-    newDigits[index] = val;
-    setOtpDigits(newDigits);
-
-    // Auto focus next box
-    if (val && index < 5) {
-      const nextEl = document.getElementById(`otp-box-${index + 1}`);
-      if (nextEl) nextEl.focus();
-    }
-  };
-
-  const handleOtpKeyDown = (index, e) => {
-    if (e.key === 'Backspace' && !otpDigits[index] && index > 0) {
-      const prevEl = document.getElementById(`otp-box-${index - 1}`);
-      if (prevEl) prevEl.focus();
-    }
-  };
-
-  const handleConfirmOtp = async () => {
-    const code = otpDigits.join('');
-    if (code.length < 6) {
-      alert('Vui lòng nhập đủ 6 chữ số mã OTP!');
-      return;
-    }
-
-    const payload = {
-      fullName: role === 'guest' ? guestForm.name : hostForm.name,
-      email: role === 'guest' ? guestForm.email : hostForm.email,
-      phoneNumber: role === 'guest' ? (guestForm.phoneCode + guestForm.phone) : (hostForm.phoneCode + hostForm.phone),
-      password: role === 'guest' ? guestForm.pwd : hostForm.pwd,
-      role: role === 'host' ? 'OWNER' : 'USER',
-    };
-
-    const res = await authService.register(payload);
-    if (res.success) {
-      setStep(3);
-    } else {
-      alert(res.message || 'Đăng ký thất bại. Vui lòng kiểm tra lại thông tin!');
-    }
-  };
-
-
   const handleResendOtp = () => {
-    setCountdown(60);
-    setCanResend(false);
-    setOtpDigits(['', '', '', '', '', '']);
-    alert(`Đã gửi lại mã OTP tới ${otpMethod === 'email' ? (role === 'guest' ? guestForm.email : hostForm.email) : (role === 'guest' ? guestForm.phone : hostForm.phone)}`);
+    setStep(1);
   };
 
   return (
@@ -769,72 +703,32 @@ export default function Register() {
             <div className="register-step">
               <div className="step-header mb-4">
                 <h1 className="step-title">Xác minh tài khoản</h1>
-                <p className="step-subtitle">Chọn phương thức nhận mã OTP để kích hoạt tài khoản</p>
+                <p className="step-subtitle">Liên kết kích hoạt đã được gửi tới email của bạn</p>
               </div>
 
               <div className="verify-method-group mb-4">
-                <button
-                  type="button"
-                  className={`verify-method-btn ${otpMethod === 'email' ? 'active' : ''}`}
-                  onClick={() => setOtpMethod('email')}
-                >
+                <div className="verify-method-btn active">
                   <i className="bi bi-envelope-fill"></i>
                   <div>
                     <div className="method-title">Xác minh Email</div>
                     <div className="method-desc">{role === 'guest' ? guestForm.email : hostForm.email}</div>
                   </div>
-                </button>
-
-                <button
-                  type="button"
-                  className={`verify-method-btn ${otpMethod === 'phone' ? 'active' : ''}`}
-                  onClick={() => setOtpMethod('phone')}
-                >
-                  <i className="bi bi-telephone-fill"></i>
-                  <div>
-                    <div className="method-title">Xác minh SMS</div>
-                    <div className="method-desc">{role === 'guest' ? guestForm.phone : hostForm.phone}</div>
-                  </div>
-                </button>
+                </div>
               </div>
 
               <div className="otp-section">
                 <p className="otp-info">
-                  Mã OTP 6 chữ số đã được gửi tới <strong>{otpMethod === 'email' ? (role === 'guest' ? guestForm.email : hostForm.email) : (role === 'guest' ? guestForm.phone : hostForm.phone)}</strong>
+                  Mở email <strong>{role === 'guest' ? guestForm.email : hostForm.email}</strong> và nhấn liên kết kích hoạt. Kiểm tra cả thư mục Spam nếu chưa thấy email.
                 </p>
-
-                <div className="otp-inputs mb-3">
-                  {otpDigits.map((digit, idx) => (
-                    <input
-                      key={idx}
-                      id={`otp-box-${idx}`}
-                      type="text"
-                      className={`otp-box ${digit ? 'filled' : ''}`}
-                      maxLength="1"
-                      inputMode="numeric"
-                      value={digit}
-                      onChange={(e) => handleOtpChange(idx, e.target.value)}
-                      onKeyDown={(e) => handleOtpKeyDown(idx, e)}
-                    />
-                  ))}
-                </div>
-
                 <p className="otp-resend-row">
-                  Chưa nhận được mã?{' '}
-                  <button
-                    type="button"
-                    className="btn-resend"
-                    onClick={handleResendOtp}
-                    disabled={!canResend}
-                  >
-                    {canResend ? 'Gửi lại mã OTP' : `Gửi lại (${countdown}s)`}
-                  </button>
+                  Không nhận được email?{' '}
+                  <button type="button" className="btn-resend" onClick={handleResendOtp}>Thử đăng ký lại</button>
                 </p>
               </div>
 
               <div className="reg-actions mt-4">
                 <button type="button" className="btn-back-step" onClick={() => setStep(1)}><i className="bi bi-arrow-left me-1"></i> Quay lại</button>
-                <button type="button" className="btn-reg-next" onClick={handleConfirmOtp}>Xác nhận <i className="bi bi-check-lg ms-1"></i></button>
+                <Link to="/login" className="btn-reg-next">Về đăng nhập <i className="bi bi-arrow-right ms-1"></i></Link>
               </div>
             </div>
           )}

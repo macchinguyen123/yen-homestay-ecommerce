@@ -17,7 +17,14 @@ export default function Login() {
 
   // Forgot password modal state
   const [forgotModalOpen, setForgotModalOpen] = useState(false);
+  const [forgotStep, setForgotStep] = useState(1); // 1: Kiểm tra Email & Gửi OTP, 2: Nhập OTP & Đổi mật khẩu
   const [resetInput, setResetInput] = useState('');
+  const [otpInput, setOtpInput] = useState('');
+  const [newPasswordInput, setNewPasswordInput] = useState('');
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [resetLoading, setResetLoading] = useState(false);
+  const [resetError, setResetError] = useState('');
+  const [resetSuccess, setResetSuccess] = useState('');
 
   const switchRole = (role) => {
     setActiveRole(role);
@@ -37,18 +44,91 @@ export default function Login() {
   };
 
   const openForgotPasswordModal = () => {
+    setForgotStep(1);
+    setResetInput(username.includes('@') ? username : '');
+    setOtpInput('');
+    setNewPasswordInput('');
+    setResetError('');
+    setResetSuccess('');
     setForgotModalOpen(true);
   };
 
   const closeForgotPasswordModal = () => {
     setForgotModalOpen(false);
+    setResetLoading(false);
+    setResetError('');
+    setResetSuccess('');
   };
 
-  const handleResetPassword = (e) => {
+  // Bước 1: Kiểm tra Email xem có tồn tại không và gửi mã OTP
+  const handleCheckEmailAndSendOtp = async (e) => {
     e.preventDefault();
-    alert('Mã khôi phục mật khẩu đã được gửi tới: ' + resetInput);
-    closeForgotPasswordModal();
-    setResetInput('');
+    setResetError('');
+    setResetSuccess('');
+
+    const emailToVerify = resetInput.trim();
+    if (!emailToVerify) {
+      setResetError('Vui lòng nhập địa chỉ email đăng ký!');
+      return;
+    }
+
+    setResetLoading(true);
+
+    try {
+      const res = await authService.forgotPassword(emailToVerify);
+      if (res && res.success) {
+        // Tìm thấy email -> Xuất thông báo và chuyển sang bước tiếp theo
+        setResetSuccess(res.message || 'Đã tìm thấy tài khoản! Mã xác nhận (OTP) đã được gửi đến email của bạn.');
+        setForgotStep(2);
+      } else {
+        // Không tìm thấy email -> Xuất thông báo lỗi và giữ nguyên ở bước 1 để nhập lại
+        setResetError(res?.message || 'Email này chưa được đăng ký trong hệ thống! Vui lòng kiểm tra lại.');
+      }
+    } catch (err) {
+      setResetError('Lỗi kết nối khi gửi yêu cầu. Vui lòng thử lại!');
+    } finally {
+      setResetLoading(false);
+    }
+  };
+
+  // Bước 2: Nhập OTP và đặt mật khẩu mới
+  const handleResetPasswordSubmit = async (e) => {
+    e.preventDefault();
+    setResetError('');
+    setResetSuccess('');
+
+    if (!otpInput.trim() || !newPasswordInput.trim()) {
+      setResetError('Vui lòng nhập đầy đủ mã OTP và mật khẩu mới!');
+      return;
+    }
+
+    if (newPasswordInput.length < 6) {
+      setResetError('Mật khẩu mới phải có tối thiểu 6 ký tự!');
+      return;
+    }
+
+    setResetLoading(true);
+
+    try {
+      const res = await authService.resetPassword({
+        email: resetInput.trim(),
+        otp: otpInput.trim(),
+        newPassword: newPasswordInput.trim(),
+      });
+
+      if (res && res.success) {
+        alert(res.message || 'Đặt lại mật khẩu thành công! Vui lòng đăng nhập với mật khẩu mới.');
+        setPassword(newPasswordInput.trim());
+        setUsername(resetInput.trim());
+        closeForgotPasswordModal();
+      } else {
+        setResetError(res?.message || 'Mã OTP không chính xác hoặc đã hết hạn!');
+      }
+    } catch (err) {
+      setResetError('Lỗi kết nối khi đặt lại mật khẩu!');
+    } finally {
+      setResetLoading(false);
+    }
   };
 
   const handleLogin = async (e) => {
@@ -333,60 +413,184 @@ export default function Login() {
         </div>
       </main>
 
-      {/* Modal Quên mật khẩu */}
+      {/* Modal Quên mật khẩu - Kiểm tra email và gửi OTP */}
       {forgotModalOpen && (
-        <div id="forgot-password-modal" className="login-modal-overlay">
-          <div className="login-modal-box">
+        <div
+          id="forgot-password-modal"
+          className="login-modal-overlay"
+          onClick={(e) => {
+            if (e.target.id === 'forgot-password-modal') closeForgotPasswordModal();
+          }}
+        >
+          <div className="login-modal-box" onClick={(e) => e.stopPropagation()}>
             <button
               type="button"
               onClick={closeForgotPasswordModal}
               className="login-modal-close"
+              aria-label="Đóng"
             >
               <i className="bi bi-x-lg" />
             </button>
 
             <div className="login-modal-head">
               <div className="login-modal-icon-badge">
-                <i className="bi bi-key" />
+                <i className={forgotStep === 1 ? "bi bi-envelope-check" : "bi bi-shield-lock"} />
               </div>
               <div>
-                <h3>Quên mật khẩu?</h3>
-                <p>Nhập email hoặc số điện thoại để nhận mã khôi phục</p>
+                <h3>{forgotStep === 1 ? 'Quên mật khẩu?' : 'Nhập mã OTP & Đặt mật khẩu mới'}</h3>
+                <p>
+                  {forgotStep === 1
+                    ? 'Nhập email để hệ thống kiểm tra và gửi mã xác nhận'
+                    : `Mã OTP đã được gửi đến: ${resetInput}`}
+                </p>
               </div>
             </div>
 
-            <form onSubmit={handleResetPassword} className="login-form">
-              <div className="login-form-group">
-                <label className="login-label">
-                  Email / Số điện thoại đăng ký
-                </label>
-                <input
-                  type="text"
-                  id="reset-input"
-                  className="login-input"
-                  placeholder="Ví dụ: email@gmail.com hoặc 0912..."
-                  value={resetInput}
-                  onChange={(e) => setResetInput(e.target.value)}
-                  required
-                />
+            {/* Thông báo lỗi (ví dụ: email chưa tồn tại, mã OTP sai) */}
+            {resetError && (
+              <div className="login-modal-alert error">
+                <i className="bi bi-exclamation-triangle-fill" />
+                <span>{resetError}</span>
               </div>
+            )}
 
-              <div className="login-modal-actions">
-                <button
-                  type="button"
-                  onClick={closeForgotPasswordModal}
-                  className="login-modal-cancel-btn"
-                >
-                  Hủy bỏ
-                </button>
-                <button
-                  type="submit"
-                  className="login-modal-submit-btn"
-                >
-                  Gửi mã khôi phục
-                </button>
+            {/* Thông báo thành công khi tìm thấy email */}
+            {resetSuccess && (
+              <div className="login-modal-alert success">
+                <i className="bi bi-check-circle-fill" />
+                <span>{resetSuccess}</span>
               </div>
-            </form>
+            )}
+
+            {/* BƯỚC 1: KIỂM TRA EMAIL TRONG HỆ THỐNG */}
+            {forgotStep === 1 ? (
+              <form onSubmit={handleCheckEmailAndSendOtp} className="login-form">
+                <div className="login-form-group">
+                  <label className="login-label">
+                    Email đăng ký tài khoản <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="email"
+                    id="reset-input"
+                    className="login-input"
+                    placeholder="Ví dụ: your-email@gmail.com"
+                    value={resetInput}
+                    onChange={(e) => {
+                      setResetInput(e.target.value);
+                      if (resetError) setResetError('');
+                    }}
+                    required
+                    autoFocus
+                  />
+                  <span className="login-helper-text">
+                    Hệ thống sẽ kiểm tra xem email này đã tồn tại chưa rồi mới gửi mã OTP.
+                  </span>
+                </div>
+
+                <div className="login-modal-actions">
+                  <button
+                    type="button"
+                    onClick={closeForgotPasswordModal}
+                    className="login-modal-cancel-btn"
+                  >
+                    Hủy bỏ
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={resetLoading}
+                    className="login-modal-submit-btn"
+                  >
+                    {resetLoading ? 'Đang kiểm tra...' : 'Tiếp tục'}
+                  </button>
+                </div>
+              </form>
+            ) : (
+              /* BƯỚC 2: NHẬP MÃ OTP VÀ MẬT KHẨU MỚI */
+              <form onSubmit={handleResetPasswordSubmit} className="login-form">
+                <div className="login-form-group">
+                  <label className="login-label">
+                    Mã xác nhận OTP (6 số) <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    id="otp-input"
+                    maxLength={6}
+                    className="login-input"
+                    style={{ textAlign: 'center', fontWeight: 'bold', letterSpacing: '6px', fontSize: '18px' }}
+                    placeholder="123456"
+                    value={otpInput}
+                    onChange={(e) => {
+                      setOtpInput(e.target.value);
+                      if (resetError) setResetError('');
+                    }}
+                    required
+                    autoFocus
+                  />
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px' }}>
+                    <span className="login-helper-text">Mã có hiệu lực trong 15 phút</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setForgotStep(1);
+                        setResetError('');
+                        setResetSuccess('');
+                      }}
+                      style={{ fontSize: '12px', color: '#15803D', background: 'transparent', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}
+                    >
+                      Đổi email khác
+                    </button>
+                  </div>
+                </div>
+
+                <div className="login-form-group">
+                  <label className="login-label">
+                    Mật khẩu mới <span className="text-red-500">*</span>
+                  </label>
+                  <div className="login-input-wrapper">
+                    <input
+                      type={showNewPassword ? 'text' : 'password'}
+                      id="new-password-input"
+                      className="login-input"
+                      placeholder="Nhập mật khẩu mới (tối thiểu 6 ký tự)"
+                      value={newPasswordInput}
+                      onChange={(e) => {
+                        setNewPasswordInput(e.target.value);
+                        if (resetError) setResetError('');
+                      }}
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowNewPassword((prev) => !prev)}
+                      className="login-toggle-pw-btn"
+                    >
+                      <i className={`bi ${showNewPassword ? 'bi-eye' : 'bi-eye-slash'}`} />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="login-modal-actions">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setForgotStep(1);
+                      setResetError('');
+                      setResetSuccess('');
+                    }}
+                    className="login-modal-cancel-btn"
+                  >
+                    Quay lại
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={resetLoading}
+                    className="login-modal-submit-btn"
+                  >
+                    {resetLoading ? 'Đang xử lý...' : 'Xác nhận đổi mật khẩu'}
+                  </button>
+                </div>
+              </form>
+            )}
           </div>
         </div>
       )}

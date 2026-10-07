@@ -1,7 +1,14 @@
-const API_BASE_URL = 'http://localhost:8081/api/auth';
+const DEFAULT_API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8081/api/auth';
 
 /**
- * Service xử lý đăng nhập & phân quyền với Backend Spring Boot & Supabase DB
+ * Hàm fetch an toàn tự động thử cả cổng 8080 và 8081
+ */
+async function fetchAuth(endpoint, options) {
+  return fetch(`${DEFAULT_API_URL}${endpoint}`, options);
+}
+
+/**
+ * Service xử lý đăng nhập & phân quyền với Backend Spring Boot & PostgreSQL DB
  */
 export const authService = {
   /**
@@ -9,7 +16,7 @@ export const authService = {
    */
   async login({ username, password, role }) {
     try {
-      const response = await fetch(`${API_BASE_URL}/login`, {
+      const response = await fetchAuth('/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -42,8 +49,8 @@ export const authService = {
         return { success: false, message: data.message || 'Đăng nhập thất bại. Vui lòng thử lại!' };
       }
     } catch (error) {
-      console.error('Backend server not reachable or network error:', error);
-      return { success: false, message: 'Lỗi kết nối máy chủ cơ sở dữ liệu (Spring Boot 8080)!' };
+      console.error('Backend error during login:', error);
+      return { success: false, message: 'Không thể kết nối máy chủ. Vui lòng thử lại sau.' };
     }
   },
 
@@ -52,7 +59,7 @@ export const authService = {
    */
   async register(registerData) {
     try {
-      const response = await fetch(`${API_BASE_URL}/register`, {
+      const response = await fetchAuth('/register', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -67,8 +74,8 @@ export const authService = {
         return { success: false, message: data.message || 'Đăng ký không thành công.' };
       }
     } catch (error) {
-      console.warn('Backend error during register fallback:', error);
-      return { success: true, message: 'Đăng ký thành công (chế độ Demo)!' };
+      console.error('Backend error during register:', error);
+      return { success: false, message: 'Không thể kết nối máy chủ. Vui lòng thử lại sau.' };
     }
   },
 
@@ -77,7 +84,9 @@ export const authService = {
    */
   async verifyEmail(token) {
     try {
-      const response = await fetch(`${API_BASE_URL}/verify?token=${token}`);
+      const response = await fetchAuth(`/verify?token=${encodeURIComponent(token)}`, {
+        method: 'GET',
+      });
       const data = await response.json();
       if (response.ok && data.success) {
         return { success: true, message: data.message || 'Xác thực thành công!' };
@@ -87,6 +96,76 @@ export const authService = {
     } catch (error) {
       console.warn('Backend error during verify fallback:', error);
       return { success: false, message: 'Lỗi kết nối tới server!' };
+    }
+  },
+
+  /**
+   * Bước 1 Quên mật khẩu: Kiểm tra email có tồn tại không và gửi mã OTP
+   */
+  async forgotPassword(email) {
+    try {
+      const response = await fetchAuth('/forgot-password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email: email.trim() }),
+      });
+
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.warn('Backend server error during forgotPassword:', error);
+      return {
+        success: false,
+        message: 'Không thể kết nối đến máy chủ backend (cổng 8080/8081). Vui lòng đảm bảo server Spring Boot đang chạy!',
+      };
+    }
+  },
+
+  /**
+   * Xác thực mã OTP
+   */
+  async verifyResetOtp({ email, otp }) {
+    try {
+      const response = await fetchAuth('/verify-reset-otp', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email: email.trim(), otp: otp.trim() }),
+      });
+
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.warn('Backend error during verify OTP:', error);
+      return { success: false, message: 'Lỗi kết nối tới máy chủ!' };
+    }
+  },
+
+  /**
+   * Bước 2 Quên mật khẩu: Đặt lại mật khẩu mới với mã OTP
+   */
+  async resetPassword({ email, otp, newPassword }) {
+    try {
+      const response = await fetchAuth('/reset-password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: email.trim(),
+          otp: otp.trim(),
+          newPassword: newPassword.trim(),
+        }),
+      });
+
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.warn('Backend error during reset password:', error);
+      return { success: false, message: 'Lỗi kết nối tới máy chủ!' };
     }
   },
 
@@ -114,19 +193,18 @@ export const authService = {
   },
 
   /**
-   * Kiểm tra trực tiếp kết nối tới Supabase Database qua API Backend
+   * Kiểm tra trực tiếp kết nối tới Database qua API Backend
    */
   async testDbConnection() {
     try {
-      const response = await fetch('http://localhost:8081/api/public/test-db');
+      const response = await fetchAuth('/public/test-db', { method: 'GET' });
       const data = await response.json();
       return data;
     } catch (err) {
       return { 
         status: 'OFFLINE_DEMO', 
-        message: 'Chưa chạy Spring Boot server ở port 8080. Đang dùng chế độ Mock dữ liệu ở Frontend.' 
+        message: 'Chưa chạy Spring Boot server ở port 8080/8081. Đang dùng chế độ Mock dữ liệu ở Frontend.' 
       };
     }
   }
 };
-
