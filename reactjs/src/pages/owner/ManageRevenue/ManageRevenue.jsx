@@ -1,4 +1,5 @@
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
+import { authService } from '../../../services/authService';
 import './ManageRevenue.css';
 import {
   INITIAL_REVENUE_METRICS,
@@ -9,6 +10,8 @@ import {
 } from './manageRevenueData';
 
 export default function ManageRevenue() {
+  const ownerId = authService.getCurrentUser()?.id;
+  const [realRevenue, setRealRevenue] = useState(null);
   // ── States ───────────────────────────────────────────────────────────
   const [filterMode, setFilterMode] = useState('month_year'); // 'month_year' | 'quarter_year' | 'calendar'
   const [selectedMonth, setSelectedMonth] = useState(9);
@@ -21,6 +24,17 @@ export default function ManageRevenue() {
   const [searchTx, setSearchTx] = useState('');
   const [sortOption, setSortOption] = useState('newest'); // 'newest' | 'oldest' | 'highest' | 'lowest'
   const [sortDropdownOpen, setSortDropdownOpen] = useState(false);
+
+  useEffect(() => {
+    if (!ownerId) return;
+    const lastDay = filterMode === 'month_year' ? new Date(selectedYear, selectedMonth, 0) : new Date(selectedYear, 11, 31);
+    const firstDay = filterMode === 'quarter_year' ? new Date(selectedYear, (selectedQuarter - 1) * 3, 1) : new Date(selectedYear, filterMode === 'month_year' ? selectedMonth - 1 : 0, 1);
+    const qs = new URLSearchParams({ ownerId, from: firstDay.toISOString().slice(0, 10), to: lastDay.toISOString().slice(0, 10) });
+    fetch(`http://localhost:8081/api/owner/analytics/revenue?${qs}`)
+      .then(r => r.ok ? r.json() : Promise.reject())
+      .then(setRealRevenue)
+      .catch(() => setRealRevenue(null));
+  }, [ownerId, filterMode, selectedMonth, selectedQuarter, selectedYear]);
 
   // SVG Chart Interactive Hover
   const [chartHover, setChartHover] = useState({
@@ -56,7 +70,7 @@ export default function ManageRevenue() {
       }
     }
 
-    const baseTotal = (100 + (seed % 45)) * 1000000;
+    const baseTotal = realRevenue ? Number(realRevenue.total || 0) : 0;
     const room = Math.round(baseTotal * 0.64);
     const service = baseTotal - room;
     const deposit = Math.round(baseTotal * 0.25);
@@ -70,7 +84,7 @@ export default function ManageRevenue() {
         deposit
       }
     };
-  }, [filterMode, selectedMonth, selectedQuarter, selectedYear, customDate]);
+  }, [filterMode, selectedMonth, selectedQuarter, selectedYear, customDate, realRevenue]);
 
   // ── Transactions Filtering & Sorting ─────────────────────────────────
   const sortedTransactions = useMemo(() => {
@@ -93,6 +107,15 @@ export default function ManageRevenue() {
 
     return list;
   }, [transactions, searchTx, sortOption]);
+
+  const exportReport = () => {
+    const rows = [['Kỳ báo cáo', 'Tổng doanh thu', 'Doanh thu phòng', 'Tiền cọc'], [periodTitle, metrics.total, metrics.room, metrics.deposit]];
+    const csv = rows.map(row => row.map(value => `"${String(value).replaceAll('"', '""')}"`).join(',')).join('\n');
+    const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a'); link.href = url; link.download = `bao-cao-doanh-thu-${periodTitle.replaceAll('/', '-')}.csv`; link.click();
+    URL.revokeObjectURL(url);
+  };
 
   // ── SVG Chart Mouse Move Handler ─────────────────────────────────────
   const handleChartMouseMove = (e) => {
@@ -242,7 +265,7 @@ export default function ManageRevenue() {
             <button
               type="button"
               className="mr-btn-action-outline"
-              onClick={() => alert(`Đã xuất báo cáo doanh thu Excel cho kỳ: ${periodTitle}!`)}
+              onClick={exportReport}
             >
               <span className="material-symbols-outlined text-[18px]" style={{ color: '#1b6d24' }}>
                 description
@@ -493,7 +516,7 @@ export default function ManageRevenue() {
               <p className="mr-box-subtitle">Động lực tăng trưởng lợi nhuận ròng của Homestay</p>
             </div>
             <span className="mr-tag-homestay" style={{ background: '#fef3c7', color: '#78350f' }}>
-              {formatVND(INITIAL_REVENUE_METRICS.serviceRevenue)}
+              {formatVND(metrics.service)}
             </span>
           </div>
 

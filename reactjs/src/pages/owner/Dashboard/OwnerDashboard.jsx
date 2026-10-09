@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import './OwnerDashboard.css';
+import { authService } from '../../../services/authService';
 import {
   INITIAL_DASHBOARD_STATS,
   INITIAL_BOOKINGS,
@@ -116,25 +117,46 @@ function RevenueChart({ period }) {
 
 // ─── Main Dashboard ────────────────────────────────────────────────────────────
 export default function OwnerDashboard() {
+  const owner = authService.getCurrentUser() || {};
+  const [ownerHomestay, setOwnerHomestay] = useState(null);
+  const [realBookings, setRealBookings] = useState([]);
   const [period, setPeriod] = useState('7days');
   const [dateFilter, setDateFilter] = useState('');
   const [page, setPage] = useState(1);
 
+  useEffect(() => {
+    fetch('http://localhost:8081/api/admin/homestays')
+      .then(r => r.ok ? r.json() : [])
+      .then(rows => {
+        const mine = rows.find(h => String(h.ownerId || h.owner_id) === String(owner.id)) || rows[0];
+        if (mine) setOwnerHomestay(mine);
+      }).catch(() => {});
+  }, [owner.id]);
+
+  useEffect(() => {
+    if (!owner.id) return;
+    fetch(`http://localhost:8081/api/owner/analytics/bookings?ownerId=${owner.id}`)
+      .then(r => r.ok ? r.json() : [])
+      .then(rows => setRealBookings(rows.map(b => ({ ...b, customerName: b.code || 'Khách đặt phòng', room: b.homestay || 'Homestay', checkIn: b.check_in, checkOut: b.check_out, price: Number(b.price || 0), statusClass: String(b.status || '').toLowerCase() }))))
+      .catch(() => setRealBookings([]));
+  }, [owner.id]);
+
   // Lọc booking theo ngày
+  const bookings = realBookings;
   const filteredBookings = dateFilter
-    ? INITIAL_BOOKINGS.filter(b => {
+    ? bookings.filter(b => {
         const cin  = new Date(b.checkIn);
         const cout = new Date(b.checkOut);
         const sel  = new Date(dateFilter);
         cin.setHours(0,0,0,0); cout.setHours(0,0,0,0); sel.setHours(0,0,0,0);
         return sel >= cin && sel <= cout;
       })
-    : INITIAL_BOOKINGS;
+    : bookings;
 
   const totalPages = Math.ceil(filteredBookings.length / ITEMS_PER_PAGE);
   const pagedBookings = filteredBookings.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
 
-  const upcomingBookings = INITIAL_BOOKINGS.filter(b => b.status === 'Đã đặt' || b.status === 'Đang ở').slice(0, 4);
+  const upcomingBookings = bookings.filter(b => new Date(b.checkIn) >= new Date()).slice(0, 4);
 
   const { percentage, booked, available, total } = OCCUPANCY_DATA;
   const occupancyDeg = Math.round((percentage / 100) * 360);
@@ -147,7 +169,7 @@ export default function OwnerDashboard() {
         <div className="dashboard-hero-overlay" />
         <div className="dashboard-hero-content">
           <div className="hero-greeting">
-            <i className="bi bi-hand-wave-fill" /> Xin chào, Nguyễn Văn An!
+            <i className="bi bi-hand-wave-fill" /> Xin chào, {owner.fullName || owner.email || 'Chủ homestay'}!
           </div>
           <h1>
             Chào mừng bạn đến với hệ thống<br />
@@ -162,16 +184,16 @@ export default function OwnerDashboard() {
         {/* Homestay card (floating right) */}
         <div className="hero-homestay-card">
           <img
-            src="https://images.unsplash.com/photo-1601918774946-25832a4be0d6?auto=format&fit=crop&w=500&q=80"
-            alt="Nhà Sàn Mộc"
+            src={ownerHomestay?.imageUrl || ownerHomestay?.img || 'https://images.unsplash.com/photo-1601918774946-25832a4be0d6?auto=format&fit=crop&w=500&q=80'}
+            alt={ownerHomestay?.name || 'Homestay'}
             className="hero-homestay-image"
           />
           <div className="hero-homestay-info">
             <span className="hero-homestay-sub">Homestay của bạn</span>
-            <h3 className="hero-homestay-name">Nhà Sàn Mộc</h3>
+            <h3 className="hero-homestay-name">{ownerHomestay?.name || 'Chưa có homestay'}</h3>
             <span className="hero-homestay-loc">
               <i className="bi bi-geo-alt-fill" />
-              Làng Cò, Mai Châu, Hòa Bình
+              {ownerHomestay?.address || ownerHomestay?.city || 'Chưa cập nhật địa chỉ'}
             </span>
           </div>
         </div>
@@ -309,7 +331,7 @@ export default function OwnerDashboard() {
             <section className="dashboard-card">
               <div className="dashboard-card-header">
                 <h2>Lịch đặt phòng sắp tới</h2>
-                <button className="view-all-button">Xem tất cả</button>
+                <button className="view-all-button" onClick={() => navigate('/owner/bookings')}>Xem tất cả</button>
               </div>
               <div className="upcoming-list">
                 {upcomingBookings.map((b, i) => (
