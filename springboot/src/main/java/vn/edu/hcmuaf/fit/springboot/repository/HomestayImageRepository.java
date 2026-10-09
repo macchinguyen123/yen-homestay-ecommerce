@@ -9,4 +9,5 @@ import java.util.List;
 @Repository
 public interface HomestayImageRepository extends JpaRepository<HomestayImage, Long> {
     List<HomestayImage> findByHomestayId(Long homestayId);
+    List<HomestayImage> findByHomestayIdIn(List<Long> homestayIds);
 }
