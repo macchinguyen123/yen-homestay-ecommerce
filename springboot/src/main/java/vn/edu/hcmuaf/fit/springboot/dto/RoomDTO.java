@@ -32,6 +32,7 @@ public class RoomDTO {
     private RoomSpecsDTO specs;
     private Double rating;
     private Integer reviewCount;
+    private List<GuestTaskDTO> tasks;
 
     @Getter
     @Setter

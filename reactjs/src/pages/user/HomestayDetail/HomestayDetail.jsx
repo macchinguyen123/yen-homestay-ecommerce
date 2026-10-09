@@ -108,16 +108,32 @@ function Lightbox({ images, index, onClose, onNav }) {
   if (!images || images.length === 0) return null;
   return (
     <div className="lightbox-overlay active" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <button type="button" className="lightbox-close-btn" onClick={onClose} title="Đóng">
+      {/* Nút đóng cố định ở góc trên bên phải màn hình */}
+      <button
+        type="button"
+        className="lightbox-close-btn"
+        onClick={onClose}
+        title="Đóng (Esc)"
+        aria-label="Đóng"
+        style={{
+          position: 'fixed',
+          top: '24px',
+          right: '28px',
+          zIndex: 9999
+        }}
+      >
         <i className="bi bi-x-lg" />
       </button>
+
       <button type="button" className="lightbox-arrow prev" onClick={() => onNav(-1)} title="Ảnh trước">
         <i className="bi bi-chevron-left" />
       </button>
+
       <div className="lightbox-image-wrap">
         <img src={images[index]} alt="Ảnh homestay" />
         <span className="lightbox-counter">{index + 1} / {images.length}</span>
       </div>
+
       <button type="button" className="lightbox-arrow next" onClick={() => onNav(1)} title="Ảnh sau">
         <i className="bi bi-chevron-right" />
       </button>
@@ -199,6 +215,29 @@ function RoomModal({ room, homestay, allHomestayReviews = [], onClose, onOpenRev
     });
   };
 
+  const roomTasks = useMemo(() => {
+    if (room?.tasks && room.tasks.length > 0) return room.tasks;
+    if (homestay?.tasks && homestay.tasks.length > 0) return homestay.tasks;
+    return [
+      {
+        id: 1,
+        title: 'Check-in xanh & Giữ gìn năng lượng',
+        description: 'Chụp hình kỷ niệm góc phòng yêu thích và tắt thiết bị điện khi ra ngoài.',
+        rewardNote: 'Tặng 1 ly trà thảo mộc hoặc cà phê nguyên chất mỗi buổi sáng',
+        icon: 'bi-cup-hot-fill',
+        status: 'OPEN'
+      },
+      {
+        id: 2,
+        title: 'Khám phá văn hoá bản địa & Đồi thông',
+        description: 'Tham gia đi dạo khám phá thiên nhiên hoặc trò chuyện văn hóa bản địa cùng chủ phòng.',
+        rewardNote: 'Giảm 10% dịch vụ thuê xe máy hoặc tặng gói quà đặc sản khi trả phòng',
+        icon: 'bi-tree-fill',
+        status: 'OPEN'
+      }
+    ];
+  }, [room?.tasks, homestay?.tasks]);
+
   const roomReviews = useMemo(() => {
     return (allHomestayReviews || []).filter((r) => String(r.roomId) === String(room.id));
   }, [allHomestayReviews, room.id]);
@@ -253,6 +292,49 @@ function RoomModal({ room, homestay, allHomestayReviews = [], onClose, onOpenRev
                 </div>
               ))}
             </div>
+
+            {/* Nhiệm vụ từ chủ phòng / host tasks */}
+            {roomTasks && roomTasks.length > 0 && (
+              <div className="room-tasks-section">
+                <div className="room-tasks-head">
+                  <span className="room-tasks-badge">
+                    <i className="bi bi-gift-fill" /> Nhiệm vụ từ chủ phòng
+                  </span>
+                  <h4 className="room-modal-subtitle" style={{ margin: '8px 0 4px' }}>
+                    Nhiệm vụ nhận thưởng khi lưu trú
+                  </h4>
+                  <p className="room-tasks-intro">
+                    Hoàn thành các hoạt động ý nghĩa do chủ phòng thiết kế để nhận quà tặng đặc sản và ưu đãi độc quyền trong chuyến đi!
+                  </p>
+                </div>
+                <div className="room-tasks-list">
+                  {roomTasks.map((t, idx) => (
+                    <div key={t.id || idx} className="room-task-card">
+                      <div className="room-task-icon-col">
+                        <div className="room-task-icon">
+                          <i className={`bi ${t.icon || 'bi-trophy-fill'}`} />
+                        </div>
+                      </div>
+                      <div className="room-task-content">
+                        <div className="room-task-title-row">
+                          <span className="room-task-title">{t.title}</span>
+                          <span className="room-task-status-tag">
+                            <i className="bi bi-lightning-charge-fill" /> Đang mở
+                          </span>
+                        </div>
+                        {t.description && <p className="room-task-desc">{t.description}</p>}
+                        {t.rewardNote && (
+                          <div className="room-task-reward">
+                            <i className="bi bi-gift" />
+                            <span><strong>Phần thưởng:</strong> {t.rewardNote}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <h4 className="room-modal-subtitle">Chọn ngày & số khách</h4>
             <div className="room-booking-form">
@@ -1043,10 +1125,15 @@ export default function HomestayDetail() {
                 ))}
               </div>
             </div>
-            <button type="button" className="yn-btn yn-btn--light yn-btn--sm gallery-all-btn"
-              onClick={() => setLightbox({ images: activeGallery, index: 0 })}>
-              <i className="bi bi-grid-3x3-gap-fill" /> Xem tất cả {activeGallery.length} ảnh
-            </button>
+            <div className="gallery-actions-bar">
+              <span className="gallery-hint-text">
+                <i className="bi bi-images" /> Nhấp vào ảnh bất kỳ để xem toàn màn hình
+              </span>
+              <button type="button" className="gallery-all-btn"
+                onClick={() => setLightbox({ images: activeGallery, index: 0 })}>
+                <i className="bi bi-grid-3x3-gap-fill" /> Xem tất cả {activeGallery.length} ảnh
+              </button>
+            </div>
           </div>
         </div>
       </section>
@@ -1109,38 +1196,6 @@ export default function HomestayDetail() {
               <button type="button" className="yn-btn yn-btn--outline" onClick={() => setAmDrawer(true)}>
                 Hiển thị tất cả {amenitiesData.length} tiện nghi
               </button>
-
-              <div className="experience-section">
-                <div className="experience-head">
-                  <div>
-                    <h4 className="experience-title"><i className="bi bi-stars" /> Trải nghiệm homestay mang lại</h4>
-                    <p className="experience-sub">Những hoạt động đậm chất miền quê bạn có thể tham gia ngay tại đồi thông.</p>
-                  </div>
-                  <span className="experience-count-note">{experiencesData.length} trải nghiệm</span>
-                </div>
-                <div className="experience-grid">
-                  {expPreview.map((x) => {
-                    const cat = EXPERIENCE_CATEGORIES.find((c) => c.id === x.category);
-                    return (
-                      <button key={x.id} type="button" className="xp-card" onClick={() => setExpDrawer(true)}>
-                        <span className="xp-card-media">
-                          <img src={unsplashUrl(x.img, 700)} alt={x.title} loading="lazy"
-                            onError={(e) => { e.target.onerror = null; e.target.src = unsplashUrl(EXPERIENCE_FALLBACK_IMG, 700); }} />
-                          <span className={`xp-badge ${x.price === 0 ? 'xp-badge--free' : ''}`}>{experiencePriceLabel(x)}</span>
-                        </span>
-                        <span className="xp-card-body">
-                          <span className="xp-cat"><i className={`bi ${cat?.icon}`} /> {cat?.label}</span>
-                          <span className="xp-card-name">{x.title}</span>
-                          <span className="xp-card-meta"><i className="bi bi-clock" /> {x.duration}</span>
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-                <button type="button" className="yn-btn yn-btn--outline" onClick={() => setExpDrawer(true)}>
-                  <i className="bi bi-compass" /> Xem tất cả {experiencesData.length} trải nghiệm
-                </button>
-              </div>
             </div>
             <div className="detail-divider" />
 
@@ -1403,12 +1458,6 @@ export default function HomestayDetail() {
         homestayRating={homestayRating}
         onClose={() => setReviewsDrawer((s) => ({ ...s, open: false }))}
         onPhotoClick={handlePhotoClick}
-      />
-
-      <ExperiencesDrawer
-        open={expDrawer}
-        onClose={() => setExpDrawer(false)}
-        onScrollToRooms={scrollToRooms}
       />
 
       <AmenitiesDrawer

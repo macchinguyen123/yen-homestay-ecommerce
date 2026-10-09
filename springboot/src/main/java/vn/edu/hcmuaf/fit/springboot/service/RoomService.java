@@ -6,12 +6,15 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import vn.edu.hcmuaf.fit.springboot.dto.GuestTaskDTO;
 import vn.edu.hcmuaf.fit.springboot.dto.HomestayDTO;
 import vn.edu.hcmuaf.fit.springboot.dto.RoomDTO;
+import vn.edu.hcmuaf.fit.springboot.model.GuestTask;
 import vn.edu.hcmuaf.fit.springboot.model.Homestay;
 import vn.edu.hcmuaf.fit.springboot.model.HomestayImage;
 import vn.edu.hcmuaf.fit.springboot.model.Room;
 import vn.edu.hcmuaf.fit.springboot.model.RoomImage;
+import vn.edu.hcmuaf.fit.springboot.repository.GuestTaskRepository;
 import vn.edu.hcmuaf.fit.springboot.repository.HomestayImageRepository;
 import vn.edu.hcmuaf.fit.springboot.repository.HomestayRepository;
 import vn.edu.hcmuaf.fit.springboot.repository.RoomImageRepository;
@@ -30,6 +33,7 @@ public class RoomService {
     private final RoomImageRepository roomImageRepository;
     private final HomestayRepository homestayRepository;
     private final HomestayImageRepository homestayImageRepository;
+    private final GuestTaskRepository guestTaskRepository;
     private final org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
 
     @PostConstruct
@@ -152,6 +156,38 @@ public class RoomService {
         return map;
     }
 
+    private GuestTaskDTO toGuestTaskDTO(GuestTask t) {
+        return GuestTaskDTO.builder()
+                .id(t.getId())
+                .homestayId(t.getHomestayId())
+                .title(t.getTitle())
+                .description(t.getDescription())
+                .rewardNote(t.getRewardNote())
+                .status(t.getStatus() != null ? t.getStatus() : "ACTIVE")
+                .build();
+    }
+
+    private List<GuestTaskDTO> getDefaultTasks(Long homestayId) {
+        return List.of(
+            GuestTaskDTO.builder()
+                .id(1000L + (homestayId != null ? homestayId : 1))
+                .homestayId(homestayId)
+                .title("Check-in & Đánh giá trải nghiệm")
+                .description("Chụp lại khoảnh khắc đẹp tại homestay và viết đánh giá chân thực để nhận voucher giảm giá cho lần đặt phòng tiếp theo.")
+                .rewardNote("Voucher giảm 10% cho kỳ nghỉ sau")
+                .status("ACTIVE")
+                .build(),
+            GuestTaskDTO.builder()
+                .id(2000L + (homestayId != null ? homestayId : 1))
+                .homestayId(homestayId)
+                .title("Bảo vệ môi trường & Tiết kiệm năng lượng")
+                .description("Tắt điều hòa và các thiết bị điện khi ra khỏi phòng, thu gom rác đúng nơi quy định của homestay.")
+                .rewardNote("Tặng set trà thảo mộc / trái cây vườn chào mừng")
+                .status("ACTIVE")
+                .build()
+        );
+    }
+
     /**
      * Lấy danh sách phòng thuộc về 1 Homestay (tối ưu nạp ảnh và review)
      */
@@ -166,8 +202,16 @@ public class RoomService {
                 .collect(Collectors.groupingBy(RoomImage::getRoomId));
         Map<Long, ReviewSummary> roomReviewStats = getRoomReviewStatsForHomestay(homestayId);
 
+        List<GuestTaskDTO> tasks = guestTaskRepository.findByHomestayId(homestayId).stream()
+                .map(this::toGuestTaskDTO)
+                .collect(Collectors.toList());
+        if (tasks.isEmpty()) {
+            tasks = getDefaultTasks(homestayId);
+        }
+        final List<GuestTaskDTO> finalTasks = tasks;
+
         return rooms.stream()
-                .map(r -> toRoomDTOWithImages(r, homestayName, imagesByRoom.getOrDefault(r.getId(), Collections.emptyList()), roomReviewStats.get(r.getId())))
+                .map(r -> toRoomDTOWithImages(r, homestayName, imagesByRoom.getOrDefault(r.getId(), Collections.emptyList()), roomReviewStats.get(r.getId()), finalTasks))
                 .collect(Collectors.toList());
     }
 
@@ -180,6 +224,7 @@ public class RoomService {
         List<Room> allRooms = roomRepository.findAll();
         List<RoomImage> allRoomImages = roomImageRepository.findAll();
         List<HomestayImage> allHomestayImages = homestayImageRepository.findAll();
+        List<GuestTask> allTasks = guestTaskRepository.findAll();
 
         Map<Long, ReviewSummary> hsReviewStats = getHomestayReviewStatsMap();
         Map<Long, ReviewSummary> roomReviewStats = getRoomReviewStatsMap();
@@ -190,16 +235,25 @@ public class RoomService {
                 .collect(Collectors.groupingBy(RoomImage::getRoomId));
         Map<Long, List<HomestayImage>> imagesByHomestay = allHomestayImages.stream()
                 .collect(Collectors.groupingBy(HomestayImage::getHomestayId));
+        Map<Long, List<GuestTaskDTO>> tasksByHomestay = allTasks.stream()
+                .collect(Collectors.groupingBy(GuestTask::getHomestayId,
+                        Collectors.mapping(this::toGuestTaskDTO, Collectors.toList())));
 
         return homestays.stream()
                 .map(h -> {
+                    List<GuestTaskDTO> hTasks = tasksByHomestay.getOrDefault(h.getId(), Collections.emptyList());
+                    if (hTasks.isEmpty()) {
+                        hTasks = getDefaultTasks(h.getId());
+                    }
+                    final List<GuestTaskDTO> finalTasks = hTasks;
+
                     List<Room> rooms = roomsByHomestay.getOrDefault(h.getId(), Collections.emptyList());
                     List<RoomDTO> roomDTOs = rooms.stream()
-                            .map(r -> toRoomDTOWithImages(r, h.getName(), imagesByRoom.getOrDefault(r.getId(), Collections.emptyList()), roomReviewStats.get(r.getId())))
+                            .map(r -> toRoomDTOWithImages(r, h.getName(), imagesByRoom.getOrDefault(r.getId(), Collections.emptyList()), roomReviewStats.get(r.getId()), finalTasks))
                             .collect(Collectors.toList());
 
                     List<HomestayImage> hImages = imagesByHomestay.getOrDefault(h.getId(), Collections.emptyList());
-                    return toHomestayDTO(h, roomDTOs, hImages, hsReviewStats.get(h.getId()));
+                    return toHomestayDTO(h, roomDTOs, hImages, hsReviewStats.get(h.getId()), hTasks);
                 })
                 .collect(Collectors.toList());
     }
@@ -279,7 +333,15 @@ public class RoomService {
         List<RoomDTO> roomDTOs = getRoomsByHomestayId(id);
         List<HomestayImage> hImages = homestayImageRepository.findByHomestayId(id);
         ReviewSummary hsStat = getHomestayReviewStat(id);
-        return toHomestayDTO(h, roomDTOs, hImages, hsStat);
+
+        List<GuestTaskDTO> tasks = guestTaskRepository.findByHomestayId(id).stream()
+                .map(this::toGuestTaskDTO)
+                .collect(Collectors.toList());
+        if (tasks.isEmpty()) {
+            tasks = getDefaultTasks(id);
+        }
+
+        return toHomestayDTO(h, roomDTOs, hImages, hsStat, tasks);
     }
 
     /**
@@ -287,10 +349,14 @@ public class RoomService {
      */
     private RoomDTO toRoomDTO(Room r, String homestayName) {
         List<RoomImage> images = roomImageRepository.findByRoomId(r.getId());
-        return toRoomDTOWithImages(r, homestayName, images, null);
+        return toRoomDTOWithImages(r, homestayName, images, null, getDefaultTasks(r.getHomestayId()));
     }
 
     private RoomDTO toRoomDTOWithImages(Room r, String homestayName, List<RoomImage> images, ReviewSummary revStat) {
+        return toRoomDTOWithImages(r, homestayName, images, revStat, getDefaultTasks(r.getHomestayId()));
+    }
+
+    private RoomDTO toRoomDTOWithImages(Room r, String homestayName, List<RoomImage> images, ReviewSummary revStat, List<GuestTaskDTO> tasks) {
         List<String> imageUrls = images.stream().map(RoomImage::getImageUrl).collect(Collectors.toList());
         if (imageUrls.isEmpty()) {
             imageUrls = getDefaultImagesForRoomType(r.getRoomType());
@@ -342,14 +408,19 @@ public class RoomService {
                         .build())
                 .rating(roomRating)
                 .reviewCount(roomRevCount)
+                .tasks(tasks != null ? tasks : Collections.emptyList())
                 .build();
     }
 
     private HomestayDTO toHomestayDTO(Homestay h, List<RoomDTO> rooms, List<HomestayImage> hImages) {
-        return toHomestayDTO(h, rooms, hImages, null);
+        return toHomestayDTO(h, rooms, hImages, null, getDefaultTasks(h.getId()));
     }
 
     private HomestayDTO toHomestayDTO(Homestay h, List<RoomDTO> rooms, List<HomestayImage> hImages, ReviewSummary hsStat) {
+        return toHomestayDTO(h, rooms, hImages, hsStat, getDefaultTasks(h.getId()));
+    }
+
+    private HomestayDTO toHomestayDTO(Homestay h, List<RoomDTO> rooms, List<HomestayImage> hImages, ReviewSummary hsStat, List<GuestTaskDTO> tasks) {
         List<String> imageUrls = hImages.stream().map(HomestayImage::getImageUrl).collect(Collectors.toList());
         if (imageUrls.isEmpty()) {
             imageUrls = getDefaultImagesForHomestay(h.getCity());
@@ -404,6 +475,7 @@ public class RoomService {
                 .travelGroups(List.of("Cặp đôi", "Gia đình", "Nhóm bạn"))
                 .rooms(rooms)
                 .defaultRoomId(defaultRoomId)
+                .tasks(tasks != null ? tasks : Collections.emptyList())
                 .build();
     }
 
