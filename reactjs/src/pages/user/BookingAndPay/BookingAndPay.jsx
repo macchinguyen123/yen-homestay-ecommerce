@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { Link, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { authService } from '../../../services/authService';
 import { bookingService } from '../../../services/bookingService';
+import { voucherService } from '../../../services/voucherService';
 import './BookingAndPay.css';
 
 const SERVICE_FEE_RATE = 0.05;
@@ -261,9 +262,14 @@ export default function BookingAndPay() {
   const cleaningFee = nights > 0 ? room.cleaningFee : 0;
   const serviceFee = Math.round(subtotal * SERVICE_FEE_RATE);
 
+  const [appliedVoucherData, setAppliedVoucherData] = useState(null);
+
   const couponObj = appliedCoupon ? COUPONS[appliedCoupon] : null;
-  const discount = couponObj && nights > 0 ? Math.min(couponObj.calc(subtotal), subtotal) : 0;
-  const grandTotal = nights > 0 ? subtotal + cleaningFee + serviceFee - discount : 0;
+  const discount = nights > 0 ? (
+    appliedVoucherData ? Math.min(appliedVoucherData.discountAmount, subtotal) :
+    (couponObj ? Math.min(couponObj.calc(subtotal), subtotal) : 0)
+  ) : 0;
+  const grandTotal = nights > 0 ? Math.max(0, subtotal + cleaningFee + serviceFee - discount) : 0;
 
   const payNow = payPlan === 'deposit' ? Math.round((grandTotal * DEPOSIT_RATE) / 1000) * 1000 : grandTotal;
   const payLater = grandTotal - payNow;
@@ -275,30 +281,69 @@ export default function BookingAndPay() {
     return sum + (x.unit === '/ khách' ? x.price * guests : x.price);
   }, 0);
 
-  // Apply coupon handler
-  const handleApplyCoupon = (codeToApply) => {
+  // Apply coupon handler (supports both presets and real Neon PostgreSQL vouchers)
+  const handleApplyCoupon = async (codeToApply) => {
     const code = (codeToApply || couponInput).trim().toUpperCase();
     if (!code) { setCouponMsg({ text: 'Vui lòng nhập mã giảm giá.', type: 'error' }); return; }
+
+    // 1. Kiểm tra preset coupons
     const c = COUPONS[code];
-    if (!c) { setCouponMsg({ text: 'Mã không hợp lệ. Hãy kiểm tra lại mã.', type: 'error' }); return; }
-
-    if (c.min && subtotal < c.min) {
-      setCouponMsg({ text: `Mã ${code} yêu cầu tiền phòng từ ${fmtVND(c.min)}.`, type: 'error' });
+    if (c) {
+      if (c.min && subtotal < c.min) {
+        setCouponMsg({ text: `Mã ${code} yêu cầu tiền phòng từ ${fmtVND(c.min)}.`, type: 'error' });
+        return;
+      }
+      if (c.minNights && nights < c.minNights) {
+        setCouponMsg({ text: `Mã ${code} yêu cầu ở từ ${c.minNights} đêm.`, type: 'error' });
+        return;
+      }
+      setAppliedVoucherData(null);
+      setAppliedCoupon(code);
+      setCouponInput(code);
+      setCouponMsg({ text: `Đã áp dụng ${code}: ${c.title}.`, type: 'ok' });
+      showToast('Đã áp dụng mã giảm giá!');
       return;
     }
-    if (c.minNights && nights < c.minNights) {
-      setCouponMsg({ text: `Mã ${code} yêu cầu ở từ ${c.minNights} đêm.`, type: 'error' });
-      return;
-    }
 
-    setAppliedCoupon(code);
-    setCouponInput(code);
-    setCouponMsg({ text: `Đã áp dụng ${code}: ${c.title}.`, type: 'ok' });
-    showToast('Đã áp dụng mã giảm giá!');
+    // 2. Kiểm tra voucher thật từ cơ sở dữ liệu PostgreSQL
+    try {
+      const res = await voucherService.checkVoucher(code);
+      if (res && res.valid) {
+        if (res.minOrderValue && subtotal < Number(res.minOrderValue)) {
+          setCouponMsg({ text: `Mã ${code} yêu cầu đơn phòng từ ${fmtVND(res.minOrderValue)}.`, type: 'error' });
+          return;
+        }
+
+        let discAmt = 0;
+        if (res.discountType === 'PERCENT') {
+          discAmt = Math.round((subtotal * Number(res.value)) / 100);
+          if (res.maxDiscount && discAmt > Number(res.maxDiscount)) {
+            discAmt = Number(res.maxDiscount);
+          }
+        } else {
+          discAmt = Number(res.value || 0);
+        }
+
+        setAppliedVoucherData({
+          code: res.code,
+          discountAmount: discAmt,
+          title: `Giảm ${fmtVND(discAmt)}`,
+        });
+        setAppliedCoupon(code);
+        setCouponInput(code);
+        setCouponMsg({ text: `Đã áp dụng mã thật ${code}: Giảm ${fmtVND(discAmt)}.`, type: 'ok' });
+        showToast(`Đã áp dụng mã ưu đãi ${code}!`);
+      } else {
+        setCouponMsg({ text: res?.message || 'Mã không hợp lệ hoặc đã hết hạn.', type: 'error' });
+      }
+    } catch {
+      setCouponMsg({ text: 'Lỗi xác thực mã giảm giá. Hãy thử lại.', type: 'error' });
+    }
   };
 
   const handleRemoveCoupon = () => {
     setAppliedCoupon(null);
+    setAppliedVoucherData(null);
     setCouponInput('');
     setCouponMsg({ text: '', type: '' });
   };

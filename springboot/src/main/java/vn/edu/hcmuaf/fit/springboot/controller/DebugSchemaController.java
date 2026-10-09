@@ -21,9 +21,9 @@ public class DebugSchemaController {
                      "ORDER BY table_name, ordinal_position";
         m.put("columns", jdbc.queryForList(sql));
         m.put("sequences", jdbc.queryForList("SELECT sequence_name FROM information_schema.sequences WHERE sequence_schema = 'public'"));
-        m.put("payment_constraints", jdbc.queryForList("SELECT conname, pg_get_constraintdef(c.oid) FROM pg_constraint c JOIN pg_class t ON c.conrelid = t.oid WHERE t.relname = 'payments'"));
-        m.put("distinct_payment_method", jdbc.queryForList("SELECT DISTINCT payment_method FROM payments"));
-        m.put("distinct_payment_status", jdbc.queryForList("SELECT DISTINCT status FROM payments"));
+        m.put("vouchers_columns", jdbc.queryForList("SELECT column_name, data_type, is_nullable FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'vouchers' ORDER BY ordinal_position"));
+        m.put("vouchers_sample", jdbc.queryForList("SELECT * FROM vouchers LIMIT 20"));
+        m.put("vouchers_count", jdbc.queryForObject("SELECT COUNT(*) FROM vouchers", Long.class));
         return ResponseEntity.ok(m);
     }
 }

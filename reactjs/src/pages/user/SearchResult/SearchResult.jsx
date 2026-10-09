@@ -21,48 +21,37 @@ const STOP_WORDS = new Set([
 
 // Kiểm tra homestay có khớp với từ khóa tìm kiếm hay không
 function matchesQuery(item, query) {
-  if (!query) return true;
+  if (!query || !query.trim()) return true;
   const kw = query.toLowerCase().trim();
-  if (!kw || kw === 'tat ca diem den' || kw === 'tất cả điểm đến') return true;
+  if (kw === 'tat ca' || kw === 'tất cả' || kw === 'tat ca diem den' || kw === 'tất cả điểm đến') return true;
 
-  const rawFields = [
-    item.name,
-    item.homestayName,
-    item.location,
-    item.address,
-    item.city,
-    item.desc,
-    item.description
-  ].filter(Boolean);
+  // Với từ khóa ngắn (<= 2 ký tự như 'r', 'đà'): Chỉ tìm trong Name và City để tránh khớp tràn lan chữ 'đường/phường' trong địa chỉ
+  const rawFields = kw.length <= 2
+    ? [item.name, item.homestayName, item.city].filter(Boolean)
+    : [
+        item.name,
+        item.homestayName,
+        item.city,
+        item.location,
+        item.address,
+        item.desc,
+        item.description
+      ].filter(Boolean);
 
   const rawTarget = rawFields.join(' ').toLowerCase();
 
   // 1. Khớp cụm từ trực tiếp (có dấu)
-  if (rawTarget.includes(kw)) {
-    if (kw.length <= 3) {
-      const words = rawTarget.split(/[\s,.-]+/);
-      if (words.some((w) => w === kw)) return true;
-    } else {
-      return true;
-    }
-  }
+  if (rawTarget.includes(kw)) return true;
 
   // 2. Khớp cụm từ không dấu
   const noToneKw = removeVietnameseTones(kw);
   const noToneTarget = removeVietnameseTones(rawTarget);
-  if (noToneTarget.includes(noToneKw)) {
-    if (noToneKw.length <= 3) {
-      const words = noToneTarget.split(/[\s,.-]+/);
-      if (words.some((w) => w === noToneKw)) return true;
-    } else {
-      return true;
-    }
-  }
+  if (noToneTarget.includes(noToneKw)) return true;
 
   // 3. Khớp không dấu và bỏ khoảng trắng (Ví dụ: "dalat" -> "da lat", "sapa" -> "sa pa", "phuquoc" -> "phu quoc", "vungtau" -> "vung tau")
   const noSpaceKw = noToneKw.replace(/\s+/g, '');
   const noSpaceTarget = noToneTarget.replace(/\s+/g, '');
-  if (noSpaceKw.length >= 4 && noSpaceTarget.includes(noSpaceKw)) return true;
+  if (noSpaceKw.length >= 3 && noSpaceTarget.includes(noSpaceKw)) return true;
 
   // Xử lý các từ viết tắt phổ biến:
   if ((noSpaceKw === 'hcm' || noSpaceKw === 'tphcm' || noSpaceKw === 'saigon') &&
@@ -73,7 +62,7 @@ function matchesQuery(item, query) {
     return true;
   }
 
-  // 4. Token matching (bỏ stop words như 'homestay', 'phòng', 'tại',...)
+  // 4. Token matching từng từ (bỏ stop words như 'homestay', 'phòng', 'tại',...)
   const tokens = noToneKw
     .split(/[\s,.-]+/)
     .filter((t) => t.length >= 2 && !STOP_WORDS.has(t));
@@ -81,9 +70,7 @@ function matchesQuery(item, query) {
   // Nếu người dùng chỉ gõ stop words thì khớp tất cả
   if (tokens.length === 0) return true;
 
-  const targetWords = noToneTarget.split(/[\s,.-]+/).filter(Boolean);
-  const matchedTokens = tokens.filter((t) => targetWords.some((w) => w === t || (t.length >= 3 && w.startsWith(t))));
-  return matchedTokens.length === tokens.length;
+  return tokens.every((token) => noToneTarget.includes(token));
 }
 
 // Cắt ngắn mô tả cho thẻ tìm kiếm để giao diện gọn gàng, bấm xem chi tiết mới hiện hết
@@ -101,10 +88,56 @@ export default function SearchResult() {
   // Query Params & Search keyword
   const queryDestParam = searchParams.get('q') || searchParams.get('destination') || searchParams.get('location') || '';
   const [searchInput, setSearchInput] = useState(queryDestParam);
+  const [searchQuery, setSearchQuery] = useState(queryDestParam);
 
+  // Đồng bộ khi URL thay đổi từ bên ngoài (trang chủ hoặc nút back/forward)
   useEffect(() => {
     setSearchInput(queryDestParam);
+    setSearchQuery(queryDestParam);
   }, [queryDestParam]);
+
+  // Tìm kiếm trực tiếp tức thì khi người dùng gõ
+  const handleInputChange = (e) => {
+    const val = e.target.value;
+    setSearchInput(val);
+    setSearchQuery(val);
+    setCurrentPage(1);
+  };
+
+  // Gửi tìm kiếm (nhấn Enter hoặc bấm nút Tìm kiếm)
+  const handleSearchSubmit = (e) => {
+    if (e) e.preventDefault();
+    const clean = searchInput.trim();
+    setSearchQuery(clean);
+    setCurrentPage(1);
+    if (clean) {
+      setSearchParams({ q: clean }, { replace: true });
+    } else {
+      setSearchParams({}, { replace: true });
+    }
+  };
+
+  // Xóa trắng ô tìm kiếm
+  const handleClearSearch = () => {
+    setSearchInput('');
+    setSearchQuery('');
+    setCurrentPage(1);
+    setSearchParams({}, { replace: true });
+  };
+
+  // Bấm chọn điểm đến gợi ý
+  const handleChipClick = (dest) => {
+    const isAll = dest === 'Tất cả';
+    const val = isAll ? '' : dest;
+    setSearchInput(val);
+    setSearchQuery(val);
+    setCurrentPage(1);
+    if (val) {
+      setSearchParams({ q: val }, { replace: true });
+    } else {
+      setSearchParams({}, { replace: true });
+    }
+  };
 
   // Sort Option & Custom dropdown
   const [sortBy, setSortBy] = useState('rating');
@@ -133,6 +166,10 @@ export default function SearchResult() {
   // Favorites
   const [favorites, setFavorites] = useState(new Set());
 
+  // Pagination State (5 kết quả 1 trang)
+  const ITEMS_PER_PAGE = 5;
+  const [currentPage, setCurrentPage] = useState(1);
+
   // Toast notice
   const [toast, setToast] = useState({ show: false, msg: '' });
 
@@ -140,6 +177,20 @@ export default function SearchResult() {
     setToast({ show: true, msg });
     setTimeout(() => setToast({ show: false, msg: '' }), 2600);
   };
+
+  // Reset page to 1 whenever filters or query change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [
+    searchQuery,
+    minPrice,
+    maxPrice,
+    selectedServices,
+    selectedRoomAmenities,
+    selectedAmenities,
+    selectedTravelGroups,
+    sortBy
+  ]);
 
   const toggleFavorite = (id, e) => {
     e.stopPropagation();
@@ -156,35 +207,44 @@ export default function SearchResult() {
     });
   };
 
-  // Danh sách homestays lấy 100% từ Database thật
+  // Danh sách homestays lấy 100% từ Database thật theo từ khóa tìm kiếm
   const [homestays, setHomestays] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let isMounted = true;
-    const fetchHomestays = async () => {
+    const fetchHomestaysFromDb = async () => {
       setLoading(true);
       try {
-        const dbList = await homestayService.getAllHomestays();
+        const dbList = await homestayService.searchHomestays(searchQuery);
         if (isMounted) {
           if (dbList && dbList.length > 0) {
             setHomestays(dbList);
-          } else {
+          } else if (!searchQuery || !searchQuery.trim()) {
             setHomestays(SAMPLE_HOMESTAYS);
+          } else {
+            setHomestays([]);
           }
           setLoading(false);
         }
       } catch (err) {
         console.warn('Lỗi khi tải homestay từ database:', err);
         if (isMounted) {
-          setHomestays(SAMPLE_HOMESTAYS);
+          setHomestays([]);
           setLoading(false);
         }
       }
     };
-    fetchHomestays();
-    return () => { isMounted = false; };
-  }, []);
+
+    const timer = setTimeout(() => {
+      fetchHomestaysFromDb();
+    }, 200);
+
+    return () => {
+      isMounted = false;
+      clearTimeout(timer);
+    };
+  }, [searchQuery]);
 
   const clearAllFilters = () => {
     setMinPrice('');
@@ -194,7 +254,9 @@ export default function SearchResult() {
     setSelectedAmenities([]);
     setSelectedTravelGroups([]);
     setSearchInput('');
-    setSearchParams({});
+    setSearchQuery('');
+    setSearchParams({}, { replace: true });
+    setCurrentPage(1);
     triggerToast('Đã xóa tất cả bộ lọc và hiển thị toàn bộ chỗ nghỉ!');
   };
 
@@ -220,8 +282,8 @@ export default function SearchResult() {
   // Filtered & Sorted Homestays
   const filteredHomestays = useMemo(() => {
     const list = homestays.filter((item) => {
-      // 1. Keyword search (Hỗ trợ tiếng Việt đầy đủ dấu và không dấu)
-      if (queryDestParam && !matchesQuery(item, queryDestParam)) {
+      // 1. Keyword search (Tìm kiếm trực tiếp theo searchQuery)
+      if (searchQuery && searchQuery.trim() && !matchesQuery(item, searchQuery)) {
         return false;
       }
 
@@ -280,7 +342,7 @@ export default function SearchResult() {
     });
   }, [
     homestays,
-    queryDestParam,
+    searchQuery,
     minPrice,
     maxPrice,
     selectedServices,
@@ -317,6 +379,22 @@ export default function SearchResult() {
     });
   };
 
+  // Phân trang 5 kết quả 1 trang
+  const totalPages = Math.ceil(filteredHomestays.length / ITEMS_PER_PAGE) || 1;
+  const paginatedHomestays = useMemo(() => {
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    return filteredHomestays.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  }, [filteredHomestays, currentPage, ITEMS_PER_PAGE]);
+
+  // Kiểm tra nếu người dùng không nhập gì hoặc chỉ nhập khoảng trắng (whitespace)
+  const isSuggestion = !searchQuery || !searchQuery.trim();
+
+  const handlePageChange = (newPage) => {
+    if (newPage < 1 || newPage > totalPages) return;
+    setCurrentPage(newPage);
+    window.scrollTo({ top: 120, behavior: 'smooth' });
+  };
+
   return (
     <main className="search-page-main">
       <div className="search-page-layout">
@@ -343,29 +421,21 @@ export default function SearchResult() {
 
         {/* 2. KHU VỰC KẾT QUẢ TÌM KIẾM BÊN PHẢI */}
         <div className="search-results-container">
-          {/* 1. Thanh tìm kiếm nhanh */}
-          <div className="sr-quick-search-box">
+          {/* 1. Thanh tìm kiếm nhanh trực tiếp */}
+          <form className="sr-quick-search-box" onSubmit={handleSearchSubmit}>
             <div className="sr-search-input-wrap">
               <i className="bi bi-search"></i>
               <input
                 type="text"
                 placeholder="Tìm điểm đến hoặc tên homestay (Đà Lạt, Sa Pa, Nông Trại...)"
                 value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    setSearchParams(searchInput.trim() ? { q: searchInput.trim() } : {});
-                  }
-                }}
+                onChange={handleInputChange}
               />
               {searchInput && (
                 <button
                   type="button"
                   className="sr-clear-btn"
-                  onClick={() => {
-                    setSearchInput('');
-                    setSearchParams({});
-                  }}
+                  onClick={handleClearSearch}
                   title="Xóa tìm kiếm"
                 >
                   <i className="bi bi-x-circle-fill"></i>
@@ -373,36 +443,25 @@ export default function SearchResult() {
               )}
             </div>
             <button
-              type="button"
+              type="submit"
               className="btn sr-submit-btn"
-              onClick={() => {
-                setSearchParams(searchInput.trim() ? { q: searchInput.trim() } : {});
-              }}
             >
               Tìm kiếm
             </button>
-          </div>
+          </form>
 
           {/* 2. Gợi ý điểm đến phổ biến */}
           <div className="sr-dest-chips">
             {['Tất cả', 'Đà Lạt', 'Sa Pa', 'Ninh Bình', 'Huế', 'Phú Quốc', 'Hà Giang'].map((dest) => {
               const isAll = dest === 'Tất cả';
-              const isActive = (!queryDestParam && isAll) ||
-                (queryDestParam && !isAll && removeVietnameseTones(queryDestParam).includes(removeVietnameseTones(dest)));
+              const isActive = (!searchQuery.trim() && isAll) ||
+                (searchQuery.trim() && !isAll && removeVietnameseTones(searchQuery).includes(removeVietnameseTones(dest)));
               return (
                 <button
                   key={dest}
                   type="button"
                   className={`sr-chip ${isActive ? 'active' : ''}`}
-                  onClick={() => {
-                    if (isAll) {
-                      setSearchInput('');
-                      setSearchParams({});
-                    } else {
-                      setSearchInput(dest);
-                      setSearchParams({ q: dest });
-                    }
-                  }}
+                  onClick={() => handleChipClick(dest)}
                 >
                   {dest}
                 </button>
@@ -410,13 +469,27 @@ export default function SearchResult() {
             })}
           </div>
 
-          {/* 3. Header toolbar */}
+          {/* 3. Header toolbar: Gợi ý khi nhập khoảng trắng hoặc không có từ khóa */}
           <div className="results-header">
-            <h2>
-              {queryDestParam
-                ? `${queryDestParam}: tìm thấy ${filteredHomestays.length} chỗ nghỉ`
-                : `Tất cả điểm đến: tìm thấy ${filteredHomestays.length} chỗ nghỉ`}
-            </h2>
+            <div>
+              <h2>
+                {isSuggestion ? (
+                  <>
+                    <span className="badge bg-success-subtle text-success me-2 px-2.5 py-1" style={{ fontSize: '13px', fontWeight: 600, borderRadius: '8px' }}>
+                      <i className="bi bi-stars me-1"></i> Gợi ý cho bạn
+                    </span>
+                    Gợi ý chỗ nghỉ nổi bật ({filteredHomestays.length} chỗ nghỉ)
+                  </>
+                ) : (
+                  `${searchQuery.trim()}: tìm thấy ${filteredHomestays.length} chỗ nghỉ`
+                )}
+              </h2>
+              {filteredHomestays.length > 0 && (
+                <p className="text-muted small mt-1 mb-0">
+                  Hiển thị {Math.min((currentPage - 1) * ITEMS_PER_PAGE + 1, filteredHomestays.length)} - {Math.min(currentPage * ITEMS_PER_PAGE, filteredHomestays.length)} trong số {filteredHomestays.length} kết quả (Trang {currentPage}/{totalPages})
+                </p>
+              )}
+            </div>
           </div>
 
           {/* Sắp xếp Custom Dropdown */}
@@ -470,104 +543,159 @@ export default function SearchResult() {
               </button>
             </div>
           ) : (
-            <div className="hotel-list">
-              {filteredHomestays.map((item) => {
-                const rating = Number(item.rating || 0);
-                const rawPrice = item.pricePerNight ?? item.price ?? item.basePrice ?? 0;
-                const price = Number(rawPrice).toLocaleString('vi-VN');
-                const isFavorite = favorites.has(item.id);
-                const imageSrc =
-                  item.image ||
-                  item.primaryImage ||
-                  item.thumb ||
-                  (item.images && item.images[0]) ||
-                  '/images/categories/7_thien_nhien_sinh_thai.jpg';
+            <>
+              <div className="hotel-list">
+                {paginatedHomestays.map((item) => {
+                  const rating = Number(item.rating || 0);
+                  const rawPrice = item.pricePerNight ?? item.price ?? item.basePrice ?? 0;
+                  const price = Number(rawPrice).toLocaleString('vi-VN');
+                  const isFavorite = favorites.has(item.id);
+                  const imageSrc =
+                    item.image ||
+                    item.primaryImage ||
+                    item.thumb ||
+                    (item.images && item.images[0]) ||
+                    '/images/categories/7_thien_nhien_sinh_thai.jpg';
 
-                return (
-                  <article key={item.id} className="hotel-card mui-shadow" data-id={item.id}>
-                    <div className="hotel-image">
-                      <img src={imageSrc} alt={item.name} loading="lazy" />
-                      <button
-                        type="button"
-                        className={`btn-favorite ${isFavorite ? 'active' : ''}`}
-                        onClick={(e) => toggleFavorite(item.id, e)}
-                        title={isFavorite ? "Bỏ yêu thích" : "Yêu thích"}
-                        aria-label="Lưu chỗ nghỉ"
-                      >
-                        <i className={`bi ${isFavorite ? 'bi-heart-fill' : 'bi-heart'}`}></i>
-                      </button>
-                    </div>
-
-                    <div className="hotel-info">
-                      <div className="info-main">
-                        <h3 className="hotel-title">
-                          <Link to={`/homestay/${item.id}`}>
-                            {item.name}
-                          </Link>
-                          <span className="stars">
-                            {'★'.repeat(Math.max(1, Math.min(5, Number(item.stars || 4))))}
-                          </span>
-                        </h3>
-
-                        <div className="hotel-location">
-                          <a
-                            href="#map"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              triggerToast(`Vị trí: ${item.address || item.location}`);
-                            }}
-                          >
-                            {item.address || item.location || 'Đang cập nhật địa chỉ'}
-                          </a>
-                        </div>
-
-                        <div className="hotel-distance">{item.distance || 'Thông tin khoảng cách đang cập nhật'}</div>
-                        
-                        {/* Mô tả ngắn gọn 2 dòng, bấm xem chi tiết mới hiện đầy đủ */}
-                        <p className="hotel-desc" title={item.description || item.desc}>
-                          {truncateDesc(item.description || item.desc)}
-                        </p>
-                      </div>
-
-                      <div className="info-action">
-                        {/* Phần đánh giá chuẩn chống xô lệch */}
-                        <div className="sr-rating-section">
-                          <div className="sr-rating-text">
-                            <div className="sr-rating-word">
-                              {Number(item.reviewCount || 0) > 0 ? getRatingWord(rating) : 'Mới'}
-                            </div>
-                            <div className="sr-rating-count">
-                              {Number(item.reviewCount || 0) > 0
-                                ? `${item.reviewCount} đánh giá`
-                                : 'Chưa có đánh giá'}
-                            </div>
-                          </div>
-                          <div className="sr-rating-score">
-                            {Number(item.reviewCount || 0) > 0 ? formatScore(rating) : '5.0'}
-                          </div>
-                        </div>
-
-                        <div className="location-score">
-                          {rawPrice ? (
-                            <>Giá: <strong>{price} VNĐ</strong> / đêm</>
-                          ) : (
-                            'Chưa có giá'
-                          )}
-                        </div>
-
+                  return (
+                    <article key={item.id} className="hotel-card mui-shadow" data-id={item.id}>
+                      <div className="hotel-image">
+                        <img src={imageSrc} alt={item.name} loading="lazy" />
                         <button
                           type="button"
-                          className="btn-primary mui-btn choose-stay"
-                          onClick={() => navigate(`/homestay/${item.id}`)}
+                          className={`btn-favorite ${isFavorite ? 'active' : ''}`}
+                          onClick={(e) => toggleFavorite(item.id, e)}
+                          title={isFavorite ? "Bỏ yêu thích" : "Yêu thích"}
+                          aria-label="Lưu chỗ nghỉ"
                         >
-                          Xem chi tiết
+                          <i className={`bi ${isFavorite ? 'bi-heart-fill' : 'bi-heart'}`}></i>
                         </button>
                       </div>
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
+
+                      <div className="hotel-info">
+                        <div className="info-main">
+                          <h3 className="hotel-title">
+                            <Link to={`/homestay/${item.id}`}>
+                              {item.name}
+                            </Link>
+                            <span className="stars">
+                              {'★'.repeat(Math.max(1, Math.min(5, Number(item.stars || 4))))}
+                            </span>
+                          </h3>
+
+                          <div className="hotel-location">
+                            <a
+                              href="#map"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                triggerToast(`Vị trí: ${item.address || item.location}`);
+                              }}
+                            >
+                              {item.address || item.location || 'Đang cập nhật địa chỉ'}
+                            </a>
+                          </div>
+
+                          <div className="hotel-distance">{item.distance || 'Thông tin khoảng cách đang cập nhật'}</div>
+                          
+                          {/* Mô tả ngắn gọn 2 dòng, bấm xem chi tiết mới hiện đầy đủ */}
+                          <p className="hotel-desc" title={item.description || item.desc}>
+                            {truncateDesc(item.description || item.desc)}
+                          </p>
+                        </div>
+
+                        <div className="info-action">
+                          {/* Phần đánh giá chuẩn chống xô lệch */}
+                          <div className="sr-rating-section">
+                            <div className="sr-rating-text">
+                              <div className="sr-rating-word">
+                                {Number(item.reviewCount || 0) > 0 ? getRatingWord(rating) : 'Mới'}
+                              </div>
+                              <div className="sr-rating-count">
+                                {Number(item.reviewCount || 0) > 0
+                                  ? `${item.reviewCount} đánh giá`
+                                  : 'Chưa có đánh giá'}
+                              </div>
+                            </div>
+                            <div className="sr-rating-score">
+                              {Number(item.reviewCount || 0) > 0 ? formatScore(rating) : '5.0'}
+                            </div>
+                          </div>
+
+                          <div className="location-score">
+                            {rawPrice ? (
+                              <>Giá: <strong>{price} VNĐ</strong> / đêm</>
+                            ) : (
+                              'Chưa có giá'
+                            )}
+                          </div>
+
+                          <button
+                            type="button"
+                            className="btn-primary mui-btn choose-stay"
+                            onClick={() => navigate(`/homestay/${item.id}`)}
+                          >
+                            Xem chi tiết
+                          </button>
+                        </div>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+
+              {/* THANH PHÂN TRANG: 5 kết quả 1 trang */}
+              {totalPages > 1 && (
+                <div className="sr-pagination-bar">
+                  <button
+                    type="button"
+                    className="sr-page-btn sr-page-nav"
+                    disabled={currentPage === 1}
+                    onClick={() => handlePageChange(currentPage - 1)}
+                    title="Trang trước"
+                  >
+                    <i className="bi bi-chevron-left me-1"></i> Trước
+                  </button>
+
+                  <div className="sr-page-numbers">
+                    {Array.from({ length: totalPages }, (_, idx) => idx + 1).map((p) => {
+                      // Logic hiển thị trang thông minh: luôn hiển thị trang đầu, cuối, và xung quanh currentPage
+                      if (
+                        p === 1 ||
+                        p === totalPages ||
+                        (p >= currentPage - 1 && p <= currentPage + 1)
+                      ) {
+                        return (
+                          <button
+                            key={p}
+                            type="button"
+                            className={`sr-page-btn ${currentPage === p ? 'active' : ''}`}
+                            onClick={() => handlePageChange(p)}
+                          >
+                            {p}
+                          </button>
+                        );
+                      }
+                      if (p === currentPage - 2 || p === currentPage + 2) {
+                        return (
+                          <span key={p} className="sr-page-dots">...</span>
+                        );
+                      }
+                      return null;
+                    })}
+                  </div>
+
+                  <button
+                    type="button"
+                    className="sr-page-btn sr-page-nav"
+                    disabled={currentPage === totalPages}
+                    onClick={() => handlePageChange(currentPage + 1)}
+                    title="Trang kế tiếp"
+                  >
+                    Sau <i className="bi bi-chevron-right ms-1"></i>
+                  </button>
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>

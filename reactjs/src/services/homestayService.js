@@ -18,6 +18,24 @@ export const homestayService = {
   },
 
   /**
+   * Tìm kiếm homestay trực tiếp từ Database theo từ khóa
+   */
+  async searchHomestays(query) {
+    try {
+      const q = query ? query.trim() : '';
+      const url = q ? `${API_BASE_URL}?q=${encodeURIComponent(q)}` : API_BASE_URL;
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      return await response.json();
+    } catch (error) {
+      console.warn('Lỗi khi tìm kiếm homestay từ database:', error.message);
+      return [];
+    }
+  },
+
+  /**
    * Lấy chi tiết homestay theo ID kèm phòng thật từ database
    */
   async getHomestayById(id) {
