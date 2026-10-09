@@ -84,13 +84,14 @@
     justify-content: space-between;
     align-items: center;
     gap: 12px;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
 }
 
 .filter-chips {
     display: flex;
     gap: 6px;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
+    white-space: nowrap;
 }
 
 .chip-btn {
@@ -103,6 +104,7 @@
     color: #475569;
     cursor: pointer;
     transition: all 0.15s ease;
+    white-space: nowrap;
 }
 
 .chip-btn:hover {
@@ -120,7 +122,9 @@
     display: flex;
     gap: 10px;
     align-items: center;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
+    flex-shrink: 0;
+    white-space: nowrap;
 }
 
 .search-input-wrap {
@@ -141,7 +145,7 @@
     border: 1px solid #CBD5E1;
     border-radius: 6px;
     font-size: 13px;
-    width: 240px;
+    width: 200px;
     outline: none;
 }
 
