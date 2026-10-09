@@ -197,27 +197,34 @@ export default function Bookings() {
               <div className="account-nav-list">
                 <button type="button" className={`account-nav-item ${currentFilter === 'all' ? 'active' : ''}`}
                   onClick={() => setCurrentFilter('all')}>
-                  <i className="bi bi-grid-fill" /> <span>Tất cả phòng đặt</span>
+                  <i className="bi bi-grid-fill nav-item-icon" />
+                  <span className="nav-item-label">Tất cả phòng đặt</span>
                   <span className="nav-badge-count">{stats.all}</span>
                 </button>
                 <button type="button" className={`account-nav-item ${currentFilter === 'active' ? 'active' : ''}`}
                   onClick={() => setCurrentFilter('active')}>
-                  <span className="active-pulse-dot" /> <span>Đang lưu trú</span>
+                  <i className="bi bi-house-heart-fill nav-item-icon text-success" />
+                  <span className="nav-item-label" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                    Đang lưu trú <span className="active-pulse-dot" />
+                  </span>
                   <span className="nav-badge-count">{stats.active}</span>
                 </button>
                 <button type="button" className={`account-nav-item ${currentFilter === 'upcoming' ? 'active' : ''}`}
                   onClick={() => setCurrentFilter('upcoming')}>
-                  <i className="bi bi-clock-history" /> <span>Sắp nhận phòng</span>
+                  <i className="bi bi-clock-history nav-item-icon" />
+                  <span className="nav-item-label">Sắp nhận phòng</span>
                   <span className="nav-badge-count">{stats.upcoming}</span>
                 </button>
                 <button type="button" className={`account-nav-item ${currentFilter === 'completed' ? 'active' : ''}`}
                   onClick={() => setCurrentFilter('completed')}>
-                  <i className="bi bi-check-circle-fill" /> <span>Đã hoàn thành</span>
+                  <i className="bi bi-check-circle-fill nav-item-icon" />
+                  <span className="nav-item-label">Đã hoàn thành</span>
                   <span className="nav-badge-count">{stats.completed}</span>
                 </button>
                 <button type="button" className={`account-nav-item ${currentFilter === 'complaint' ? 'active' : ''}`}
                   onClick={() => setCurrentFilter('complaint')}>
-                  <i className="bi bi-exclamation-triangle-fill" /> <span>Khiếu nại</span>
+                  <i className="bi bi-exclamation-triangle-fill nav-item-icon" />
+                  <span className="nav-item-label">Khiếu nại</span>
                   <span className="nav-badge-count">{stats.complaint}</span>
                 </button>
               </div>

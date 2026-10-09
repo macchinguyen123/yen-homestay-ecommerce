@@ -153,55 +153,104 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
-}
-
-.account-nav-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 14px;
-  border-radius: 12px;
-  color: #475569;
-  font-size: 0.88rem;
-  font-weight: 600;
-  transition: all 0.2s ease;
-  position: relative;
-  cursor: pointer;
-  border: none;
-  background: transparent;
   width: 100%;
-  text-align: left;
 }
 
-.account-nav-item:hover, .account-nav-item.active {
-  background-color: #F0FDF4;
-  color: #15803D;
-  font-weight: 800;
+.account-nav-list .account-nav-item {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 10px !important;
+  padding: 10px 14px !important;
+  height: 44px !important;
+  min-height: 44px !important;
+  max-height: 44px !important;
+  border-radius: 12px !important;
+  color: #475569 !important;
+  font-size: 0.88rem !important;
+  font-weight: 600 !important;
+  transition: all 0.2s ease !important;
+  position: relative !important;
+  cursor: pointer !important;
+  border: 1px solid transparent !important;
+  background: transparent !important;
+  width: 100% !important;
+  text-align: left !important;
+  box-sizing: border-box !important;
 }
 
-.nav-badge-count {
-  background-color: #F1F5F9;
-  color: #334155;
-  font-weight: 800;
-  font-size: 0.74rem;
-  padding: 2px 8px;
-  border-radius: 9999px;
-  margin-left: auto;
+.account-nav-list .account-nav-item:hover,
+.account-nav-list .account-nav-item.active {
+  background-color: #F0FDF4 !important;
+  color: #15803D !important;
+  font-weight: 800 !important;
+  border-color: #BBF7D0 !important;
 }
 
-.account-nav-item.active .nav-badge-count {
-  background-color: #15803D;
-  color: #FFFFFF;
+.account-nav-list .account-nav-item .nav-item-icon {
+  width: 20px !important;
+  min-width: 20px !important;
+  max-width: 20px !important;
+  height: 20px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-size: 1.05rem !important;
+  color: #64748B !important;
+  flex-shrink: 0 !important;
+  margin-right: 2px !important;
 }
 
-.active-pulse-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #22C55E;
-  box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7);
-  animation: pulse-green 1.8s infinite;
-  display: inline-block;
+.account-nav-list .account-nav-item.active .nav-item-icon {
+  color: #15803D !important;
+}
+
+.account-nav-list .account-nav-item .nav-item-label {
+  flex: 1 1 auto !important;
+  font-size: 0.88rem !important;
+  font-weight: 700 !important;
+  color: inherit !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  line-height: 1.2 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.account-nav-list .account-nav-item .nav-badge-count {
+  flex: 0 0 auto !important;
+  background-color: #F1F5F9 !important;
+  color: #334155 !important;
+  font-weight: 800 !important;
+  font-size: 0.74rem !important;
+  padding: 2px 9px !important;
+  border-radius: 9999px !important;
+  margin-left: auto !important;
+  height: auto !important;
+  min-width: unset !important;
+  max-width: unset !important;
+  line-height: 1.2 !important;
+}
+
+.account-nav-list .account-nav-item.active .nav-badge-count {
+  background-color: #15803D !important;
+  color: #FFFFFF !important;
+}
+
+.account-nav-list .active-pulse-dot {
+  width: 8px !important;
+  height: 8px !important;
+  min-width: 8px !important;
+  max-width: 8px !important;
+  min-height: 8px !important;
+  max-height: 8px !important;
+  border-radius: 50% !important;
+  background: #22C55E !important;
+  box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7) !important;
+  animation: pulse-green 1.8s infinite !important;
+  display: inline-block !important;
+  flex-shrink: 0 !important;
 }
 
 @keyframes pulse-green {
