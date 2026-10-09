@@ -21,9 +21,9 @@ public class DebugSchemaController {
                      "ORDER BY table_name, ordinal_position";
         m.put("columns", jdbc.queryForList(sql));
         m.put("sequences", jdbc.queryForList("SELECT sequence_name FROM information_schema.sequences WHERE sequence_schema = 'public'"));
-        m.put("max_review_id", jdbc.queryForObject("SELECT COALESCE(MAX(review_id), 0) FROM reviews", Long.class));
-        m.put("max_report_id", jdbc.queryForObject("SELECT COALESCE(MAX(report_id), 0) FROM reports", Long.class));
-        m.put("max_booking_id", jdbc.queryForObject("SELECT COALESCE(MAX(booking_id), 0) FROM bookings", Long.class));
+        m.put("payment_constraints", jdbc.queryForList("SELECT conname, pg_get_constraintdef(c.oid) FROM pg_constraint c JOIN pg_class t ON c.conrelid = t.oid WHERE t.relname = 'payments'"));
+        m.put("distinct_payment_method", jdbc.queryForList("SELECT DISTINCT payment_method FROM payments"));
+        m.put("distinct_payment_status", jdbc.queryForList("SELECT DISTINCT status FROM payments"));
         return ResponseEntity.ok(m);
     }
 }

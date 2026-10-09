@@ -1,6 +1,7 @@
 package vn.edu.hcmuaf.fit.springboot.controller;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -35,15 +36,8 @@ public class HomeController {
         return formatter.format(price).replace(",", ".") + "đ";
     }
 
-    private String getPrimaryImage(Long homestayId) {
-        List<HomestayImage> images = homestayImageRepository.findByHomestayId(homestayId);
-        if (images != null && !images.isEmpty()) {
-            return images.get(0).getImageUrl();
-        }
-        return "https://images.unsplash.com/photo-1518780664697-55e3ad937233?auto=format&fit=crop&w=600&q=80"; // fallback
-    }
-
     @GetMapping
+    @Cacheable("homePageData")
     public ResponseEntity<Map<String, Object>> getHomePageData() {
         Map<String, Object> response = new HashMap<>();
 

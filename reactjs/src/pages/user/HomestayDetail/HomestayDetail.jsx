@@ -126,7 +126,7 @@ function Lightbox({ images, index, onClose, onNav }) {
 }
 
 /** Room Modal */
-function RoomModal({ room, allHomestayReviews = [], onClose, onOpenReviews, showToast }) {
+function RoomModal({ room, homestay, allHomestayReviews = [], onClose, onOpenReviews, showToast }) {
   const [galleryIdx, setGalleryIdx] = useState(0);
   const scrollRef = useRef(null);
 
@@ -185,12 +185,16 @@ function RoomModal({ room, allHomestayReviews = [], onClose, onOpenReviews, show
     if (!nights || nights <= 0) { showToast('Vui lòng chọn lại ngày nhận - trả phòng hợp lệ!'); return; }
     showToast(`Đang chuyển đến trang xác nhận đặt "${roomName}"...`);
     onClose();
-    navigate(`/booking?roomId=${room.id}&checkin=${checkin}&checkout=${checkout}&guests=${guests}`, {
+    const hId = homestay?.id || room.homestayId || '';
+    navigate(`/booking?homestayId=${hId}&roomId=${room.id}&checkin=${checkin}&checkout=${checkout}&guests=${guests}`, {
       state: {
+        homestayId: hId,
         roomId: room.id,
         checkin,
         checkout,
         guests,
+        homestay,
+        room,
       },
     });
   };
@@ -1383,6 +1387,7 @@ export default function HomestayDetail() {
       {activeRoomIdx !== null && rooms[activeRoomIdx] && (
         <RoomModal
           room={rooms[activeRoomIdx]}
+          homestay={homestay}
           allHomestayReviews={dbReviews}
           onClose={() => setActiveRoomIdx(null)}
           onOpenReviews={(group) => { setActiveRoomIdx(null); setReviewsDrawer({ open: true, group }); }}

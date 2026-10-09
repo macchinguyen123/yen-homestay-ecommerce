@@ -79,28 +79,7 @@ public class DbConnectionTestRunner implements CommandLineRunner {
                 log.warn("Lỗi kiểm tra/khởi tạo bảng viewed_histories: {}", e.getMessage());
             }
 
-            String[] tables = {
-                "users", "categories", "homestays", "homestay_images", "rooms", 
-                "room_images", "extra_amenities", "guest_tasks", "ad_packages", 
-                "homestay_ads", "bookings", "booking_extras", "payments", "reports", 
-                "reviews", "vouchers", "festivals", "wishlists", "viewed_histories"
-            };
-
-            for (String table : tables) {
-                try {
-                    Long count = jdbcTemplate.queryForObject("SELECT count(*) FROM " + table, Long.class);
-                    if (count != null && count > 0) {
-                        List<Map<String, Object>> rows = jdbcTemplate.queryForList("SELECT * FROM " + table + " LIMIT 1");
-                        Map<String, Object> firstRow = rows.isEmpty() ? Map.of() : rows.get(0);
-                        log.info("🔹 {:<18} | {} bản ghi | Dòng đầu: {}", table, String.format("%3d", count), firstRow);
-                    } else {
-                        log.info("🔹 {:<18} |   0 bản ghi | (Bảng trống)", table);
-                    }
-                } catch (Exception e) {
-                    log.warn("⚠️ {:<18} | Lỗi truy vấn: {}", table, e.getMessage());
-                }
-            }
-
+            log.info("🚀 Database đã sẵn sàng & kết nối ổn định tới Neon PostgreSQL!");
             log.info("================================================================");
         } catch (Exception e) {
             log.error("❌ RẤT TIẾC: KIỂM TRA BẢNG DỮ LIỆU THẤT BẠI!", e);
