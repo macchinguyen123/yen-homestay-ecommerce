@@ -133,22 +133,31 @@ export default function Homepage() {
 
   // Fetch dynamic data
   useEffect(() => {
+    let isMounted = true;
     const fetchHomeData = async () => {
+      setIsLoading(true);
       try {
-        const homeRes = await fetch('http://localhost:8081/api/public/home');
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 2500);
+
+        const homeRes = await fetch('http://localhost:8081/api/public/home', { signal: controller.signal });
+        clearTimeout(timeoutId);
+
         if (homeRes.ok) {
           const data = await homeRes.json();
-          if (data.heroSlides) {
+          if (data && data.heroSlides && isMounted) {
             setHomeData(prev => ({ ...prev, ...data }));
+            setIsLoading(false);
+            return; // Data loaded in 1 lightning-fast request!
           }
         }
       } catch (err) {
-        console.warn('Failed to fetch dynamic home data, using fallback:', err);
+        console.warn('Lỗi hoặc timeout khi tải dữ liệu trang chủ trực tiếp, chuyển sang phương án fallback:', err);
       }
 
       try {
         const realHomestays = await homestayService.getAllHomestays();
-        if (realHomestays && realHomestays.length > 0) {
+        if (isMounted && realHomestays && realHomestays.length > 0) {
           const mappedHomestays = realHomestays.map((h, i) => ({
             id: h.id || h.homestayId,
             name: h.name,
@@ -201,11 +210,13 @@ export default function Homepage() {
         }
       } catch (err) {
         console.warn('Failed to fetch real homestays:', err);
+      } finally {
+        if (isMounted) setIsLoading(false);
       }
-      setIsLoading(false);
     };
 
     fetchHomeData();
+    return () => { isMounted = false; };
   }, []);
 
   // Hero slider auto-play

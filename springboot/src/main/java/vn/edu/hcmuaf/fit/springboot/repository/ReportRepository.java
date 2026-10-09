@@ -12,4 +12,5 @@ public interface ReportRepository extends JpaRepository<Report, Long> {
     List<Report> findByReportedHomestayId(Long homestayId);
     java.util.Optional<Report> findFirstByBookingId(Long bookingId);
     List<Report> findByBookingId(Long bookingId);
+    List<Report> findByBookingIdIn(List<Long> bookingIds);
 }
