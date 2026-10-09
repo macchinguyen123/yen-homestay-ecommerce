@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { Outlet, NavLink, Link, useNavigate } from 'react-router-dom';
 import './Layouts.css';
+import { authService } from '../services/authService';
+import { userService } from '../services/userService';
 
 // ─── Danh sách nav theo sidebar.html gốc ─────────────────────────────────────
 const OWNER_NAV = [
@@ -26,6 +28,7 @@ const SAMPLE_NOTIFS = [
 
 export default function OwnerLayout() {
   const navigate = useNavigate();
+  const [ownerProfile, setOwnerProfile] = useState(() => authService.getCurrentUser() || {});
 
   // Notification dropdown
   const [notifOpen, setNotifOpen] = useState(false);
@@ -72,6 +75,16 @@ export default function OwnerLayout() {
 
   useEffect(() => {
     fetchHomestays();
+
+    const user = authService.getCurrentUser();
+    if (user?.id) {
+      userService.getUserProfile(user.id).then(result => {
+        if (result.success && result.data) {
+          setOwnerProfile(result.data);
+          localStorage.setItem('user', JSON.stringify({ ...user, ...result.data }));
+        }
+      });
+    }
 
     const handleSync = () => {
       fetchHomestays();
@@ -281,13 +294,13 @@ export default function OwnerLayout() {
                 aria-label="Tài khoản"
               >
                 <img
-                  src="https://lh3.googleusercontent.com/aida/AEtjO1W7zs7OjBASCOexo74_mIgfQZTcHfdYs4AEy6azcaerc7X6IvM9nRu28E-RnVj7Xy6fyOhptHylxmI6RomPfEdWiYzjw0V-yC6tQ7qliOWFrY8-_z9Umlu9GLUHeDbDtoyytD4pPROYAQ4DqzbShJOYUgKdJWg83gVaScW_7WY2vDqgy16KLOiYQ9rBz3fb50bOLvZtubEFqW8cHqktuA0BcjG9YuxpWN6XELHpvmfymi5zqcsHwvyJ3pz2gBd_bOAup7qMKlzR"
+                  src={ownerProfile.avatar || `https://ui-avatars.com/api/?background=059669&color=fff&name=${encodeURIComponent(ownerProfile.fullName || 'Owner')}`}
                   alt="Profile"
                   className="owner-profile-avatar"
                 />
                 <div className="owner-profile-info">
                   <div className="owner-profile-name-row">
-                    <span className="owner-profile-name">Nguyễn Văn An</span>
+              <span className="owner-profile-name">{ownerProfile.fullName || ownerProfile.email || 'Chủ homestay'}</span>
                     <span className="owner-profile-role-badge">Chủ homestay</span>
                   </div>
                   <span className="owner-profile-sub">
@@ -303,13 +316,13 @@ export default function OwnerLayout() {
                   <div className="owner-dropdown-header border-b-only">
                     <div className="owner-profile-dropdown-info">
                       <img
-                        src="https://lh3.googleusercontent.com/aida/AEtjO1W7zs7OjBASCOexo74_mIgfQZTcHfdYs4AEy6azcaerc7X6IvM9nRu28E-RnVj7Xy6fyOhptHylxmI6RomPfEdWiYzjw0V-yC6tQ7qliOWFrY8-_z9Umlu9GLUHeDbDtoyytD4pPROYAQ4DqzbShJOYUgKdJWg83gVaScW_7WY2vDqgy16KLOiYQ9rBz3fb50bOLvZtubEFqW8cHqktuA0BcjG9YuxpWN6XELHpvmfymi5zqcsHwvyJ3pz2gBd_bOAup7qMKlzR"
+                        src={ownerProfile.avatar || `https://ui-avatars.com/api/?background=059669&color=fff&name=${encodeURIComponent(ownerProfile.fullName || 'Owner')}`}
                         alt=""
                         className="owner-profile-avatar--lg"
                       />
                       <div>
-                        <strong>Nguyễn Văn An</strong>
-                        <span>nguyenvanan@gmail.com</span>
+                        <strong>{ownerProfile.fullName || 'Chủ homestay'}</strong>
+                        <span>{ownerProfile.email || ''}</span>
                       </div>
                     </div>
                   </div>
