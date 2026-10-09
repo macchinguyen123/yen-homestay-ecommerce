@@ -204,6 +204,71 @@ public class RoomService {
                 .collect(Collectors.toList());
     }
 
+    private String removeVietnameseTones(String str) {
+        if (str == null) return "";
+        String s = java.text.Normalizer.normalize(str, java.text.Normalizer.Form.NFD)
+                .replaceAll("\\p{InCombiningDiacriticalMarks}+", "");
+        s = s.replace('đ', 'd').replace('Đ', 'd');
+        return s.toLowerCase().trim();
+    }
+
+    /**
+     * Tìm kiếm Homestay trực tiếp theo Database
+     */
+    public List<HomestayDTO> searchHomestaysFromDb(String keyword) {
+        if (keyword == null || keyword.trim().isEmpty()) {
+            return getAllHomestaysWithRooms();
+        }
+        String cleanKw = keyword.trim().toLowerCase();
+        String noToneKw = removeVietnameseTones(cleanKw);
+        String noSpaceKw = noToneKw.replaceAll("\\s+", "");
+
+        // 1. Tìm từ Database bằng JPA LIKE
+        List<Homestay> dbMatches;
+        if (cleanKw.length() <= 2) {
+            // Khi gõ 1-2 ký tự (như 'r', 'đà'): Chỉ tìm trong Name và City để chính xác
+            dbMatches = homestayRepository.searchByNameOrCity(cleanKw);
+        } else {
+            dbMatches = homestayRepository.searchByNameOrCityOrAddress(cleanKw);
+        }
+
+        Set<Long> matchedIds = dbMatches.stream().map(Homestay::getId).collect(Collectors.toSet());
+
+        // 2. Lấy toàn bộ Homestays kèm phòng và ảnh từ DB (có cache)
+        List<HomestayDTO> all = getAllHomestaysWithRooms();
+
+        // 3. Lọc kết quả: Trực tiếp từ DB ID hoặc khớp chuẩn tiếng Việt không dấu
+        return all.stream().filter(dto -> {
+            if (matchedIds.contains(dto.getId())) {
+                return true;
+            }
+            // Khớp không dấu trên Name và City
+            String noToneName = removeVietnameseTones(dto.getName());
+            String noToneCity = removeVietnameseTones(dto.getCity());
+
+            if (noToneName.contains(noToneKw) || noToneCity.contains(noToneKw)) {
+                return true;
+            }
+
+            // Khớp viết liền (như "dalat" -> "da lat", "sapa" -> "sa pa", "phuquoc" -> "phu quoc")
+            String noSpaceName = noToneName.replaceAll("\\s+", "");
+            String noSpaceCity = noToneCity.replaceAll("\\s+", "");
+            if (noSpaceKw.length() >= 3 && (noSpaceName.contains(noSpaceKw) || noSpaceCity.contains(noSpaceKw))) {
+                return true;
+            }
+
+            // Nếu từ khóa dài (>= 4 ký tự) và khớp address không dấu
+            if (cleanKw.length() >= 4 && dto.getAddress() != null) {
+                String noToneAddress = removeVietnameseTones(dto.getAddress());
+                if (noToneAddress.contains(noToneKw)) {
+                    return true;
+                }
+            }
+
+            return false;
+        }).collect(Collectors.toList());
+    }
+
     /**
      * Lấy thông tin 1 Homestay kèm các phòng từ Database
      */

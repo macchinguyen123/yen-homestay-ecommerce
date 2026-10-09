@@ -250,7 +250,9 @@
   background: #ffffff;
   overflow: hidden;
   transition: box-shadow 0.25s ease, transform 0.2s ease;
-  min-height: 190px;
+  height: 205px;
+  min-height: 205px;
+  max-height: 205px;
 }
 
 .hotel-card:hover {
@@ -258,11 +260,14 @@
   box-shadow: 0px 6px 16px rgba(0, 0, 0, 0.12);
 }
 
-/* Card Image (Cố định góc trái, ảnh bao phủ trọn vẹn, tim nằm góc trên ảnh) */
+/* Card Image (Quy định 1 kích cỡ đồng nhất 100%: 260px x 205px) */
 .hotel-image {
-  width: 240px;
-  min-width: 240px;
-  max-width: 240px;
+  width: 260px;
+  min-width: 260px;
+  max-width: 260px;
+  height: 205px;
+  min-height: 205px;
+  max-height: 205px;
   position: relative;
   overflow: hidden;
   background-color: #eaf1ec;
@@ -321,36 +326,45 @@
 
 /* Card Info */
 .hotel-info {
-  padding: 16px 20px;
+  padding: 14px 18px;
   display: flex;
   flex: 1;
   justify-content: space-between;
-  gap: 20px;
+  gap: 16px;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .info-main {
   flex: 1;
   display: flex;
   flex-direction: column;
-  justify-content: flex-start;
+  justify-content: space-between;
   min-width: 0;
+  overflow: hidden;
 }
 
 .hotel-title {
-  font-size: 19px;
+  font-size: 18px;
   color: #176b42;
-  margin-bottom: 6px;
+  margin-bottom: 4px;
   display: flex;
   align-items: center;
   gap: 6px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .hotel-title a {
   color: #176b42;
   text-decoration: none;
   font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .hotel-title a:hover {
@@ -361,12 +375,16 @@
   color: #febb02;
   font-size: 13px;
   letter-spacing: 1px;
+  flex-shrink: 0;
 }
 
 .hotel-location {
   font-size: 12.5px;
   color: #1a1a1a;
-  margin-bottom: 4px;
+  margin-bottom: 3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .hotel-location a {
@@ -381,14 +399,17 @@
 
 .hotel-distance {
   font-size: 12px;
-  margin-bottom: 8px;
+  margin-bottom: 5px;
   color: #595959;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Mô tả ngắn gọn tối đa 2 dòng, cắt bằng ellipsis */
 .hotel-desc {
-  font-size: 13px;
-  line-height: 1.5;
+  font-size: 12.5px;
+  line-height: 1.45;
   color: #4b5563;
   margin: 0;
   display: -webkit-box;
@@ -407,6 +428,7 @@
   justify-content: space-between;
   min-width: 170px;
   flex-shrink: 0;
+  height: 100%;
 }
 
 /* Phần đánh giá chống xô lệch */
@@ -514,6 +536,74 @@
   margin-bottom: 8px;
 }
 
+/* Pagination Bar */
+.sr-pagination-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px solid #e5ece6;
+  flex-wrap: wrap;
+}
+
+.sr-page-numbers {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sr-page-btn {
+  min-width: 40px;
+  height: 40px;
+  padding: 0 12px;
+  border: 1.5px solid #d4e2d8;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #173c2a;
+  font-size: 14px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.sr-page-btn:hover:not(:disabled):not(.active) {
+  background: #f0f8f2;
+  border-color: #176b42;
+  color: #176b42;
+}
+
+.sr-page-btn.active {
+  background: #176b42;
+  border-color: #176b42;
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(23, 107, 66, 0.25);
+  cursor: default;
+}
+
+.sr-page-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  border-color: #e2e8f0;
+  background: #f8fafc;
+  color: #94a3b8;
+}
+
+.sr-page-nav {
+  padding: 0 16px;
+}
+
+.sr-page-dots {
+  padding: 0 6px;
+  color: #88988e;
+  font-weight: 700;
+}
+
 /* Toast Message */
 #result-toast {
   position: fixed;
@@ -547,20 +637,38 @@
 @media (max-width: 768px) {
   .hotel-card {
     flex-direction: column;
+    height: auto;
     min-height: auto;
+    max-height: none;
   }
   .hotel-image {
     width: 100%;
+    min-width: 100%;
     max-width: 100%;
     height: 200px;
+    min-height: 200px;
+    max-height: 200px;
   }
   .hotel-info {
     flex-direction: column;
+    padding: 16px;
+  }
+  .hotel-title {
+    flex-wrap: wrap;
+    white-space: normal;
+  }
+  .hotel-title a {
+    white-space: normal;
+  }
+  .hotel-location,
+  .hotel-distance {
+    white-space: normal;
   }
   .info-action {
     align-items: flex-start;
     margin-top: 14px;
     width: 100%;
+    height: auto;
   }
   .sr-rating-section {
     flex-direction: row-reverse;

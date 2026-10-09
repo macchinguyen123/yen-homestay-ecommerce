@@ -147,34 +147,34 @@
   position: relative;
   margin-top: 10px;
   width: 100%;
-  max-width: 980px;
+  max-width: 1140px;
   z-index: 25;
 }
 
 .search-box.modern-gold-box {
   background: #FFFFFF;
-  border-radius: 20px;
+  border-radius: 9999px;
   box-shadow: 0 16px 40px rgba(15, 23, 42, 0.28);
-  padding: 10px;
+  padding: 6px 10px;
 }
 
 .search-form {
   display: flex;
-  align-items: stretch;
-  gap: 10px;
+  align-items: center;
+  gap: 6px;
 }
 
 .search-field {
   position: relative;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   border-radius: var(--radius-md);
   transition: var(--transition-fast);
 }
 
 .field-with-border {
-  padding: 8px 16px;
+  padding: 5px 14px;
   flex: 1 1 0;
   min-width: 0;
 }
@@ -183,9 +183,9 @@
   border-right: 1px solid #E2E8F0;
 }
 
-.field-destination { flex: 1.7 1 0; }
-.field-checkin, .field-checkout { flex: 1 1 0; }
-.field-guests-rooms { flex: 1.15 1 0; position: relative; border-right: 1px solid #E2E8F0; }
+.field-destination { flex: 1.8 1 0; }
+.field-checkin, .field-checkout { flex: 0.95 1 0; }
+.field-guests-rooms { flex: 1.1 1 0; position: relative; border-right: 1px solid #E2E8F0; }
 
 .search-field-icon {
   font-size: 1.15rem;
@@ -223,10 +223,10 @@
 .guests-toggle-btn {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   width: 100%;
   height: 100%;
-  padding: 8px 16px;
+  padding: 5px 14px;
   border-radius: var(--radius-md);
   background: transparent;
   cursor: pointer;
@@ -283,22 +283,23 @@
 .search-submit-btn {
   background: var(--primary-color) !important;
   color: var(--white) !important;
-  font-size: 0.96rem !important;
+  font-size: 0.92rem !important;
   font-weight: 700 !important;
-  padding: 0 26px !important;
-  border-radius: 14px !important;
+  padding: 10px 24px !important;
+  border-radius: 9999px !important;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  box-shadow: 0 6px 16px rgba(21, 128, 61, 0.35) !important;
+  box-shadow: 0 4px 14px rgba(21, 128, 61, 0.3) !important;
   border: none;
   cursor: pointer;
+  white-space: nowrap;
 }
 
 .search-submit-btn:hover {
   background: var(--primary-hover) !important;
-  transform: translateY(-2px);
+  transform: translateY(-1px);
 }
 
 .modern-hero-tags {
