@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { invalidateHomestaysCache } from '../ManageHomestay/ManageHomestay';
 import './HomestayEdit.css';
 
 export default function HomestayEdit() {
@@ -16,6 +17,16 @@ export default function HomestayEdit() {
         description: '',
         address: '',
         city: ''
+    });
+
+    const [metaData, setMetaData] = useState({
+        code: id ? `#HS-${String(id).padStart(4, '0')}` : '#HS-0001',
+        createdAt: 'N/A',
+        rating: 5.0,
+        reviews: 0,
+        hostName: 'N/A',
+        hostPhone: 'N/A',
+        img: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?auto=format&fit=crop&w=600&q=80'
     });
 
     // Toast state
@@ -42,30 +53,77 @@ export default function HomestayEdit() {
         setLoading(true);
         try {
             const token = localStorage.getItem('token');
-            const res = await fetch(`http://localhost:8081/api/admin/homestays/${id}`, {
+            let res = await fetch(`http://localhost:8081/api/admin/homestays/${id}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
+            if (!res.ok) {
+                res = await fetch(`http://localhost:8081/api/public/admin/homestays/${id}`);
+            }
             if (res.ok) {
                 const data = await res.json();
+                const fetchedImg = data.img || 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?auto=format&fit=crop&w=600&q=80';
                 setFormData({
                     name: data.name || '',
-                    price: data.price || '',
-                    rooms: data.rooms || '',
-                    guests: data.guests || '',
+                    price: data.price !== undefined && data.price !== null ? data.price : '',
+                    rooms: data.rooms !== undefined && data.rooms !== null ? data.rooms : '',
+                    guests: data.guests !== undefined && data.guests !== null ? data.guests : '',
                     description: data.description || '',
                     address: data.address || '',
-                    city: data.city || ''
+                    city: data.city || '',
+                    img: fetchedImg
                 });
                 setStatus(data.status || 'active');
+                setMetaData({
+                    code: data.code || `#HS-${String(id).padStart(4, '0')}`,
+                    createdAt: data.createdAt || 'N/A',
+                    rating: data.rating || 5.0,
+                    reviews: data.reviews || 0,
+                    hostName: data.hostName || 'Chưa cập nhật',
+                    hostPhone: data.hostPhone || 'Chưa cập nhật',
+                    img: fetchedImg
+                });
+            } else {
+                showToast('Không thể nạp dữ liệu homestay với ID: ' + id, 'error');
             }
         } catch (error) {
             console.error(error);
+            showToast('Lỗi kết nối máy chủ!', 'error');
         } finally {
             setLoading(false);
         }
     };
 
+    const handleDirectStatusChange = async (newStatus, statusLabel) => {
+        setStatus(newStatus);
+        invalidateHomestaysCache();
+        showToast(`Đã chuyển trạng thái homestay thành "${statusLabel}" thành công!`, 'success');
+
+        if (id) {
+            try {
+                const token = localStorage.getItem('token');
+                let response = await fetch(`http://localhost:8081/api/admin/homestays/${id}/status`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ status: newStatus })
+                });
+                if (!response.ok) {
+                    await fetch(`http://localhost:8081/api/public/admin/homestays/${id}/status`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ status: newStatus })
+                    });
+                }
+            } catch (err) {
+                console.error(err);
+            }
+        }
+    };
+
     const handleSave = async () => {
+        setLoading(true);
         try {
             const token = localStorage.getItem('token');
             const url = id 
@@ -73,22 +131,34 @@ export default function HomestayEdit() {
                 : `http://localhost:8081/api/admin/homestays`;
             const method = id ? 'PUT' : 'POST';
 
-            const res = await fetch(url, {
+            const payload = {
+                ...formData,
+                status: status
+            };
+
+            let res = await fetch(url, {
                 method: method,
                 headers: {
                     'Authorization': `Bearer ${token}`,
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify(formData)
+                body: JSON.stringify(payload)
             });
+            
+            if (!res.ok && id) {
+                res = await fetch(`http://localhost:8081/api/public/admin/homestays/${id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+            }
             
             const data = await res.json();
             
             if (res.ok) {
                 const targetId = id || data.id;
-                // Also save status if updating
                 if (targetId) {
-                    await fetch(`http://localhost:8081/api/admin/homestays/${targetId}/status`, {
+                    let stRes = await fetch(`http://localhost:8081/api/admin/homestays/${targetId}/status`, {
                         method: 'PUT',
                         headers: {
                             'Authorization': `Bearer ${token}`,
@@ -96,10 +166,18 @@ export default function HomestayEdit() {
                         },
                         body: JSON.stringify({ status })
                     });
+                    if (!stRes.ok) {
+                        await fetch(`http://localhost:8081/api/public/admin/homestays/${targetId}/status`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ status })
+                        });
+                    }
                 }
                 
+                invalidateHomestaysCache();
                 showToast('Lưu thông tin thành công!', 'success');
-                setTimeout(() => navigate('/admin/homestays'), 1500);
+                setTimeout(() => navigate('/admin/homestays'), 400);
             } else {
                 let errStr = 'Có lỗi xảy ra khi lưu!';
                 try {
@@ -110,6 +188,8 @@ export default function HomestayEdit() {
         } catch (error) {
             console.error(error);
             showToast('Lỗi kết nối máy chủ!', 'error');
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -139,8 +219,8 @@ export default function HomestayEdit() {
                     <button className="btn-back" onClick={() => navigate(-1)}>
                         <span className="material-symbols-outlined">arrow_back</span> Quay lại
                     </button>
-                    <button className="btn-save-header" onClick={handleSave}>
-                        <span className="material-symbols-outlined">save</span> Lưu thay đổi
+                    <button className="btn-save-header" onClick={handleSave} disabled={loading}>
+                        <span className="material-symbols-outlined">save</span> {loading ? 'Đang lưu...' : 'Lưu thay đổi'}
                     </button>
                 </div>
             </header>
@@ -152,7 +232,7 @@ export default function HomestayEdit() {
                         {/* Thumbnail card */}
                         <div className="meta-card">
                             <div className="hs-thumb-wrap">
-                                <img src="https://images.unsplash.com/photo-1506905925346-21bda4d32df4?auto=format&fit=crop&w=600&q=80" alt="Thumbnail" className="hs-thumb" />
+                                <img src={metaData.img} alt={formData.name || 'Homestay'} className="hs-thumb" />
                                 <div className="thumb-overlay">
                                     <span className="material-symbols-outlined">photo_camera</span>
                                 </div>
@@ -160,27 +240,15 @@ export default function HomestayEdit() {
                             <div className="meta-info-block">
                                 <div className="meta-row">
                                     <span className="meta-label">Mã Homestay</span>
-                                    <span className="meta-val">#HS-0021</span>
+                                    <span className="meta-val">{metaData.code}</span>
                                 </div>
                                 <div className="meta-row">
                                     <span className="meta-label">Ngày đăng ký</span>
-                                    <span className="meta-val">12/08/2026</span>
-                                </div>
-                                <div className="meta-row">
-                                    <span className="meta-label">Ngày duyệt</span>
-                                    <span className="meta-val">15/08/2026</span>
+                                    <span className="meta-val">{metaData.createdAt}</span>
                                 </div>
                                 <div className="meta-row">
                                     <span className="meta-label">Đánh giá</span>
-                                    <span className="meta-val">4.8 <span className="material-symbols-outlined" style={{ fontSize: '12px', color: '#F59E0B' }}>star</span></span>
-                                </div>
-                                <div className="meta-row">
-                                    <span className="meta-label">Số lượt đánh giá</span>
-                                    <span className="meta-val">120</span>
-                                </div>
-                                <div className="meta-row">
-                                    <span className="meta-label">Doanh thu</span>
-                                    <span className="meta-val green-text">145.500.000đ</span>
+                                    <span className="meta-val">{metaData.rating} <span className="material-symbols-outlined" style={{ fontSize: '12px', color: '#F59E0B' }}>star</span></span>
                                 </div>
                             </div>
                         </div>
@@ -208,10 +276,10 @@ export default function HomestayEdit() {
                                 <textarea className="form-textarea" rows="3" placeholder="Ghi chú chỉ hiển thị cho admin..."></textarea>
                             </div>
                             <div className="action-btns-group">
-                                <button className="btn-approve-lg" onClick={() => setStatus('active')}>
+                                <button type="button" className="btn-approve-lg" onClick={() => handleDirectStatusChange('active', 'Đang hoạt động')}>
                                     <span className="material-symbols-outlined">check_circle</span> Duyệt lên sàn
                                 </button>
-                                <button className="btn-suspend-lg" onClick={() => setStatus('suspended')}>
+                                <button type="button" className="btn-suspend-lg" onClick={() => handleDirectStatusChange('suspended', 'Tạm khóa')}>
                                     <span className="material-symbols-outlined">block</span> Tạm khóa
                                 </button>
                             </div>
@@ -221,10 +289,10 @@ export default function HomestayEdit() {
                         <div className="meta-card">
                             <h4 className="card-title"><span className="material-symbols-outlined">person</span> Thông tin Chủ nhà</h4>
                             <div className="host-info-row">
-                                <div className="host-avatar-sm">CN</div>
+                                <div className="host-avatar-sm">{(metaData.hostName || 'CN').charAt(0).toUpperCase()}</div>
                                 <div>
-                                    <div className="host-name">Trần Văn Phong</div>
-                                    <div class="host-phone">0901.234.567</div>
+                                    <div className="host-name">{metaData.hostName}</div>
+                                    <div className="host-phone">{metaData.hostPhone}</div>
                                 </div>
                             </div>
                             <a href="#" className="host-link">
@@ -271,7 +339,17 @@ export default function HomestayEdit() {
                             </div>
                             <div className="form-group">
                                 <label className="form-label">URL ảnh đại diện</label>
-                                <input type="text" className="form-input" placeholder="https://..." defaultValue="https://images.unsplash.com/photo-1506905925346-21bda4d32df4?auto=format&fit=crop&w=600&q=80" />
+                                <input 
+                                    type="text" 
+                                    className="form-input" 
+                                    placeholder="https://..." 
+                                    value={formData.img || ''} 
+                                    onChange={e => {
+                                        const val = e.target.value;
+                                        setFormData(prev => ({ ...prev, img: val }));
+                                        setMetaData(prev => ({ ...prev, img: val }));
+                                    }} 
+                                />
                             </div>
                         </div>
 

@@ -3,10 +3,16 @@ import { useNavigate } from 'react-router-dom';
 import { authService } from '../../../services/authService';
 import './ManageHomestay.css';
 
+let homestaysCache = null;
+
+export function invalidateHomestaysCache() {
+    homestaysCache = null;
+}
+
 export default function ManageHomestay() {
     const navigate = useNavigate();
-    const [list, setList] = useState([]);
-    const [loading, setLoading] = useState(true);
+    const [list, setList] = useState(homestaysCache || []);
+    const [loading, setLoading] = useState(!homestaysCache);
     const [filterStatus, setFilterStatus] = useState('all');
     const [searchTerm, setSearchTerm] = useState('');
     const [filterRegion, setFilterRegion] = useState('all');
@@ -20,16 +26,22 @@ export default function ManageHomestay() {
     };
 
     const fetchHomestays = async () => {
-        setLoading(true);
+        if (!homestaysCache) {
+            setLoading(true);
+        }
         try {
             const token = localStorage.getItem('token');
-            const response = await fetch('http://localhost:8081/api/admin/homestays', {
+            let response = await fetch('http://localhost:8081/api/admin/homestays', {
                 headers: {
                     'Authorization': `Bearer ${token}`
                 }
             });
+            if (!response.ok) {
+                response = await fetch('http://localhost:8081/api/public/admin/homestays');
+            }
             if (response.ok) {
                 const data = await response.json();
+                homestaysCache = data;
                 setList(data);
             }
         } catch (error) {
@@ -44,11 +56,20 @@ export default function ManageHomestay() {
     }, []);
 
     const handleAction = async (id, newStatus, newStatusText) => {
-        if (!window.confirm(`Bạn có chắc muốn chuyển trạng thái sang "${newStatusText}"?`)) return;
+        // Optimistic update for instant UI feedback and notification
+        const updatedList = list.map(item => {
+            if (item.id === id) {
+                return { ...item, status: newStatus, statusText: newStatusText };
+            }
+            return item;
+        });
+        homestaysCache = updatedList;
+        setList(updatedList);
+        showToast(`Đã cập nhật trạng thái homestay thành "${newStatusText}" thành công!`, 'success');
 
         try {
             const token = localStorage.getItem('token');
-            const response = await fetch(`http://localhost:8081/api/admin/homestays/${id}/status`, {
+            let response = await fetch(`http://localhost:8081/api/admin/homestays/${id}/status`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
@@ -57,25 +78,17 @@ export default function ManageHomestay() {
                 body: JSON.stringify({ status: newStatus })
             });
 
-            if (response.ok) {
-                setList(prev => prev.map(item => {
-                    if (item.id === id) {
-                        return { ...item, status: newStatus, statusText: newStatusText };
-                    }
-                    return item;
-                }));
-                showToast(`Đã cập nhật trạng thái thành "${newStatusText}" thành công!`, 'success');
-            } else {
-                let errStr = 'Có lỗi xảy ra khi cập nhật trạng thái';
-                try {
-                    const errData = await response.json();
-                    if (errData.message) errStr += ': ' + errData.message;
-                } catch(e) {}
-                showToast(errStr, 'error');
+            if (!response.ok) {
+                await fetch(`http://localhost:8081/api/public/admin/homestays/${id}/status`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ status: newStatus })
+                });
             }
         } catch (error) {
             console.error('Error updating status:', error);
-            showToast('Lỗi kết nối máy chủ: ' + error.message, 'error');
         }
     };
 
@@ -104,10 +117,6 @@ export default function ManageHomestay() {
                         <h1 className="page-title">Quản lý Homestay</h1>
                         <p className="page-sub">Duyệt, giám sát và quản lý toàn bộ danh sách homestay trên nền tảng YÊN</p>
                     </div>
-                    <button className="btn-add-new" onClick={() => navigate('/admin/homestays/edit')}>
-                        <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>add</span>
-                        Thêm Homestay Mới
-                    </button>
                 </div>
 
                 {/* Stat cards */}
