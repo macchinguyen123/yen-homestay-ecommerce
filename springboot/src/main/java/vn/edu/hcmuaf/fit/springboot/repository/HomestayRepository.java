@@ -11,6 +11,7 @@ public interface HomestayRepository extends JpaRepository<Homestay, Long> {
     List<Homestay> findByOwnerId(Long ownerId);
     List<Homestay> findByCategoryId(Long categoryId);
     List<Homestay> findByCity(String city);
+    List<Homestay> findByCityIgnoreCase(String city);
     List<Homestay> findByStatus(String status);
     long countByStatusIgnoreCase(String status);
 
