@@ -736,6 +736,7 @@
   overflow-x: auto;
   margin: 20px 0;
   padding-bottom: 4px;
+  scrollbar-width: thin;
 }
 
 .festival-tab-btn {
@@ -751,6 +752,8 @@
   font-weight: 700;
   cursor: pointer;
   white-space: nowrap;
+  flex: 0 0 auto;
+  min-width: max-content;
   transition: all 0.2s ease;
 }
 
@@ -771,6 +774,32 @@
   align-items: center;
   justify-content: space-between;
   gap: 20px;
+  position: relative;
+  overflow: hidden;
+}
+
+.festival-banner-card > div:not(.festival-banner-backdrop),
+.festival-banner-card > a {
+  position: relative;
+  z-index: 1;
+}
+
+.festival-banner-card > div:not(.festival-banner-backdrop) {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.festival-banner-card > a {
+  flex: 0 0 auto;
+}
+
+.festival-banner-backdrop {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  opacity: 0.16;
+  pointer-events: none;
 }
 
 .fest-badge {
@@ -787,6 +816,7 @@
   font-weight: 800;
   color: #78350F;
   margin: 6px 0;
+  overflow-wrap: anywhere;
 }
 
 .fest-meta {
@@ -794,6 +824,13 @@
   gap: 16px;
   font-size: 0.84rem;
   color: #92400E;
+  flex-wrap: wrap;
+}
+
+.festival-banner-card p {
+  margin: 8px 0 0;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
 }
 
 /* --- 6. HOMESTAY CARDS GLOBAL --- */

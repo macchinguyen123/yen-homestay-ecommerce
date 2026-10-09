@@ -88,6 +88,13 @@ const FAVORITES_HOMESTAYS = [
   { id: 104, name: 'Danang Ocean Horizon', city: 'danang', location: 'Bán đảo Sơn Trà, Đà Nẵng', rating: 4.94, reviews: 178, specs: '2 phòng ngủ · 4 khách', amenities: 'Bể bơi vô cực ngắm vịnh · Bếp BBQ · Đón tiễn sân bay', price: '1.450.000đ', tag: 'View biển triệu đô', img: 'https://images.unsplash.com/photo-1571896349842-33c89424de2d?auto=format&fit=crop&w=600&q=80' },
 ];
 
+function formatFestivalDate(value) {
+  if (!value) return '';
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(value)) return value;
+  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return match ? `${match[3]}/${match[2]}/${match[1]}` : value;
+}
+
 export default function Homepage() {
   const navigate = useNavigate();
 
@@ -107,6 +114,7 @@ export default function Homepage() {
 
   // Festival Section State
   const [activeFestivalKey, setActiveFestivalKey] = useState('diff');
+  const [databaseFestivals, setDatabaseFestivals] = useState(null);
 
   // Favorites Filter City State
   const [favCityFilter, setFavCityFilter] = useState('all');
@@ -177,6 +185,37 @@ export default function Homepage() {
     fetchHomeData();
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+    fetch('http://localhost:8081/api/public/festivals')
+      .then(response => response.ok ? response.json() : Promise.reject(new Error('Festival API unavailable')))
+      .then(rows => {
+        if (cancelled) return;
+        const mapped = rows.map(festival => ({
+          ...festival,
+          key: String(festival.id),
+          badge: festival.badgeInfo || (festival.status === 'active' ? 'Đang diễn ra' : 'Sắp diễn ra'),
+          date: [festival.startDate, festival.endDate].filter(Boolean).map(formatFestivalDate).join(' – '),
+          location: [festival.location, festival.city].filter(Boolean).join(', '),
+          homestays: (festival.homestays || []).map(home => ({
+            id: home.id,
+            name: home.name,
+            location: home.address || home.city || festival.city,
+            distance: home.distanceLabel || 'Homestay gợi ý gần lễ hội',
+            rating: home.rating || 'Mới',
+            reviews: 0,
+            price: home.price ? `${Number(home.price).toLocaleString('vi-VN')}đ` : 'Liên hệ',
+            tag: home.distanceLabel || 'Gợi ý theo lễ hội',
+            img: home.imageUrl || festival.imageUrl || 'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=600&q=80',
+          })),
+        }));
+        setDatabaseFestivals(mapped);
+        setActiveFestivalKey(mapped.length ? String(mapped[0].id) : null);
+      })
+      .catch(() => { if (!cancelled) setDatabaseFestivals(null); });
+    return () => { cancelled = true; };
+  }, []);
+
   // Hero slider auto-play
   useEffect(() => {
     if (homeData.heroSlides.length === 0) return;
@@ -233,7 +272,12 @@ export default function Homepage() {
     return h.city === favCityFilter;
   });
 
-  const activeFestData = homeData.festivals[activeFestivalKey] || homeData.festivals.diff || FESTIVALS.diff;
+  const festivalTabs = databaseFestivals === null
+    ? Object.entries(homeData.festivals).map(([key, festival]) => ({ key, name: festival.name }))
+    : databaseFestivals.map(festival => ({ key: festival.key, name: festival.name }));
+  const activeFestData = databaseFestivals === null
+    ? homeData.festivals[activeFestivalKey] || homeData.festivals.diff || FESTIVALS.diff
+    : databaseFestivals.find(festival => festival.key === activeFestivalKey);
 
   return (
     <div className="homepage-wrapper">
@@ -558,39 +602,35 @@ export default function Homepage() {
             <span style={{ color: '#15803D' }}><i className="bi bi-house-heart-fill" /> Homestay gần đó dễ dàng di chuyển</span>
           </div>
 
-          <div className="festival-tabs">
-            <button
-              type="button"
-              className={`festival-tab-btn ${activeFestivalKey === 'diff' ? 'active' : ''}`}
-              onClick={() => setActiveFestivalKey('diff')}
-            >
-              <i className="bi bi-fire" /> Lễ Hội Pháo Hoa Quốc Tế DIFF (Đà Nẵng)
-            </button>
-            <button
-              type="button"
-              className={`festival-tab-btn ${activeFestivalKey === 'dalat' ? 'active' : ''}`}
-              onClick={() => setActiveFestivalKey('dalat')}
-            >
-              <i className="bi bi-flower1" /> Festival Hoa Đà Lạt (Lâm Viên)
-            </button>
-          </div>
-
-          <div className="festival-banner-card">
-            <div>
-              <span className="fest-badge">{activeFestData.badge}</span>
-              <h3 className="fest-name">{activeFestData.name}</h3>
-              <div className="fest-meta">
-                <span><i className="bi bi-geo-alt-fill" /> <strong>{activeFestData.location}</strong></span>
-                <span><i className="bi bi-clock-fill" /> <strong>{activeFestData.date}</strong></span>
+          {festivalTabs.length > 0 ? (
+            <>
+              <div className="festival-tabs">
+                {festivalTabs.map(festival => (
+                  <button key={festival.key} type="button" className={`festival-tab-btn ${activeFestivalKey === festival.key ? 'active' : ''}`} onClick={() => setActiveFestivalKey(festival.key)}>
+                    <i className="bi bi-calendar-event" /> {festival.name}
+                  </button>
+                ))}
               </div>
-            </div>
-            <Link to="/search" className="btn-view-room" style={{ background: '#D97706', whiteSpace: 'nowrap' }}>
-              Xem homestay gần nhất
-            </Link>
-          </div>
 
-          <div className="festival-homestays-grid">
-            {activeFestData.homestays.map((h) => (
+              {activeFestData && <>
+                <div className="festival-banner-card">
+                  <div className="festival-banner-backdrop" style={activeFestData.imageUrl ? { backgroundImage: `url(${activeFestData.imageUrl})` } : undefined} />
+                  <div>
+                    <span className="fest-badge">{activeFestData.badge}</span>
+                    <h3 className="fest-name">{activeFestData.name}</h3>
+                    <div className="fest-meta">
+                      <span><i className="bi bi-geo-alt-fill" /> <strong>{activeFestData.location}</strong></span>
+                      <span><i className="bi bi-clock-fill" /> <strong>{activeFestData.date || 'Chưa cập nhật thời gian'}</strong></span>
+                    </div>
+                    {activeFestData.description && <p>{activeFestData.description}</p>}
+                  </div>
+                  <Link to={`/search?q=${encodeURIComponent(activeFestData.city || '')}`} className="btn-view-room" style={{ background: '#D97706', whiteSpace: 'nowrap' }}>
+                    Xem homestay gần nhất
+                  </Link>
+                </div>
+
+                {activeFestData.homestays?.length ? <div className="festival-homestays-grid">
+                  {activeFestData.homestays.map((h) => (
               <div key={h.id} className="homestay-card">
                 <div className="card-img-wrapper">
                   <span className="card-top-tag">{h.tag}</span>
@@ -620,9 +660,12 @@ export default function Homepage() {
                     <Link to={`/homestay/${h.id}`} className="btn-view-room">Xem homestay</Link>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
+                  </div>
+                  ))}
+                </div> : <p className="section-subtitle">Chưa có homestay được gợi ý cho lễ hội này.</p>}
+              </>}
+            </>
+          ) : <p className="section-subtitle">Hiện chưa có lễ hội sắp diễn ra.</p>}
         </div>
       </section>
 
