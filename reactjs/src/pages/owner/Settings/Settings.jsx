@@ -1,8 +1,12 @@
 import React, { useState, useMemo } from 'react';
 import './Settings.css';
 import { initialSettingsData } from './settingsData';
+import { userService } from '../../../services/userService';
+import { authService } from '../../../services/authService';
 
 export default function Settings() {
+  const currentUser = authService.getCurrentUser();
+  const userId = currentUser?.id;
   const [activeTab, setActiveTab] = useState('account'); // 'account' | 'bank' | 'notification'
 
   // Profile Form State
@@ -31,6 +35,7 @@ export default function Settings() {
 
   // Toast State
   const [toastMessage, setToastMessage] = useState(null);
+  const [savingProfile, setSavingProfile] = useState(false);
   const showToast = (msg) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3500);
@@ -40,6 +45,20 @@ export default function Settings() {
   const unreadNotiCount = useMemo(() => {
     return notifications.filter((n) => n.unread).length;
   }, [notifications]);
+
+  React.useEffect(() => {
+    if (!userId) return;
+    userService.getUserProfile(userId).then(result => {
+      if (!result.success || !result.data) return;
+      const data = result.data;
+      setProfile(prev => ({ ...prev, ...data,
+        phone: data.phoneNumber || '',
+        address: data.street || '',
+        birthday: data.dobYear && data.dobMonth && data.dobDay ? `${data.dobYear}-${String(data.dobMonth).padStart(2, '0')}-${String(data.dobDay).padStart(2, '0')}` : '',
+        initials: (data.fullName || prev.fullName || 'U').split(/\s+/).map(x => x[0]).join('').slice(-2).toUpperCase()
+      }));
+    });
+  }, [userId]);
 
   // Format thời gian đã trôi qua
   const formatTimeAgo = (minutes) => {
@@ -57,13 +76,31 @@ export default function Settings() {
   };
 
   // Lưu thông tin cá nhân
-  const handleSaveProfile = (e) => {
+  const handleSaveProfile = async (e) => {
     e.preventDefault();
-    showToast('Đã lưu thông tin tài khoản thành công!');
+    if (!userId) return showToast('Vui lòng đăng nhập lại để cập nhật tài khoản.');
+    setSavingProfile(true);
+    const dateParts = profile.birthday ? profile.birthday.split('-') : [];
+    const result = await userService.updateUserProfile(userId, {
+      fullName: profile.fullName,
+      phoneNumber: profile.phone,
+      street: profile.address,
+      dobYear: dateParts[0] || null,
+      dobMonth: dateParts[1] || null,
+      dobDay: dateParts[2] || null,
+    });
+    if (result.success && result.data) {
+      const saved = result.data;
+      setProfile(prev => ({ ...prev, ...saved, phone: saved.phoneNumber || prev.phone, address: saved.street || prev.address }));
+      const stored = authService.getCurrentUser();
+      if (stored) localStorage.setItem('user', JSON.stringify({ ...stored, fullName: saved.fullName, phoneNumber: saved.phoneNumber, avatar: saved.avatar }));
+    }
+    setSavingProfile(false);
+    showToast(result.success ? 'Đã lưu thông tin tài khoản thành công!' : (result.error || 'Không thể cập nhật thông tin.'));
   };
 
   // Đổi mật khẩu
-  const handleChangePassword = (e) => {
+  const handleChangePassword = async (e) => {
     e.preventDefault();
     if (passwordForm.newPass.length < 8) {
       showToast('⚠️ Mật khẩu mới phải có tối thiểu 8 ký tự!');
@@ -74,8 +111,11 @@ export default function Settings() {
       return;
     }
 
+    if (!userId) return showToast('Vui lòng đăng nhập lại để đổi mật khẩu.');
+    const result = await userService.changePassword(userId, passwordForm.current, passwordForm.newPass);
+    if (!result.success) return showToast(result.message || 'Đổi mật khẩu thất bại.');
     setPasswordForm({ current: '', newPass: '', confirmPass: '' });
-    showToast('Đã cập nhật mật khẩu mới thành công!');
+    showToast(result.message || 'Đã cập nhật mật khẩu mới thành công!');
   };
 
   // Thêm tài khoản ngân hàng mới
@@ -347,7 +387,7 @@ export default function Settings() {
                 <div className="settings-field full settings-btn-row">
                   <button type="submit" className="btn-save-settings">
                     <span className="material-symbols-outlined text-[17px]">save</span>
-                    Lưu thông tin cá nhân
+                    {savingProfile ? 'Đang lưu...' : 'Lưu thông tin cá nhân'}
                   </button>
                 </div>
               </form>
