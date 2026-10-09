@@ -80,7 +80,7 @@ public class TestDbController {
         return ResponseEntity.ok(map);
     }
 
-    @GetMapping("/categories")
+    @GetMapping("/test-categories")
     public ResponseEntity<List<Category>> getAllCategories() {
         return ResponseEntity.ok(categoryRepository.findAll());
     }

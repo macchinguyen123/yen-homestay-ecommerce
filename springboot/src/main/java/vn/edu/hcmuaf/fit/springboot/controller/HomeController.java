@@ -81,9 +81,13 @@ public class HomeController {
         );
 
         // 1. Bulk DB fetch to eliminate N+1 queries for lightning fast response time
-        List<Homestay> allHomestays = homestayRepository.findAll();
-        List<HomestayImage> allImages = homestayImageRepository.findAll();
-        List<vn.edu.hcmuaf.fit.springboot.model.Review> allReviews = reviewRepository.findAll();
+        // Limit to 50 best rated homestays to optimize load time
+        org.springframework.data.domain.Pageable top50 = org.springframework.data.domain.PageRequest.of(0, 50, org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "rating"));
+        List<Homestay> allHomestays = homestayRepository.findAll(top50).getContent();
+        
+        List<Long> homestayIds = allHomestays.stream().map(Homestay::getId).collect(Collectors.toList());
+        List<HomestayImage> allImages = homestayIds.isEmpty() ? new ArrayList<>() : homestayImageRepository.findByHomestayIdIn(homestayIds);
+        List<vn.edu.hcmuaf.fit.springboot.model.Review> allReviews = homestayIds.isEmpty() ? new ArrayList<>() : reviewRepository.findByHomestayIdIn(homestayIds);
 
         Map<Long, String> imageMap = new HashMap<>();
         for (HomestayImage img : allImages) {
@@ -99,7 +103,8 @@ public class HomeController {
             }
         }
 
-        // Sort by rating descending
+        // Sort by rating descending (already sorted by DB, but keep this to be safe)
+        allHomestays = new ArrayList<>(allHomestays);
         allHomestays.sort((h1, h2) -> {
             Double r1 = h1.getRating() != null ? h1.getRating() : 0.0;
             Double r2 = h2.getRating() != null ? h2.getRating() : 0.0;
