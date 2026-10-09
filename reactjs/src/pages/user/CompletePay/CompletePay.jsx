@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
+import { bookingService } from '../../../services/bookingService';
 import './CompletePay.css';
 
 const BOOKINGS_KEY = 'yenBookings';
@@ -24,39 +25,6 @@ function fmtDate(s) {
   return `${WEEKDAYS[d.getDay()]}, ${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
 }
 
-const DEFAULT_DEMO_BOOKING = {
-  code: 'YEN-2026-8892',
-  homestay: 'The Memory Valley Villa',
-  room: {
-    name: 'Villa 3 phòng ngủ view thung lũng',
-    thumb: 'https://images.unsplash.com/photo-1518780664697-55e3ad937233?auto=format&fit=crop&w=600&q=80',
-  },
-  location: 'Hồ Tuyền Lâm, Đà Lạt',
-  checkin: '2026-09-22',
-  checkout: '2026-09-25',
-  nights: 3,
-  guests: 8,
-  contact: {
-    fullName: 'Lê Hoàng Mai Chi',
-    phone: '0949.050.888',
-    email: 'maichi.le@gmail.com',
-  },
-  arrivalTime: '14:30 - 15:00',
-  experiences: ['Tour săn mây bình minh thung lũng', 'Tiệc nướng BBQ gia đình'],
-  note: 'Vui lòng chuẩn bị thêm 2 bộ chăn gối phụ.',
-  pricing: {
-    subtotal: 3900000,
-    cleaning: 250000,
-    service: 200000,
-    discount: 0,
-    total: 4350000,
-    paid: 4350000,
-    remaining: 0,
-    experienceEstimate: 350000,
-  },
-  method: 'vietqr',
-};
-
 export default function CompletePay() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -67,23 +35,100 @@ export default function CompletePay() {
 
   useEffect(() => {
     const code = searchParams.get('code');
-    try {
-      const list = JSON.parse(localStorage.getItem(BOOKINGS_KEY) || '[]');
-      const last = JSON.parse(sessionStorage.getItem(LAST_KEY) || 'null');
+    let isMounted = true;
 
-      let found = null;
-      if (code) {
-        found = list.find((b) => b.code === code) || (last && last.code === code ? last : null);
-      } else {
-        found = last || list[0] || DEFAULT_DEMO_BOOKING;
+    async function loadBooking() {
+      setLoading(true);
+      try {
+        const list = JSON.parse(localStorage.getItem(BOOKINGS_KEY) || '[]');
+        const last = JSON.parse(sessionStorage.getItem(LAST_KEY) || 'null');
+        let localFound = null;
+        if (code) {
+          localFound = list.find((b) => b.code === code) || (last && last.code === code ? last : null);
+        } else {
+          localFound = last || list[0] || null;
+        }
+
+        // Tra cứu đơn đặt phòng từ CSDL thật Neon PostgreSQL
+        const targetCode = code || (localFound?.code ? localFound.code : null);
+        if (targetCode) {
+          try {
+            const dbData = await bookingService.getBookingByCode(targetCode);
+            if (dbData && isMounted) {
+              const checkinStr = dbData.checkInDate || dbData.checkIn || '';
+              const checkoutStr = dbData.checkOutDate || dbData.checkOut || '';
+              const nightsCount = dbData.nights || 1;
+              const totalNum = Number(dbData.totalPriceRaw || 0) || (typeof dbData.totalPrice === 'number' ? dbData.totalPrice : 0);
+              const depositNum = Number(dbData.depositAmount || 0);
+              const remainingNum = Number(dbData.remainingAmount || 0);
+              const paidNum = depositNum > 0 ? depositNum : totalNum;
+
+              const adapted = {
+                code: dbData.bookingCode,
+                homestay: dbData.homestayName,
+                room: {
+                  name: dbData.roomName || 'Phòng nghỉ sinh thái',
+                  thumb: dbData.roomImage || dbData.homestayImage || 'https://images.unsplash.com/photo-1518780664697-55e3ad937233?auto=format&fit=crop&w=600&q=80',
+                },
+                location: dbData.location || 'Việt Nam',
+                checkin: checkinStr,
+                checkout: checkoutStr,
+                nights: nightsCount,
+                guests: dbData.guestsCount || 2,
+                contact: {
+                  fullName: dbData.touristName || 'Quý khách',
+                  phone: 'Liên hệ qua ứng dụng',
+                  email: 'Đã xác nhận trong tài khoản',
+                },
+                pricing: {
+                  subtotal: totalNum,
+                  cleaning: 0,
+                  service: 0,
+                  discount: 0,
+                  total: totalNum,
+                  paid: paidNum,
+                  remaining: remainingNum,
+                  experienceEstimate: 0,
+                },
+                method: dbData.paymentType === 'DEPOSIT' ? 'vietqr' : 'vietqr',
+                depositStatus: dbData.depositStatus,
+                status: dbData.status,
+              };
+
+              if (localFound && localFound.pricing) {
+                setBooking({
+                  ...adapted,
+                  ...localFound,
+                  code: dbData.bookingCode,
+                  homestay: dbData.homestayName || localFound.homestay,
+                  room: {
+                    name: dbData.roomName || localFound.room?.name,
+                    thumb: dbData.roomImage || localFound.room?.thumb,
+                  },
+                });
+              } else {
+                setBooking(adapted);
+              }
+              setLoading(false);
+              return;
+            }
+          } catch (apiErr) {
+            console.warn('Không thể tải đặt phòng từ DB, dùng fallback:', apiErr);
+          }
+        }
+
+        if (isMounted) {
+          setBooking(localFound || null);
+        }
+      } catch (e) {
+        if (isMounted) setBooking(null);
+      } finally {
+        if (isMounted) setLoading(false);
       }
-
-      setBooking(found);
-    } catch (e) {
-      setBooking(DEFAULT_DEMO_BOOKING);
-    } finally {
-      setLoading(false);
     }
+
+    loadBooking();
+    return () => { isMounted = false; };
   }, [searchParams]);
 
   const triggerToast = (msg) => {
