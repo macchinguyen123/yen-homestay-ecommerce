@@ -105,6 +105,29 @@ public class AdminHomestayController {
         return ResponseEntity.ok(result);
     }
 
+    @GetMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> getHomestayById(@PathVariable Long id) {
+        Optional<Homestay> opt = homestayRepository.findById(id);
+        if (opt.isPresent()) {
+            Homestay h = opt.get();
+            Map<String, Object> map = new HashMap<>();
+            map.put("id", h.getId());
+            map.put("name", h.getName());
+            map.put("price", h.getBasePrice());
+            map.put("rooms", h.getNumRooms());
+            map.put("guests", h.getMaxGuests());
+            map.put("description", h.getDescription());
+            map.put("address", h.getAddress());
+            map.put("city", h.getCity());
+            map.put("status", h.getStatus() != null ? h.getStatus().toLowerCase() : "pending");
+            
+            return ResponseEntity.ok(map);
+        } else {
+            return ResponseEntity.status(404).body(Map.of("success", false, "message", "Không tìm thấy Homestay"));
+        }
+    }
+
     @PutMapping("/{id}/status")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> updateHomestayStatus(@PathVariable Long id, @RequestBody Map<String, String> payload) {
@@ -121,6 +144,54 @@ public class AdminHomestayController {
             return ResponseEntity.ok(Map.of("success", true, "message", "Cập nhật trạng thái thành công"));
         } else {
             return ResponseEntity.status(404).body(Map.of("success", false, "message", "Không tìm thấy Homestay"));
+        }
+    }
+
+    @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> updateHomestayDetails(@PathVariable Long id, @RequestBody Map<String, Object> payload) {
+        Optional<Homestay> opt = homestayRepository.findById(id);
+        if (opt.isPresent()) {
+            Homestay h = opt.get();
+            if (payload.containsKey("name")) h.setName((String) payload.get("name"));
+            if (payload.containsKey("price")) h.setBasePrice(new java.math.BigDecimal(payload.get("price").toString()));
+            if (payload.containsKey("rooms")) h.setNumRooms(Integer.valueOf(payload.get("rooms").toString()));
+            if (payload.containsKey("guests")) h.setMaxGuests(Integer.valueOf(payload.get("guests").toString()));
+            if (payload.containsKey("description")) h.setDescription((String) payload.get("description"));
+            if (payload.containsKey("address")) h.setAddress((String) payload.get("address"));
+            if (payload.containsKey("city")) h.setCity((String) payload.get("city"));
+            
+            homestayRepository.save(h);
+            return ResponseEntity.ok(Map.of("success", true, "message", "Cập nhật thông tin thành công"));
+        } else {
+            return ResponseEntity.status(404).body(Map.of("success", false, "message", "Không tìm thấy Homestay"));
+        }
+    }
+
+    @PostMapping
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> createHomestay(@RequestBody Map<String, Object> payload) {
+        try {
+            Homestay h = new Homestay();
+            if (payload.containsKey("name")) h.setName((String) payload.get("name"));
+            if (payload.containsKey("price")) h.setBasePrice(new java.math.BigDecimal(payload.get("price").toString()));
+            if (payload.containsKey("rooms")) h.setNumRooms(Integer.valueOf(payload.get("rooms").toString()));
+            if (payload.containsKey("guests")) h.setMaxGuests(Integer.valueOf(payload.get("guests").toString()));
+            if (payload.containsKey("description")) h.setDescription((String) payload.get("description"));
+            if (payload.containsKey("address")) h.setAddress((String) payload.get("address"));
+            if (payload.containsKey("city")) h.setCity((String) payload.get("city"));
+            
+            // Set default values for a new homestay
+            h.setStatus("pending");
+            h.setCreatedAt(java.time.LocalDateTime.now());
+            // Normally you would get the owner ID from the authenticated user or assign one.
+            // For now we'll set it to 1L or handle appropriately if ownerId is passed
+            h.setOwnerId(1L); 
+            
+            homestayRepository.save(h);
+            return ResponseEntity.ok(Map.of("success", true, "message", "Thêm homestay thành công", "id", h.getId()));
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(Map.of("success", false, "message", "Lỗi server: " + e.getMessage()));
         }
     }
 }

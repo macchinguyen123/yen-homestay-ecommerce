@@ -433,3 +433,31 @@
 .btn-pass:hover {
     background: #166534;
 }
+
+/* Toast Floating Notice */
+.manage-toast {
+    position: fixed;
+    bottom: 30px;
+    right: 30px;
+    background: #0F172A;
+    color: #FFF;
+    padding: 14px 20px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+    z-index: 9999;
+    transform: translateY(100px);
+    opacity: 0;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    font-weight: 500;
+}
+
+.manage-toast.show {
+    transform: translateY(0);
+    opacity: 1;
+}
+
+.manage-toast.success .material-symbols-outlined { color: #10B981; }
+.manage-toast.error .material-symbols-outlined { color: #EF4444; }

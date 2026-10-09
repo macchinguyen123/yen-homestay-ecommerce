@@ -1,16 +1,117 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import './HomestayEdit.css';
 
 export default function HomestayEdit() {
+    const { id } = useParams();
     const navigate = useNavigate();
     const [status, setStatus] = useState('active');
+    const [loading, setLoading] = useState(false);
     
+    const [formData, setFormData] = useState({
+        name: '',
+        price: '',
+        rooms: '',
+        guests: '',
+        description: '',
+        address: '',
+        city: ''
+    });
+
+    // Toast state
+    const [toast, setToast] = useState({ show: false, msg: '', type: 'success' });
+    
+    const showToast = (msg, type = 'success') => {
+        setToast({ show: true, msg, type });
+        setTimeout(() => setToast({ show: false, msg: '', type: 'success' }), 3000);
+    };
+
     const [kycDocs, setKycDocs] = useState({
         license: false,
         ownership: false,
         cccd: false
     });
+
+    useEffect(() => {
+        if (id) {
+            fetchHomestay();
+        }
+    }, [id]);
+
+    const fetchHomestay = async () => {
+        setLoading(true);
+        try {
+            const token = localStorage.getItem('token');
+            const res = await fetch(`http://localhost:8081/api/admin/homestays/${id}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (res.ok) {
+                const data = await res.json();
+                setFormData({
+                    name: data.name || '',
+                    price: data.price || '',
+                    rooms: data.rooms || '',
+                    guests: data.guests || '',
+                    description: data.description || '',
+                    address: data.address || '',
+                    city: data.city || ''
+                });
+                setStatus(data.status || 'active');
+            }
+        } catch (error) {
+            console.error(error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleSave = async () => {
+        try {
+            const token = localStorage.getItem('token');
+            const url = id 
+                ? `http://localhost:8081/api/admin/homestays/${id}`
+                : `http://localhost:8081/api/admin/homestays`;
+            const method = id ? 'PUT' : 'POST';
+
+            const res = await fetch(url, {
+                method: method,
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(formData)
+            });
+            
+            const data = await res.json();
+            
+            if (res.ok) {
+                const targetId = id || data.id;
+                // Also save status if updating
+                if (targetId) {
+                    await fetch(`http://localhost:8081/api/admin/homestays/${targetId}/status`, {
+                        method: 'PUT',
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ status })
+                    });
+                }
+                
+                showToast('Lưu thông tin thành công!', 'success');
+                setTimeout(() => navigate('/admin/homestays'), 1500);
+            } else {
+                let errStr = 'Có lỗi xảy ra khi lưu!';
+                try {
+                    if (data.message) errStr += ' ' + data.message;
+                } catch(e) {}
+                showToast(errStr, 'error');
+            }
+        } catch (error) {
+            console.error(error);
+            showToast('Lỗi kết nối máy chủ!', 'error');
+        }
+    };
 
     const handleStatusChange = (e) => {
         setStatus(e.target.value);
@@ -38,7 +139,7 @@ export default function HomestayEdit() {
                     <button className="btn-back" onClick={() => navigate(-1)}>
                         <span className="material-symbols-outlined">arrow_back</span> Quay lại
                     </button>
-                    <button className="btn-save-header">
+                    <button className="btn-save-header" onClick={handleSave}>
                         <span className="material-symbols-outlined">save</span> Lưu thay đổi
                     </button>
                 </div>
@@ -107,10 +208,10 @@ export default function HomestayEdit() {
                                 <textarea className="form-textarea" rows="3" placeholder="Ghi chú chỉ hiển thị cho admin..."></textarea>
                             </div>
                             <div className="action-btns-group">
-                                <button className="btn-approve-lg">
+                                <button className="btn-approve-lg" onClick={() => setStatus('active')}>
                                     <span className="material-symbols-outlined">check_circle</span> Duyệt lên sàn
                                 </button>
-                                <button className="btn-suspend-lg">
+                                <button className="btn-suspend-lg" onClick={() => setStatus('suspended')}>
                                     <span className="material-symbols-outlined">block</span> Tạm khóa
                                 </button>
                             </div>
@@ -141,19 +242,19 @@ export default function HomestayEdit() {
                             <div className="form-grid-2">
                                 <div className="form-group full-span">
                                     <label className="form-label">Tên Homestay <span className="required">*</span></label>
-                                    <input type="text" className="form-input" placeholder="Tên homestay hiển thị..." defaultValue="Nhà Mây Mai Châu" />
+                                    <input type="text" className="form-input" placeholder="Tên homestay hiển thị..." value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
                                 </div>
                                 <div className="form-group">
                                     <label className="form-label">Giá cơ bản (đ/đêm) <span className="required">*</span></label>
-                                    <input type="number" className="form-input" placeholder="450000" defaultValue="450000" />
+                                    <input type="number" className="form-input" placeholder="450000" value={formData.price} onChange={e => setFormData({...formData, price: e.target.value})} />
                                 </div>
                                 <div className="form-group">
                                     <label className="form-label">Số phòng</label>
-                                    <input type="number" className="form-input" placeholder="5" min="1" defaultValue="4" />
+                                    <input type="number" className="form-input" placeholder="5" min="1" value={formData.rooms} onChange={e => setFormData({...formData, rooms: e.target.value})} />
                                 </div>
                                 <div className="form-group">
                                     <label className="form-label">Sức chứa tối đa (khách)</label>
-                                    <input type="number" className="form-input" placeholder="12" min="1" defaultValue="10" />
+                                    <input type="number" className="form-input" placeholder="12" min="1" value={formData.guests} onChange={e => setFormData({...formData, guests: e.target.value})} />
                                 </div>
                                 <div className="form-group">
                                     <label className="form-label">Giờ Check-in</label>
@@ -166,7 +267,7 @@ export default function HomestayEdit() {
                             </div>
                             <div className="form-group">
                                 <label className="form-label">Mô tả ngắn</label>
-                                <textarea className="form-textarea" rows="3" placeholder="Mô tả nổi bật của homestay..." defaultValue="Nằm giữa đồi chè thơ mộng..."></textarea>
+                                <textarea className="form-textarea" rows="3" placeholder="Mô tả nổi bật của homestay..." value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})}></textarea>
                             </div>
                             <div className="form-group">
                                 <label className="form-label">URL ảnh đại diện</label>
@@ -180,23 +281,11 @@ export default function HomestayEdit() {
                             <div className="form-grid-2">
                                 <div className="form-group full-span">
                                     <label className="form-label">Địa chỉ đầy đủ</label>
-                                    <input type="text" className="form-input" placeholder="Số nhà, đường..." defaultValue="12 Bản Lác" />
+                                    <input type="text" className="form-input" placeholder="Số nhà, đường..." value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} />
                                 </div>
                                 <div className="form-group">
-                                    <label className="form-label">Phường / Xã / Thôn / Bản</label>
-                                    <input type="text" className="form-input" placeholder="Phường/Xã/Thôn..." defaultValue="Chiềng Châu" />
-                                </div>
-                                <div className="form-group">
-                                    <label className="form-label">Quận / Huyện</label>
-                                    <input type="text" className="form-input" placeholder="Quận/Huyện..." defaultValue="Mai Châu" />
-                                </div>
-                                <div className="form-group">
-                                    <label className="form-label">Tỉnh / Thành phố</label>
-                                    <input type="text" className="form-input" placeholder="Tỉnh/Thành phố..." defaultValue="Hòa Bình" />
-                                </div>
-                                <div className="form-group">
-                                    <label className="form-label">Khu vực du lịch</label>
-                                    <select className="form-select" defaultValue="Mai Châu">
+                                    <label className="form-label">Khu vực / Tỉnh thành</label>
+                                    <select className="form-select" value={formData.city || ''} onChange={e => setFormData({...formData, city: e.target.value})}>
                                         <option value="">-- Chọn khu vực --</option>
                                         <option value="Hà Giang">Hà Giang</option>
                                         <option value="Sapa">Sapa</option>
@@ -313,10 +402,18 @@ export default function HomestayEdit() {
                 <span className="save-bar-info">Chỉnh sửa thông tin homestay</span>
                 <div className="save-bar-btns">
                     <button className="btn-cancel-bar" onClick={() => navigate(-1)}>Hủy</button>
-                    <button className="btn-save-bar">
+                    <button className="btn-save-bar" onClick={handleSave}>
                         <span className="material-symbols-outlined">save</span> Lưu thay đổi
                     </button>
                 </div>
+            </div>
+
+            {/* Toast Notification UI */}
+            <div className={`manage-toast ${toast.show ? 'show' : ''} ${toast.type}`}>
+                <span className="material-symbols-outlined">
+                    {toast.type === 'success' ? 'check_circle' : 'error'}
+                </span>
+                <span>{toast.msg}</span>
             </div>
         </div>
     );

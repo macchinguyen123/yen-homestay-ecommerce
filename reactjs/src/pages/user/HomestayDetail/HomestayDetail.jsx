@@ -723,6 +723,7 @@ export default function HomestayDetail() {
 
   // State thông tin homestay và danh sách phòng từ Database
   const [homestay, setHomestay] = useState(null);
+  const [loading, setLoading] = useState(true);
   const [rooms, setRooms] = useState(roomsData);
 
   // Đánh giá thực tế lấy trực tiếp từ bảng reviews & users trong CSDL
@@ -766,25 +767,30 @@ export default function HomestayDetail() {
 
   // Tải thông tin homestay và danh sách phòng thật từ SAMPLE_HOMESTAYS hoặc Database
   useEffect(() => {
+    window.scrollTo(0, 0);
     let isMounted = true;
     const fetchHomestayAndRooms = async () => {
+      setLoading(true);
       try {
         let currentHomestay = null;
         let homestayIdNum = id && !isNaN(id) ? Number(id) : null;
 
-        // 1. Kiểm tra trước trong SAMPLE_HOMESTAYS (16 homestays chuẩn TMDT)
-        if (id) {
+        // 1. Ưu tiên tải từ database trước nếu id là số
+        if (homestayIdNum) {
+          try {
+            currentHomestay = await homestayService.getHomestayById(homestayIdNum);
+          } catch (error) {
+            console.error("Error fetching homestay from DB:", error);
+          }
+        }
+
+        // 2. Nếu không tìm thấy trong database, tìm trong SAMPLE_HOMESTAYS
+        if (!currentHomestay && id) {
           currentHomestay = SAMPLE_HOMESTAYS.find(
             (h) => String(h.id) === String(id) || 
                    h.name.toLowerCase() === decodeURIComponent(id).toLowerCase()
           );
         }
-
-        // 2. Nếu không tìm thấy trong SAMPLE_HOMESTAYS và id là số, tải từ database
-        if (!currentHomestay && homestayIdNum) {
-          currentHomestay = await homestayService.getHomestayById(homestayIdNum);
-        }
-
         // 3. Nếu chưa có, tìm trong tất cả homestays từ database
         if (!currentHomestay) {
           const allDbHomestays = await homestayService.getAllHomestays();
@@ -824,6 +830,8 @@ export default function HomestayDetail() {
         }
       } catch (err) {
         console.warn('Lỗi khi tải chi tiết homestay & phòng:', err);
+      } finally {
+        if (isMounted) setLoading(false);
       }
     };
 
@@ -965,6 +973,15 @@ export default function HomestayDetail() {
   const hostName = homestay?.ownerName || homestay?.hostName || 'Trần Văn Hùng';
   const hostAvatar = homestay?.ownerAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=240&q=80';
   const hostBio = homestay?.ownerBio || `Xin chào! Tôi là ${hostName}, người sáng lập và quản lý homestay. Rất vui được đón tiếp quý khách đến nghỉ dưỡng và tận hưởng những ngày bình yên.`;
+
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', flexDirection: 'column', color: '#15803D' }}>
+        <i className="bi bi-arrow-repeat" style={{ animation: 'spin 1s linear infinite', fontSize: '2rem', marginBottom: '16px' }} />
+        <h2>Đang tải thông tin homestay...</h2>
+      </div>
+    );
+  }
 
   return (
     <div className="hd-page">

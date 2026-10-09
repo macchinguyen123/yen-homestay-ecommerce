@@ -37,15 +37,7 @@ export default function Header() {
           <img src={logoImg} alt="YÊN Logo" className="yen-logo-img" />
         </Link>
 
-        {/* Mobile Toggle Button */}
-        <button
-          className="yen-mobile-toggle"
-          onClick={toggleMobileMenu}
-          aria-label="Toggle Menu"
-          type="button"
-        >
-          <i className={`bi ${mobileMenuOpen ? 'bi-x-lg' : 'bi-list'}`} />
-        </button>
+
 
         {/* Navigation Menu */}
         <nav>
