@@ -733,12 +733,11 @@
 }
 
 .festival-tabs {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
-  overflow-x: auto;
   margin: 20px 0;
   padding-bottom: 4px;
-  scrollbar-width: thin;
 }
 
 .festival-tab-btn {
@@ -754,8 +753,12 @@
   font-weight: 700;
   cursor: pointer;
   white-space: nowrap;
-  flex: 0 0 auto;
-  min-width: max-content;
+  min-width: 0;
+  width: 100%;
+  justify-content: center;
+  text-align: center;
+  white-space: normal;
+  overflow-wrap: anywhere;
   transition: all 0.2s ease;
 }
 
@@ -833,6 +836,22 @@
   margin: 8px 0 0;
   line-height: 1.5;
   overflow-wrap: anywhere;
+}
+
+.festival-loading {
+  min-height: 90px;
+  display: grid;
+  place-items: center;
+  color: #64748B;
+  font-size: 0.95rem;
+}
+
+@media (max-width: 900px) {
+  .festival-tabs { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+@media (max-width: 640px) {
+  .festival-tabs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 /* --- 6. HOMESTAY CARDS GLOBAL --- */

@@ -112,6 +112,8 @@ export default function Homepage() {
 
   // Festival Section State
   const [activeFestivalKey, setActiveFestivalKey] = useState('diff');
+  const [databaseFestivals, setDatabaseFestivals] = useState([]);
+  const [festivalLoading, setFestivalLoading] = useState(true);
   const [visibleFestivalCount, setVisibleFestivalCount] = useState(4);
 
   // Favorites Filter City State
@@ -133,6 +135,27 @@ export default function Homepage() {
     favoritesHomestays: FAVORITES_HOMESTAYS
   });
   const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch('http://localhost:8081/api/public/festivals')
+      .then(response => response.ok ? response.json() : Promise.reject(new Error('Festival API unavailable')))
+      .then(rows => {
+        if (cancelled) return;
+        if (!Array.isArray(rows)) { setDatabaseFestivals([]); return; }
+        const mapped = rows.map(festival => ({
+          ...festival,
+          key: String(festival.id),
+          badge: festival.badgeInfo || 'Sắp diễn ra',
+          date: [festival.startDate, festival.endDate].filter(Boolean).join(' – '),
+          location: [festival.location, festival.city].filter(Boolean).join(', '),
+          homestays: festival.homestays || [],
+        }));
+        setDatabaseFestivals(mapped);
+        setActiveFestivalKey(mapped[0].key);
+      }).catch(() => {}).finally(() => { if (!cancelled) setFestivalLoading(false); });
+    return () => { cancelled = true; };
+  }, []);
 
   const expGridRef = useRef(null);
 
@@ -280,7 +303,8 @@ export default function Homepage() {
     return h.city === favCityFilter;
   });
 
-  const activeFestData = homeData.festivals[activeFestivalKey] || homeData.festivals.diff || FESTIVALS.diff;
+  const festivalTabs = databaseFestivals;
+  const activeFestData = databaseFestivals.find(festival => festival.key === activeFestivalKey) || databaseFestivals[0];
 
   return (
     <div className="homepage-wrapper">
@@ -605,24 +629,18 @@ export default function Homepage() {
             <span style={{ color: '#15803D' }}><i className="bi bi-house-heart-fill" /> Homestay gần đó dễ dàng di chuyển</span>
           </div>
 
-          <div className="festival-tabs">
-            <button
-              type="button"
-              className={`festival-tab-btn ${activeFestivalKey === 'diff' ? 'active' : ''}`}
-              onClick={() => { setActiveFestivalKey('diff'); setVisibleFestivalCount(4); }}
-            >
-              <i className="bi bi-fire" /> Lễ Hội Pháo Hoa Quốc Tế DIFF (Đà Nẵng)
-            </button>
-            <button
-              type="button"
-              className={`festival-tab-btn ${activeFestivalKey === 'dalat' ? 'active' : ''}`}
-              onClick={() => { setActiveFestivalKey('dalat'); setVisibleFestivalCount(4); }}
-            >
-              <i className="bi bi-flower1" /> Festival Hoa Đà Lạt (Lâm Viên)
-            </button>
-          </div>
+          {festivalLoading && <div className="festival-loading">Đang tải lễ hội...</div>}
+          {!festivalLoading && festivalTabs.length === 0 && <div className="festival-loading">Chưa có dữ liệu lễ hội.</div>}
+          {!festivalLoading && festivalTabs.length > 0 && <div className="festival-tabs">
+            {festivalTabs.map(festival => (
+              <button key={festival.key} type="button" className={`festival-tab-btn ${activeFestivalKey === festival.key ? 'active' : ''}`} onClick={() => { setActiveFestivalKey(festival.key); setVisibleFestivalCount(4); }}>
+                <i className="bi bi-calendar-event" /> {festival.name}
+              </button>
+            ))}
+          </div>}
 
-          <div className="festival-banner-card">
+          {!festivalLoading && activeFestData && <><div className="festival-banner-card">
+            <div className="festival-banner-backdrop" style={activeFestData.imageUrl ? { backgroundImage: `url(${activeFestData.imageUrl})` } : undefined} />
             <div>
               <span className="fest-badge">{activeFestData.badge}</span>
               <h3 className="fest-name">{activeFestData.name}</h3>
@@ -669,9 +687,9 @@ export default function Homepage() {
                 </div>
               </div>
             ))}
-          </div>
+          </div></>}
 
-          {visibleFestivalCount < (activeFestData.homestays || []).length && (
+          {activeFestData && visibleFestivalCount < (activeFestData.homestays || []).length && (
             <div style={{ textAlign: 'center', marginTop: '32px' }}>
               <button 
                 onClick={() => setVisibleFestivalCount(prev => prev + 4)}
