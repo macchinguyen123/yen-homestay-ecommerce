@@ -649,12 +649,20 @@
   border-radius: var(--mh-radius-lg);
   width: 100%;
   max-width: 680px;
-  max-height: 90vh;
+  max-height: 85vh;
   display: flex;
   flex-direction: column;
   box-shadow: var(--mh-shadow-lg);
   overflow: hidden;
   animation: mh-scale-up 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.mh-modal-box form {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .mh-modal-box.modal-sm { max-width: 480px; }
@@ -672,6 +680,7 @@
   align-items: flex-start;
   justify-content: space-between;
   border-bottom: 1px solid var(--mh-surface-container);
+  flex-shrink: 0;
 }
 
 .mh-modal-header h3 {
@@ -708,7 +717,28 @@
 .mh-modal-body {
   padding: 20px 24px;
   overflow-y: auto;
+  max-height: calc(85vh - 130px);
   flex: 1;
+  min-height: 0;
+}
+
+/* Custom Scrollbar for Modal Body */
+.mh-modal-body::-webkit-scrollbar {
+  width: 6px;
+}
+
+.mh-modal-body::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 4px;
+}
+
+.mh-modal-body::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+.mh-modal-body::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
 }
 
 .mh-modal-footer {
@@ -719,6 +749,7 @@
   justify-content: flex-end;
   gap: 10px;
   background-color: #fafbfc;
+  flex-shrink: 0;
 }
 
 /* Form Controls Inside Modals */
@@ -882,4 +913,41 @@
 .mh-alert-box.info {
   background-color: var(--mh-surface-container-low);
   color: var(--mh-primary-container);
+}
+
+/* ── Modern Search Input Box Wrapper ── */
+.mh-search-box-wrap {
+  display: flex;
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid #c0c8c2;
+  border-radius: 20px;
+  padding: 0 14px;
+  width: 280px;
+  max-width: 100%;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  transition: all 0.2s ease;
+}
+
+.mh-search-box-wrap:focus-within {
+  border-color: #154332;
+  box-shadow: 0 0 0 3px rgba(21, 67, 50, 0.12);
+}
+
+.mh-search-box-wrap input {
+  flex: 1;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  padding: 8px 0 !important;
+  font-size: 13px !important;
+  color: #0b1c30 !important;
+}
+
+.mh-search-box-wrap input:focus,
+.mh-search-box-wrap input:active {
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
 }

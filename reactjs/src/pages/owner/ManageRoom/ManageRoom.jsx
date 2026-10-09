@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import './ManageRoom.css';
 import { initialRoomsData } from './manageRoomData';
 
@@ -7,6 +7,53 @@ export default function ManageRoom() {
   const [viewMode, setViewMode] = useState('both'); // 'cards' | 'timeline' | 'both'
   const [activeTab, setActiveTab] = useState('all'); // 'all' | 'occupied' | 'available' | 'maintenance'
   const [searchQuery, setSearchQuery] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  // Fetch real rooms from backend DB
+  React.useEffect(() => {
+    fetchRealRooms();
+  }, []);
+
+  const fetchRealRooms = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch('http://localhost:8081/api/public/homestays');
+      if (response.ok) {
+        const data = await response.json();
+        if (data && data.length > 0) {
+          const allFetchedRooms = [];
+          data.forEach(hs => {
+            if (hs.rooms && hs.rooms.length > 0) {
+              hs.rooms.forEach(r => {
+                allFetchedRooms.push({
+                  code: `P.${r.id || Math.floor(Math.random()*100+100)}`,
+                  name: `${r.name || r.roomName} (${hs.name})`,
+                  type: r.roomType || 'Garden View',
+                  capacity: r.capacity || 2,
+                  capacityLabel: `${r.capacity || 2} khách`,
+                  bed: r.specs?.beds || '1 Giường đôi',
+                  floor: 'Tầng 1',
+                  price: r.price || r.pricePerNight || 850000,
+                  status: (r.status || 'AVAILABLE').toLowerCase() === 'available' ? 'available' : ((r.status || '').toLowerCase() === 'occupied' ? 'occupied' : 'available'),
+                  description: r.description || `Không gian nghỉ dưỡng tại ${hs.name}`,
+                  amenities: r.amenities || ['Wifi', 'Điều hòa', 'Phòng tắm riêng'],
+                  image: r.thumb || r.primaryImage || hs.image || 'https://images.unsplash.com/photo-1590490360182-c33d57733427?auto=format&fit=crop&w=800&q=80',
+                  stay: 'Phòng sạch sẽ sẵn sàng đón khách'
+                });
+              });
+            }
+          });
+          if (allFetchedRooms.length > 0) {
+            setRoomsList(allFetchedRooms);
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Lỗi nạp phòng từ CSDL:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Trạng thái các Modals
   const [selectedRoom, setSelectedRoom] = useState(null);

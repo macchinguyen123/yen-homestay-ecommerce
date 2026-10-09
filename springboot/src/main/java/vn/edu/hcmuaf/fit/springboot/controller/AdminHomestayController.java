@@ -261,17 +261,29 @@ public class AdminHomestayController {
             if (payload.containsKey("name") && payload.get("name") != null) h.setName((String) payload.get("name"));
             if (payload.containsKey("price") && payload.get("price") != null && !payload.get("price").toString().trim().isEmpty()) {
                 h.setBasePrice(new java.math.BigDecimal(payload.get("price").toString()));
+            } else {
+                h.setBasePrice(new java.math.BigDecimal("890000"));
             }
             if (payload.containsKey("rooms") && payload.get("rooms") != null && !payload.get("rooms").toString().trim().isEmpty()) {
                 h.setNumRooms(Integer.valueOf(payload.get("rooms").toString()));
+            } else {
+                h.setNumRooms(6);
             }
             if (payload.containsKey("guests") && payload.get("guests") != null && !payload.get("guests").toString().trim().isEmpty()) {
                 h.setMaxGuests(Integer.valueOf(payload.get("guests").toString()));
+            } else {
+                h.setMaxGuests(10);
             }
             if (payload.containsKey("description") && payload.get("description") != null) h.setDescription((String) payload.get("description"));
             if (payload.containsKey("address") && payload.get("address") != null) h.setAddress((String) payload.get("address"));
             if (payload.containsKey("city") && payload.get("city") != null) h.setCity((String) payload.get("city"));
             
+            if (payload.containsKey("categoryId") && payload.get("categoryId") != null && !payload.get("categoryId").toString().trim().isEmpty()) {
+                h.setCategoryId(Long.valueOf(payload.get("categoryId").toString()));
+            } else {
+                h.setCategoryId(1L); // Default category_id 1 to prevent DB NOT NULL constraint violation
+            }
+
             if (payload.containsKey("status") && payload.get("status") != null) {
                 String st = ((String) payload.get("status")).trim();
                 if ("suspended".equalsIgnoreCase(st) || "locked".equalsIgnoreCase(st) || "inactive".equalsIgnoreCase(st) || "tạm khóa".equalsIgnoreCase(st)) {
@@ -291,8 +303,24 @@ public class AdminHomestayController {
             }
             
             homestayRepository.save(h);
+
+            // Save Image for new homestay
+            String imgUrl = null;
+            if (payload.containsKey("img") && payload.get("img") != null) imgUrl = (String) payload.get("img");
+            else if (payload.containsKey("image") && payload.get("image") != null) imgUrl = (String) payload.get("image");
+
+            if (imgUrl != null && !imgUrl.trim().isEmpty()) {
+                HomestayImage newImg = HomestayImage.builder()
+                        .homestayId(h.getId())
+                        .imageUrl(imgUrl.trim())
+                        .isPrimary(true)
+                        .build();
+                homestayImageRepository.save(newImg);
+            }
+
             return ResponseEntity.ok(Map.of("success", true, "message", "Thêm homestay thành công", "id", h.getId()));
         } catch (Exception e) {
+            e.printStackTrace();
             return ResponseEntity.status(500).body(Map.of("success", false, "message", "Lỗi server: " + e.getMessage()));
         }
     }
