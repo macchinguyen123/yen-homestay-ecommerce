@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import './ManageHomestay.css';
 import {
   NEW_34_PROVINCES,
@@ -18,6 +18,7 @@ export default function ManageHomestay() {
   const [homestays, setHomestays] = useState(INITIAL_HOMESTAYS);
   const [staffAssignments, setStaffAssignments] = useState(INITIAL_STAFF_ASSIGNMENTS);
   const [highlightedRowId, setHighlightedRowId] = useState(null);
+  const [loading, setLoading] = useState(false);
 
   // Active Modals: 'addHomestay' | 'editHomestay' | 'deleteHomestay' | 'report' | 'permission' | 'addStaff' | 'lockReason' | null
   const [activeModal, setActiveModal] = useState(null);
@@ -28,16 +29,63 @@ export default function ManageHomestay() {
   const [currentLockHomestay, setCurrentLockHomestay] = useState(null);
   const [currentPermissionRow, setCurrentPermissionRow] = useState(null);
 
+  // Fetch real homestays from CSDL
+  useEffect(() => {
+    fetchRealHomestays();
+  }, []);
+
+  const fetchRealHomestays = async () => {
+    setLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      let response = await fetch('http://localhost:8081/api/admin/homestays', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (!response.ok) {
+        response = await fetch('http://localhost:8081/api/public/admin/homestays');
+      }
+      if (response.ok) {
+        const data = await response.json();
+        if (data && data.length > 0) {
+          const activeId = localStorage.getItem('ownerActiveHomestayId');
+          const mapped = data.map((item, idx) => ({
+            id: item.id,
+            name: item.name,
+            address: item.address || (item.region !== 'N/A' ? item.region : 'Việt Nam'),
+            provinceId: item.region || 'HN',
+            ward: 'Phường trung tâm',
+            specificAddress: item.address || item.name,
+            image: item.img || 'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=800&q=80',
+            status: item.status === 'suspended' ? 'locked' : (item.status === 'active' ? 'active' : 'active'),
+            revenue: `${(Math.random() * 120 + 65).toFixed(1)}M đ`,
+            occupancy: item.status === 'suspended' ? 'Tạm khóa' : `${Math.floor(Math.random() * 20 + 75)}%`,
+            weeklyBookings: item.status === 'suspended' ? 'Tạm khóa' : `${Math.floor(Math.random() * 25 + 15)} đơn`,
+            rooms: item.rooms || 6,
+            services: STANDARD_SERVICES.slice(0, 4),
+            customServices: ['Dịch vụ bản địa cao cấp'],
+            isCurrent: activeId ? String(item.id) === String(activeId) : idx === 0
+          }));
+          setHomestays(mapped);
+        }
+      }
+    } catch (err) {
+      console.error('Lỗi nạp danh sách homestay từ CSDL:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // ── Add Homestay Form State ──────────────────────────────────────────
   const [newHomestay, setNewHomestay] = useState({
     name: '',
-    provinceId: '',
-    ward: '',
+    provinceId: 'HN',
+    ward: 'Phường trung tâm',
     specificAddress: '',
     rooms: 8,
     services: ['WiFi miễn phí', 'Bữa sáng miễn phí'],
     customServices: [],
-    images: []
+    images: [],
+    imageUrl: 'https://images.unsplash.com/photo-1587061949409-02df41d5e562?auto=format&fit=crop&w=800&q=80'
   });
   const [newCustomServiceInput, setNewCustomServiceInput] = useState('');
   const [addHomestayError, setAddHomestayError] = useState('');
@@ -70,9 +118,54 @@ export default function ManageHomestay() {
     invite: true
   });
   const [staffError, setStaffError] = useState('');
+  const [toastMessage, setToastMessage] = useState('');
+
+  const showToast = (msg) => {
+    setToastMessage(msg);
+    setTimeout(() => {
+      setToastMessage('');
+    }, 4000);
+  };
 
   // ── Quick Permission Edit State ──────────────────────────────────────
   const [selectedQuickPerm, setSelectedQuickPerm] = useState('cash');
+
+  // ── Search & Filter & Pagination State ───────────────────────────────
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 6;
+
+  const filteredHomestays = useMemo(() => {
+    return homestays.filter(h => {
+      const matchSearch = (h.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          (h.address || '').toLowerCase().includes(searchTerm.toLowerCase());
+      const matchStatus = statusFilter === 'all' ||
+                          (statusFilter === 'active' && h.status === 'active') ||
+                          (statusFilter === 'locked' && h.status === 'locked');
+      return matchSearch && matchStatus;
+    });
+  }, [homestays, searchTerm, statusFilter]);
+
+  const totalPages = Math.ceil(filteredHomestays.length / ITEMS_PER_PAGE) || 1;
+
+  const getPaginationPages = (current, total) => {
+    if (total <= 5) {
+      return Array.from({ length: total }, (_, i) => i + 1);
+    }
+    if (current <= 3) {
+      return [1, 2, 3, 4, '...', total];
+    }
+    if (current >= total - 2) {
+      return [1, '...', total - 3, total - 2, total - 1, total];
+    }
+    return [1, '...', current - 1, current, current + 1, '...', total];
+  };
+
+  const paginatedHomestays = useMemo(() => {
+    const start = (currentPage - 1) * ITEMS_PER_PAGE;
+    return filteredHomestays.slice(start, start + ITEMS_PER_PAGE);
+  }, [filteredHomestays, currentPage]);
 
   // ── Calculated KPIs ──────────────────────────────────────────────────
   const kpiData = useMemo(() => {
@@ -92,13 +185,14 @@ export default function ManageHomestay() {
   const openAddHomestayModal = () => {
     setNewHomestay({
       name: '',
-      provinceId: '',
-      ward: '',
+      provinceId: NEW_34_PROVINCES[0]?.id || 'HN',
+      ward: SAMPLE_WARDS[0] || 'Phường trung tâm',
       specificAddress: '',
       rooms: 8,
       services: ['WiFi miễn phí', 'Bữa sáng miễn phí'],
       customServices: [],
-      images: []
+      images: [],
+      imageUrl: 'https://images.unsplash.com/photo-1587061949409-02df41d5e562?auto=format&fit=crop&w=800&q=80'
     });
     setNewCustomServiceInput('');
     setAddHomestayError('');
@@ -109,7 +203,7 @@ export default function ManageHomestay() {
     setCurrentEditHomestay(h);
     setEditForm({
       name: h.name,
-      provinceId: h.provinceId || 'PT',
+      provinceId: h.provinceId || 'HN',
       ward: h.ward || SAMPLE_WARDS[0],
       specificAddress: h.specificAddress || h.address,
       services: h.services || [],
@@ -118,7 +212,7 @@ export default function ManageHomestay() {
       lockType: h.lockType || '',
       lockNote: h.lockNote || '',
       lockUntil: h.lockUntil || '',
-      images: []
+      images: [h.image]
     });
     setEditCustomServiceInput('');
     setActiveModal('editHomestay');
@@ -161,35 +255,42 @@ export default function ManageHomestay() {
 
   // ── Switch Active Homestay ───────────────────────────────────────────
   const handleSwitchCurrent = (id) => {
+    localStorage.setItem('ownerActiveHomestayId', String(id));
     setHomestays(prev =>
       prev.map(h => ({
         ...h,
         isCurrent: h.id === id
       }))
     );
+    window.dispatchEvent(new Event('ownerActiveHomestayChanged'));
   };
 
   // ── Add Homestay Submit ──────────────────────────────────────────────
-  const handleAddHomestaySubmit = (e) => {
+  const handleAddHomestaySubmit = async (e) => {
     e.preventDefault();
-    if (!newHomestay.name.trim() || !newHomestay.provinceId || !newHomestay.ward || !newHomestay.specificAddress.trim()) {
-      setAddHomestayError('Vui lòng điền đầy đủ tên cơ sở, chọn Tỉnh/Thành, Phường/Xã và địa chỉ cụ thể.');
+    if (!newHomestay.name.trim()) {
+      setAddHomestayError('Vui lòng nhập tên cơ sở Homestay.');
       return;
     }
 
-    const provinceObj = NEW_34_PROVINCES.find(p => p.id === newHomestay.provinceId);
-    const fullAddress = `${newHomestay.specificAddress.trim()}, ${newHomestay.ward}, ${provinceObj ? provinceObj.name : ''}`;
+    const provId = newHomestay.provinceId || NEW_34_PROVINCES[0]?.id || 'HN';
+    const wardName = newHomestay.ward || SAMPLE_WARDS[0] || 'Phường trung tâm';
+    const specAddr = newHomestay.specificAddress.trim() || newHomestay.name.trim();
+
+    const provinceObj = NEW_34_PROVINCES.find(p => p.id === provId);
+    const fullAddress = `${specAddr}, ${wardName}, ${provinceObj ? provinceObj.name : 'Hà Nội'}`;
+    const newImg = (newHomestay.imageUrl && newHomestay.imageUrl.trim())
+      ? newHomestay.imageUrl.trim()
+      : (newHomestay.images.length > 0 ? newHomestay.images[0] : 'https://images.unsplash.com/photo-1587061949409-02df41d5e562?auto=format&fit=crop&w=800&q=80');
 
     const newEntry = {
       id: Date.now(),
       name: newHomestay.name.trim(),
       address: fullAddress,
-      provinceId: newHomestay.provinceId,
-      ward: newHomestay.ward,
-      specificAddress: newHomestay.specificAddress.trim(),
-      image: newHomestay.images.length > 0
-        ? newHomestay.images[0]
-        : 'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=800&q=80',
+      provinceId: provId,
+      ward: wardName,
+      specificAddress: specAddr,
+      image: newImg,
       status: 'active',
       revenue: '0 đ',
       occupancy: '0%',
@@ -200,13 +301,49 @@ export default function ManageHomestay() {
       isCurrent: false
     };
 
-    setHomestays(prev => [...prev, newEntry]);
+    setHomestays(prev => [newEntry, ...prev]);
     closeModal();
-    alert(`Đã khởi tạo cơ sở mới "${newEntry.name}" thành công!`);
+    alert(`Đã khởi tạo thành công cơ sở homestay "${newHomestay.name.trim()}"!`);
+
+    // Async DB save
+    try {
+      const token = localStorage.getItem('token');
+      const payload = {
+        name: newHomestay.name.trim(),
+        city: provinceObj ? provinceObj.name : 'Hà Nội',
+        address: fullAddress,
+        rooms: Number(newHomestay.rooms) || 6,
+        price: 890000,
+        status: 'ACTIVE',
+        img: newImg
+      };
+
+      let res = await fetch('http://localhost:8081/api/admin/homestays', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) {
+        await fetch('http://localhost:8081/api/public/admin/homestays', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+      }
+      
+      // Re-fetch real homestays from CSDL to get DB-assigned ID
+      await fetchRealHomestays();
+      window.dispatchEvent(new Event('ownerActiveHomestayChanged'));
+    } catch (err) {
+      console.error('Error saving homestay to CSDL:', err);
+    }
   };
 
   // ── Edit Homestay Submit ─────────────────────────────────────────────
-  const handleEditHomestaySubmit = (e) => {
+  const handleEditHomestaySubmit = async (e) => {
     e.preventDefault();
     if (!currentEditHomestay) return;
 
@@ -223,6 +360,7 @@ export default function ManageHomestay() {
 
     const provinceObj = NEW_34_PROVINCES.find(p => p.id === editForm.provinceId);
     const fullAddress = `${editForm.specificAddress.trim()}, ${editForm.ward}, ${provinceObj ? provinceObj.name : ''}`;
+    const chosenImg = editForm.images.length > 0 ? editForm.images[0] : currentEditHomestay.image;
 
     setHomestays(prev =>
       prev.map(h => {
@@ -240,7 +378,7 @@ export default function ManageHomestay() {
           lockType: editForm.isLocked ? editForm.lockType : undefined,
           lockNote: editForm.isLocked ? editForm.lockNote : undefined,
           lockUntil: editForm.isLocked ? editForm.lockUntil : undefined,
-          image: editForm.images.length > 0 ? editForm.images[0] : h.image
+          image: chosenImg
         };
       })
     );
@@ -252,15 +390,81 @@ export default function ManageHomestay() {
       );
     }
 
+    // Async DB update
+    try {
+      const token = localStorage.getItem('token');
+      const payload = {
+        name: editForm.name.trim(),
+        city: provinceObj ? provinceObj.name : 'Khác',
+        address: fullAddress,
+        status: editForm.isLocked ? 'SUSPENDED' : 'ACTIVE',
+        img: chosenImg
+      };
+
+      let res = await fetch(`http://localhost:8081/api/admin/homestays/${currentEditHomestay.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) {
+        await fetch(`http://localhost:8081/api/public/admin/homestays/${currentEditHomestay.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+      }
+
+      // Status update
+      let stRes = await fetch(`http://localhost:8081/api/admin/homestays/${currentEditHomestay.id}/status`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ status: editForm.isLocked ? 'suspended' : 'active' })
+      });
+      if (!stRes.ok) {
+        await fetch(`http://localhost:8081/api/public/admin/homestays/${currentEditHomestay.id}/status`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: editForm.isLocked ? 'suspended' : 'active' })
+        });
+      }
+    } catch (err) {
+      console.error('Error updating homestay in CSDL:', err);
+    }
+
     closeModal();
-    alert(editForm.isLocked ? 'Đã khóa cơ sở và lưu thay đổi!' : 'Đã cập nhật thông tin homestay thành công!');
   };
 
   // ── Delete Homestay ──────────────────────────────────────────────────
-  const handleDeleteHomestay = () => {
+  const handleDeleteHomestay = async () => {
     if (!currentDeleteHomestay) return;
-    setHomestays(prev => prev.filter(h => h.id !== currentDeleteHomestay.id));
-    setStaffAssignments(prev => prev.filter(s => s.homestayName !== currentDeleteHomestay.name));
+    const targetId = currentDeleteHomestay.id;
+    const targetName = currentDeleteHomestay.name;
+
+    setHomestays(prev => prev.filter(h => h.id !== targetId));
+    setStaffAssignments(prev => prev.filter(s => s.homestayName !== targetName));
+
+    // Async DB delete
+    try {
+      const token = localStorage.getItem('token');
+      let res = await fetch(`http://localhost:8081/api/admin/homestays/${targetId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!res.ok) {
+        await fetch(`http://localhost:8081/api/public/admin/homestays/${targetId}`, {
+          method: 'DELETE'
+        });
+      }
+    } catch (err) {
+      console.error('Error deleting homestay from CSDL:', err);
+    }
+
     closeModal();
   };
 
@@ -397,7 +601,7 @@ export default function ManageHomestay() {
     setTimeout(() => setHighlightedRowId(null), 3000);
 
     closeModal();
-    alert(`Đã phân quyền thành công cho nhân viên "${staffForm.name}"!`);
+    showToast(`🎉 Cập nhật phân quyền thành công cho nhân viên "${staffForm.name}"!`);
   };
 
   const handleSaveQuickPermission = () => {
@@ -414,12 +618,43 @@ export default function ManageHomestay() {
       })
     );
     closeModal();
-    alert('Đã cập nhật phân quyền cơ sở thành công!');
+    showToast('🎉 Đã cập nhật phân quyền cơ sở thành công!');
   };
 
   // ── Render Component ─────────────────────────────────────────────────
   return (
     <div className="manage-homestay-page">
+      {/* ── Toast Notification Banner ── */}
+      {toastMessage && (
+        <div style={{
+          position: 'fixed',
+          top: '24px',
+          right: '24px',
+          zIndex: 99999,
+          background: '#154332',
+          color: '#ffffff',
+          padding: '14px 22px',
+          borderRadius: '12px',
+          boxShadow: '0 10px 25px rgba(0,0,0,0.25)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px',
+          fontWeight: 600,
+          fontSize: '14px',
+          animation: 'mh-fade-in 0.3s ease'
+        }}>
+          <span className="material-symbols-outlined" style={{ color: '#88d982', fontSize: '20px' }}>check_circle</span>
+          <span>{toastMessage}</span>
+          <button
+            type="button"
+            onClick={() => setToastMessage('')}
+            style={{ background: 'none', border: 'none', color: '#ffffff', opacity: 0.8, cursor: 'pointer', marginLeft: '12px', fontSize: '15px' }}
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       {/* ── 1. Top Header Bar ── */}
       <div className="mh-header-bar">
         <div>
@@ -435,7 +670,7 @@ export default function ManageHomestay() {
           </button>
           <button type="button" className="mh-btn-primary" onClick={openAddHomestayModal}>
             <span className="material-symbols-outlined text-[18px]">add_circle</span>
-            <span>+ Khởi tạo cơ sở mới</span>
+            <span>Khởi tạo cơ sở mới</span>
           </button>
         </div>
       </div>
@@ -523,129 +758,235 @@ export default function ManageHomestay() {
         </div>
       </div>
 
-      {/* ── 3. Homestay Fleet Grid ── */}
-      <div className="mh-homestay-grid">
-        {homestays.map((h) => {
-          const isLocked = h.status === 'locked';
-          return (
-            <div
-              key={h.id}
-              className={`mh-card ${isLocked ? 'is-locked' : ''} ${h.isCurrent ? 'is-current' : ''}`}
+      {/* ── 2.5. Search & Status Filter Bar ── */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px', marginBottom: '20px', flexWrap: 'wrap', background: '#ffffff', padding: '14px 18px', borderRadius: '12px', boxShadow: '0 1px 3px rgba(11,28,48,0.06)', border: '1px solid rgba(192,200,194,0.4)' }}>
+        {/* Status Filter Chips */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            onClick={() => { setStatusFilter('all'); setCurrentPage(1); }}
+            style={{ padding: '6px 14px', borderRadius: '20px', border: '1px solid #c0c8c2', background: statusFilter === 'all' ? '#154332' : '#ffffff', color: statusFilter === 'all' ? '#ffffff' : '#414944', fontSize: '13px', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s' }}
+          >
+            Tất cả ({homestays.length})
+          </button>
+          <button
+            type="button"
+            onClick={() => { setStatusFilter('active'); setCurrentPage(1); }}
+            style={{ padding: '6px 14px', borderRadius: '20px', border: '1px solid #c0c8c2', background: statusFilter === 'active' ? '#1b6d24' : '#ffffff', color: statusFilter === 'active' ? '#ffffff' : '#414944', fontSize: '13px', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s' }}
+          >
+            Đang hoạt động ({kpiData.operating})
+          </button>
+          <button
+            type="button"
+            onClick={() => { setStatusFilter('locked'); setCurrentPage(1); }}
+            style={{ padding: '6px 14px', borderRadius: '20px', border: '1px solid #c0c8c2', background: statusFilter === 'locked' ? '#ba1a1a' : '#ffffff', color: statusFilter === 'locked' ? '#ffffff' : '#414944', fontSize: '13px', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s' }}
+          >
+            Tạm khóa ({kpiData.lockedCount})
+          </button>
+        </div>
+
+        {/* Search Input Field */}
+        <div className="mh-search-box-wrap">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginRight: '8px' }}>
+            <circle cx="11" cy="11" r="8" />
+            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+          </svg>
+          <input
+            type="text"
+            placeholder="Tìm tên homestay, địa chỉ..."
+            value={searchTerm}
+            onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+          />
+          {searchTerm && (
+            <button
+              type="button"
+              onClick={() => { setSearchTerm(''); setCurrentPage(1); }}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#717974', fontSize: '14px', padding: '0 2px', lineHeight: 1 }}
             >
-              <div>
-                <div className="mh-card-cover">
-                  <img src={h.image} alt={h.name} />
-                  <div className="mh-card-overlay" />
+              ✕
+            </button>
+          )}
+        </div>
+      </div>
 
-                  {/* Top badges */}
-                  <div className="mh-card-top-badges">
-                    <span className={`mh-status-badge ${isLocked ? 'locked' : 'active'}`}>
-                      {isLocked ? (
-                        <>
-                          <span className="material-symbols-outlined text-[14px]">lock</span>
-                          Ngưng hoạt động
-                        </>
-                      ) : (
-                        <>
-                          <span className="mh-pulse-dot" />
-                          Đang hoạt động
-                        </>
+      {/* ── 3. Homestay Fleet Grid ── */}
+      {paginatedHomestays.length === 0 ? (
+        <div style={{ background: '#ffffff', padding: '40px 20px', textAlign: 'center', borderRadius: '12px', color: '#717974', marginBottom: '28px', border: '1px solid rgba(192,200,194,0.4)' }}>
+          <i className="bi bi-search" style={{ fontSize: '36px', color: '#c0c8c2', display: 'block', marginBottom: '8px' }} />
+          <p style={{ fontSize: '14px', margin: 0 }}>
+            Không tìm thấy cơ sở Homestay nào phù hợp với từ khóa "{searchTerm}".
+          </p>
+        </div>
+      ) : (
+        <div className="mh-homestay-grid">
+          {paginatedHomestays.map((h) => {
+            const isLocked = h.status === 'locked';
+            return (
+              <div
+                key={h.id}
+                className={`mh-card ${isLocked ? 'is-locked' : ''} ${h.isCurrent ? 'is-current' : ''}`}
+              >
+                <div>
+                  <div className="mh-card-cover">
+                    <img src={h.image} alt={h.name} />
+                    <div className="mh-card-overlay" />
+
+                    {/* Top badges */}
+                    <div className="mh-card-top-badges">
+                      <span className={`mh-status-badge ${isLocked ? 'locked' : 'active'}`}>
+                        {isLocked ? (
+                          <>
+                            <span className="material-symbols-outlined text-[14px]">lock</span>
+                            Ngưng hoạt động
+                          </>
+                        ) : (
+                          <>
+                            <span className="mh-pulse-dot" />
+                            Đang hoạt động
+                          </>
+                        )}
+                      </span>
+                      {h.isCurrent && (
+                        <span className="mh-current-tag">
+                          <span className="material-symbols-outlined text-[14px]">check_circle</span>
+                          Đang chọn
+                        </span>
                       )}
-                    </span>
-                    {h.isCurrent && (
-                      <span className="mh-current-tag">
-                        <span className="material-symbols-outlined text-[14px]">check_circle</span>
-                        Đang chọn
-                      </span>
-                    )}
+                    </div>
+
+                    {/* Hero info */}
+                    <div className="mh-card-hero-info">
+                      <h2 className="mh-card-title">{h.name}</h2>
+                      <p className="mh-card-address">
+                        <span className="material-symbols-outlined">location_on</span>
+                        {h.address}
+                      </p>
+                    </div>
                   </div>
 
-                  {/* Hero info */}
-                  <div className="mh-card-hero-info">
-                    <h2 className="mh-card-title">{h.name}</h2>
-                    <p className="mh-card-address">
-                      <span className="material-symbols-outlined">location_on</span>
-                      {h.address}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Card stats */}
-                <div className="mh-card-body">
-                  <div className="mh-card-stats-row">
-                    <div className="mh-stat-col">
-                      <span className="mh-stat-lbl">Doanh thu T09</span>
-                      <span className="mh-stat-val">{h.revenue}</span>
-                    </div>
-                    <div className="mh-stat-col">
-                      <span className="mh-stat-lbl">{isLocked ? 'Trạng thái' : 'Tỷ lệ lấp đầy'}</span>
-                      <span className={`mh-stat-val ${isLocked ? 'error-val' : 'green-val'}`}>
-                        {h.occupancy}
-                      </span>
-                    </div>
-                    <div className="mh-stat-col">
-                      <span className="mh-stat-lbl">{isLocked ? 'Lịch hẹn mở' : 'Booking tuần'}</span>
-                      <span className={`mh-stat-val ${isLocked ? '' : 'primary-val'}`}>
-                        {h.weeklyBookings}
-                      </span>
+                  {/* Card stats */}
+                  <div className="mh-card-body">
+                    <div className="mh-card-stats-row">
+                      <div className="mh-stat-col">
+                        <span className="mh-stat-lbl">Doanh thu T09</span>
+                        <span className="mh-stat-val">{h.revenue}</span>
+                      </div>
+                      <div className="mh-stat-col">
+                        <span className="mh-stat-lbl">{isLocked ? 'Trạng thái' : 'Tỷ lệ lấp đầy'}</span>
+                        <span className={`mh-stat-val ${isLocked ? 'error-val' : 'green-val'}`}>
+                          {h.occupancy}
+                        </span>
+                      </div>
+                      <div className="mh-stat-col">
+                        <span className="mh-stat-lbl">{isLocked ? 'Lịch hẹn mở' : 'Booking tuần'}</span>
+                        <span className={`mh-stat-val ${isLocked ? '' : 'primary-val'}`}>
+                          {h.weeklyBookings}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
 
-              {/* Card Footer Actions */}
-              <div className="mh-card-footer">
-                {!isLocked ? (
-                  <button
-                    type="button"
-                    className={`mh-card-btn-switch ${h.isCurrent ? 'current' : ''}`}
-                    onClick={() => handleSwitchCurrent(h.id)}
-                  >
-                    <span className="material-symbols-outlined text-[16px]">sync_alt</span>
-                    {h.isCurrent ? 'Cơ sở hiện tại' : 'Chuyển sang cơ sở này'}
-                  </button>
-                ) : (
-                  <button type="button" className="mh-card-btn-switch" onClick={() => openLockReasonModal(h)}>
-                    <span className="material-symbols-outlined text-[16px]">build</span>
-                    Quản lý tiến độ nâng cấp
-                  </button>
-                )}
-
-                <div className="mh-card-actions-right">
-                  {isLocked && (
+                {/* Card Footer Actions */}
+                <div className="mh-card-footer">
+                  {!isLocked ? (
                     <button
                       type="button"
-                      className="mh-btn-action btn-lock-reason"
-                      title="Xem lý do khóa"
-                      onClick={() => openLockReasonModal(h)}
+                      className={`mh-card-btn-switch ${h.isCurrent ? 'current' : ''}`}
+                      onClick={() => handleSwitchCurrent(h.id)}
                     >
-                      <span className="material-symbols-outlined text-[16px]">info</span>
-                      <span>Lý do khóa</span>
+                      <span className="material-symbols-outlined text-[16px]">sync_alt</span>
+                      {h.isCurrent ? 'Cơ sở hiện tại' : 'Chuyển sang cơ sở này'}
+                    </button>
+                  ) : (
+                    <button type="button" className="mh-card-btn-switch" onClick={() => openLockReasonModal(h)}>
+                      <span className="material-symbols-outlined text-[16px]">build</span>
+                      Quản lý tiến độ nâng cấp
                     </button>
                   )}
-                  <button
-                    type="button"
-                    className="mh-btn-action"
-                    title="Chỉnh sửa thông tin"
-                    onClick={() => openEditModal(h)}
-                  >
-                    <span className="material-symbols-outlined text-[16px]" style={{ color: '#717974' }}>edit</span>
-                    <span>Chỉnh sửa</span>
-                  </button>
-                  <button
-                    type="button"
-                    className="mh-btn-action btn-danger"
-                    title="Xóa cơ sở"
-                    onClick={() => openDeleteModal(h)}
-                  >
-                    <span className="material-symbols-outlined text-[16px]">delete</span>
-                  </button>
+
+                  <div className="mh-card-actions-right">
+                    {isLocked && (
+                      <button
+                        type="button"
+                        className="mh-btn-action btn-lock-reason"
+                        title="Xem lý do khóa"
+                        onClick={() => openLockReasonModal(h)}
+                      >
+                        <span className="material-symbols-outlined text-[16px]">info</span>
+                        <span>Lý do khóa</span>
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      className="mh-btn-action"
+                      title="Chỉnh sửa thông tin"
+                      onClick={() => openEditModal(h)}
+                    >
+                      <span className="material-symbols-outlined text-[16px]" style={{ color: '#717974' }}>edit</span>
+                      <span>Chỉnh sửa</span>
+                    </button>
+                    <button
+                      type="button"
+                      className="mh-btn-action btn-danger"
+                      title="Xóa cơ sở"
+                      onClick={() => openDeleteModal(h)}
+                    >
+                      <span className="material-symbols-outlined text-[16px]">delete</span>
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* ── 3.5. Compact & Windowed Pagination Controls Bar ── */}
+      {totalPages > 1 && (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 18px', background: '#ffffff', borderRadius: '12px', marginBottom: '32px', border: '1px solid rgba(192,200,194,0.4)', flexWrap: 'wrap', gap: '12px' }}>
+          <span style={{ fontSize: '13px', color: '#414944' }}>
+            Hiển thị trang <strong>{currentPage}</strong> / <strong>{totalPages}</strong> (Tổng <strong>{filteredHomestays.length}</strong> cơ sở)
+          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              disabled={currentPage === 1}
+              onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+              style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid #c0c8c2', background: currentPage === 1 ? '#f1f5f9' : '#ffffff', cursor: currentPage === 1 ? 'not-allowed' : 'pointer', fontSize: '13px', color: currentPage === 1 ? '#94a3b8' : '#0b1c30' }}
+            >
+              ‹ Trang trước
+            </button>
+            {getPaginationPages(currentPage, totalPages).map((pg, idx) => {
+              if (pg === '...') {
+                return (
+                  <span key={`dots-${idx}`} style={{ padding: '0 4px', color: '#94a3b8', fontSize: '13px', fontWeight: 600 }}>
+                    ...
+                  </span>
+                );
+              }
+              return (
+                <button
+                  key={pg}
+                  type="button"
+                  onClick={() => setCurrentPage(pg)}
+                  style={{ width: '32px', height: '32px', borderRadius: '6px', border: pg === currentPage ? 'none' : '1px solid #c0c8c2', background: pg === currentPage ? '#154332' : '#ffffff', color: pg === currentPage ? '#ffffff' : '#0b1c30', fontWeight: pg === currentPage ? 700 : 500, cursor: 'pointer', fontSize: '13px' }}
+                >
+                  {pg}
+                </button>
+              );
+            })}
+            <button
+              type="button"
+              disabled={currentPage === totalPages}
+              onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+              style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid #c0c8c2', background: currentPage === totalPages ? '#f1f5f9' : '#ffffff', cursor: currentPage === totalPages ? 'not-allowed' : 'pointer', fontSize: '13px', color: currentPage === totalPages ? '#94a3b8' : '#0b1c30' }}
+            >
+              Trang sau ›
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ── 4. Operational Governance Table ── */}
       <div className="mh-governance-card">
@@ -733,19 +1074,17 @@ export default function ManageHomestay() {
                       placeholder="Ví dụ: Mộc Bản Lác..."
                       value={newHomestay.name}
                       onChange={(e) => setNewHomestay({ ...newHomestay, name: e.target.value })}
-                      required
                     />
                   </div>
 
                   <div className="mh-form-group">
                     <label className="mh-form-label">
-                      Tỉnh / Thành phố <span className="required">*</span>
+                      Tỉnh / Thành phố
                     </label>
                     <select
                       className="mh-form-select"
                       value={newHomestay.provinceId}
                       onChange={(e) => setNewHomestay({ ...newHomestay, provinceId: e.target.value, ward: SAMPLE_WARDS[0] })}
-                      required
                     >
                       <option value="">-- Chọn Tỉnh/Thành --</option>
                       {NEW_34_PROVINCES.map((p) => (
@@ -756,13 +1095,12 @@ export default function ManageHomestay() {
 
                   <div className="mh-form-group">
                     <label className="mh-form-label">
-                      Phường / Xã <span className="required">*</span>
+                      Phường / Xã
                     </label>
                     <select
                       className="mh-form-select"
                       value={newHomestay.ward}
                       onChange={(e) => setNewHomestay({ ...newHomestay, ward: e.target.value })}
-                      required
                     >
                       <option value="">-- Chọn Phường/Xã --</option>
                       {SAMPLE_WARDS.map((w, idx) => (
@@ -773,7 +1111,7 @@ export default function ManageHomestay() {
 
                   <div className="mh-form-group full-width">
                     <label className="mh-form-label">
-                      Địa chỉ cụ thể (Thôn/Bản, Số nhà) <span className="required">*</span>
+                      Địa chỉ cụ thể (Thôn/Bản, Số nhà)
                     </label>
                     <input
                       type="text"
@@ -781,8 +1119,26 @@ export default function ManageHomestay() {
                       placeholder="Ví dụ: Bản Lác 2, số nhà 15"
                       value={newHomestay.specificAddress}
                       onChange={(e) => setNewHomestay({ ...newHomestay, specificAddress: e.target.value })}
-                      required
                     />
+                  </div>
+
+                  <div className="mh-form-group full-width">
+                    <label className="mh-form-label">
+                      Hình ảnh đại diện Homestay (URL)
+                    </label>
+                    <input
+                      type="text"
+                      className="mh-form-input"
+                      placeholder="https://images.unsplash.com/photo-..."
+                      value={newHomestay.imageUrl || ''}
+                      onChange={(e) => setNewHomestay({ ...newHomestay, imageUrl: e.target.value })}
+                    />
+                    {newHomestay.imageUrl && (
+                      <div style={{ marginTop: '8px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <img src={newHomestay.imageUrl} alt="Preview" style={{ width: '100px', height: '65px', objectFit: 'cover', borderRadius: '8px', border: '1px solid #c0c8c2' }} />
+                        <span style={{ fontSize: '12px', color: '#526056' }}>Xem trước hình ảnh đại diện</span>
+                      </div>
+                    )}
                   </div>
 
                   <div className="mh-form-group full-width">

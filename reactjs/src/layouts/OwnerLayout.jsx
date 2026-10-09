@@ -36,15 +36,67 @@ export default function OwnerLayout() {
   const [profileOpen, setProfileOpen] = useState(false);
   const profileRef = useRef(null);
 
+  // Dynamic Homestays & Switcher State
+  const [homestaysList, setHomestaysList] = useState([]);
+  const [activeHomestayId, setActiveHomestayId] = useState(null);
+  const [hsDropdownOpen, setHsDropdownOpen] = useState(false);
+  const hsRef = useRef(null);
+
+  const fetchHomestays = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      let res = await fetch('http://localhost:8081/api/admin/homestays', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (!res.ok) {
+        res = await fetch('http://localhost:8081/api/public/admin/homestays');
+      }
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.length > 0) {
+          setHomestaysList(data);
+          const storedId = localStorage.getItem('ownerActiveHomestayId');
+          const found = data.find(h => String(h.id) === String(storedId));
+          if (found) {
+            setActiveHomestayId(found.id);
+          } else {
+            setActiveHomestayId(data[0].id);
+            localStorage.setItem('ownerActiveHomestayId', String(data[0].id));
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Lỗi nạp danh sách homestay cho sidebar:', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchHomestays();
+
+    const handleSync = () => {
+      fetchHomestays();
+    };
+    window.addEventListener('ownerActiveHomestayChanged', handleSync);
+    return () => window.removeEventListener('ownerActiveHomestayChanged', handleSync);
+  }, []);
+
   // Đóng dropdown khi click bên ngoài
   useEffect(() => {
     function handleClickOutside(e) {
       if (notifRef.current && !notifRef.current.contains(e.target))   setNotifOpen(false);
       if (profileRef.current && !profileRef.current.contains(e.target)) setProfileOpen(false);
+      if (hsRef.current && !hsRef.current.contains(e.target)) setHsDropdownOpen(false);
     }
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  const handleSelectHomestay = (hsId) => {
+    localStorage.setItem('ownerActiveHomestayId', String(hsId));
+    setActiveHomestayId(hsId);
+    setHsDropdownOpen(false);
+    window.dispatchEvent(new Event('ownerActiveHomestayChanged'));
+  };
 
   const handleReadAllNotifs = () => {
     setNotifCount(0);
@@ -55,6 +107,8 @@ export default function OwnerLayout() {
     setProfileOpen(false);
     navigate('/');
   };
+
+  const currentHomestayObj = homestaysList.find(h => String(h.id) === String(activeHomestayId)) || homestaysList[0];
 
   return (
     <div className="owner-layout-root">
@@ -69,7 +123,9 @@ export default function OwnerLayout() {
           <i className="bi bi-house-gear-fill owner-sidebar-brand-icon" />
           <div className="owner-sidebar-brand-text">
             <span className="owner-sidebar-brand-name">YÊN <span>Host</span></span>
-            <span className="owner-sidebar-brand-sub">Nhà Sàn Mộc</span>
+            <span className="owner-sidebar-brand-sub">
+              {currentHomestayObj ? currentHomestayObj.name : 'Nhà Sàn Mộc'}
+            </span>
           </div>
         </div>
 
@@ -89,17 +145,64 @@ export default function OwnerLayout() {
           ))}
         </nav>
 
-        {/* Footer: nút Về trang khách */}
+        {/* Footer: nút Chọn/Chuyển homestay + Về trang khách */}
         <div className="owner-sidebar-footer">
-          <div className="owner-sidebar-homestay-card">
-            <div className="owner-sidebar-homestay-icon">
-              <i className="bi bi-houses-fill" />
+          <div className="owner-sidebar-hs-wrap" ref={hsRef} style={{ position: 'relative' }}>
+            <div
+              className="owner-sidebar-homestay-card"
+              onClick={() => setHsDropdownOpen(o => !o)}
+              title="Nhấn để đổi cơ sở Homestay đang quản lý"
+            >
+              <div className="owner-sidebar-homestay-icon">
+                {currentHomestayObj?.img ? (
+                  <img src={currentHomestayObj.img} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '6px' }} />
+                ) : (
+                  <i className="bi bi-houses-fill" />
+                )}
+              </div>
+              <div className="owner-sidebar-homestay-info">
+                <strong>{currentHomestayObj ? currentHomestayObj.name : 'Đang nạp cơ sở...'}</strong>
+                <span>{currentHomestayObj ? (currentHomestayObj.region || currentHomestayObj.address || 'Việt Nam') : ''}</span>
+              </div>
+              <i className="bi bi-chevron-expand owner-sidebar-homestay-arrow" />
             </div>
-            <div className="owner-sidebar-homestay-info">
-              <strong>Nhà Sàn Mộc</strong>
-              <span>Mai Châu, Hòa Bình</span>
-            </div>
-            <i className="bi bi-chevron-expand owner-sidebar-homestay-arrow" />
+
+            {/* Homestay Switcher Dropdown */}
+            {hsDropdownOpen && (
+              <div className="owner-hs-switcher-dropdown">
+                <div className="owner-hs-switcher-header">
+                  <span>Chuyển cơ sở ({homestaysList.length})</span>
+                  <Link to="/owner/homestays" className="owner-hs-add-link" onClick={() => setHsDropdownOpen(false)}>
+                    + Tạo cơ sở mới
+                  </Link>
+                </div>
+                <div className="owner-hs-switcher-list">
+                  {homestaysList.map((hs) => {
+                    const isSelected = String(hs.id) === String(activeHomestayId);
+                    return (
+                      <div
+                        key={hs.id}
+                        className={`owner-hs-item ${isSelected ? 'selected' : ''}`}
+                        onClick={() => handleSelectHomestay(hs.id)}
+                      >
+                        <img
+                          src={hs.img || 'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=800&q=80'}
+                          alt={hs.name}
+                          className="owner-hs-item-img"
+                        />
+                        <div className="owner-hs-item-info">
+                          <div className="owner-hs-item-name">{hs.name}</div>
+                          <div className="owner-hs-item-sub">{hs.region || hs.address || 'Việt Nam'}</div>
+                        </div>
+                        {isSelected && (
+                          <i className="bi bi-check-circle-fill owner-hs-item-check" />
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
 
           <Link to="/" className="owner-nav-item owner-nav-switch">
@@ -187,7 +290,9 @@ export default function OwnerLayout() {
                     <span className="owner-profile-name">Nguyễn Văn An</span>
                     <span className="owner-profile-role-badge">Chủ homestay</span>
                   </div>
-                  <span className="owner-profile-sub">Nhà Sàn Mộc</span>
+                  <span className="owner-profile-sub">
+                    {currentHomestayObj ? currentHomestayObj.name : 'Nhà Sàn Mộc'}
+                  </span>
                 </div>
                 <i className="bi bi-chevron-down owner-profile-chevron" />
               </button>

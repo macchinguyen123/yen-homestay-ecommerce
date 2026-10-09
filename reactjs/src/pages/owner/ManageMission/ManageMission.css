@@ -934,10 +934,18 @@
   border-radius: var(--mm-radius-lg);
   width: 100%;
   max-width: 600px;
-  max-height: 90vh;
+  max-height: 85vh;
   display: flex;
   flex-direction: column;
   box-shadow: var(--mm-shadow-lg);
+  overflow: hidden;
+}
+
+.mm-modal-box form {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
   overflow: hidden;
 }
 
@@ -950,6 +958,7 @@
   align-items: flex-start;
   justify-content: space-between;
   border-bottom: 1px solid var(--mm-surface-container);
+  flex-shrink: 0;
 }
 
 .mm-modal-header h3 {
@@ -985,7 +994,9 @@
 .mm-modal-body {
   padding: 20px 24px;
   overflow-y: auto;
+  max-height: calc(85vh - 130px);
   flex: 1;
+  min-height: 0;
 }
 
 .mm-modal-footer {
@@ -996,6 +1007,7 @@
   justify-content: flex-end;
   gap: 10px;
   background-color: #fafbfc;
+  flex-shrink: 0;
 }
 
 /* Form Styles */
