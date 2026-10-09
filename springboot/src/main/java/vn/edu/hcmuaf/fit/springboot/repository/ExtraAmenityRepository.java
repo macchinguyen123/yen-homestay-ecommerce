@@ -9,4 +9,6 @@ import java.util.List;
 @Repository
 public interface ExtraAmenityRepository extends JpaRepository<ExtraAmenity, Long> {
     List<ExtraAmenity> findByHomestayId(Long homestayId);
+    List<ExtraAmenity> findByHomestayIdOrderByIdDesc(Long homestayId);
+    long countByHomestayId(Long homestayId);
 }
