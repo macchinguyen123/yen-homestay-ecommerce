@@ -20,6 +20,7 @@ import Promotions from '../pages/user/Promotions/Promotions';
 import SearchResult from '../pages/user/SearchResult/SearchResult';
 import Support from '../pages/user/Support/Support';
 import Wishlist from '../pages/user/Wishlist/Wishlist';
+import Category from '../pages/user/Category/Category';
 
 // Owner Pages
 import OwnerDashboard from '../pages/owner/Dashboard/OwnerDashboard';
@@ -80,6 +81,11 @@ export default function AppRoutes() {
         <Route path="/search-result" element={<SearchResult />} />
         <Route path="/support" element={<Support />} />
         <Route path="/wishlist" element={<Wishlist />} />
+        <Route path="/category" element={<Category />} />
+        <Route path="/category/:id" element={<Category />} />
+        <Route path="/categories" element={<Category />} />
+        <Route path="/danh-muc" element={<Category />} />
+        <Route path="/danh-muc/:id" element={<Category />} />
       </Route>
 
       {/* ── 2. KHU VỰC CHỦ HOMESTAY (OWNER / HOST) ── */}

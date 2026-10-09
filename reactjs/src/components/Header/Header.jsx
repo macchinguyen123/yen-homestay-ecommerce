@@ -56,6 +56,17 @@ export default function Header() {
 
             <li className="yen-nav-item">
               <NavLink
+                to="/category"
+                className={({ isActive }) => `yen-nav-link ${isActive ? 'active' : ''}`}
+                onClick={closeMobileMenu}
+              >
+                <i className="bi bi-grid-fill nav-icon" />
+                <span>Danh mục</span>
+              </NavLink>
+            </li>
+
+            <li className="yen-nav-item">
+              <NavLink
                 to="/promotions"
                 className={({ isActive }) => `yen-nav-link ${isActive ? 'active' : ''}`}
                 onClick={closeMobileMenu}
