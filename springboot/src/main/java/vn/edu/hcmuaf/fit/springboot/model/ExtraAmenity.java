@@ -30,4 +30,19 @@ public class ExtraAmenity {
 
     @Builder.Default
     private String status = "ACTIVE";
+
+    @Column(name = "category")
+    private String category;
+
+    @Column(name = "description", columnDefinition = "TEXT")
+    private String description;
+
+    @Column(name = "image", columnDefinition = "TEXT")
+    private String image;
+
+    @Column(name = "linked_services")
+    private String linkedServices;
+
+    @Column(name = "created_at")
+    private java.time.LocalDateTime createdAt;
 }
