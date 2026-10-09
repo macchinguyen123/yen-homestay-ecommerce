@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import './Homepage.css';
 import { homestayService } from '../../../services/homestayService';
+import { formatAmenities } from '../Category/Category';
 
 const HERO_SLIDES = [
   { id: 1, img: 'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=1920&q=80', title: 'Homestay giữa núi rừng bản địa chân thực' },
@@ -10,14 +11,18 @@ const HERO_SLIDES = [
 ];
 
 const EXPERIENCES = [
-  { id: 1, title: 'Miệt vườn', desc: 'Ở giữa vườn cây, hái trái, làm vườn', tag: 'Miệt vườn', img: 'https://images.unsplash.com/photo-1544644181-1484b3fdfc62?auto=format&fit=crop&w=600&q=80' },
-  { id: 2, title: 'Nông trại', desc: 'Trồng rau, thu hoạch, chăm vật nuôi, làm ruộng', tag: 'Nông trại', img: 'https://images.unsplash.com/photo-1500595046743-cd271d694d30?auto=format&fit=crop&w=600&q=80' },
-  { id: 3, title: 'Sông nước', desc: 'Đi xuồng, chèo ghe, câu cá, ngắm sông', tag: 'Sông nước', img: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=600&q=80' },
-  { id: 4, title: 'Nhà quê truyền thống', desc: 'Nhà gỗ, nhà vườn, nhà cổ địa phương', tag: 'Nhà quê', img: 'https://images.unsplash.com/photo-1518780664697-55e3ad937233?auto=format&fit=crop&w=600&q=80' },
-  { id: 5, title: 'Ẩm thực quê', desc: 'Nấu ăn cùng chủ nhà, làm bánh dân gian', tag: 'Ẩm thực', img: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=600&q=80' },
-  { id: 6, title: 'Làng nghề truyền thống', desc: 'Đan lát, làm gốm, dệt đồ thủ công', tag: 'Làng nghề', img: 'https://images.unsplash.com/photo-1513519245088-0e12902e5a38?auto=format&fit=crop&w=600&q=80' },
-  { id: 7, title: 'Thiên nhiên sinh thái', desc: 'Rừng, đồng ruộng, hồ, suối sinh thái', tag: 'Thiên nhiên', img: 'https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?auto=format&fit=crop&w=600&q=80' },
-  { id: 8, title: 'Trải nghiệm đời sống', desc: 'Bắt cá, hái rau, đi chợ quê, chăm vườn', tag: 'Đời sống', img: 'https://images.unsplash.com/photo-1516253593875-bd7ba052fbc5?auto=format&fit=crop&w=600&q=80' },
+  { id: 1, title: 'Miệt vườn', desc: 'Ở giữa vườn cây, hái trái, làm vườn', tag: 'Miệt vườn', cat: 'miet-vuan', img: 'https://images.unsplash.com/photo-1544644181-1484b3fdfc62?auto=format&fit=crop&w=600&q=80' },
+  { id: 2, title: 'Nông trại', desc: 'Trồng rau, thu hoạch, chăm vật nuôi, làm ruộng', tag: 'Nông trại', cat: 'nong-trai', img: 'https://images.unsplash.com/photo-1500595046743-cd271d694d30?auto=format&fit=crop&w=600&q=80' },
+  { id: 3, title: 'Sông nước', desc: 'Đi xuồng, chèo ghe, câu cá, ngắm sông', tag: 'Sông nước', cat: 'song-nuoc', img: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=600&q=80' },
+  { id: 4, title: 'Nhà quê truyền thống', desc: 'Nhà gỗ, nhà vườn, nhà cổ, sinh hoạt cùng gia đình địa phương', tag: 'Nhà quê', cat: 'nha-que', img: 'https://images.unsplash.com/photo-1518780664697-55e3ad937233?auto=format&fit=crop&w=600&q=80' },
+  { id: 5, title: 'Ẩm thực quê', desc: 'Nấu ăn cùng chủ nhà, làm bánh dân gian, ăn cơm nhà', tag: 'Ẩm thực', cat: 'am-thuc', img: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=600&q=80' },
+  { id: 6, title: 'Làng nghề truyền thống', desc: 'Đan lát, làm gốm, dệt, làm đồ thủ công', tag: 'Làng nghề', cat: 'lang-nghe', img: 'https://images.unsplash.com/photo-1513519245088-0e12902e5a38?auto=format&fit=crop&w=600&q=80' },
+  { id: 7, title: 'Thiên nhiên sinh thái', desc: 'Rừng, đồng ruộng, hồ, suối, vườn sinh thái', tag: 'Thiên nhiên', cat: 'thien-nhien', img: 'https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?auto=format&fit=crop&w=600&q=80' },
+  { id: 8, title: 'Trải nghiệm đời sống quê', desc: 'Bắt cá, hái rau, đi chợ quê, chăm vườn', tag: 'Đời sống quê', cat: 'doi-song', img: 'https://images.unsplash.com/photo-1516253593875-bd7ba052fbc5?auto=format&fit=crop&w=600&q=80' },
+  { id: 9, title: 'Văn hóa địa phương', desc: 'Đờn ca, hát dân gian, lễ hội, kể chuyện địa phương', tag: 'Văn hóa', cat: 'van-hoa', img: 'https://images.unsplash.com/photo-1510798831971-661eb04b3739?auto=format&fit=crop&w=600&q=80' },
+  { id: 10, title: 'Khám phá làng quê', desc: 'Đạp xe, đi bộ, tham quan xóm làng', tag: 'Khám phá', cat: 'kham-pha', img: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=600&q=80' },
+  { id: 11, title: 'Chậm thư giãn', desc: 'Võng, uống trà, ngắm hoàng hôn, đọc sách, nghỉ ngơi', tag: 'Nghỉ dưỡng', cat: 'thu-gian', img: 'https://images.unsplash.com/photo-1528127269322-539801943592?auto=format&fit=crop&w=600&q=80' },
+  { id: 12, title: 'Ở cùng người bản địa', desc: 'Sinh hoạt, ăn uống và trò chuyện cùng gia đình chủ nhà', tag: 'Người bản địa', cat: 'ban-dia', img: 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=600&q=80' },
 ];
 
 const COMBOS = [
@@ -493,7 +498,7 @@ export default function Homepage() {
               else if (t.includes('bản địa')) iconClass = 'bi-people';
 
               return (
-                <div key={exp.id} className="experience-card" onClick={() => navigate('/booking')}>
+                <div key={exp.id} className="experience-card" onClick={() => navigate(`/category?cat=${exp.cat || 'all'}`)} style={{ cursor: 'pointer' }}>
                   <div className="exp-img-wrapper">
                     <img src={exp.img} alt={exp.title} loading="lazy" />
                     <span className="exp-badge">
@@ -713,7 +718,7 @@ export default function Homepage() {
                   <div className="card-specs"><span>{h.specs}</span></div>
                   <div className="card-amenities-box">
                     <span className="amenities-label">Tiện nghi nổi bật:</span>
-                    <p className="amenities-items">{h.amenities}</p>
+                    <p className="amenities-items">{formatAmenities(h.amenities)}</p>
                   </div>
                   <div className="card-footer-row">
                     <div>
@@ -795,7 +800,7 @@ export default function Homepage() {
                   <div className="card-specs"><span>{h.specs}</span></div>
                   <div className="card-amenities-box">
                     <span className="amenities-label">Tiện nghi nổi bật:</span>
-                    <p className="amenities-items">{h.amenities}</p>
+                    <p className="amenities-items">{formatAmenities(h.amenities)}</p>
                   </div>
                   <div className="card-footer-row">
                     <div>

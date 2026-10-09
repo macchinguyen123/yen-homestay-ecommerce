@@ -1,0 +1,601 @@
+/* ===== CATEGORY PAGE STYLES ===== */
+
+.category-page-wrapper {
+  background-color: #F8FAFC;
+  min-height: 100vh;
+  padding-bottom: 60px;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  color: #0F172A;
+}
+
+.cat-container {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+/* 1. HERO BANNER */
+.cat-hero-banner {
+  background: linear-gradient(135deg, #0F5132 0%, #15803D 50%, #166534 100%);
+  color: #FFFFFF;
+  padding: 44px 0 36px;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.cat-hero-banner::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.08) 0%, transparent 60%);
+  pointer-events: none;
+}
+
+.cat-hero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: #FEF08A;
+  font-size: 0.82rem;
+  font-weight: 700;
+  padding: 6px 16px;
+  border-radius: 9999px;
+  margin-bottom: 14px;
+}
+
+.cat-hero-title {
+  font-size: 2.2rem;
+  font-weight: 800;
+  color: #FFFFFF;
+  margin-bottom: 10px;
+  letter-spacing: -0.02em;
+}
+
+.cat-hero-subtitle {
+  font-size: 1rem;
+  color: #E2E8F0;
+  max-width: 720px;
+  margin: 0 auto 28px;
+  line-height: 1.5;
+}
+
+/* CHIPS BANNER SCROLL */
+.cat-chips-scroll {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.cat-chip-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  color: #FFFFFF;
+  padding: 8px 18px;
+  border-radius: 9999px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+
+.cat-chip-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: translateY(-2px);
+}
+
+.cat-chip-btn.active {
+  background: #FFFFFF;
+  color: #15803D;
+  font-weight: 700;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+}
+
+/* 2. FILTER BAR */
+.cat-filter-section {
+  background: #FFFFFF;
+  border-bottom: 1px solid #E2E8F0;
+  padding: 18px 0;
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+}
+
+.cat-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+
+.filter-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.search-item {
+  flex: 1;
+  min-width: 260px;
+}
+
+.search-item input {
+  width: 100%;
+  padding: 10px 36px 10px 38px;
+  border: 1.5px solid #CBD5E1;
+  border-radius: 12px;
+  font-size: 0.9rem;
+  outline: none;
+  background: #F8FAFC;
+  transition: all 0.2s ease;
+}
+
+.search-item input:focus {
+  border-color: #15803D;
+  background: #FFFFFF;
+  box-shadow: 0 0 0 3px rgba(21, 128, 61, 0.12);
+}
+
+.search-icon {
+  position: absolute;
+  left: 12px;
+  color: #64748B;
+  font-size: 1rem;
+}
+
+.btn-clear-search {
+  position: absolute;
+  right: 10px;
+  background: none;
+  border: none;
+  color: #94A3B8;
+  cursor: pointer;
+  font-size: 1.1rem;
+  padding: 0;
+}
+
+.select-item select {
+  padding: 10px 14px 10px 36px;
+  border: 1.5px solid #CBD5E1;
+  border-radius: 12px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #1E293B;
+  background: #F8FAFC;
+  outline: none;
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%252364748B' viewBox='0 0 16 16'%3E%3Cpath d='M7.247 11.14 2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 32px;
+  transition: all 0.2s ease;
+}
+
+.select-item select:focus {
+  border-color: #15803D;
+  background-color: #FFFFFF;
+}
+
+.select-icon {
+  position: absolute;
+  left: 12px;
+  font-size: 1rem;
+  pointer-events: none;
+}
+
+.btn-reset-filters {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #FEF2F2;
+  border: 1px solid #FCA5A5;
+  color: #DC2626;
+  font-size: 0.85rem;
+  font-weight: 700;
+  padding: 9px 16px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-reset-filters:hover {
+  background: #FEE2E2;
+}
+
+/* 3. SECTION DANH SÁCH 16 SẢN PHẨM KHUNG CHUẨN MẪU ẢNH */
+.cat-products-section {
+  padding: 32px 0 40px;
+}
+
+.cat-results-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.cat-results-header h2 {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: #0F172A;
+  margin: 0;
+}
+
+.results-count-badge {
+  background: #E2E8F0;
+  color: #334155;
+  font-size: 0.82rem;
+  font-weight: 700;
+  padding: 5px 14px;
+  border-radius: 9999px;
+}
+
+/* KHUNG LƯỚI 4 CỘT (MATCHING SNAPSHOT USER 100%) */
+.cat-products-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px;
+}
+
+/* THẺ PRODUCT CARD CHUẨN */
+.cat-homestay-card {
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 18px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.25s ease;
+}
+
+.cat-homestay-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.1);
+  border-color: #CBD5E1;
+}
+
+/* KHU VỰC ẢNH */
+.cat-homestay-card .card-img-wrapper {
+  position: relative;
+  width: 100%;
+  height: 200px;
+  overflow: hidden;
+  background: #F1F5F9;
+}
+
+.cat-homestay-card .card-img-wrapper img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform 0.4s ease;
+}
+
+.cat-homestay-card:hover .card-img-wrapper img {
+  transform: scale(1.06);
+}
+
+/* TAG BẢN CẮT ĐEN KHU TRÊN */
+.cat-homestay-card .card-top-tag {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  background: rgba(15, 23, 42, 0.88);
+  backdrop-filter: blur(4px);
+  color: #FFFFFF;
+  font-size: 0.74rem;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* NÚT TRÁI TIM YÊU THÍCH NGUYÊN BẢN PURE HEART (ĐÃ UPDATE THEO YÊU CẦU TRƯỚC) */
+.cat-homestay-card .card-wishlist-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: transparent;
+  border: none;
+  padding: 4px;
+  cursor: pointer;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  outline: none;
+}
+
+.cat-homestay-card .card-wishlist-btn i {
+  font-size: 1.5rem;
+  color: rgba(255, 255, 255, 0.95);
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.6));
+  transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.cat-homestay-card .card-wishlist-btn:hover i {
+  color: #E11D48;
+  transform: scale(1.22);
+  filter: drop-shadow(0 4px 12px rgba(225, 29, 72, 0.65));
+}
+
+.cat-homestay-card .card-wishlist-btn.active i {
+  color: #E11D48;
+  filter: drop-shadow(0 4px 14px rgba(225, 29, 72, 0.7));
+  animation: heartPop 0.45s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+/* PHẦN THÔNG TIN BODY THẺ */
+.cat-homestay-card .card-body {
+  padding: 16px 18px 18px;
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+  gap: 6px;
+}
+
+.cat-homestay-card .card-location-rating {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.82rem;
+}
+
+.cat-homestay-card .card-location {
+  color: #475569;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.cat-homestay-card .card-rating {
+  font-weight: 800;
+  color: #0F172A;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.cat-homestay-card .card-title {
+  font-size: 1.1rem;
+  font-weight: 800;
+  margin: 4px 0 2px;
+  line-height: 1.35;
+}
+
+.cat-homestay-card .card-title a {
+  color: #0F172A;
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+
+.cat-homestay-card .card-title a:hover {
+  color: #15803D;
+}
+
+.cat-homestay-card .card-specs {
+  font-size: 0.85rem;
+  color: #64748B;
+  font-weight: 500;
+}
+
+/* BOX TIỆN NGHI NỔI BẬT (ĐÃ LOẠI BỎ ngoặc {" "}, QUOTES) */
+.cat-homestay-card .card-amenities-box {
+  background: #F8FAFC;
+  border-radius: 12px;
+  padding: 10px 12px;
+  margin: 8px 0 10px;
+  border: 1px solid #F1F5F9;
+}
+
+.cat-homestay-card .amenities-label {
+  display: block;
+  font-size: 0.76rem;
+  color: #64748B;
+  font-weight: 700;
+  margin-bottom: 2px;
+}
+
+.cat-homestay-card .amenities-items {
+  font-size: 0.84rem;
+  color: #1E293B;
+  font-weight: 600;
+  margin: 0;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* HÀNG CHÂN THẺ (GIÁ & NÚT XEM HOMESTAY GỌN ĐẸP) */
+.cat-homestay-card .card-footer-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: auto;
+  padding-top: 8px;
+}
+
+.cat-homestay-card .price-label {
+  font-size: 0.75rem;
+  color: #94A3B8;
+  display: block;
+}
+
+.cat-homestay-card .card-price {
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: #15803D;
+  line-height: 1.2;
+}
+
+.cat-homestay-card .btn-view-room {
+  background: #15803D;
+  color: #FFFFFF;
+  font-size: 0.85rem;
+  font-weight: 700;
+  padding: 8px 18px;
+  border-radius: 9999px;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.cat-homestay-card .btn-view-room:hover {
+  background: #166534;
+  color: #FFFFFF;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(21, 128, 61, 0.3);
+}
+
+/* 4. PHÂN TRANG (PAGINATION) */
+.cat-pagination-wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  margin-top: 40px;
+}
+
+.pagination-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #FFFFFF;
+  border: 1.5px solid #CBD5E1;
+  color: #334155;
+  padding: 8px 18px;
+  border-radius: 12px;
+  font-size: 0.88rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.pagination-btn:hover:not(:disabled) {
+  border-color: #15803D;
+  color: #15803D;
+  background: #F0FDF4;
+}
+
+.pagination-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.pagination-numbers {
+  display: flex;
+  gap: 6px;
+}
+
+.page-num-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: #FFFFFF;
+  border: 1.5px solid #CBD5E1;
+  color: #334155;
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.page-num-btn:hover {
+  border-color: #15803D;
+  color: #15803D;
+}
+
+.page-num-btn.active {
+  background: #15803D;
+  border-color: #15803D;
+  color: #FFFFFF;
+  box-shadow: 0 4px 12px rgba(21, 128, 61, 0.3);
+}
+
+/* LOADING & EMPTY STATES */
+.cat-loading-box,
+.cat-empty-box {
+  text-align: center;
+  padding: 60px 20px;
+  background: #FFFFFF;
+  border-radius: 20px;
+  border: 1px dashed #CBD5E1;
+  margin: 20px 0;
+}
+
+/* TOAST NOTICE */
+.toast-notice {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  background: #0F172A;
+  color: #FFFFFF;
+  padding: 12px 20px;
+  border-radius: 14px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+  transform: translateY(100px);
+  opacity: 0;
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  z-index: 9999;
+}
+
+.toast-notice.show {
+  transform: translateY(0);
+  opacity: 1;
+}
+
+/* RESPONSIVE DESIGN */
+@media (max-width: 1200px) {
+  .cat-products-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 900px) {
+  .cat-products-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .cat-hero-title {
+    font-size: 1.8rem;
+  }
+}
+
+@media (max-width: 580px) {
+  .cat-products-grid {
+    grid-template-columns: 1fr;
+  }
+  .search-item {
+    min-width: 100%;
+  }
+}
