@@ -10,6 +10,14 @@ export default function ManageHomestay() {
     const [filterStatus, setFilterStatus] = useState('all');
     const [searchTerm, setSearchTerm] = useState('');
     const [filterRegion, setFilterRegion] = useState('all');
+    
+    // Toast state
+    const [toast, setToast] = useState({ show: false, msg: '', type: 'success' });
+    
+    const showToast = (msg, type = 'success') => {
+        setToast({ show: true, msg, type });
+        setTimeout(() => setToast({ show: false, msg: '', type: 'success' }), 3000);
+    };
 
     const fetchHomestays = async () => {
         setLoading(true);
@@ -50,19 +58,24 @@ export default function ManageHomestay() {
             });
 
             if (response.ok) {
-                // Update local state instead of refetching for performance
                 setList(prev => prev.map(item => {
                     if (item.id === id) {
                         return { ...item, status: newStatus, statusText: newStatusText };
                     }
                     return item;
                 }));
+                showToast(`Đã cập nhật trạng thái thành "${newStatusText}" thành công!`, 'success');
             } else {
-                alert('Có lỗi xảy ra khi cập nhật trạng thái');
+                let errStr = 'Có lỗi xảy ra khi cập nhật trạng thái';
+                try {
+                    const errData = await response.json();
+                    if (errData.message) errStr += ': ' + errData.message;
+                } catch(e) {}
+                showToast(errStr, 'error');
             }
         } catch (error) {
             console.error('Error updating status:', error);
-            alert('Lỗi kết nối máy chủ');
+            showToast('Lỗi kết nối máy chủ: ' + error.message, 'error');
         }
     };
 
@@ -71,9 +84,11 @@ export default function ManageHomestay() {
         const matchSearch = (item.name || '').toLowerCase().includes(searchTerm.toLowerCase())
             || (item.host || '').toLowerCase().includes(searchTerm.toLowerCase())
             || (item.code || '').toLowerCase().includes(searchTerm.toLowerCase());
-        const matchRegion = filterRegion === 'all' || (item.region || '').toLowerCase().includes(filterRegion.toLowerCase());
+        const matchRegion = filterRegion === 'all' || (item.region || '') === filterRegion;
         return matchStatus && matchSearch && matchRegion;
     });
+
+    const uniqueRegions = Array.from(new Set(list.map(item => item.region).filter(r => r && r !== 'N/A')));
 
     const activeCount = list.filter(x => x.status === 'active').length;
     const pendingCount = list.filter(x => x.status === 'pending').length;
@@ -150,11 +165,9 @@ export default function ManageHomestay() {
                         </div>
                         <select className="select-region" value={filterRegion} onChange={(e) => setFilterRegion(e.target.value)}>
                             <option value="all">Tất cả khu vực</option>
-                            <option value="Hà Giang">Hà Giang</option>
-                            <option value="Sapa">Sapa</option>
-                            <option value="Đà Lạt">Đà Lạt</option>
-                            <option value="Hội An">Hội An</option>
-                            <option value="Mai Châu">Mai Châu</option>
+                            {uniqueRegions.map((region, idx) => (
+                                <option key={idx} value={region}>{region}</option>
+                            ))}
                         </select>
                     </div>
                 </div>
@@ -190,7 +203,7 @@ export default function ManageHomestay() {
                                 filteredData.map(item => (
                                     <tr key={item.id}>
                                         <td>
-                                            <div className="homestay-meta" onClick={() => navigate('/admin/homestays/edit')} style={{ cursor: 'pointer' }}>
+                                            <div className="homestay-meta" onClick={() => navigate(`/admin/homestays/edit/${item.id}`)} style={{ cursor: 'pointer' }}>
                                                 <img src={item.img} className="homestay-img" alt={item.name} />
                                                 <div>
                                                     <div className="homestay-title">{item.name}</div>
@@ -207,7 +220,7 @@ export default function ManageHomestay() {
                                         <td style={{ color: '#64748B', fontSize: '12.5px' }}>{item.date}</td>
                                         <td><span className={`status-chip ${item.status}`}>{item.statusText}</span></td>
                                         <td className="action-col">
-                                            <button className="btn-action" onClick={() => navigate('/admin/homestays/edit')}>
+                                            <button className="btn-action" onClick={() => navigate(`/admin/homestays/edit/${item.id}`)}>
                                                 <span className="material-symbols-outlined" style={{ fontSize: '15px' }}>edit</span> Xem & Sửa
                                             </button>
                                             
@@ -236,6 +249,14 @@ export default function ManageHomestay() {
                     </table>
                 </div>
 
+            </div>
+
+            {/* Toast Notification UI */}
+            <div className={`manage-toast ${toast.show ? 'show' : ''} ${toast.type}`}>
+                <span className="material-symbols-outlined">
+                    {toast.type === 'success' ? 'check_circle' : 'error'}
+                </span>
+                <span>{toast.msg}</span>
             </div>
         </div>
     );

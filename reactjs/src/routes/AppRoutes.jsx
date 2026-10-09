@@ -113,6 +113,7 @@ export default function AppRoutes() {
           <Route path="/admin/complaints" element={<ComplaintsManagement />} />
           <Route path="/admin/homestays" element={<AdminManageHomestay />} />
           <Route path="/admin/homestays/edit" element={<HomestayEdit />} />
+          <Route path="/admin/homestays/edit/:id" element={<HomestayEdit />} />
           <Route path="/admin/local-content" element={<LocalContent />} />
           <Route path="/admin/transactions" element={<ManageTransactions />} />
           <Route path="/admin/reports" element={<ReportsStatistics />} />

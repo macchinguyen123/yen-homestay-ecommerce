@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import './Homepage.css';
+import { homestayService } from '../../../services/homestayService';
 
 const HERO_SLIDES = [
   { id: 1, img: 'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=1920&q=80', title: 'Homestay giữa núi rừng bản địa chân thực' },
@@ -109,6 +110,8 @@ export default function Homepage() {
 
   // Favorites Filter City State
   const [favCityFilter, setFavCityFilter] = useState('all');
+  const [visibleFavoritesCount, setVisibleFavoritesCount] = useState(4);
+  const [visibleHotCount, setVisibleHotCount] = useState(4);
 
   // Wishlist State
   const [wishlist, setWishlist] = useState(new Set());
@@ -129,18 +132,49 @@ export default function Homepage() {
 
   // Fetch dynamic data
   useEffect(() => {
-    fetch('http://localhost:8081/api/public/home')
-      .then(res => res.json())
-      .then(data => {
-        if (data.heroSlides) {
-          setHomeData(data);
+    const fetchHomeData = async () => {
+      try {
+        const homeRes = await fetch('http://localhost:8081/api/public/home');
+        if (homeRes.ok) {
+          const data = await homeRes.json();
+          if (data.heroSlides) {
+            setHomeData(prev => ({ ...prev, ...data }));
+          }
         }
-        setIsLoading(false);
-      })
-      .catch(err => {
+      } catch (err) {
         console.warn('Failed to fetch dynamic home data, using fallback:', err);
-        setIsLoading(false);
-      });
+      }
+
+      try {
+        const realHomestays = await homestayService.getAllHomestays();
+        if (realHomestays && realHomestays.length > 0) {
+          const mappedHomestays = realHomestays.map((h, i) => ({
+            id: h.id || h.homestayId,
+            name: h.name,
+            city: (h.city || 'dalat').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').replace(/ /g, ''),
+            location: h.address || h.city,
+            rating: h.rating || 5.0,
+            reviews: h.totalReviews || Math.floor(Math.random() * 200) + 10,
+            specs: `${h.numRooms || 1} phòng ngủ · ${h.maxGuests || 2} khách`,
+            amenities: h.amenities || 'Tiện nghi tiêu chuẩn',
+            price: h.basePrice ? Number(h.basePrice).toLocaleString('vi-VN') + 'đ' : '1.500.000đ',
+            tag: i === 0 ? 'Top 1 Bán Chạy' : (i < 3 ? `Đã đặt ${30 - i} lần` : 'Khuyến mãi'),
+            img: (h.images && h.images.length > 0) ? h.images[0] : (h.image || h.primaryImage || 'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=600&q=80')
+          }));
+
+          setHomeData(prev => ({
+            ...prev,
+            hotHomestays: mappedHomestays,
+            favoritesHomestays: mappedHomestays
+          }));
+        }
+      } catch (err) {
+        console.warn('Failed to fetch real homestays:', err);
+      }
+      setIsLoading(false);
+    };
+
+    fetchHomeData();
   }, []);
 
   // Hero slider auto-play
@@ -364,7 +398,7 @@ export default function Homepage() {
           <button
             type="button"
             className="slider-arrow prev"
-            onClick={() => setCurrentSlide((prev) => (prev - 1 + homeData.heroSlides.length) % homeData.heroSlides.length)}
+            onClick={() => setCurrentSlide((prev) => (prev === 0 ? homeData.heroSlides.length - 1 : prev - 1))}
           >
             <i className="bi bi-chevron-left" />
           </button>
@@ -471,7 +505,7 @@ export default function Homepage() {
                     <p className="combo-description">{c.desc}</p>
                     <div className="combo-price-action">
                       <div className="combo-price">{c.price} <span>/ khách</span></div>
-                      <Link to="/homestay/doi" className="btn-combo-arrow">
+                      <Link to={`/homestay/${c.id || 1}`} className="btn-combo-arrow">
                         <i className="bi bi-arrow-right" style={{ fontSize: '1.2rem' }} />
                       </Link>
                     </div>
@@ -480,7 +514,7 @@ export default function Homepage() {
                   <button
                     type="button"
                     className="combo-nav-btn combo-prev"
-                    onClick={() => setComboIndex((prev) => (prev - 1 + homeData.combos.length) % homeData.combos.length)}
+                    onClick={() => setComboIndex((prev) => (prev === 0 ? homeData.combos.length - 1 : prev - 1))}
                   >
                     <i className="bi bi-chevron-left" />
                   </button>
@@ -550,7 +584,7 @@ export default function Homepage() {
                 <span><i className="bi bi-clock-fill" /> <strong>{activeFestData.date}</strong></span>
               </div>
             </div>
-            <Link to="/homestay/doi" className="btn-view-room" style={{ background: '#D97706', whiteSpace: 'nowrap' }}>
+            <Link to="/search" className="btn-view-room" style={{ background: '#D97706', whiteSpace: 'nowrap' }}>
               Xem homestay gần nhất
             </Link>
           </div>
@@ -567,21 +601,23 @@ export default function Homepage() {
                   >
                     <i className={`bi ${wishlist.has(h.name) ? 'bi-heart-fill' : 'bi-heart'}`} />
                   </button>
-                  <img src={h.img} alt={h.name} />
+                  <Link to={`/homestay/${h.id || 'doi'}`} style={{ display: 'block', height: '100%' }}>
+                    <img src={h.img || 'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=600&q=80'} alt={h.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  </Link>
                 </div>
                 <div className="card-body">
                   <div className="card-location-rating">
                     <span className="card-location"><i className="bi bi-geo-alt-fill text-success" /> {h.location}</span>
                     <span className="card-rating"><i className="bi bi-star-fill" /> {h.rating} ({h.reviews})</span>
                   </div>
-                  <h3 className="card-title"><Link to="/homestay/doi">{h.name}</Link></h3>
+                  <h3 className="card-title"><Link to={`/homestay/${h.id}`}>{h.name}</Link></h3>
                   <div className="card-specs">{h.distance}</div>
                   <div className="card-footer-row">
                     <div>
                       <span className="price-label">Giá từ:</span>
                       <span className="card-price">{h.price}</span>
                     </div>
-                    <Link to="/homestay/doi" className="btn-view-room">Xem homestay</Link>
+                    <Link to={`/homestay/${h.id}`} className="btn-view-room">Xem homestay</Link>
                   </div>
                 </div>
               </div>
@@ -598,7 +634,7 @@ export default function Homepage() {
           <p className="section-subtitle">Top 4 căn homestay được khách hàng chốt phòng liên tục trong 24 giờ qua</p>
 
           <div className="hot-grid">
-            {homeData.hotHomestays.map((h) => (
+            {homeData.hotHomestays.slice(0, visibleHotCount).map((h) => (
               <div key={h.id} className="homestay-card">
                 <div className="card-img-wrapper">
                   <span className="card-top-tag tag-hot"><i className="bi bi-fire" /> {h.tag}</span>
@@ -609,14 +645,16 @@ export default function Homepage() {
                   >
                     <i className={`bi ${wishlist.has(h.name) ? 'bi-heart-fill' : 'bi-heart'}`} />
                   </button>
-                  <img src={h.img} alt={h.name} />
+                  <Link to={`/homestay/${h.id || 'doi'}`} style={{ display: 'block', height: '100%' }}>
+                    <img src={h.img || 'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=600&q=80'} alt={h.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  </Link>
                 </div>
                 <div className="card-body">
                   <div className="card-location-rating">
                     <span className="card-location"><i className="bi bi-geo-alt-fill text-success" /> {h.location}</span>
                     <span className="card-rating"><i className="bi bi-star-fill" /> {h.rating} ({h.reviews})</span>
                   </div>
-                  <h3 className="card-title"><Link to="/homestay/doi">{h.name}</Link></h3>
+                  <h3 className="card-title"><Link to={`/homestay/${h.id}`}>{h.name}</Link></h3>
                   <div className="card-specs"><span>{h.specs}</span></div>
                   <div className="card-amenities-box">
                     <span className="amenities-label">Tiện nghi nổi bật:</span>
@@ -627,12 +665,25 @@ export default function Homepage() {
                       <span className="price-label">Giá từ:</span>
                       <span className="card-price">{h.price}</span>
                     </div>
-                    <Link to="/homestay/doi" className="btn-view-room">Xem homestay</Link>
+                    <Link to={`/homestay/${h.id}`} className="btn-view-room">Xem homestay</Link>
                   </div>
                 </div>
               </div>
             ))}
           </div>
+
+          {visibleHotCount < homeData.hotHomestays.length && (
+            <div style={{ textAlign: 'center', marginTop: '32px' }}>
+              <button 
+                onClick={() => setVisibleHotCount(prev => prev + 4)}
+                style={{ padding: '12px 32px', borderRadius: '12px', fontWeight: 'bold', background: '#FFF', border: '1.5px solid #15803D', color: '#15803D', cursor: 'pointer', transition: 'all 0.2s' }}
+                onMouseOver={(e) => { e.currentTarget.style.background = '#15803D'; e.currentTarget.style.color = '#FFF'; }}
+                onMouseOut={(e) => { e.currentTarget.style.background = '#FFF'; e.currentTarget.style.color = '#15803D'; }}
+              >
+                Xem thêm homestay hot
+              </button>
+            </div>
+          )}
         </div>
       </section>
 
@@ -656,7 +707,7 @@ export default function Homepage() {
                   key={tab.key}
                   type="button"
                   className={`city-tab ${favCityFilter === tab.key ? 'active' : ''}`}
-                  onClick={() => setFavCityFilter(tab.key)}
+                  onClick={() => { setFavCityFilter(tab.key); setVisibleFavoritesCount(4); }}
                 >
                   {tab.label}
                 </button>
@@ -665,7 +716,7 @@ export default function Homepage() {
           </div>
 
           <div className="favorites-grid">
-            {filteredFavorites.map((h) => (
+            {filteredFavorites.slice(0, visibleFavoritesCount).map((h) => (
               <div key={h.id} className="homestay-card">
                 <div className="card-img-wrapper">
                   <span className="card-top-tag">{h.tag}</span>
@@ -676,14 +727,16 @@ export default function Homepage() {
                   >
                     <i className={`bi ${wishlist.has(h.name) ? 'bi-heart-fill' : 'bi-heart'}`} />
                   </button>
-                  <img src={h.img} alt={h.name} />
+                  <Link to={`/homestay/${h.id || 'doi'}`} style={{ display: 'block', height: '100%' }}>
+                    <img src={h.img || 'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=600&q=80'} alt={h.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  </Link>
                 </div>
                 <div className="card-body">
                   <div className="card-location-rating">
                     <span className="card-location"><i className="bi bi-geo-alt-fill text-success" /> {h.location}</span>
                     <span className="card-rating"><i className="bi bi-star-fill" /> {h.rating} ({h.reviews})</span>
                   </div>
-                  <h3 className="card-title"><Link to="/homestay/doi">{h.name}</Link></h3>
+                  <h3 className="card-title"><Link to={`/homestay/${h.id}`}>{h.name}</Link></h3>
                   <div className="card-specs"><span>{h.specs}</span></div>
                   <div className="card-amenities-box">
                     <span className="amenities-label">Tiện nghi nổi bật:</span>
@@ -694,12 +747,25 @@ export default function Homepage() {
                       <span className="price-label">Giá từ:</span>
                       <span className="card-price">{h.price}</span>
                     </div>
-                    <Link to="/homestay/doi" className="btn-view-room">Xem homestay</Link>
+                    <Link to={`/homestay/${h.id}`} className="btn-view-room">Xem homestay</Link>
                   </div>
                 </div>
               </div>
             ))}
           </div>
+
+          {visibleFavoritesCount < filteredFavorites.length && (
+            <div style={{ textAlign: 'center', marginTop: '32px' }}>
+              <button 
+                onClick={() => setVisibleFavoritesCount(prev => prev + 4)}
+                style={{ padding: '12px 32px', borderRadius: '12px', fontWeight: 'bold', background: '#FFF', border: '1.5px solid #15803D', color: '#15803D', cursor: 'pointer', transition: 'all 0.2s' }}
+                onMouseOver={(e) => { e.currentTarget.style.background = '#15803D'; e.currentTarget.style.color = '#FFF'; }}
+                onMouseOut={(e) => { e.currentTarget.style.background = '#FFF'; e.currentTarget.style.color = '#15803D'; }}
+              >
+                Xem thêm homestay
+              </button>
+            </div>
+          )}
         </div>
       </section>
 
