@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { Link, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { authService } from '../../../services/authService';
 import { bookingService } from '../../../services/bookingService';
+import { voucherService } from '../../../services/voucherService';
 import './BookingAndPay.css';
 
 const SERVICE_FEE_RATE = 0.05;
@@ -108,30 +109,11 @@ export default function BookingAndPay() {
   const defaultCheckinDate = new Date(); defaultCheckinDate.setDate(defaultCheckinDate.getDate() + 7);
   const defaultCheckoutDate = new Date(defaultCheckinDate); defaultCheckoutDate.setDate(defaultCheckoutDate.getDate() + 2);
 
+  const [homestay, setHomestay] = useState(DEFAULT_HOMESTAY);
   const [room, setRoom] = useState(ROOM_CATALOG.doi);
   const [checkin, setCheckin] = useState(toInputDate(defaultCheckinDate));
   const [checkout, setCheckout] = useState(toInputDate(defaultCheckoutDate));
   const [guests, setGuests] = useState(2);
-
-  // Read passed booking details from HomestayDetail / Room Modal
-  useEffect(() => {
-    const passedRoomId = searchParams.get('roomId') || location.state?.roomId;
-    if (passedRoomId && ROOM_CATALOG[passedRoomId]) {
-      setRoom(ROOM_CATALOG[passedRoomId]);
-    }
-    const passedCheckin = searchParams.get('checkin') || location.state?.checkin;
-    if (passedCheckin) {
-      setCheckin(passedCheckin);
-    }
-    const passedCheckout = searchParams.get('checkout') || location.state?.checkout;
-    if (passedCheckout) {
-      setCheckout(passedCheckout);
-    }
-    const passedGuests = searchParams.get('guests') || location.state?.guests;
-    if (passedGuests) {
-      setGuests(Number(passedGuests));
-    }
-  }, [searchParams, location.state]);
 
   // Form Contact
   const [fullName, setFullName] = useState('');
@@ -139,6 +121,104 @@ export default function BookingAndPay() {
   const [email, setEmail] = useState('');
   const [arrivalTime, setArrivalTime] = useState('');
   const [guestNote, setGuestNote] = useState('');
+
+  // Tự động điền thông tin tài khoản đang đăng nhập
+  useEffect(() => {
+    const user = authService.getCurrentUser();
+    if (user) {
+      if (user.fullName) setFullName(user.fullName);
+      if (user.phone) setPhone(user.phone);
+      if (user.email) setEmail(user.email);
+    }
+  }, []);
+
+  // Đọc thông tin phòng & homestay từ state hoặc URL searchParams
+  useEffect(() => {
+    const passedRoomId = searchParams.get('roomId') || location.state?.roomId;
+    const passedHomestayId = searchParams.get('homestayId') || location.state?.homestayId;
+
+    if (location.state?.room) {
+      const r = location.state.room;
+      setRoom({
+        id: r.id,
+        name: r.name || r.roomName || 'Phòng nghỉ',
+        price: Number(r.price || r.pricePerNight || 890000),
+        cleaningFee: Number(r.cleaningFee || 100000),
+        maxGuests: r.specs?.guests || r.capacity || 2,
+        thumb: r.thumb || r.primaryImage || r.gallery?.[0] || 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=400&q=80',
+        homestayId: r.homestayId,
+      });
+    } else if (passedRoomId) {
+      if (ROOM_CATALOG[passedRoomId]) {
+        setRoom(ROOM_CATALOG[passedRoomId]);
+      } else {
+        fetch(`http://localhost:8081/api/public/rooms/${passedRoomId}`)
+          .then((res) => res.ok ? res.json() : null)
+          .then((data) => {
+            if (data) {
+              setRoom({
+                id: data.id,
+                name: data.name || data.roomName || 'Phòng nghỉ',
+                price: Number(data.price || data.pricePerNight || 890000),
+                cleaningFee: Number(data.cleaningFee || 100000),
+                maxGuests: data.specs?.guests || data.capacity || 2,
+                thumb: data.thumb || data.primaryImage || data.gallery?.[0] || 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=400&q=80',
+                homestayId: data.homestayId,
+              });
+              if (!passedHomestayId && data.homestayId) {
+                fetch(`http://localhost:8081/api/public/homestays/${data.homestayId}`)
+                  .then((r) => r.ok ? r.json() : null)
+                  .then((hData) => {
+                    if (hData) {
+                      setHomestay({
+                        id: hData.id,
+                        name: hData.name,
+                        location: hData.location || hData.address || hData.city || 'Việt Nam',
+                        rating: hData.rating || 5.0,
+                        reviewCount: hData.reviewCount || hData.reviews || 0,
+                      });
+                    }
+                  });
+              }
+            }
+          })
+          .catch((err) => console.error('Lỗi tải thông tin phòng:', err));
+      }
+    }
+
+    if (location.state?.homestay) {
+      const h = location.state.homestay;
+      setHomestay({
+        id: h.id,
+        name: h.name,
+        location: h.location || h.address || h.city || 'Việt Nam',
+        rating: h.rating || 5.0,
+        reviewCount: h.reviewCount || h.reviews || 0,
+      });
+    } else if (passedHomestayId) {
+      fetch(`http://localhost:8081/api/public/homestays/${passedHomestayId}`)
+        .then((res) => res.ok ? res.json() : null)
+        .then((hData) => {
+          if (hData) {
+            setHomestay({
+              id: hData.id,
+              name: hData.name,
+              location: hData.location || hData.address || hData.city || 'Việt Nam',
+              rating: hData.rating || 5.0,
+              reviewCount: hData.reviewCount || hData.reviews || 0,
+            });
+          }
+        })
+        .catch((err) => console.error('Lỗi tải homestay:', err));
+    }
+
+    const passedCheckin = searchParams.get('checkin') || location.state?.checkin;
+    if (passedCheckin) setCheckin(passedCheckin);
+    const passedCheckout = searchParams.get('checkout') || location.state?.checkout;
+    if (passedCheckout) setCheckout(passedCheckout);
+    const passedGuests = searchParams.get('guests') || location.state?.guests;
+    if (passedGuests) setGuests(Number(passedGuests));
+  }, [searchParams, location.state]);
 
   // Addons & Discounts
   const [selectedExperiences, setSelectedExperiences] = useState(new Set());
@@ -182,9 +262,14 @@ export default function BookingAndPay() {
   const cleaningFee = nights > 0 ? room.cleaningFee : 0;
   const serviceFee = Math.round(subtotal * SERVICE_FEE_RATE);
 
+  const [appliedVoucherData, setAppliedVoucherData] = useState(null);
+
   const couponObj = appliedCoupon ? COUPONS[appliedCoupon] : null;
-  const discount = couponObj && nights > 0 ? Math.min(couponObj.calc(subtotal), subtotal) : 0;
-  const grandTotal = nights > 0 ? subtotal + cleaningFee + serviceFee - discount : 0;
+  const discount = nights > 0 ? (
+    appliedVoucherData ? Math.min(appliedVoucherData.discountAmount, subtotal) :
+    (couponObj ? Math.min(couponObj.calc(subtotal), subtotal) : 0)
+  ) : 0;
+  const grandTotal = nights > 0 ? Math.max(0, subtotal + cleaningFee + serviceFee - discount) : 0;
 
   const payNow = payPlan === 'deposit' ? Math.round((grandTotal * DEPOSIT_RATE) / 1000) * 1000 : grandTotal;
   const payLater = grandTotal - payNow;
@@ -196,30 +281,69 @@ export default function BookingAndPay() {
     return sum + (x.unit === '/ khách' ? x.price * guests : x.price);
   }, 0);
 
-  // Apply coupon handler
-  const handleApplyCoupon = (codeToApply) => {
+  // Apply coupon handler (supports both presets and real Neon PostgreSQL vouchers)
+  const handleApplyCoupon = async (codeToApply) => {
     const code = (codeToApply || couponInput).trim().toUpperCase();
     if (!code) { setCouponMsg({ text: 'Vui lòng nhập mã giảm giá.', type: 'error' }); return; }
+
+    // 1. Kiểm tra preset coupons
     const c = COUPONS[code];
-    if (!c) { setCouponMsg({ text: 'Mã không hợp lệ. Hãy kiểm tra lại mã.', type: 'error' }); return; }
-
-    if (c.min && subtotal < c.min) {
-      setCouponMsg({ text: `Mã ${code} yêu cầu tiền phòng từ ${fmtVND(c.min)}.`, type: 'error' });
+    if (c) {
+      if (c.min && subtotal < c.min) {
+        setCouponMsg({ text: `Mã ${code} yêu cầu tiền phòng từ ${fmtVND(c.min)}.`, type: 'error' });
+        return;
+      }
+      if (c.minNights && nights < c.minNights) {
+        setCouponMsg({ text: `Mã ${code} yêu cầu ở từ ${c.minNights} đêm.`, type: 'error' });
+        return;
+      }
+      setAppliedVoucherData(null);
+      setAppliedCoupon(code);
+      setCouponInput(code);
+      setCouponMsg({ text: `Đã áp dụng ${code}: ${c.title}.`, type: 'ok' });
+      showToast('Đã áp dụng mã giảm giá!');
       return;
     }
-    if (c.minNights && nights < c.minNights) {
-      setCouponMsg({ text: `Mã ${code} yêu cầu ở từ ${c.minNights} đêm.`, type: 'error' });
-      return;
-    }
 
-    setAppliedCoupon(code);
-    setCouponInput(code);
-    setCouponMsg({ text: `Đã áp dụng ${code}: ${c.title}.`, type: 'ok' });
-    showToast('Đã áp dụng mã giảm giá!');
+    // 2. Kiểm tra voucher thật từ cơ sở dữ liệu PostgreSQL
+    try {
+      const res = await voucherService.checkVoucher(code);
+      if (res && res.valid) {
+        if (res.minOrderValue && subtotal < Number(res.minOrderValue)) {
+          setCouponMsg({ text: `Mã ${code} yêu cầu đơn phòng từ ${fmtVND(res.minOrderValue)}.`, type: 'error' });
+          return;
+        }
+
+        let discAmt = 0;
+        if (res.discountType === 'PERCENT') {
+          discAmt = Math.round((subtotal * Number(res.value)) / 100);
+          if (res.maxDiscount && discAmt > Number(res.maxDiscount)) {
+            discAmt = Number(res.maxDiscount);
+          }
+        } else {
+          discAmt = Number(res.value || 0);
+        }
+
+        setAppliedVoucherData({
+          code: res.code,
+          discountAmount: discAmt,
+          title: `Giảm ${fmtVND(discAmt)}`,
+        });
+        setAppliedCoupon(code);
+        setCouponInput(code);
+        setCouponMsg({ text: `Đã áp dụng mã thật ${code}: Giảm ${fmtVND(discAmt)}.`, type: 'ok' });
+        showToast(`Đã áp dụng mã ưu đãi ${code}!`);
+      } else {
+        setCouponMsg({ text: res?.message || 'Mã không hợp lệ hoặc đã hết hạn.', type: 'error' });
+      }
+    } catch {
+      setCouponMsg({ text: 'Lỗi xác thực mã giảm giá. Hãy thử lại.', type: 'error' });
+    }
   };
 
   const handleRemoveCoupon = () => {
     setAppliedCoupon(null);
+    setAppliedVoucherData(null);
     setCouponInput('');
     setCouponMsg({ text: '', type: '' });
   };
@@ -263,9 +387,9 @@ export default function BookingAndPay() {
       return;
     }
 
-    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-    let code = 'YEN-';
-    for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)];
+    const yr = new Date().getFullYear();
+    const rnd = Math.floor(1000 + Math.random() * 9000);
+    const code = `YEN-${yr}-${rnd}`;
     setBookingCode(code);
     setStep(2);
     setPayModalOpen(true);
@@ -285,20 +409,50 @@ export default function BookingAndPay() {
   }, [payModalOpen]);
 
   // Handle Confirm Payment
-  const handleConfirmPayment = () => {
+  const handleConfirmPayment = async () => {
     setIsProcessing(true);
-    setTimeout(() => {
-      setIsProcessing(false);
-      setPayModalOpen(false);
+    try {
+      const realUser = authService.getCurrentUser();
+      const hsId = Number(searchParams.get('homestayId') || location.state?.homestayId || homestay.id || room.homestayId || 1);
+      const rmId = Number(searchParams.get('roomId') || location.state?.roomId || room.id);
+
+      const bookingPayload = {
+        touristId: realUser?.id ? Number(realUser.id) : 21,
+        homestayId: hsId,
+        roomId: Number.isFinite(rmId) && rmId > 0 ? rmId : null,
+        checkInDate: checkin,
+        checkOutDate: checkout,
+        guestsCount: guests,
+        totalPrice: grandTotal,
+        discountAmount: discount,
+        paymentType: payPlan === 'deposit' ? 'DEPOSIT' : 'FULL',
+        depositAmount: payNow,
+        remainingAmount: payLater,
+        depositStatus: 'PAID',
+        status: 'CONFIRMED',
+        customerName: fullName,
+        customerPhone: phone,
+        customerEmail: email,
+      };
+
+      let finalCode = bookingCode;
+      try {
+        const result = await bookingService.createBooking(bookingPayload);
+        if (result && result.bookingCode) {
+          finalCode = result.bookingCode;
+        }
+      } catch (err) {
+        console.warn('Tạo đặt phòng qua API gặp lỗi, tiếp tục với mã dự phòng:', err);
+      }
 
       const bookingRecord = {
-        code: bookingCode,
-        homestay: DEFAULT_HOMESTAY.name,
+        code: finalCode,
+        homestay: homestay.name || DEFAULT_HOMESTAY.name,
         room: {
           name: room.name,
           thumb: room.thumb,
         },
-        location: DEFAULT_HOMESTAY.location,
+        location: homestay.location || DEFAULT_HOMESTAY.location,
         checkin: checkin,
         checkout: checkout,
         nights: nights,
@@ -337,30 +491,15 @@ export default function BookingAndPay() {
         console.error('Save booking error:', e);
       }
 
-      // Lưu đơn vào CSDL thật khi có homestayId/roomId thật và người dùng đã đăng nhập
-      const realUser = authService.getCurrentUser();
-      const hsId = Number(searchParams.get('homestayId') || location.state?.homestayId);
-      const rmId = Number(searchParams.get('roomId') || location.state?.roomId);
-      if (realUser?.id && hsId) {
-        bookingService.createBooking({
-          touristId: realUser.id,
-          homestayId: hsId,
-          roomId: Number.isFinite(rmId) && rmId > 0 ? rmId : null,
-          checkInDate: checkin,
-          checkOutDate: checkout,
-          guestsCount: guests,
-          totalPrice: grandTotal,
-          discountAmount: discount,
-          paymentType: payPlan === 'deposit' ? 'DEPOSIT' : 'FULL',
-          depositAmount: payNow,
-          remainingAmount: payLater,
-          depositStatus: 'PAID',
-          status: 'CONFIRMED',
-        }).catch((err) => console.error('Create booking error:', err));
-      }
-
-      navigate(`/complete-pay?code=${bookingCode}`);
-    }, 1800);
+      setIsProcessing(false);
+      setPayModalOpen(false);
+      setStep(3);
+      navigate(`/complete-pay?code=${finalCode}`);
+    } catch (e) {
+      console.error('Lỗi quy trình xác nhận thanh toán:', e);
+      setIsProcessing(false);
+      showToast('Có lỗi xảy ra, vui lòng thử lại!');
+    }
   };
 
   const copyToClipboard = (text) => {
@@ -691,7 +830,7 @@ export default function BookingAndPay() {
                   <span className="bk-card-icon"><i className="bi bi-shield-check" /></span>
                   <div>
                     <h2>Chính sách hủy phòng</h2>
-                    <p>Áp dụng cho đặt phòng này tại {DEFAULT_HOMESTAY.name}.</p>
+                    <p>Áp dụng cho đặt phòng này tại {homestay.name}.</p>
                   </div>
                 </div>
                 <ul className="bk-policy">
@@ -714,10 +853,10 @@ export default function BookingAndPay() {
                 <div className="bk-sum-room">
                   <img src={room.thumb} alt={room.name} />
                   <div>
-                    <span className="bk-sum-homestay">{DEFAULT_HOMESTAY.name}</span>
+                    <span className="bk-sum-homestay">{homestay.name}</span>
                     <h3>{room.name}</h3>
                     <span className="bk-sum-rating">
-                      <i className="bi bi-star-fill" /> {DEFAULT_HOMESTAY.rating.toFixed(2)} ({DEFAULT_HOMESTAY.reviewCount} đánh giá)
+                      <i className="bi bi-star-fill" /> {Number(homestay.rating || 5).toFixed(1)} ({homestay.reviewCount || 0} đánh giá)
                     </span>
                   </div>
                 </div>

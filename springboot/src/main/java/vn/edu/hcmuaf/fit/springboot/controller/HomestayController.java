@@ -18,7 +18,25 @@ public class HomestayController {
     private final RoomService roomService;
 
     @GetMapping
-    public ResponseEntity<List<HomestayDTO>> getAllHomestays() {
+    public ResponseEntity<List<HomestayDTO>> getAllHomestays(
+            @RequestParam(value = "q", required = false) String query,
+            @RequestParam(value = "search", required = false) String search,
+            @RequestParam(value = "city", required = false) String city) {
+        String keyword = query != null ? query : (search != null ? search : city);
+        if (keyword != null && !keyword.trim().isEmpty()) {
+            return ResponseEntity.ok(roomService.searchHomestaysFromDb(keyword.trim()));
+        }
+        return ResponseEntity.ok(roomService.getAllHomestaysWithRooms());
+    }
+
+    @GetMapping("/search")
+    public ResponseEntity<List<HomestayDTO>> searchHomestays(
+            @RequestParam(value = "q", required = false) String query,
+            @RequestParam(value = "keyword", required = false) String keyword) {
+        String term = query != null ? query : keyword;
+        if (term != null && !term.trim().isEmpty()) {
+            return ResponseEntity.ok(roomService.searchHomestaysFromDb(term.trim()));
+        }
         return ResponseEntity.ok(roomService.getAllHomestaysWithRooms());
     }
 

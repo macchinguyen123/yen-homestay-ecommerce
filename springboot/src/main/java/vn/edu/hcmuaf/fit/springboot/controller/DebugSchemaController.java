@@ -21,9 +21,9 @@ public class DebugSchemaController {
                      "ORDER BY table_name, ordinal_position";
         m.put("columns", jdbc.queryForList(sql));
         m.put("sequences", jdbc.queryForList("SELECT sequence_name FROM information_schema.sequences WHERE sequence_schema = 'public'"));
-        m.put("max_review_id", jdbc.queryForObject("SELECT COALESCE(MAX(review_id), 0) FROM reviews", Long.class));
-        m.put("max_report_id", jdbc.queryForObject("SELECT COALESCE(MAX(report_id), 0) FROM reports", Long.class));
-        m.put("max_booking_id", jdbc.queryForObject("SELECT COALESCE(MAX(booking_id), 0) FROM bookings", Long.class));
+        m.put("vouchers_columns", jdbc.queryForList("SELECT column_name, data_type, is_nullable FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'vouchers' ORDER BY ordinal_position"));
+        m.put("vouchers_sample", jdbc.queryForList("SELECT * FROM vouchers LIMIT 20"));
+        m.put("vouchers_count", jdbc.queryForObject("SELECT COUNT(*) FROM vouchers", Long.class));
         return ResponseEntity.ok(m);
     }
 }

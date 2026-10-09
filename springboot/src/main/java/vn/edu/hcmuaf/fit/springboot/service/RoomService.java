@@ -3,6 +3,7 @@ package vn.edu.hcmuaf.fit.springboot.service;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import vn.edu.hcmuaf.fit.springboot.dto.HomestayDTO;
@@ -43,19 +44,24 @@ public class RoomService {
     /**
      * Lấy toàn bộ danh sách phòng từ Database
      */
+    @Cacheable("allRooms")
     public List<RoomDTO> getAllRooms() {
         List<Room> rooms = roomRepository.findAll();
         Map<Long, String> homestayNames = homestayRepository.findAll().stream()
                 .collect(Collectors.toMap(Homestay::getId, Homestay::getName, (a, b) -> a));
+        List<RoomImage> allImages = roomImageRepository.findAll();
+        Map<Long, List<RoomImage>> imagesByRoom = allImages.stream()
+                .collect(Collectors.groupingBy(RoomImage::getRoomId));
 
         return rooms.stream()
-                .map(r -> toRoomDTO(r, homestayNames.get(r.getHomestayId())))
+                .map(r -> toRoomDTOWithImages(r, homestayNames.get(r.getHomestayId()), imagesByRoom.getOrDefault(r.getId(), Collections.emptyList()), null))
                 .collect(Collectors.toList());
     }
 
     /**
      * Lấy chi tiết 1 phòng theo ID từ Database
      */
+    @Cacheable(value = "roomDetail", key = "#id")
     public RoomDTO getRoomById(Long id) {
         Room room = roomRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy phòng với ID: " + id));
@@ -69,6 +75,45 @@ public class RoomService {
     public static class ReviewSummary {
         private final int count;
         private final double avgRating;
+    }
+
+    private ReviewSummary getHomestayReviewStat(Long homestayId) {
+        try {
+            return jdbcTemplate.query(
+                "SELECT COUNT(*) AS cnt, AVG(rating) AS avg_rating FROM reviews WHERE homestay_id = ?",
+                rs -> {
+                    if (rs.next()) {
+                        int cnt = rs.getInt("cnt");
+                        double avg = rs.getDouble("avg_rating");
+                        return new ReviewSummary(cnt, Math.round(avg * 10.0) / 10.0);
+                    }
+                    return new ReviewSummary(0, 5.0);
+                },
+                homestayId
+            );
+        } catch (Exception e) {
+            log.warn("Lỗi truy vấn thống kê reviews homestay {}: {}", homestayId, e.getMessage());
+            return new ReviewSummary(0, 5.0);
+        }
+    }
+
+    private Map<Long, ReviewSummary> getRoomReviewStatsForHomestay(Long homestayId) {
+        Map<Long, ReviewSummary> map = new HashMap<>();
+        try {
+            jdbcTemplate.query(
+                "SELECT b.room_id, COUNT(*) AS cnt, AVG(r.rating) AS avg_rating FROM reviews r JOIN bookings b ON r.booking_id = b.booking_id WHERE b.homestay_id = ? AND b.room_id IS NOT NULL GROUP BY b.room_id",
+                rs -> {
+                    long rId = rs.getLong("room_id");
+                    int cnt = rs.getInt("cnt");
+                    double avg = rs.getDouble("avg_rating");
+                    map.put(rId, new ReviewSummary(cnt, Math.round(avg * 10.0) / 10.0));
+                },
+                homestayId
+            );
+        } catch (Exception e) {
+            log.warn("Lỗi truy vấn thống kê reviews phòng của homestay {}: {}", homestayId, e.getMessage());
+        }
+        return map;
     }
 
     private Map<Long, ReviewSummary> getHomestayReviewStatsMap() {
@@ -108,16 +153,18 @@ public class RoomService {
     }
 
     /**
-     * Lấy danh sách phòng thuộc về 1 Homestay
+     * Lấy danh sách phòng thuộc về 1 Homestay (tối ưu nạp ảnh và review)
      */
+    @Cacheable(value = "homestayRooms", key = "#homestayId")
     public List<RoomDTO> getRoomsByHomestayId(Long homestayId) {
         List<Room> rooms = roomRepository.findByHomestayId(homestayId);
         String homestayName = homestayRepository.findById(homestayId)
                 .map(Homestay::getName).orElse("Homestay");
-        List<RoomImage> allImages = roomImageRepository.findAll();
-        Map<Long, List<RoomImage>> imagesByRoom = allImages.stream()
+        List<Long> roomIds = rooms.stream().map(Room::getId).collect(Collectors.toList());
+        List<RoomImage> roomImages = roomIds.isEmpty() ? Collections.emptyList() : roomImageRepository.findByRoomIdIn(roomIds);
+        Map<Long, List<RoomImage>> imagesByRoom = roomImages.stream()
                 .collect(Collectors.groupingBy(RoomImage::getRoomId));
-        Map<Long, ReviewSummary> roomReviewStats = getRoomReviewStatsMap();
+        Map<Long, ReviewSummary> roomReviewStats = getRoomReviewStatsForHomestay(homestayId);
 
         return rooms.stream()
                 .map(r -> toRoomDTOWithImages(r, homestayName, imagesByRoom.getOrDefault(r.getId(), Collections.emptyList()), roomReviewStats.get(r.getId())))
@@ -127,6 +174,7 @@ public class RoomService {
     /**
      * Lấy toàn bộ danh sách Homestay kèm các phòng thực tế từ Database
      */
+    @Cacheable("allHomestays")
     public List<HomestayDTO> getAllHomestaysWithRooms() {
         List<Homestay> homestays = homestayRepository.findAll();
         List<Room> allRooms = roomRepository.findAll();
@@ -156,16 +204,82 @@ public class RoomService {
                 .collect(Collectors.toList());
     }
 
+    private String removeVietnameseTones(String str) {
+        if (str == null) return "";
+        String s = java.text.Normalizer.normalize(str, java.text.Normalizer.Form.NFD)
+                .replaceAll("\\p{InCombiningDiacriticalMarks}+", "");
+        s = s.replace('đ', 'd').replace('Đ', 'd');
+        return s.toLowerCase().trim();
+    }
+
+    /**
+     * Tìm kiếm Homestay trực tiếp theo Database
+     */
+    public List<HomestayDTO> searchHomestaysFromDb(String keyword) {
+        if (keyword == null || keyword.trim().isEmpty()) {
+            return getAllHomestaysWithRooms();
+        }
+        String cleanKw = keyword.trim().toLowerCase();
+        String noToneKw = removeVietnameseTones(cleanKw);
+        String noSpaceKw = noToneKw.replaceAll("\\s+", "");
+
+        // 1. Tìm từ Database bằng JPA LIKE
+        List<Homestay> dbMatches;
+        if (cleanKw.length() <= 2) {
+            // Khi gõ 1-2 ký tự (như 'r', 'đà'): Chỉ tìm trong Name và City để chính xác
+            dbMatches = homestayRepository.searchByNameOrCity(cleanKw);
+        } else {
+            dbMatches = homestayRepository.searchByNameOrCityOrAddress(cleanKw);
+        }
+
+        Set<Long> matchedIds = dbMatches.stream().map(Homestay::getId).collect(Collectors.toSet());
+
+        // 2. Lấy toàn bộ Homestays kèm phòng và ảnh từ DB (có cache)
+        List<HomestayDTO> all = getAllHomestaysWithRooms();
+
+        // 3. Lọc kết quả: Trực tiếp từ DB ID hoặc khớp chuẩn tiếng Việt không dấu
+        return all.stream().filter(dto -> {
+            if (matchedIds.contains(dto.getId())) {
+                return true;
+            }
+            // Khớp không dấu trên Name và City
+            String noToneName = removeVietnameseTones(dto.getName());
+            String noToneCity = removeVietnameseTones(dto.getCity());
+
+            if (noToneName.contains(noToneKw) || noToneCity.contains(noToneKw)) {
+                return true;
+            }
+
+            // Khớp viết liền (như "dalat" -> "da lat", "sapa" -> "sa pa", "phuquoc" -> "phu quoc")
+            String noSpaceName = noToneName.replaceAll("\\s+", "");
+            String noSpaceCity = noToneCity.replaceAll("\\s+", "");
+            if (noSpaceKw.length() >= 3 && (noSpaceName.contains(noSpaceKw) || noSpaceCity.contains(noSpaceKw))) {
+                return true;
+            }
+
+            // Nếu từ khóa dài (>= 4 ký tự) và khớp address không dấu
+            if (cleanKw.length() >= 4 && dto.getAddress() != null) {
+                String noToneAddress = removeVietnameseTones(dto.getAddress());
+                if (noToneAddress.contains(noToneKw)) {
+                    return true;
+                }
+            }
+
+            return false;
+        }).collect(Collectors.toList());
+    }
+
     /**
      * Lấy thông tin 1 Homestay kèm các phòng từ Database
      */
+    @Cacheable(value = "homestayDetail", key = "#id")
     public HomestayDTO getHomestayById(Long id) {
         Homestay h = homestayRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy homestay với ID: " + id));
         List<RoomDTO> roomDTOs = getRoomsByHomestayId(id);
         List<HomestayImage> hImages = homestayImageRepository.findByHomestayId(id);
-        Map<Long, ReviewSummary> hsStats = getHomestayReviewStatsMap();
-        return toHomestayDTO(h, roomDTOs, hImages, hsStats.get(id));
+        ReviewSummary hsStat = getHomestayReviewStat(id);
+        return toHomestayDTO(h, roomDTOs, hImages, hsStat);
     }
 
     /**

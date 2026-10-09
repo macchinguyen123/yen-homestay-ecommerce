@@ -3,6 +3,8 @@ import { Link, useNavigate } from "react-router-dom";
 import "./PersonalAccount.css";
 import { userService } from "../../../services/userService";
 import { authService } from "../../../services/authService";
+import { viewedHistoryService } from "../../../services/viewedHistoryService";
+import { formatAmenities } from "../Category/Category";
 
 const PROVINCES_DATA = [
   { code: "HN", name: "Hà Nội", wards: ["Ba Đình", "Hoàn Kiếm", "Tây Hồ", "Cầu Giấy"] },
@@ -284,9 +286,17 @@ export default function PersonalAccount() {
       const currentUser = authService.getCurrentUser();
       const userId = currentUser?.id || 10;
 
-      const res = await viewedHistoryService.getViewedHistory(userId);
-      if (res.success && Array.isArray(res.data)) {
-        setViewedList(res.data);
+      try {
+        const res = await viewedHistoryService.getViewedHistory(userId);
+        if (res?.success && Array.isArray(res.data) && res.data.length > 0) {
+          setViewedList(res.data);
+        } else {
+          // Nếu CSDL trống hoặc chưa xem sản phẩm nào, dùng danh sách gợi ý mẫu
+          setViewedList(INITIAL_VIEWED_LIST);
+        }
+      } catch (err) {
+        console.warn("Lỗi khi tải lịch sử xem homestay:", err);
+        setViewedList(INITIAL_VIEWED_LIST);
       }
     };
 
@@ -1040,7 +1050,7 @@ export default function PersonalAccount() {
 
                             <div className="card-amenities-box">
                               <span className="amenities-label">Tiện nghi nổi bật:</span>
-                              <p className="amenities-items">{item.amenities}</p>
+                              <p className="amenities-items">{formatAmenities(item.amenities)}</p>
                             </div>
 
                             <div className="card-footer-row">

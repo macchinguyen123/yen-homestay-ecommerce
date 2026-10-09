@@ -79,7 +79,6 @@ export default function SearchSidebar({
             <h3>Dịch vụ &amp; trải nghiệm</h3>
             {allServices.map((item) => {
               const val = typeof item === 'object' ? item.name : item;
-              const count = typeof item === 'object' ? item.count : null;
               return (
                 <label key={val} className="filter-option">
                   <input
@@ -88,7 +87,6 @@ export default function SearchSidebar({
                     onChange={() => handleToggle(selectedServices, setSelectedServices, val)}
                   />
                   <span>{val}</span>
-                  {count !== null && count !== undefined && <small>{count}</small>}
                 </label>
               );
             })}
@@ -101,7 +99,6 @@ export default function SearchSidebar({
             <h3>Tiện nghi phòng</h3>
             {allRoomAmenities.map((item) => {
               const val = typeof item === 'object' ? item.name : item;
-              const count = typeof item === 'object' ? item.count : null;
               return (
                 <label key={val} className="filter-option">
                   <input
@@ -110,7 +107,6 @@ export default function SearchSidebar({
                     onChange={() => handleToggle(selectedRoomAmenities, setSelectedRoomAmenities, val)}
                   />
                   <span>{val}</span>
-                  {count !== null && count !== undefined && <small>{count}</small>}
                 </label>
               );
             })}
@@ -123,7 +119,6 @@ export default function SearchSidebar({
             <h3>Tiện nghi homestay</h3>
             {allAmenities.map((item) => {
               const val = typeof item === 'object' ? item.name : item;
-              const count = typeof item === 'object' ? item.count : null;
               return (
                 <label key={val} className="filter-option">
                   <input
@@ -132,7 +127,6 @@ export default function SearchSidebar({
                     onChange={() => handleToggle(selectedAmenities, setSelectedAmenities, val)}
                   />
                   <span>{val}</span>
-                  {count !== null && count !== undefined && <small>{count}</small>}
                 </label>
               );
             })}
@@ -145,7 +139,6 @@ export default function SearchSidebar({
             <h3>Nhóm du lịch phù hợp</h3>
             {allTravelGroups.map((item) => {
               const val = typeof item === 'object' ? item.name : item;
-              const count = typeof item === 'object' ? item.count : null;
               return (
                 <label key={val} className="filter-option">
                   <input
@@ -154,7 +147,6 @@ export default function SearchSidebar({
                     onChange={() => handleToggle(selectedTravelGroups, setSelectedTravelGroups, val)}
                   />
                   <span>{val}</span>
-                  {count !== null && count !== undefined && <small>{count}</small>}
                 </label>
               );
             })}

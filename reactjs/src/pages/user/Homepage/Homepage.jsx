@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import './Homepage.css';
 import { homestayService } from '../../../services/homestayService';
+import { formatAmenities } from '../Category/Category';
 
 const HERO_SLIDES = [
   { id: 1, img: 'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=1920&q=80', title: 'Homestay giữa núi rừng bản địa chân thực' },
@@ -10,14 +11,18 @@ const HERO_SLIDES = [
 ];
 
 const EXPERIENCES = [
-  { id: 1, title: 'Miệt vườn', desc: 'Ở giữa vườn cây, hái trái, làm vườn', tag: 'Miệt vườn', img: 'https://images.unsplash.com/photo-1544644181-1484b3fdfc62?auto=format&fit=crop&w=600&q=80' },
-  { id: 2, title: 'Nông trại', desc: 'Trồng rau, thu hoạch, chăm vật nuôi, làm ruộng', tag: 'Nông trại', img: 'https://images.unsplash.com/photo-1500595046743-cd271d694d30?auto=format&fit=crop&w=600&q=80' },
-  { id: 3, title: 'Sông nước', desc: 'Đi xuồng, chèo ghe, câu cá, ngắm sông', tag: 'Sông nước', img: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=600&q=80' },
-  { id: 4, title: 'Nhà quê truyền thống', desc: 'Nhà gỗ, nhà vườn, nhà cổ địa phương', tag: 'Nhà quê', img: 'https://images.unsplash.com/photo-1518780664697-55e3ad937233?auto=format&fit=crop&w=600&q=80' },
-  { id: 5, title: 'Ẩm thực quê', desc: 'Nấu ăn cùng chủ nhà, làm bánh dân gian', tag: 'Ẩm thực', img: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=600&q=80' },
-  { id: 6, title: 'Làng nghề truyền thống', desc: 'Đan lát, làm gốm, dệt đồ thủ công', tag: 'Làng nghề', img: 'https://images.unsplash.com/photo-1513519245088-0e12902e5a38?auto=format&fit=crop&w=600&q=80' },
-  { id: 7, title: 'Thiên nhiên sinh thái', desc: 'Rừng, đồng ruộng, hồ, suối sinh thái', tag: 'Thiên nhiên', img: 'https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?auto=format&fit=crop&w=600&q=80' },
-  { id: 8, title: 'Trải nghiệm đời sống', desc: 'Bắt cá, hái rau, đi chợ quê, chăm vườn', tag: 'Đời sống', img: 'https://images.unsplash.com/photo-1516253593875-bd7ba052fbc5?auto=format&fit=crop&w=600&q=80' },
+  { id: 1, title: 'Miệt vườn', desc: 'Ở giữa vườn cây, hái trái, làm vườn', tag: 'Miệt vườn', cat: 'miet-vuan', img: 'https://images.unsplash.com/photo-1544644181-1484b3fdfc62?auto=format&fit=crop&w=600&q=80' },
+  { id: 2, title: 'Nông trại', desc: 'Trồng rau, thu hoạch, chăm vật nuôi, làm ruộng', tag: 'Nông trại', cat: 'nong-trai', img: 'https://images.unsplash.com/photo-1500595046743-cd271d694d30?auto=format&fit=crop&w=600&q=80' },
+  { id: 3, title: 'Sông nước', desc: 'Đi xuồng, chèo ghe, câu cá, ngắm sông', tag: 'Sông nước', cat: 'song-nuoc', img: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=600&q=80' },
+  { id: 4, title: 'Nhà quê truyền thống', desc: 'Nhà gỗ, nhà vườn, nhà cổ, sinh hoạt cùng gia đình địa phương', tag: 'Nhà quê', cat: 'nha-que', img: 'https://images.unsplash.com/photo-1518780664697-55e3ad937233?auto=format&fit=crop&w=600&q=80' },
+  { id: 5, title: 'Ẩm thực quê', desc: 'Nấu ăn cùng chủ nhà, làm bánh dân gian, ăn cơm nhà', tag: 'Ẩm thực', cat: 'am-thuc', img: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=600&q=80' },
+  { id: 6, title: 'Làng nghề truyền thống', desc: 'Đan lát, làm gốm, dệt, làm đồ thủ công', tag: 'Làng nghề', cat: 'lang-nghe', img: 'https://images.unsplash.com/photo-1513519245088-0e12902e5a38?auto=format&fit=crop&w=600&q=80' },
+  { id: 7, title: 'Thiên nhiên sinh thái', desc: 'Rừng, đồng ruộng, hồ, suối, vườn sinh thái', tag: 'Thiên nhiên', cat: 'thien-nhien', img: 'https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?auto=format&fit=crop&w=600&q=80' },
+  { id: 8, title: 'Trải nghiệm đời sống quê', desc: 'Bắt cá, hái rau, đi chợ quê, chăm vườn', tag: 'Đời sống quê', cat: 'doi-song', img: 'https://images.unsplash.com/photo-1516253593875-bd7ba052fbc5?auto=format&fit=crop&w=600&q=80' },
+  { id: 9, title: 'Văn hóa địa phương', desc: 'Đờn ca, hát dân gian, lễ hội, kể chuyện địa phương', tag: 'Văn hóa', cat: 'van-hoa', img: 'https://images.unsplash.com/photo-1510798831971-661eb04b3739?auto=format&fit=crop&w=600&q=80' },
+  { id: 10, title: 'Khám phá làng quê', desc: 'Đạp xe, đi bộ, tham quan xóm làng', tag: 'Khám phá', cat: 'kham-pha', img: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=600&q=80' },
+  { id: 11, title: 'Chậm thư giãn', desc: 'Võng, uống trà, ngắm hoàng hôn, đọc sách, nghỉ ngơi', tag: 'Nghỉ dưỡng', cat: 'thu-gian', img: 'https://images.unsplash.com/photo-1528127269322-539801943592?auto=format&fit=crop&w=600&q=80' },
+  { id: 12, title: 'Ở cùng người bản địa', desc: 'Sinh hoạt, ăn uống và trò chuyện cùng gia đình chủ nhà', tag: 'Người bản địa', cat: 'ban-dia', img: 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=600&q=80' },
 ];
 
 const COMBOS = [
@@ -88,13 +93,6 @@ const FAVORITES_HOMESTAYS = [
   { id: 104, name: 'Danang Ocean Horizon', city: 'danang', location: 'Bán đảo Sơn Trà, Đà Nẵng', rating: 4.94, reviews: 178, specs: '2 phòng ngủ · 4 khách', amenities: 'Bể bơi vô cực ngắm vịnh · Bếp BBQ · Đón tiễn sân bay', price: '1.450.000đ', tag: 'View biển triệu đô', img: 'https://images.unsplash.com/photo-1571896349842-33c89424de2d?auto=format&fit=crop&w=600&q=80' },
 ];
 
-function formatFestivalDate(value) {
-  if (!value) return '';
-  if (/^\d{2}\/\d{2}\/\d{4}$/.test(value)) return value;
-  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  return match ? `${match[3]}/${match[2]}/${match[1]}` : value;
-}
-
 export default function Homepage() {
   const navigate = useNavigate();
 
@@ -114,7 +112,7 @@ export default function Homepage() {
 
   // Festival Section State
   const [activeFestivalKey, setActiveFestivalKey] = useState('diff');
-  const [databaseFestivals, setDatabaseFestivals] = useState(null);
+  const [visibleFestivalCount, setVisibleFestivalCount] = useState(4);
 
   // Favorites Filter City State
   const [favCityFilter, setFavCityFilter] = useState('all');
@@ -140,80 +138,90 @@ export default function Homepage() {
 
   // Fetch dynamic data
   useEffect(() => {
+    let isMounted = true;
     const fetchHomeData = async () => {
+      setIsLoading(true);
       try {
-        const homeRes = await fetch('http://localhost:8081/api/public/home');
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 2500);
+
+        const homeRes = await fetch('http://localhost:8081/api/public/home', { signal: controller.signal });
+        clearTimeout(timeoutId);
+
         if (homeRes.ok) {
           const data = await homeRes.json();
-          if (data.heroSlides) {
+          if (data && data.heroSlides && isMounted) {
             setHomeData(prev => ({ ...prev, ...data }));
+            setIsLoading(false);
+            return; // Data loaded in 1 lightning-fast request!
           }
         }
       } catch (err) {
-        console.warn('Failed to fetch dynamic home data, using fallback:', err);
+        console.warn('Lỗi hoặc timeout khi tải dữ liệu trang chủ trực tiếp, chuyển sang phương án fallback:', err);
       }
 
       try {
         const realHomestays = await homestayService.getAllHomestays();
-        if (realHomestays && realHomestays.length > 0) {
+        if (isMounted && realHomestays && realHomestays.length > 0) {
           const mappedHomestays = realHomestays.map((h, i) => ({
             id: h.id || h.homestayId,
             name: h.name,
             city: (h.city || 'dalat').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').replace(/ /g, ''),
             location: h.address || h.city,
             rating: h.rating || 5.0,
-            reviews: h.totalReviews || Math.floor(Math.random() * 200) + 10,
+            reviews: h.reviews || h.totalReviews || Math.floor(Math.random() * 200) + 10,
             specs: `${h.numRooms || 1} phòng ngủ · ${h.maxGuests || 2} khách`,
             amenities: h.amenities || 'Tiện nghi tiêu chuẩn',
-            price: h.basePrice ? Number(h.basePrice).toLocaleString('vi-VN') + 'đ' : '1.500.000đ',
+            price: h.basePrice ? Number(h.basePrice).toLocaleString('vi-VN') + 'đ' : (h.price ? (typeof h.price === 'number' ? h.price.toLocaleString('vi-VN') + 'đ' : h.price) : '1.500.000đ'),
             tag: i === 0 ? 'Top 1 Bán Chạy' : (i < 3 ? `Đã đặt ${30 - i} lần` : 'Khuyến mãi'),
             img: (h.images && h.images.length > 0) ? h.images[0] : (h.image || h.primaryImage || 'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=600&q=80')
           }));
 
+          // Dynamic Festival homestays filtered from real database homestays
+          const danangHs = mappedHomestays.filter(h => (h.location + ' ' + h.city).toLowerCase().includes('danang') || (h.location + ' ' + h.city).toLowerCase().includes('đà nẵng') || (h.location + ' ' + h.city).toLowerCase().includes('da nang'));
+          const dalatHs = mappedHomestays.filter(h => (h.location + ' ' + h.city).toLowerCase().includes('dalat') || (h.location + ' ' + h.city).toLowerCase().includes('đà lạt') || (h.location + ' ' + h.city).toLowerCase().includes('da lat'));
+
+          const dynamicFestivals = {
+            diff: {
+              badge: 'Sắp diễn ra vào tháng 6',
+              name: 'Lễ Hội Pháo Hoa Quốc Tế Đà Nẵng (DIFF)',
+              location: 'Sân khấu bờ sông Hàn, TP. Đà Nẵng',
+              date: '08/06 - 13/07/2026',
+              homestays: (danangHs.length > 0 ? danangHs : mappedHomestays.slice(0, 3)).map((h, idx) => ({
+                ...h,
+                distance: `Cách điểm bắn pháo hoa ~${(idx + 1) * 350}m`,
+                tag: idx % 2 === 0 ? 'Gần khán đài pháo hoa' : 'Đi bộ ra lễ hội'
+              }))
+            },
+            dalat: {
+              badge: 'Khai mạc cuối năm',
+              name: 'Festival Hoa Đà Lạt Sắc Màu Xứ Ngàn Hoa',
+              location: 'Quảng trường Lâm Viên & Hồ Xuân Hương, Đà Lạt',
+              date: '18/12 - 31/12/2026',
+              homestays: (dalatHs.length > 0 ? dalatHs : mappedHomestays.slice(0, 3)).map((h, idx) => ({
+                ...h,
+                distance: `Cách Quảng trường Lâm Viên ~${(idx + 1) * 400}m`,
+                tag: idx % 2 === 0 ? 'Đi bộ ra Festival' : 'Săn mây thung lũng'
+              }))
+            }
+          };
+
           setHomeData(prev => ({
             ...prev,
             hotHomestays: mappedHomestays,
-            favoritesHomestays: mappedHomestays
+            favoritesHomestays: mappedHomestays,
+            festivals: dynamicFestivals
           }));
         }
       } catch (err) {
         console.warn('Failed to fetch real homestays:', err);
+      } finally {
+        if (isMounted) setIsLoading(false);
       }
-      setIsLoading(false);
     };
 
     fetchHomeData();
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-    fetch('http://localhost:8081/api/public/festivals')
-      .then(response => response.ok ? response.json() : Promise.reject(new Error('Festival API unavailable')))
-      .then(rows => {
-        if (cancelled) return;
-        const mapped = rows.map(festival => ({
-          ...festival,
-          key: String(festival.id),
-          badge: festival.badgeInfo || (festival.status === 'active' ? 'Đang diễn ra' : 'Sắp diễn ra'),
-          date: [festival.startDate, festival.endDate].filter(Boolean).map(formatFestivalDate).join(' – '),
-          location: [festival.location, festival.city].filter(Boolean).join(', '),
-          homestays: (festival.homestays || []).map(home => ({
-            id: home.id,
-            name: home.name,
-            location: home.address || home.city || festival.city,
-            distance: home.distanceLabel || 'Homestay gợi ý gần lễ hội',
-            rating: home.rating || 'Mới',
-            reviews: 0,
-            price: home.price ? `${Number(home.price).toLocaleString('vi-VN')}đ` : 'Liên hệ',
-            tag: home.distanceLabel || 'Gợi ý theo lễ hội',
-            img: home.imageUrl || festival.imageUrl || 'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=600&q=80',
-          })),
-        }));
-        setDatabaseFestivals(mapped);
-        setActiveFestivalKey(mapped.length ? String(mapped[0].id) : null);
-      })
-      .catch(() => { if (!cancelled) setDatabaseFestivals(null); });
-    return () => { cancelled = true; };
+    return () => { isMounted = false; };
   }, []);
 
   // Hero slider auto-play
@@ -272,12 +280,7 @@ export default function Homepage() {
     return h.city === favCityFilter;
   });
 
-  const festivalTabs = databaseFestivals === null
-    ? Object.entries(homeData.festivals).map(([key, festival]) => ({ key, name: festival.name }))
-    : databaseFestivals.map(festival => ({ key: festival.key, name: festival.name }));
-  const activeFestData = databaseFestivals === null
-    ? homeData.festivals[activeFestivalKey] || homeData.festivals.diff || FESTIVALS.diff
-    : databaseFestivals.find(festival => festival.key === activeFestivalKey);
+  const activeFestData = homeData.festivals[activeFestivalKey] || homeData.festivals.diff || FESTIVALS.diff;
 
   return (
     <div className="homepage-wrapper">
@@ -495,7 +498,7 @@ export default function Homepage() {
               else if (t.includes('bản địa')) iconClass = 'bi-people';
 
               return (
-                <div key={exp.id} className="experience-card" onClick={() => navigate('/booking')}>
+                <div key={exp.id} className="experience-card" onClick={() => navigate(`/category?cat=${exp.cat || 'all'}`)} style={{ cursor: 'pointer' }}>
                   <div className="exp-img-wrapper">
                     <img src={exp.img} alt={exp.title} loading="lazy" />
                     <span className="exp-badge">
@@ -602,35 +605,39 @@ export default function Homepage() {
             <span style={{ color: '#15803D' }}><i className="bi bi-house-heart-fill" /> Homestay gần đó dễ dàng di chuyển</span>
           </div>
 
-          {festivalTabs.length > 0 ? (
-            <>
-              <div className="festival-tabs">
-                {festivalTabs.map(festival => (
-                  <button key={festival.key} type="button" className={`festival-tab-btn ${activeFestivalKey === festival.key ? 'active' : ''}`} onClick={() => setActiveFestivalKey(festival.key)}>
-                    <i className="bi bi-calendar-event" /> {festival.name}
-                  </button>
-                ))}
+          <div className="festival-tabs">
+            <button
+              type="button"
+              className={`festival-tab-btn ${activeFestivalKey === 'diff' ? 'active' : ''}`}
+              onClick={() => { setActiveFestivalKey('diff'); setVisibleFestivalCount(4); }}
+            >
+              <i className="bi bi-fire" /> Lễ Hội Pháo Hoa Quốc Tế DIFF (Đà Nẵng)
+            </button>
+            <button
+              type="button"
+              className={`festival-tab-btn ${activeFestivalKey === 'dalat' ? 'active' : ''}`}
+              onClick={() => { setActiveFestivalKey('dalat'); setVisibleFestivalCount(4); }}
+            >
+              <i className="bi bi-flower1" /> Festival Hoa Đà Lạt (Lâm Viên)
+            </button>
+          </div>
+
+          <div className="festival-banner-card">
+            <div>
+              <span className="fest-badge">{activeFestData.badge}</span>
+              <h3 className="fest-name">{activeFestData.name}</h3>
+              <div className="fest-meta">
+                <span><i className="bi bi-geo-alt-fill" /> <strong>{activeFestData.location}</strong></span>
+                <span><i className="bi bi-clock-fill" /> <strong>{activeFestData.date}</strong></span>
               </div>
+            </div>
+            <Link to="/search" className="btn-view-room" style={{ background: '#D97706', whiteSpace: 'nowrap' }}>
+              Xem homestay gần nhất
+            </Link>
+          </div>
 
-              {activeFestData && <>
-                <div className="festival-banner-card">
-                  <div className="festival-banner-backdrop" style={activeFestData.imageUrl ? { backgroundImage: `url(${activeFestData.imageUrl})` } : undefined} />
-                  <div>
-                    <span className="fest-badge">{activeFestData.badge}</span>
-                    <h3 className="fest-name">{activeFestData.name}</h3>
-                    <div className="fest-meta">
-                      <span><i className="bi bi-geo-alt-fill" /> <strong>{activeFestData.location}</strong></span>
-                      <span><i className="bi bi-clock-fill" /> <strong>{activeFestData.date || 'Chưa cập nhật thời gian'}</strong></span>
-                    </div>
-                    {activeFestData.description && <p>{activeFestData.description}</p>}
-                  </div>
-                  <Link to={`/search?q=${encodeURIComponent(activeFestData.city || '')}`} className="btn-view-room" style={{ background: '#D97706', whiteSpace: 'nowrap' }}>
-                    Xem homestay gần nhất
-                  </Link>
-                </div>
-
-                {activeFestData.homestays?.length ? <div className="festival-homestays-grid">
-                  {activeFestData.homestays.map((h) => (
+          <div className="festival-homestays-grid">
+            {(activeFestData.homestays || []).slice(0, visibleFestivalCount).map((h) => (
               <div key={h.id} className="homestay-card">
                 <div className="card-img-wrapper">
                   <span className="card-top-tag">{h.tag}</span>
@@ -660,12 +667,22 @@ export default function Homepage() {
                     <Link to={`/homestay/${h.id}`} className="btn-view-room">Xem homestay</Link>
                   </div>
                 </div>
-                  </div>
-                  ))}
-                </div> : <p className="section-subtitle">Chưa có homestay được gợi ý cho lễ hội này.</p>}
-              </>}
-            </>
-          ) : <p className="section-subtitle">Hiện chưa có lễ hội sắp diễn ra.</p>}
+              </div>
+            ))}
+          </div>
+
+          {visibleFestivalCount < (activeFestData.homestays || []).length && (
+            <div style={{ textAlign: 'center', marginTop: '32px' }}>
+              <button 
+                onClick={() => setVisibleFestivalCount(prev => prev + 4)}
+                style={{ padding: '12px 32px', borderRadius: '12px', fontWeight: 'bold', background: '#FFF', border: '1.5px solid #15803D', color: '#15803D', cursor: 'pointer', transition: 'all 0.2s' }}
+                onMouseOver={(e) => { e.currentTarget.style.background = '#15803D'; e.currentTarget.style.color = '#FFF'; }}
+                onMouseOut={(e) => { e.currentTarget.style.background = '#FFF'; e.currentTarget.style.color = '#15803D'; }}
+              >
+                Xem thêm homestay theo lễ hội
+              </button>
+            </div>
+          )}
         </div>
       </section>
 
@@ -701,7 +718,7 @@ export default function Homepage() {
                   <div className="card-specs"><span>{h.specs}</span></div>
                   <div className="card-amenities-box">
                     <span className="amenities-label">Tiện nghi nổi bật:</span>
-                    <p className="amenities-items">{h.amenities}</p>
+                    <p className="amenities-items">{formatAmenities(h.amenities)}</p>
                   </div>
                   <div className="card-footer-row">
                     <div>
@@ -783,7 +800,7 @@ export default function Homepage() {
                   <div className="card-specs"><span>{h.specs}</span></div>
                   <div className="card-amenities-box">
                     <span className="amenities-label">Tiện nghi nổi bật:</span>
-                    <p className="amenities-items">{h.amenities}</p>
+                    <p className="amenities-items">{formatAmenities(h.amenities)}</p>
                   </div>
                   <div className="card-footer-row">
                     <div>

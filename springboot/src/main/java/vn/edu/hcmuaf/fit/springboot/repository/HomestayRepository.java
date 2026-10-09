@@ -17,5 +17,16 @@ public interface HomestayRepository extends JpaRepository<Homestay, Long> {
 
     @org.springframework.data.jpa.repository.Query("SELECT h.city, COUNT(h) FROM Homestay h WHERE h.city IS NOT NULL AND h.city != '' GROUP BY h.city ORDER BY COUNT(h) DESC")
     List<Object[]> countHomestaysByCity();
+
+    @org.springframework.data.jpa.repository.Query("SELECT h FROM Homestay h WHERE " +
+           "LOWER(h.name) LIKE LOWER(CONCAT('%', :kw, '%')) OR " +
+           "LOWER(h.city) LIKE LOWER(CONCAT('%', :kw, '%'))")
+    List<Homestay> searchByNameOrCity(@org.springframework.data.repository.query.Param("kw") String kw);
+
+    @org.springframework.data.jpa.repository.Query("SELECT h FROM Homestay h WHERE " +
+           "LOWER(h.name) LIKE LOWER(CONCAT('%', :kw, '%')) OR " +
+           "LOWER(h.city) LIKE LOWER(CONCAT('%', :kw, '%')) OR " +
+           "LOWER(h.address) LIKE LOWER(CONCAT('%', :kw, '%'))")
+    List<Homestay> searchByNameOrCityOrAddress(@org.springframework.data.repository.query.Param("kw") String kw);
 }
 

@@ -104,6 +104,17 @@ public class BookingService {
     public Booking createBooking(CreateBookingRequest req) {
         String code = "YEN-" + LocalDate.now().getYear() + "-" + (1000 + new SecureRandom().nextInt(9000));
 
+        // Chuẩn hóa theo ràng buộc Check Constraint của Neon PostgreSQL:
+        // payment_type: 'FULL' hoặc 'DEPOSIT'
+        String payType = "DEPOSIT".equalsIgnoreCase(req.getPaymentType()) ? "DEPOSIT" : "FULL";
+        // deposit_status: 'HELD', 'REFUNDED' hoặc 'FORFEITED'
+        String depStatus = "REFUNDED".equalsIgnoreCase(req.getDepositStatus()) ? "REFUNDED" :
+                           ("FORFEITED".equalsIgnoreCase(req.getDepositStatus()) ? "FORFEITED" : "HELD");
+        // status: 'PENDING', 'CONFIRMED', 'COMPLETED', 'CANCELLED'
+        String bookingStatus = "CANCELLED".equalsIgnoreCase(req.getStatus()) ? "CANCELLED" :
+                               ("COMPLETED".equalsIgnoreCase(req.getStatus()) ? "COMPLETED" :
+                               ("PENDING".equalsIgnoreCase(req.getStatus()) ? "PENDING" : "CONFIRMED"));
+
         Booking booking = Booking.builder()
                 .bookingCode(code)
                 .touristId(req.getTouristId() != null ? req.getTouristId() : 21L) // Mặc định du khách
@@ -117,22 +128,37 @@ public class BookingService {
                 .discountAmount(req.getDiscountAmount() != null ? req.getDiscountAmount() : BigDecimal.ZERO)
                 .depositAmount(req.getDepositAmount() != null ? req.getDepositAmount() : BigDecimal.ZERO)
                 .remainingAmount(req.getRemainingAmount() != null ? req.getRemainingAmount() : BigDecimal.ZERO)
-                .paymentType(req.getPaymentType() != null ? req.getPaymentType() : "VIETQR")
-                .depositStatus(req.getDepositStatus() != null ? req.getDepositStatus() : "PAID")
-                .status(req.getStatus() != null ? req.getStatus() : "CONFIRMED")
+                .paymentType(payType)
+                .depositStatus(depStatus)
+                .status(bookingStatus)
                 .createdAt(LocalDateTime.now())
                 .build();
 
         Booking savedBooking = bookingRepository.save(booking);
 
         // Tạo bản ghi giao dịch payment nếu đã thanh toán
+        // payments.payment_method: 'BANK_TRANSFER', 'CASH', 'VNPAY', 'MOMO'
+        // payments.status: 'PENDING', 'SUCCESS', 'FAILED'
+        String rawMethod = (req.getPaymentMethod() != null ? req.getPaymentMethod() :
+                           (req.getPaymentType() != null ? req.getPaymentType() : "")).toUpperCase();
+        String dbMethod = "BANK_TRANSFER";
+        if (rawMethod.contains("MOMO")) {
+            dbMethod = "MOMO";
+        } else if (rawMethod.contains("VNPAY") || rawMethod.contains("CARD") || rawMethod.contains("ZALO")) {
+            dbMethod = "VNPAY";
+        } else if (rawMethod.contains("CASH") || rawMethod.contains("TIEN_MAT")) {
+            dbMethod = "CASH";
+        } else {
+            dbMethod = "BANK_TRANSFER";
+        }
+
         if (booking.getDepositAmount() != null && booking.getDepositAmount().compareTo(BigDecimal.ZERO) > 0) {
             Payment payment = Payment.builder()
                     .bookingId(savedBooking.getId())
                     .amount(booking.getDepositAmount())
-                    .paymentMethod(booking.getPaymentType())
+                    .paymentMethod(dbMethod)
                     .transactionCode("TXN-" + System.currentTimeMillis())
-                    .status("PAID")
+                    .status("SUCCESS")
                     .paidAt(LocalDateTime.now())
                     .build();
             paymentRepository.save(payment);

@@ -9,4 +9,5 @@ import java.util.List;
 @Repository
 public interface GuestTaskRepository extends JpaRepository<GuestTask, Long> {
     List<GuestTask> findByHomestayId(Long homestayId);
+    List<GuestTask> findByHomestayIdIn(List<Long> homestayIds);
 }
