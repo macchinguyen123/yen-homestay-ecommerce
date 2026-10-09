@@ -107,6 +107,7 @@ export default function Homepage() {
 
   // Festival Section State
   const [activeFestivalKey, setActiveFestivalKey] = useState('diff');
+  const [visibleFestivalCount, setVisibleFestivalCount] = useState(4);
 
   // Favorites Filter City State
   const [favCityFilter, setFavCityFilter] = useState('all');
@@ -154,18 +155,48 @@ export default function Homepage() {
             city: (h.city || 'dalat').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').replace(/ /g, ''),
             location: h.address || h.city,
             rating: h.rating || 5.0,
-            reviews: h.totalReviews || Math.floor(Math.random() * 200) + 10,
+            reviews: h.reviews || h.totalReviews || Math.floor(Math.random() * 200) + 10,
             specs: `${h.numRooms || 1} phòng ngủ · ${h.maxGuests || 2} khách`,
             amenities: h.amenities || 'Tiện nghi tiêu chuẩn',
-            price: h.basePrice ? Number(h.basePrice).toLocaleString('vi-VN') + 'đ' : '1.500.000đ',
+            price: h.basePrice ? Number(h.basePrice).toLocaleString('vi-VN') + 'đ' : (h.price ? (typeof h.price === 'number' ? h.price.toLocaleString('vi-VN') + 'đ' : h.price) : '1.500.000đ'),
             tag: i === 0 ? 'Top 1 Bán Chạy' : (i < 3 ? `Đã đặt ${30 - i} lần` : 'Khuyến mãi'),
             img: (h.images && h.images.length > 0) ? h.images[0] : (h.image || h.primaryImage || 'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=600&q=80')
           }));
 
+          // Dynamic Festival homestays filtered from real database homestays
+          const danangHs = mappedHomestays.filter(h => (h.location + ' ' + h.city).toLowerCase().includes('danang') || (h.location + ' ' + h.city).toLowerCase().includes('đà nẵng') || (h.location + ' ' + h.city).toLowerCase().includes('da nang'));
+          const dalatHs = mappedHomestays.filter(h => (h.location + ' ' + h.city).toLowerCase().includes('dalat') || (h.location + ' ' + h.city).toLowerCase().includes('đà lạt') || (h.location + ' ' + h.city).toLowerCase().includes('da lat'));
+
+          const dynamicFestivals = {
+            diff: {
+              badge: 'Sắp diễn ra vào tháng 6',
+              name: 'Lễ Hội Pháo Hoa Quốc Tế Đà Nẵng (DIFF)',
+              location: 'Sân khấu bờ sông Hàn, TP. Đà Nẵng',
+              date: '08/06 - 13/07/2026',
+              homestays: (danangHs.length > 0 ? danangHs : mappedHomestays.slice(0, 3)).map((h, idx) => ({
+                ...h,
+                distance: `Cách điểm bắn pháo hoa ~${(idx + 1) * 350}m`,
+                tag: idx % 2 === 0 ? 'Gần khán đài pháo hoa' : 'Đi bộ ra lễ hội'
+              }))
+            },
+            dalat: {
+              badge: 'Khai mạc cuối năm',
+              name: 'Festival Hoa Đà Lạt Sắc Màu Xứ Ngàn Hoa',
+              location: 'Quảng trường Lâm Viên & Hồ Xuân Hương, Đà Lạt',
+              date: '18/12 - 31/12/2026',
+              homestays: (dalatHs.length > 0 ? dalatHs : mappedHomestays.slice(0, 3)).map((h, idx) => ({
+                ...h,
+                distance: `Cách Quảng trường Lâm Viên ~${(idx + 1) * 400}m`,
+                tag: idx % 2 === 0 ? 'Đi bộ ra Festival' : 'Săn mây thung lũng'
+              }))
+            }
+          };
+
           setHomeData(prev => ({
             ...prev,
             hotHomestays: mappedHomestays,
-            favoritesHomestays: mappedHomestays
+            favoritesHomestays: mappedHomestays,
+            festivals: dynamicFestivals
           }));
         }
       } catch (err) {
@@ -562,14 +593,14 @@ export default function Homepage() {
             <button
               type="button"
               className={`festival-tab-btn ${activeFestivalKey === 'diff' ? 'active' : ''}`}
-              onClick={() => setActiveFestivalKey('diff')}
+              onClick={() => { setActiveFestivalKey('diff'); setVisibleFestivalCount(4); }}
             >
               <i className="bi bi-fire" /> Lễ Hội Pháo Hoa Quốc Tế DIFF (Đà Nẵng)
             </button>
             <button
               type="button"
               className={`festival-tab-btn ${activeFestivalKey === 'dalat' ? 'active' : ''}`}
-              onClick={() => setActiveFestivalKey('dalat')}
+              onClick={() => { setActiveFestivalKey('dalat'); setVisibleFestivalCount(4); }}
             >
               <i className="bi bi-flower1" /> Festival Hoa Đà Lạt (Lâm Viên)
             </button>
@@ -590,7 +621,7 @@ export default function Homepage() {
           </div>
 
           <div className="festival-homestays-grid">
-            {activeFestData.homestays.map((h) => (
+            {(activeFestData.homestays || []).slice(0, visibleFestivalCount).map((h) => (
               <div key={h.id} className="homestay-card">
                 <div className="card-img-wrapper">
                   <span className="card-top-tag">{h.tag}</span>
@@ -623,6 +654,19 @@ export default function Homepage() {
               </div>
             ))}
           </div>
+
+          {visibleFestivalCount < (activeFestData.homestays || []).length && (
+            <div style={{ textAlign: 'center', marginTop: '32px' }}>
+              <button 
+                onClick={() => setVisibleFestivalCount(prev => prev + 4)}
+                style={{ padding: '12px 32px', borderRadius: '12px', fontWeight: 'bold', background: '#FFF', border: '1.5px solid #15803D', color: '#15803D', cursor: 'pointer', transition: 'all 0.2s' }}
+                onMouseOver={(e) => { e.currentTarget.style.background = '#15803D'; e.currentTarget.style.color = '#FFF'; }}
+                onMouseOut={(e) => { e.currentTarget.style.background = '#FFF'; e.currentTarget.style.color = '#15803D'; }}
+              >
+                Xem thêm homestay theo lễ hội
+              </button>
+            </div>
+          )}
         </div>
       </section>
 
