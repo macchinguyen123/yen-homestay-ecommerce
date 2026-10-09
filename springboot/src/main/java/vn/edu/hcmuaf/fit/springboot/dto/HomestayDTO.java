@@ -40,4 +40,5 @@ public class HomestayDTO {
     private List<String> travelGroups;
     private List<RoomDTO> rooms;
     private Long defaultRoomId;
+    private List<GuestTaskDTO> tasks;
 }
