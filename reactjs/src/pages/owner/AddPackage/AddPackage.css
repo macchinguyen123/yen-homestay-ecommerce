@@ -727,11 +727,14 @@
 .pkg-modal-box {
   background: #FFFFFF;
   width: 100%;
-  max-width: 480px;
+  max-width: 520px;
+  max-height: calc(100vh - 48px);
+  display: flex;
+  flex-direction: column;
   border-radius: 18px;
   box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.25);
-  overflow: hidden;
   border: 1px solid #E2E8F0;
+  overflow: hidden;
   animation: pkgSlideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -746,12 +749,13 @@
 }
 
 .pkg-modal-header {
-  padding: 18px 20px;
+  padding: 16px 20px;
   background: #F8FAFC;
   border-bottom: 1px solid #E2E8F0;
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-shrink: 0;
 }
 
 .pkg-modal-title-wrap {
@@ -799,17 +803,34 @@
 }
 
 .pkg-modal-body {
-  padding: 20px;
+  padding: 16px 20px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+/* Custom sleek scrollbar for modal */
+.pkg-modal-body::-webkit-scrollbar {
+  width: 6px;
+}
+.pkg-modal-body::-webkit-scrollbar-track {
+  background: #F1F5F9;
+}
+.pkg-modal-body::-webkit-scrollbar-thumb {
+  background: #CBD5E1;
+  border-radius: 4px;
+}
+.pkg-modal-body::-webkit-scrollbar-thumb:hover {
+  background: #94A3B8;
 }
 
 .pkg-modal-highlight-card {
   background: #F0FDF4;
   border: 1px solid #BBF7D0;
   border-radius: 12px;
-  padding: 14px 16px;
+  padding: 12px 14px;
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -913,6 +934,7 @@
   display: flex;
   justify-content: flex-end;
   gap: 10px;
+  flex-shrink: 0;
 }
 
 .pkg-modal-btn-cancel {
@@ -1010,4 +1032,341 @@
 .pkg-toast i {
   color: #34D399;
   font-size: 1.2rem;
+}
+
+/* ── CSDL LIVE SYNC BADGE & TOOLBAR ──────────────────────────── */
+.pkg-sync-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.pkg-db-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #ECFDF5;
+  border: 1px solid #A7F3D0;
+  color: #065F46;
+  padding: 5px 12px;
+  border-radius: 9999px;
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.pkg-db-pill .dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #10B981;
+  animation: pkgPulse 1.8s infinite;
+}
+
+@keyframes pkgPulse {
+  0% { transform: scale(0.9); opacity: 0.8; }
+  50% { transform: scale(1.3); opacity: 1; }
+  100% { transform: scale(0.9); opacity: 0.8; }
+}
+
+.pkg-btn-sync {
+  border: 1px solid #CBD5E1;
+  background: #FFFFFF;
+  color: #334155;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+}
+
+.pkg-btn-sync:hover {
+  background: #F1F5F9;
+  border-color: #047857;
+  color: #047857;
+}
+
+.pkg-btn-sync.spinning i {
+  animation: pkgSpin 1s linear infinite;
+}
+
+@keyframes pkgSpin {
+  100% { transform: rotate(360deg); }
+}
+
+/* ── SEARCH INPUT ────────────────────────────────────────────── */
+.pkg-search-box {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-width: 240px;
+}
+
+.pkg-search-box i {
+  position: absolute;
+  left: 12px;
+  color: #94A3B8;
+  font-size: 0.95rem;
+}
+
+.pkg-search-input {
+  width: 100%;
+  padding: 7px 12px 7px 34px;
+  border-radius: 8px;
+  border: 1px solid #CBD5E1;
+  font-size: 0.82rem;
+  background: #FFFFFF;
+  color: #0F172A;
+  transition: border-color 0.2s;
+  outline: none;
+}
+
+.pkg-search-input:focus {
+  border-color: #059669;
+  box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.1);
+}
+
+/* ── FORM ELEMENTS IN MODAL ──────────────────────────────────── */
+.pkg-form-group {
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.pkg-form-label {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #334155;
+}
+
+.pkg-form-select,
+.pkg-form-input {
+  width: 100%;
+  padding: 9px 12px;
+  border-radius: 8px;
+  border: 1px solid #CBD5E1;
+  font-size: 0.85rem;
+  color: #0F172A;
+  background: #FFFFFF;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.pkg-form-select:focus,
+.pkg-form-input:focus {
+  border-color: #059669;
+  box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.1);
+}
+
+/* ── QR PAYMENT BOX IN RECHARGE MODAL ───────────────────────── */
+.pkg-qr-box {
+  background: #F8FAFC;
+  border: 1px dashed #CBD5E1;
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 12px;
+}
+
+.pkg-qr-img {
+  width: 90px;
+  height: 90px;
+  border-radius: 8px;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+}
+
+.pkg-qr-img img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.pkg-qr-details {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.82rem;
+  color: #475569;
+}
+
+.pkg-qr-details strong {
+  color: #0F172A;
+}
+
+/* ── HISTORY HEADER TABS ─────────────────────────────────────── */
+.pkg-history-tabs {
+  display: inline-flex;
+  gap: 6px;
+}
+
+.pkg-htab-btn {
+  border: 1px solid #E2E8F0;
+  background: #FFFFFF;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #64748B;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.pkg-htab-btn:hover {
+  background: #F1F5F9;
+  color: #0F172A;
+}
+
+.pkg-htab-btn.active {
+  background: #065F46;
+  color: #FFFFFF;
+  border-color: #065F46;
+}
+
+/* ── EMPTY & LOADING STATES ──────────────────────────────────── */
+.pkg-empty-state {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 48px 20px;
+  background: #FFFFFF;
+  border: 1px dashed #CBD5E1;
+  border-radius: 16px;
+  color: #64748B;
+}
+
+.pkg-empty-state i {
+  font-size: 2.5rem;
+  color: #94A3B8;
+  margin-bottom: 12px;
+}
+
+.pkg-empty-state h4 {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #1E293B;
+  margin: 0 0 6px;
+}
+
+.pkg-empty-state p {
+  font-size: 0.85rem;
+  margin: 0;
+}
+
+/* ── TABLE ACTION & VIEW DETAIL BUTTON ───────────────────────── */
+.pkg-btn-view-detail {
+  border: 1px solid #E2E8F0;
+  background: #F8FAFC;
+  color: #065F46;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  transition: all 0.2s ease;
+}
+
+.pkg-btn-view-detail:hover {
+  background: #065F46;
+  color: #FFFFFF;
+  border-color: #065F46;
+  box-shadow: 0 1px 3px rgba(6, 95, 70, 0.2);
+}
+
+/* ── SHORTFALL BALANCE ALERT & QUICK RECHARGE BUTTON ─────────── */
+.pkg-shortfall-alert {
+  background: #FEF2F2;
+  border: 1px solid #FECACA;
+  border-radius: 10px;
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.pkg-shortfall-text {
+  font-size: 0.82rem;
+  color: #991B1B;
+}
+
+.pkg-shortfall-text strong {
+  color: #DC2626;
+  font-weight: 800;
+}
+
+.pkg-shortfall-btn {
+  border: none;
+  background: #DC2626;
+  color: #FFFFFF;
+  padding: 5px 12px;
+  border-radius: 6px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+  transition: background 0.2s;
+}
+
+.pkg-shortfall-btn:hover {
+  background: #B91C1C;
+}
+
+/* ── ORDER DETAIL MODAL GRID ─────────────────────────────────── */
+.pkg-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin-top: 4px;
+}
+
+@media (max-width: 640px) {
+  .pkg-detail-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.pkg-detail-item {
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.pkg-detail-item .label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #64748B;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.pkg-detail-item .val {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #0F172A;
+}
+
+.pkg-detail-item .val.accent {
+  color: #059669;
 }

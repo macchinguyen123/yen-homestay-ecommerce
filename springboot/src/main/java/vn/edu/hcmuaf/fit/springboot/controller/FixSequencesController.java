@@ -15,8 +15,8 @@ public class FixSequencesController {
     @GetMapping
     public ResponseEntity<?> fix() {
         Map<String, Object> res = new HashMap<>();
-        String[] tables = new String[]{"reviews", "reports", "bookings", "payments", "users", "homestays", "rooms", "guest_tasks"};
-        String[] pks = new String[]{"review_id", "report_id", "booking_id", "payment_id", "user_id", "homestay_id", "room_id", "task_id"};
+        String[] tables = new String[]{"reviews", "reports", "bookings", "payments", "users", "homestays", "rooms", "guest_tasks", "homestay_ads", "ad_packages", "ad_slots"};
+        String[] pks = new String[]{"review_id", "report_id", "booking_id", "payment_id", "user_id", "homestay_id", "room_id", "task_id", "ad_id", "package_id", "slot_id"};
 
         for (int i = 0; i < tables.length; i++) {
             String table = tables[i];
