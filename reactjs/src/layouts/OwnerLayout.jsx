@@ -58,6 +58,9 @@ export default function OwnerLayout() {
         const data = await res.json();
         if (data && data.length > 0) {
           setHomestaysList(data);
+          try {
+            localStorage.setItem('owner_homestays', JSON.stringify(data.map(h => ({ id: h.id, name: h.name, city: h.region || h.city || h.address || '' }))));
+          } catch (e) {}
           const storedId = localStorage.getItem('ownerActiveHomestayId');
           const found = data.find(h => String(h.id) === String(storedId));
           if (found) {
