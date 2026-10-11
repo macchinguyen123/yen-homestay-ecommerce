@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import './Category.css';
 import { homestayService } from '../../../services/homestayService';
+import { TiltedGridHero } from '@/components/ui/tilted-grid-hero';
 
 // Hàm chuẩn hóa làm sạch chuỗi tiện nghi nổi bật (loại bỏ {" ", " }, "...")
 export function formatAmenities(raw) {
@@ -20,20 +21,184 @@ export function formatAmenities(raw) {
 }
 
 const CATEGORY_TABS = [
-  { id: 'all', name: 'Tất cả danh mục', icon: 'bi-grid-fill' },
-  { id: 'miet-vuan', name: 'Miệt vườn', icon: 'bi-tree-fill', keyword: 'miệt vườn' },
-  { id: 'nong-trai', name: 'Nông trại', icon: 'bi-brightness-high-fill', keyword: 'nông trại' },
-  { id: 'song-nuoc', name: 'Sông nước', icon: 'bi-water', keyword: 'sông nước' },
-  { id: 'nha-que', name: 'Nhà quê truyền thống', icon: 'bi-house-heart-fill', keyword: 'nhà quê' },
-  { id: 'am-thuc', name: 'Ẩm thực quê', icon: 'bi-cup-hot-fill', keyword: 'ẩm thực' },
-  { id: 'lang-nghe', name: 'Làng nghề truyền thống', icon: 'bi-brush-fill', keyword: 'làng nghề' },
-  { id: 'thien-nhien', name: 'Thiên nhiên sinh thái', icon: 'bi-compass-fill', keyword: 'thiên nhiên' },
-  { id: 'doi-song', name: 'Trải nghiệm đời sống quê', icon: 'bi-basket-fill', keyword: 'đời sống' },
-  { id: 'van-hoa', name: 'Văn hóa địa phương', icon: 'bi-people-fill', keyword: 'văn hóa' },
-  { id: 'kham-pha', name: 'Khám phá làng quê', icon: 'bi-bicycle', keyword: 'khám phá' },
-  { id: 'thu-gian', name: 'Chậm thư giãn', icon: 'bi-cloud-sun-fill', keyword: 'thư giãn' },
-  { id: 'ban-dia', name: 'Ở cùng người bản địa', icon: 'bi-house-heart', keyword: 'bản địa' },
+  { id: 'all', dbId: null, name: 'Tất cả danh mục', icon: 'bi-grid-fill' },
+  { id: 'miet-vuan', dbId: 1, name: 'Miệt vườn', icon: 'bi-tree-fill', keyword: 'miệt vườn' },
+  { id: 'nong-trai', dbId: 2, name: 'Nông trại', icon: 'bi-brightness-high-fill', keyword: 'nông trại' },
+  { id: 'song-nuoc', dbId: 3, name: 'Sông nước', icon: 'bi-water', keyword: 'sông nước' },
+  { id: 'nha-que', dbId: 4, name: 'Nhà quê truyền thống', icon: 'bi-house-heart-fill', keyword: 'nhà quê' },
+  { id: 'am-thuc', dbId: 5, name: 'Ẩm thực quê', icon: 'bi-cup-hot-fill', keyword: 'ẩm thực' },
+  { id: 'lang-nghe', dbId: 6, name: 'Làng nghề truyền thống', icon: 'bi-brush-fill', keyword: 'làng nghề' },
+  { id: 'thien-nhien', dbId: 7, name: 'Thiên nhiên sinh thái', icon: 'bi-compass-fill', keyword: 'thiên nhiên' },
+  { id: 'doi-song', dbId: 8, name: 'Trải nghiệm đời sống quê', icon: 'bi-basket-fill', keyword: 'đời sống' },
+  { id: 'van-hoa', dbId: 9, name: 'Văn hóa địa phương', icon: 'bi-people-fill', keyword: 'văn hóa' },
+  { id: 'kham-pha', dbId: 10, name: 'Khám phá làng quê', icon: 'bi-bicycle', keyword: 'khám phá' },
+  { id: 'thu-gian', dbId: 11, name: 'Chậm thư giãn', icon: 'bi-cloud-sun-fill', keyword: 'thư giãn' },
+  { id: 'ban-dia', dbId: 12, name: 'Ở cùng người bản địa', icon: 'bi-house-heart', keyword: 'bản địa' },
 ];
+
+// Ảnh đại diện cho từng danh mục chiếu lên dải vòm 3D khi ở mục "Tất cả danh mục"
+const ALL_CATEGORIES_HERO_IMAGES = [
+  { src: 'https://images.unsplash.com/photo-1513519245088-0e12902e5a38?auto=format&fit=crop&w=800&q=80', alt: 'Miệt vườn cây trái miền Tây' },
+  { src: 'https://images.unsplash.com/photo-1500595046743-cd271d694d30?auto=format&fit=crop&w=800&q=80', alt: 'Nông trại thảo nguyên sinh thái' },
+  { src: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=800&q=80', alt: 'Sông nước miền Tây hữu tình' },
+  { src: 'https://images.unsplash.com/photo-1510798831971-661eb04b3739?auto=format&fit=crop&w=800&q=80', alt: 'Nhà quê truyền thống ba gian' },
+  { src: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=800&q=80', alt: 'Ẩm thực quê mộc mạc thơm ngon' },
+  { src: 'https://images.unsplash.com/photo-1518780664697-55e3ad937233?auto=format&fit=crop&w=800&q=80', alt: 'Làng nghề thủ công độc bản' },
+  { src: 'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=800&q=80', alt: 'Thiên nhiên sinh thái trong lành' },
+  { src: 'https://images.unsplash.com/photo-1544644181-1484b3fdfc62?auto=format&fit=crop&w=800&q=80', alt: 'Trải nghiệm đời sống quê dân dã' },
+  { src: 'https://images.unsplash.com/photo-1528127269322-539801943592?auto=format&fit=crop&w=800&q=80', alt: 'Nét đẹp văn hóa bản địa lâu đời' },
+  { src: 'https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?auto=format&fit=crop&w=800&q=80', alt: 'Khám phá làng quê thanh bình' },
+  { src: 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=800&q=80', alt: 'Chậm rãi thư giãn ngắm cảnh' },
+  { src: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=800&q=80', alt: 'Ở cùng người bản địa mến khách' },
+];
+
+// Danh sách ~10 ảnh đặc trưng cho từng danh mục riêng biệt khi được chọn
+const CATEGORY_SPECIFIC_IMAGES = {
+  'miet-vuan': [
+    { src: 'https://images.unsplash.com/photo-1513519245088-0e12902e5a38?auto=format&fit=crop&w=800&q=80', alt: 'Vườn sầu riêng Cái Mơn trĩu quả' },
+    { src: 'https://images.unsplash.com/photo-1500595046743-cd271d694d30?auto=format&fit=crop&w=800&q=80', alt: 'Vườn chôm chôm Chợ Lách xum xuê' },
+    { src: 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=800&q=80', alt: 'Vườn bưởi da xanh Bến Tre' },
+    { src: 'https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?auto=format&fit=crop&w=800&q=80', alt: 'Vườn dâu Phong Điền Cần Thơ' },
+    { src: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=800&q=80', alt: 'Miệt vườn sông nước Tiền Giang' },
+    { src: 'https://images.unsplash.com/photo-1544644181-1484b3fdfc62?auto=format&fit=crop&w=800&q=80', alt: 'Rặng dừa nước Bến Tre xanh ngát' },
+    { src: 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=800&q=80', alt: 'Hiên nhà vườn ngập gió trong lành' },
+    { src: 'https://images.unsplash.com/photo-1584622650111-993a426fbf0a?auto=format&fit=crop&w=800&q=80', alt: 'Không gian nghỉ dưỡng miệt vườn thanh tịnh' },
+    { src: 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=800&q=80', alt: 'Vườn cây sum suê trĩu hạt Cái Bè' },
+    { src: 'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=800&q=80', alt: 'Lối đi lát gạch quanh vườn hoa' },
+  ],
+  'nong-trai': [
+    { src: 'https://images.unsplash.com/photo-1500595046743-cd271d694d30?auto=format&fit=crop&w=800&q=80', alt: 'Nông trại rau hữu cơ Đà Lạt' },
+    { src: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=800&q=80', alt: 'Đồi chè Cầu Đất bát ngát nắng mai' },
+    { src: 'https://images.unsplash.com/photo-1510798831971-661eb04b3739?auto=format&fit=crop&w=800&q=80', alt: 'Thảo nguyên bò sữa Mộc Châu' },
+    { src: 'https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?auto=format&fit=crop&w=800&q=80', alt: 'Vườn dâu tây trĩu quả chín mọng' },
+    { src: 'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=800&q=80', alt: 'Nông trại sinh thái Tam Đảo' },
+    { src: 'https://images.unsplash.com/photo-1513519245088-0e12902e5a38?auto=format&fit=crop&w=800&q=80', alt: 'Đồng cừu Phan Rang nắng ấm' },
+    { src: 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=800&q=80', alt: 'Cánh đồng hoa oải hương thơ mộng' },
+    { src: 'https://images.unsplash.com/photo-1544644181-1484b3fdfc62?auto=format&fit=crop&w=800&q=80', alt: 'Nhà kính nông nghiệp công nghệ cao' },
+    { src: 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=800&q=80', alt: 'Bungalow gỗ ấm cúng giữa cánh đồng' },
+    { src: 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=800&q=80', alt: 'Bình minh rực rỡ trên trang trại xanh' },
+  ],
+  'song-nuoc': [
+    { src: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=800&q=80', alt: 'Chợ nổi Cái Răng Cần Thơ rộn rã' },
+    { src: 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=800&q=80', alt: 'Chèo SUP hoàng hôn Đầm Chuồn Huế' },
+    { src: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=800&q=80', alt: 'Nhà sàn ven sông Hàn Đà Nẵng' },
+    { src: 'https://images.unsplash.com/photo-1544644181-1484b3fdfc62?auto=format&fit=crop&w=800&q=80', alt: 'Xuồng ba lá qua rừng tràm Trà Sư' },
+    { src: 'https://images.unsplash.com/photo-1513519245088-0e12902e5a38?auto=format&fit=crop&w=800&q=80', alt: 'Bến đò Tràng An non nước Ninh Bình' },
+    { src: 'https://images.unsplash.com/photo-1510798831971-661eb04b3739?auto=format&fit=crop&w=800&q=80', alt: 'Ngắm bình minh êm đềm trên sông Hương' },
+    { src: 'https://images.unsplash.com/photo-1500595046743-cd271d694d30?auto=format&fit=crop&w=800&q=80', alt: 'Bungalow nổi mặt hồ Thác Bà' },
+    { src: 'https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?auto=format&fit=crop&w=800&q=80', alt: 'Làng chài Cửa Vạn bồng bềnh' },
+    { src: 'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=800&q=80', alt: 'Homestay ven bờ sông Tiền hiền hòa' },
+    { src: 'https://images.unsplash.com/photo-1528127269322-539801943592?auto=format&fit=crop&w=800&q=80', alt: 'Cầu khỉ bắc qua dòng kênh xanh mát' },
+  ],
+  'nha-que': [
+    { src: 'https://images.unsplash.com/photo-1510798831971-661eb04b3739?auto=format&fit=crop&w=800&q=80', alt: 'Nhà ba gian Bắc Bộ ngói đỏ' },
+    { src: 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=800&q=80', alt: 'Nhà sàn gỗ Pơ-mu Tây Bắc' },
+    { src: 'https://images.unsplash.com/photo-1544644181-1484b3fdfc62?auto=format&fit=crop&w=800&q=80', alt: 'Nhà cổ lợp ngói âm dương Nam Bộ' },
+    { src: 'https://images.unsplash.com/photo-1500595046743-cd271d694d30?auto=format&fit=crop&w=800&q=80', alt: 'Sân gạch đỏ rợp bóng cây xanh' },
+    { src: 'https://images.unsplash.com/photo-1518780664697-55e3ad937233?auto=format&fit=crop&w=800&q=80', alt: 'Gian bếp củi đượm khói lam chiều' },
+    { src: 'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=800&q=80', alt: 'Hiên nhà gỗ lim chạm khắc tinh tế' },
+    { src: 'https://images.unsplash.com/photo-1513519245088-0e12902e5a38?auto=format&fit=crop&w=800&q=80', alt: 'Cổng tre vào nhà quê mộc mạc' },
+    { src: 'https://images.unsplash.com/photo-1507525428033-b723cf961d3e?auto=format&fit=crop&w=800&q=80', alt: 'Giàn mướp và ao sen trước ngõ' },
+    { src: 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=800&q=80', alt: 'Bộ bàn ghế tre uống trà sớm' },
+    { src: 'https://images.unsplash.com/photo-1528127269322-539801943592?auto=format&fit=crop&w=800&q=80', alt: 'Phòng ngủ ấm cúng mùng vải trắng' },
+  ],
+  'am-thuc': [
+    { src: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=800&q=80', alt: 'Mâm cơm niêu cá kho tộ đậm đà' },
+    { src: 'https://images.unsplash.com/photo-1516253593875-bd7ba052fbc5?auto=format&fit=crop&w=800&q=80', alt: 'Trà sen Cung đình Huế thơm ngát' },
+    { src: 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=800&q=80', alt: 'Bánh xèo giòn rụm miền Tây' },
+    { src: 'https://images.unsplash.com/photo-1540420773420-3366772f4999?auto=format&fit=crop&w=800&q=80', alt: 'Rau rừng luộc chấm kho quẹt' },
+    { src: 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&w=800&q=80', alt: 'Canh chua cá lóc bông điên điển' },
+    { src: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=800&q=80', alt: 'Thịt trâu gác bếp Tây Bắc' },
+    { src: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?auto=format&fit=crop&w=800&q=80', alt: 'Bánh cuốn nóng tráng tay Cát Cát' },
+    { src: 'https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?auto=format&fit=crop&w=800&q=80', alt: 'Tiệc nướng BBQ khoai bắp đồi thông' },
+    { src: 'https://images.unsplash.com/photo-1565958011703-44f9829ba187?auto=format&fit=crop&w=800&q=80', alt: 'Chè hạt sen long nhãn ngọt mát' },
+    { src: 'https://images.unsplash.com/photo-1482049016688-2d3e1b311543?auto=format&fit=crop&w=800&q=80', alt: 'Bữa sáng đậm đà hương vị đồng quê' },
+  ],
+  'lang-nghe': [
+    { src: 'https://images.unsplash.com/photo-1518780664697-55e3ad937233?auto=format&fit=crop&w=800&q=80', alt: 'Làng gốm Bát Tràng tráng men' },
+    { src: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=800&q=80', alt: 'Xoay gốm thủ công Thanh Hà' },
+    { src: 'https://images.unsplash.com/photo-1513519245088-0e12902e5a38?auto=format&fit=crop&w=800&q=80', alt: 'Khung cửi dệt thổ cẩm Tả Phìn' },
+    { src: 'https://images.unsplash.com/photo-1528127269322-539801943592?auto=format&fit=crop&w=800&q=80', alt: 'Làng nón lá Thủy Thanh xứ Huế' },
+    { src: 'https://images.unsplash.com/photo-1500595046743-cd271d694d30?auto=format&fit=crop&w=800&q=80', alt: 'Làng thêu ren Văn Lâm Ninh Bình' },
+    { src: 'https://images.unsplash.com/photo-1544644181-1484b3fdfc62?auto=format&fit=crop&w=800&q=80', alt: 'Đan lát mây tre đan Phú Vinh' },
+    { src: 'https://images.unsplash.com/photo-1510798831971-661eb04b3739?auto=format&fit=crop&w=800&q=80', alt: 'Làng tranh dân gian Đông Hồ' },
+    { src: 'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=800&q=80', alt: 'Lò đúc đồng cổ truyền Ngũ Xã' },
+    { src: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=800&q=80', alt: 'Chạm khắc gỗ Kim Bồng Hội An' },
+    { src: 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=800&q=80', alt: 'Làng làm hương Thủy Xuân rực rỡ' },
+  ],
+  'thien-nhien': [
+    { src: 'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=800&q=80', alt: 'Rừng thông Đà Lạt ngát hương' },
+    { src: 'https://images.unsplash.com/photo-1528127269322-539801943592?auto=format&fit=crop&w=800&q=80', alt: 'Ruộng bậc thang Mù Cang Chải' },
+    { src: 'https://images.unsplash.com/photo-1500595046743-cd271d694d30?auto=format&fit=crop&w=800&q=80', alt: 'Đỉnh núi Fansipan chạm mây' },
+    { src: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=800&q=80', alt: 'Hồ Tuyền Lâm xanh biếc' },
+    { src: 'https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?auto=format&fit=crop&w=800&q=80', alt: 'Rừng nguyên sinh Cúc Phương' },
+    { src: 'https://images.unsplash.com/photo-1510798831971-661eb04b3739?auto=format&fit=crop&w=800&q=80', alt: 'Thác Bản Giốc trắng xóa' },
+    { src: 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=800&q=80', alt: 'Hang động kỳ vĩ Phong Nha' },
+    { src: 'https://images.unsplash.com/photo-1513519245088-0e12902e5a38?auto=format&fit=crop&w=800&q=80', alt: 'Đồi cỏ hồng Lạc Dương' },
+    { src: 'https://images.unsplash.com/photo-1544644181-1484b3fdfc62?auto=format&fit=crop&w=800&q=80', alt: 'Vịnh Lan Hạ nước xanh ngọc' },
+    { src: 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=800&q=80', alt: 'Hoàng hôn thung lũng Mai Châu' },
+  ],
+  'doi-song': [
+    { src: 'https://images.unsplash.com/photo-1544644181-1484b3fdfc62?auto=format&fit=crop&w=800&q=80', alt: 'Bắt cá mương tát gàu sòng' },
+    { src: 'https://images.unsplash.com/photo-1510798831971-661eb04b3739?auto=format&fit=crop&w=800&q=80', alt: 'Gặt lúa mùa vàng ấm áp' },
+    { src: 'https://images.unsplash.com/photo-1500595046743-cd271d694d30?auto=format&fit=crop&w=800&q=80', alt: 'Cấy lúa cùng nông dân bản địa' },
+    { src: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=800&q=80', alt: 'Đi chợ phiên vùng cao sớm mai' },
+    { src: 'https://images.unsplash.com/photo-1513519245088-0e12902e5a38?auto=format&fit=crop&w=800&q=80', alt: 'Hái chè cùng đồng bào miền núi' },
+    { src: 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=800&q=80', alt: 'Chăn thả bò sữa trên thảo nguyên' },
+    { src: 'https://images.unsplash.com/photo-1518780664697-55e3ad937233?auto=format&fit=crop&w=800&q=80', alt: 'Đan lưới vá chài ven sông' },
+    { src: 'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=800&q=80', alt: 'Nấu kẹo dừa thủ công Bến Tre' },
+    { src: 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=800&q=80', alt: 'Gói bánh chưng xanh thơm nồng' },
+    { src: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=800&q=80', alt: 'Bữa cơm sum vầy gia đình bản địa' },
+  ],
+  'van-hoa': [
+    { src: 'https://images.unsplash.com/photo-1528127269322-539801943592?auto=format&fit=crop&w=800&q=80', alt: 'Lễ hội Cồng Chiêng Tây Nguyên' },
+    { src: 'https://images.unsplash.com/photo-1510798831971-661eb04b3739?auto=format&fit=crop&w=800&q=80', alt: 'Đờn ca tài tử Nam Bộ trên sông' },
+    { src: 'https://images.unsplash.com/photo-1518780664697-55e3ad937233?auto=format&fit=crop&w=800&q=80', alt: 'Múa khèn Mông đón xuân sang' },
+    { src: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=800&q=80', alt: 'Hát bài chòi Hội An phố cổ' },
+    { src: 'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=800&q=80', alt: 'Lễ cấp sắc người Dao đỏ' },
+    { src: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=800&q=80', alt: 'Kiến trúc nhà Rông Kon Klor' },
+    { src: 'https://images.unsplash.com/photo-1544644181-1484b3fdfc62?auto=format&fit=crop&w=800&q=80', alt: 'Nhã nhạc cung đình Huế' },
+    { src: 'https://images.unsplash.com/photo-1500595046743-cd271d694d30?auto=format&fit=crop&w=800&q=80', alt: 'Trang phục thổ cẩm người Thái' },
+    { src: 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=800&q=80', alt: 'Hát then đàn tính Tày Nùng' },
+    { src: 'https://images.unsplash.com/photo-1513519245088-0e12902e5a38?auto=format&fit=crop&w=800&q=80', alt: 'Lễ hội hoa ban Tây Bắc' },
+  ],
+  'kham-pha': [
+    { src: 'https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?auto=format&fit=crop&w=800&q=80', alt: 'Đạp xe xuyên rừng cao su' },
+    { src: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=800&q=80', alt: 'Trekking khám phá bản làng Sapa' },
+    { src: 'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=800&q=80', alt: 'Dạo bộ đường làng hoa mười giờ' },
+    { src: 'https://images.unsplash.com/photo-1528127269322-539801943592?auto=format&fit=crop&w=800&q=80', alt: 'Chinh phục cung đèo Mã Pí Lèng' },
+    { src: 'https://images.unsplash.com/photo-1510798831971-661eb04b3739?auto=format&fit=crop&w=800&q=80', alt: 'Khám phá đồi chè Ô Long rực rỡ' },
+    { src: 'https://images.unsplash.com/photo-1500595046743-cd271d694d30?auto=format&fit=crop&w=800&q=80', alt: 'Thám hiểm thung lũng Nà Ka' },
+    { src: 'https://images.unsplash.com/photo-1544644181-1484b3fdfc62?auto=format&fit=crop&w=800&q=80', alt: 'Chèo kayak sông Son Quảng Bình' },
+    { src: 'https://images.unsplash.com/photo-1513519245088-0e12902e5a38?auto=format&fit=crop&w=800&q=80', alt: 'Đạp xe quanh hồ Tuyền Lâm' },
+    { src: 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=800&q=80', alt: 'Cắm trại ngắm sao trời đỉnh đèo' },
+    { src: 'https://images.unsplash.com/photo-1518780664697-55e3ad937233?auto=format&fit=crop&w=800&q=80', alt: 'Lặn ngắm rạn san hô Cù Lao Chàm' },
+  ],
+  'thu-gian': [
+    { src: 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=800&q=80', alt: 'Bồn tắm gỗ ngoài trời ngắm mây' },
+    { src: 'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=800&q=80', alt: 'Nằm võng đung đưa dưới bóng dừa' },
+    { src: 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=800&q=80', alt: 'Đọc sách bên hiên ngập nắng vàng' },
+    { src: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=800&q=80', alt: 'Yoga đón bình minh thung lũng' },
+    { src: 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=800&q=80', alt: 'Thưởng trà thảo mộc bên lò sưởi' },
+    { src: 'https://images.unsplash.com/photo-1500595046743-cd271d694d30?auto=format&fit=crop&w=800&q=80', alt: 'Bể bơi nước ấm view đồi thông' },
+    { src: 'https://images.unsplash.com/photo-1510798831971-661eb04b3739?auto=format&fit=crop&w=800&q=80', alt: 'Nghe tiếng mưa rơi trên mái ngói' },
+    { src: 'https://images.unsplash.com/photo-1544644181-1484b3fdfc62?auto=format&fit=crop&w=800&q=80', alt: 'Liệu trình tắm lá thuốc thư giãn' },
+    { src: 'https://images.unsplash.com/photo-1513519245088-0e12902e5a38?auto=format&fit=crop&w=800&q=80', alt: 'Cà phê ban công sáng sớm mát lành' },
+    { src: 'https://images.unsplash.com/photo-1528127269322-539801943592?auto=format&fit=crop&w=800&q=80', alt: 'Ngắm hoàng hôn tím buông trên đồi' },
+  ],
+  'ban-dia': [
+    { src: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=800&q=80', alt: 'Chủ nhà đón khách thân thiện nồng hậu' },
+    { src: 'https://images.unsplash.com/photo-1510798831971-661eb04b3739?auto=format&fit=crop&w=800&q=80', alt: 'Cùng nấu ăn bên bếp lửa gia đình' },
+    { src: 'https://images.unsplash.com/photo-1500595046743-cd271d694d30?auto=format&fit=crop&w=800&q=80', alt: 'Nghe kể chuyện tích xưa bản làng' },
+    { src: 'https://images.unsplash.com/photo-1518780664697-55e3ad937233?auto=format&fit=crop&w=800&q=80', alt: 'Uống rượu cần cùng gia chủ bản địa' },
+    { src: 'https://images.unsplash.com/photo-1544644181-1484b3fdfc62?auto=format&fit=crop&w=800&q=80', alt: 'Tham gia thu hoạch mùa cùng nông dân' },
+    { src: 'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=800&q=80', alt: 'Tập nói tiếng bản địa giao lưu vui vẻ' },
+    { src: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=800&q=80', alt: 'Được hướng dẫn tham quan bí mật địa phương' },
+    { src: 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=800&q=80', alt: 'Mặc thử trang phục truyền thống' },
+    { src: 'https://images.unsplash.com/photo-1513519245088-0e12902e5a38?auto=format&fit=crop&w=800&q=80', alt: 'Bữa cơm đãi khách thịnh tình' },
+    { src: 'https://images.unsplash.com/photo-1528127269322-539801943592?auto=format&fit=crop&w=800&q=80', alt: 'Món quà đặc sản tự làm tiễn biệt' },
+  ],
+};
 
 const SAMPLE_CATEGORY_HOMESTAYS = [
   { id: 201, name: 'Nông Trại Rau Xuân Thọ', city: 'dalat', location: 'Đà Lạt', rating: 5.0, reviews: 1, rooms: 6, maxGuests: 15, specs: '6 phòng ngủ · 15 khách', amenities: '{"Vườn rau hữu cơ", "Khu chăn nuôi t..."}', price: '4.200.000đ', basePriceNum: 4200000, tag: 'Top Bán Chạy', category: 'nong-trai', img: 'https://images.unsplash.com/photo-1500595046743-cd271d694d30?auto=format&fit=crop&w=600&q=80' },
@@ -62,6 +227,29 @@ const SAMPLE_CATEGORY_HOMESTAYS = [
   { id: 224, name: 'Sơn Trà Infinity Luxury Resort', city: 'danang', location: 'Đà Nẵng', rating: 4.99, reviews: 112, rooms: 5, maxGuests: 12, specs: '5 phòng ngủ · 12 khách', amenities: '{"Bể bơi vô cực triệu đô", "Quản gia riêng 24/7", "BBQ hải sản tươi"}', price: '5.500.000đ', basePriceNum: 5500000, tag: 'Villa Thượng Đỉnh', category: 'villa', img: 'https://images.unsplash.com/photo-1571896349842-33c89424de2d?auto=format&fit=crop&w=600&q=80' },
 ];
 
+// Hàm chuẩn hóa linh hoạt URL param thành Category Tab ID (hỗ trợ slug, id số, tên tiếng Việt)
+export const resolveCategoryTab = (param) => {
+  if (!param || param === 'all') return 'all';
+  const foundById = CATEGORY_TABS.find(t => t.id === param);
+  if (foundById) return foundById.id;
+
+  const num = Number(param);
+  if (!isNaN(num) && num > 0) {
+    const foundByDbId = CATEGORY_TABS.find(t => t.dbId === num);
+    if (foundByDbId) return foundByDbId.id;
+  }
+
+  const lower = String(param).toLowerCase().trim();
+  const foundByName = CATEGORY_TABS.find(t => 
+    t.name.toLowerCase().includes(lower) || 
+    lower.includes(t.name.toLowerCase()) ||
+    (t.keyword && lower.includes(t.keyword.toLowerCase()))
+  );
+  if (foundByName) return foundByName.id;
+
+  return 'all';
+};
+
 const ITEMS_PER_PAGE = 16;
 
 export default function Category() {
@@ -70,7 +258,7 @@ export default function Category() {
   const urlCategoryParam = searchParams.get('cat') || searchParams.get('type') || 'all';
 
   // Filters State
-  const [activeCategory, setActiveCategory] = useState(urlCategoryParam);
+  const [activeCategory, setActiveCategory] = useState(resolveCategoryTab(urlCategoryParam));
   const [searchKeyword, setSearchKeyword] = useState('');
   const [selectedCity, setSelectedCity] = useState('all');
   const [priceRange, setPriceRange] = useState('all');
@@ -83,10 +271,13 @@ export default function Category() {
 
   // Homestays data list from DB & fallback
   const [homestays, setHomestays] = useState(SAMPLE_CATEGORY_HOMESTAYS);
+  const [rawHomestays, setRawHomestays] = useState([]);
+  const [dbCategories, setDbCategories] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    setActiveCategory(urlCategoryParam);
+    const targetCat = resolveCategoryTab(urlCategoryParam);
+    setActiveCategory(targetCat);
     setCurrentPage(1);
     window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
   }, [urlCategoryParam]);
@@ -96,36 +287,49 @@ export default function Category() {
     const loadHomestays = async () => {
       setLoading(true);
       try {
-        const dbList = await homestayService.getAllHomestays();
-        if (isMounted && dbList && dbList.length > 0) {
-          const catKeys = ['miet-vuan', 'nong-trai', 'song-nuoc', 'nha-que', 'am-thuc', 'lang-nghe', 'thien-nhien', 'doi-song', 'san-may', 'bien-dao', 'van-hoa', 'villa'];
-          const mapped = dbList.map((h, i) => {
-            const rawPrice = h.basePrice || h.pricePerNight || h.price || 1500000;
-            const numPrice = Number(rawPrice);
-            return {
-              id: h.id || h.homestayId || (i + 1),
-              name: h.name,
-              city: (h.city || 'dalat').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/ /g, ''),
-              location: h.address || h.city || 'Việt Nam',
-              rating: h.rating || 5.0,
-              reviews: h.reviews || h.reviewCount || 1,
-              specs: `${h.numRooms || 3} phòng ngủ · ${h.maxGuests || 6} khách`,
-              amenities: h.amenities || '{"Sân vườn", "Tiện nghi tiêu chuẩn"}',
-              price: numPrice.toLocaleString('vi-VN') + 'đ',
-              basePriceNum: numPrice,
-              tag: i % 3 === 0 ? 'Top Bán Chạy' : (i % 2 === 0 ? 'Ưu Đãi' : 'Nổi Bật'),
-              category: h.categorySlug || catKeys[i % catKeys.length],
-              img: (h.images && h.images.length > 0) ? h.images[0] : (h.image || h.primaryImage || SAMPLE_CATEGORY_HOMESTAYS[i % SAMPLE_CATEGORY_HOMESTAYS.length].img)
-            };
-          });
-          // Gộp cả dữ liệu thật và sample để đảm bảo luôn đủ 16+ homestay cho người dùng phân trang
-          setHomestays([...mapped, ...SAMPLE_CATEGORY_HOMESTAYS]);
-        } else {
-          setHomestays(SAMPLE_CATEGORY_HOMESTAYS);
+        const [dbListResult, catResult] = await Promise.allSettled([
+          homestayService.getAllHomestays(),
+          fetch('http://localhost:8081/api/public/categories').then(r => r.json())
+        ]);
+
+        const dbList = dbListResult.status === 'fulfilled' && Array.isArray(dbListResult.value) ? dbListResult.value : [];
+        const cats = catResult.status === 'fulfilled' && Array.isArray(catResult.value) ? catResult.value : [];
+
+        if (isMounted) {
+          if (dbList.length > 0) setRawHomestays(dbList);
+          if (cats.length > 0) setDbCategories(cats);
+
+          if (dbList.length > 0) {
+            const catKeys = ['miet-vuan', 'nong-trai', 'song-nuoc', 'nha-que', 'am-thuc', 'lang-nghe', 'thien-nhien', 'doi-song', 'san-may', 'bien-dao', 'van-hoa', 'villa'];
+            const mapped = dbList.map((h, i) => {
+              const rawPrice = h.basePrice || h.pricePerNight || h.price || 1500000;
+              const numPrice = Number(rawPrice);
+              return {
+                id: h.id || h.homestayId || (i + 1),
+                categoryId: h.categoryId,
+                name: h.name,
+                city: (h.city || 'dalat').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/ /g, ''),
+                location: h.address || h.city || 'Việt Nam',
+                rating: h.rating || 5.0,
+                reviews: h.reviews || h.reviewCount || 1,
+                specs: `${h.numRooms || 3} phòng ngủ · ${h.maxGuests || 6} khách`,
+                amenities: h.amenities || '{"Sân vườn", "Tiện nghi tiêu chuẩn"}',
+                price: numPrice.toLocaleString('vi-VN') + 'đ',
+                basePriceNum: numPrice,
+                tag: i % 3 === 0 ? 'Top Bán Chạy' : (i % 2 === 0 ? 'Ưu Đãi' : 'Nổi Bật'),
+                category: h.categorySlug || catKeys[i % catKeys.length],
+                img: (h.images && h.images.length > 0) ? h.images[0] : (h.image || h.primaryImage || SAMPLE_CATEGORY_HOMESTAYS[i % SAMPLE_CATEGORY_HOMESTAYS.length].img)
+              };
+            });
+            // Gộp cả dữ liệu thật và sample để đảm bảo luôn đủ 16+ homestay cho người dùng phân trang
+            setHomestays([...mapped, ...SAMPLE_CATEGORY_HOMESTAYS]);
+          } else {
+            setHomestays(SAMPLE_CATEGORY_HOMESTAYS);
+          }
         }
       } catch (err) {
         console.warn('Lỗi tải dữ liệu danh mục:', err);
-        setHomestays(SAMPLE_CATEGORY_HOMESTAYS);
+        if (isMounted) setHomestays(SAMPLE_CATEGORY_HOMESTAYS);
       } finally {
         if (isMounted) setLoading(false);
       }
@@ -168,14 +372,16 @@ export default function Category() {
       // 1. Lọc theo danh mục
       if (activeCategory !== 'all') {
         const selectedTab = CATEGORY_TABS.find(t => t.id === activeCategory);
+        const targetDbId = selectedTab?.dbId;
         const kw = (selectedTab?.keyword || activeCategory).toLowerCase();
         
+        const isDbIdMatch = targetDbId && Number(item.categoryId) === Number(targetDbId);
         const catSlug = (item.category || '').toLowerCase();
         const isExactCat = catSlug === activeCategory || catSlug.includes(activeCategory);
         const targetStr = (catSlug + ' ' + item.name + ' ' + item.amenities + ' ' + item.location + ' ' + (item.tag || '')).toLowerCase();
         const isKwMatch = targetStr.includes(kw);
 
-        if (!isExactCat && !isKwMatch) {
+        if (!isDbIdMatch && !isExactCat && !isKwMatch) {
           return false;
         }
       }
@@ -244,36 +450,147 @@ export default function Category() {
 
   const currentTabInfo = CATEGORY_TABS.find(t => t.id === activeCategory) || CATEGORY_TABS[0];
 
+  // Lấy ảnh động trên dải băng từ CSDL:
+  // - Ở mục "Tất cả danh mục" (activeCategory === 'all'): Lấy ảnh đại diện của từng danh mục
+  // - Ở từng danh mục (activeCategory !== 'all'): Lấy đúng 10 ảnh đại diện của các sản phẩm thuộc danh mục đó từ CSDL
+  const heroImages = useMemo(() => {
+    // 1. MỤC TẤT CẢ DANH MỤC -> Lấy ảnh danh mục
+    if (activeCategory === 'all') {
+      const categoryTabs = CATEGORY_TABS.filter(t => t.id !== 'all');
+      const catImages = categoryTabs.map((tab, idx) => {
+        // Tìm category trong dbCategories
+        const dbCat = dbCategories.find(c => c.id === tab.dbId || c.name?.toLowerCase().includes(tab.name.toLowerCase()));
+        if (dbCat && dbCat.imageUrl && dbCat.imageUrl.trim() !== '') {
+          return {
+            src: dbCat.imageUrl,
+            alt: `Danh mục ${tab.name}`
+          };
+        }
+
+        // Nếu bảng category chưa có imageUrl, lấy ảnh của homestay đầu tiên thuộc danh mục đó trong CSDL
+        const firstProd = rawHomestays.find(h => Number(h.categoryId) === Number(tab.dbId));
+        if (firstProd) {
+          const imgSrc = firstProd.image || (Array.isArray(firstProd.images) && firstProd.images[0]);
+          if (imgSrc) {
+            return {
+              src: imgSrc,
+              alt: `Danh mục ${tab.name} - ${firstProd.name}`
+            };
+          }
+        }
+
+        // Fallback nếu CSDL đang tải
+        return ALL_CATEGORIES_HERO_IMAGES[idx % ALL_CATEGORIES_HERO_IMAGES.length];
+      });
+
+      return catImages.filter(img => Boolean(img?.src));
+    }
+
+    // 2. TỪNG DANH MỤC CỤ THỂ -> Lấy 10 ảnh đại diện của các sản phẩm thuộc danh mục đó từ CSDL
+    const currentTab = CATEGORY_TABS.find(t => t.id === activeCategory);
+    const targetDbId = currentTab?.dbId;
+
+    if (rawHomestays.length > 0) {
+      // Lọc các homestay thuộc danh mục đó từ CSDL
+      const matchedProducts = rawHomestays.filter(h => {
+        if (targetDbId && Number(h.categoryId) === Number(targetDbId)) return true;
+        const kw = (currentTab?.keyword || '').toLowerCase();
+        const fullStr = `${h.name || ''} ${h.description || ''} ${h.categorySlug || ''}`.toLowerCase();
+        return kw && fullStr.includes(kw);
+      });
+
+      if (matchedProducts.length > 0) {
+        const productList = [];
+
+        // Lấy ảnh đại diện chính của từng sản phẩm trong danh mục
+        matchedProducts.forEach(p => {
+          const mainImg = p.image || (Array.isArray(p.images) && p.images[0]);
+          if (mainImg) {
+            productList.push({
+              src: mainImg,
+              alt: p.name || `Homestay ${currentTab?.name}`
+            });
+          }
+        });
+
+        // Nếu danh mục có ít hơn 10 sản phẩm trong DB, lấy thêm ảnh trong bộ sưu tập (images) của các sản phẩm đó
+        if (productList.length < 10) {
+          for (const p of matchedProducts) {
+            if (Array.isArray(p.images) && p.images.length > 1) {
+              for (let imgIdx = 1; imgIdx < p.images.length; imgIdx++) {
+                if (productList.length >= 10) break;
+                if (p.images[imgIdx]) {
+                  productList.push({
+                    src: p.images[imgIdx],
+                    alt: `${p.name} - Ảnh ${imgIdx + 1}`
+                  });
+                }
+              }
+            }
+            if (productList.length >= 10) break;
+          }
+        }
+
+        // Nếu vẫn chưa đủ 10 ảnh, lặp xoay vòng để đủ đúng 10 ảnh đại diện sản phẩm
+        let loopCount = 0;
+        while (productList.length < 10 && productList.length > 0) {
+          productList.push({ ...productList[loopCount % productList.length] });
+          loopCount++;
+        }
+
+        if (productList.length > 0) {
+          return productList.slice(0, 10);
+        }
+      }
+    }
+
+    // Fallback ảnh danh mục cụ thể nếu chưa load xong CSDL
+    return (CATEGORY_SPECIFIC_IMAGES[activeCategory] || ALL_CATEGORIES_HERO_IMAGES).slice(0, 10);
+  }, [activeCategory, rawHomestays, dbCategories]);
+
   return (
     <div className="category-page-wrapper">
-      {/* 1. HERO HEADER SANGBẢN */}
+      {/* 1. HERO HEADER 3D TILTED CYLINDRICAL GRID */}
       <section className="cat-hero-banner">
-        <div className="cat-container">
-          <span className="cat-hero-badge">
-            <i className={`bi ${currentTabInfo.icon}`} /> Trải nghiệm nghỉ dưỡng độc bản
-          </span>
-          <h1 className="cat-hero-title">
-            Danh Mục Homestay {currentTabInfo.id !== 'all' ? `· ${currentTabInfo.name}` : ''}
-          </h1>
-          <p className="cat-hero-subtitle">
-            Hơn +100 căn homestay miệt vườn, nông trại, sông nước và nhà quê truyền thống chuẩn phong cách bản địa Việt Nam.
-          </p>
+        <TiltedGridHero
+          key={activeCategory}
+          images={heroImages}
+          className="cat-tilted-hero-container"
+          speed={28}
+          gap={16}
+          fade={14}
+        >
+          <div className="cat-hero-overlay">
+            <div className="cat-hero-header-block">
+              <span className="cat-hero-badge">
+                <i className={`bi ${currentTabInfo.icon}`} /> Trải nghiệm nghỉ dưỡng độc bản
+              </span>
+              <h1 className="cat-hero-title">
+                Danh Mục Homestay {currentTabInfo.id !== 'all' ? `· ${currentTabInfo.name}` : ''}
+              </h1>
+              <p className="cat-hero-subtitle">
+                {currentTabInfo.id === 'all'
+                  ? 'Hơn +100 căn homestay miệt vườn, nông trại, sông nước chuẩn phong cách bản địa Việt Nam.'
+                  : `Khám phá không gian homestay ${currentTabInfo.name} mộc mạc, đậm chất bản địa.`}
+              </p>
+            </div>
 
-          {/* BAR CHIPS DANH MỤC KHÁM PHÁ NHANH */}
-          <div className="cat-chips-scroll">
-            {CATEGORY_TABS.map((tab) => (
-              <button
-                key={tab.id}
-                type="button"
-                className={`cat-chip-btn ${activeCategory === tab.id ? 'active' : ''}`}
-                onClick={() => handleCategorySelect(tab.id)}
-              >
-                <i className={`bi ${tab.icon}`} />
-                <span>{tab.name}</span>
-              </button>
-            ))}
+            {/* BAR CHIPS DANH MỤC KHÁM PHÁ NHANH */}
+            <div className="cat-chips-scroll">
+              {CATEGORY_TABS.map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  className={`cat-chip-btn ${activeCategory === tab.id ? 'active' : ''}`}
+                  onClick={() => handleCategorySelect(tab.id)}
+                >
+                  <i className={`bi ${tab.icon}`} />
+                  <span>{tab.name}</span>
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+        </TiltedGridHero>
       </section>
 
       {/* 2. THANH BỘ LỌC THÔNG MINH */}

@@ -1,0 +1,176 @@
+/* ==========================================================================
+   Interactive Bento Gallery Styles & Fallbacks
+   ========================================================================== */
+
+/* Utility styling fallbacks if Tailwind is not globally compiled */
+.bento-fixed-overlay {
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  background-color: rgba(0, 0, 0, 0.8) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  z-index: 99990 !important;
+}
+
+.bento-modal-container {
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  z-index: 99995 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  pointer-events: none !important;
+}
+
+.bento-modal-content-wrap {
+  pointer-events: auto !important;
+  position: relative !important;
+  width: 92% !important;
+  max-width: 860px !important;
+  aspect-ratio: 16 / 9 !important;
+  max-height: 72vh !important;
+  border-radius: 16px !important;
+  overflow: hidden !important;
+  background: #000000 !important;
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.15) !important;
+}
+
+.bento-modal-close-btn {
+  pointer-events: auto !important;
+  position: fixed !important;
+  top: 24px !important;
+  right: 28px !important;
+  width: 44px !important;
+  height: 44px !important;
+  border-radius: 50% !important;
+  background: rgba(255, 255, 255, 0.2) !important;
+  border: 1px solid rgba(255, 255, 255, 0.3) !important;
+  color: #ffffff !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+  z-index: 99999 !important;
+  backdrop-filter: blur(8px) !important;
+  transition: all 0.2s ease !important;
+}
+
+.bento-modal-close-btn:hover {
+  background: rgba(255, 255, 255, 0.35) !important;
+  transform: scale(1.1) !important;
+}
+
+.bento-modal-dock {
+  position: fixed !important;
+  z-index: 99998 !important;
+  right: 24px !important;
+  bottom: 24px !important;
+  left: auto !important;
+  top: auto !important;
+  touch-action: none !important;
+}
+
+.bento-modal-dock-inner {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  gap: 8px !important;
+  padding: 6px 10px !important;
+  border-radius: 20px !important;
+  background: rgba(15, 23, 42, 0.85) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.25) !important;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6) !important;
+  cursor: grab !important;
+}
+
+.bento-modal-dock-inner:active {
+  cursor: grabbing !important;
+}
+
+.bento-dock-items-row {
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  align-items: center !important;
+  gap: 8px !important;
+  padding: 4px !important;
+  overflow-x: auto !important;
+  max-width: 80vw !important;
+  scrollbar-width: none !important;
+}
+
+.bento-dock-items-row::-webkit-scrollbar {
+  display: none !important;
+}
+
+.bento-dock-thumb {
+  width: 52px !important;
+  height: 52px !important;
+  min-width: 52px !important;
+  min-height: 52px !important;
+  flex-shrink: 0 !important;
+  display: block !important;
+  border-radius: 12px !important;
+  overflow: hidden !important;
+  cursor: pointer !important;
+  position: relative !important;
+  border: 2px solid rgba(255, 255, 255, 0.25) !important;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.bento-dock-thumb.active {
+  border-color: #34d399 !important;
+  box-shadow: 0 0 14px rgba(52, 211, 153, 0.6) !important;
+}
+
+.bento-dock-thumb img,
+.bento-dock-thumb video {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  display: block !important;
+}
+
+.bento-overlay-caption {
+  position: absolute !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  padding: 24px 20px 14px !important;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.85) 0%, rgba(0, 0, 0, 0.35) 60%, transparent 100%) !important;
+  color: #ffffff !important;
+  pointer-events: none !important;
+}
+
+.bento-overlay-caption h3 {
+  font-size: 1.2rem !important;
+  font-weight: 700 !important;
+  margin: 0 0 4px !important;
+  color: #ffffff !important;
+}
+
+.bento-overlay-caption p {
+  font-size: 0.85rem !important;
+  color: rgba(255, 255, 255, 0.8) !important;
+  margin: 0 !important;
+}
+
+/* Grid layout for interactive bento gallery */
+.bento-grid-wrapper {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  auto-rows: 70px;
+}
+
+@media (max-width: 768px) {
+  .bento-grid-wrapper {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from 'react';
 import { useNavigate, useParams, useSearchParams, useLocation } from 'react-router-dom';
 import './HomestayDetail.css';
 import { authService } from '../../../services/authService';
@@ -13,6 +13,7 @@ import {
   EXPERIENCE_FALLBACK_IMG, similarHomestaysData,
   avatarColors, unsplashUrl, fmtVND, SERVICE_FEE_RATE,
 } from './homestayDetailData';
+import { GalleryModal } from '@/components/ui/interactive-bento-gallery';
 
 // ─── Helpers ──────────────────────────────────────────────────
 function toInputDate(d) {
@@ -797,6 +798,8 @@ export default function HomestayDetail() {
   const { id } = useParams();
   const [searchParams] = useSearchParams();
   const [lightbox, setLightbox] = useState(null);
+  const [bentoModalOpen, setBentoModalOpen] = useState(false);
+  const [selectedBentoItem, setSelectedBentoItem] = useState(null);
   const [activeRoomIdx, setActiveRoomIdx] = useState(null);
   const [reviewsDrawer, setReviewsDrawer] = useState({ open: false, group: 'all' });
   const [expDrawer, setExpDrawer] = useState(false);
@@ -807,10 +810,34 @@ export default function HomestayDetail() {
   const [wishlist, setWishlist] = useState({});
   const [toast, setToast] = useState({ show: false, msg: '' });
 
+  const location = useLocation();
+
+  // Khởi tạo ngay từ state truyền sang hoặc cache để hiển thị tức thì (0ms, không chờ loading)
+  const initialHomestay = useMemo(() => {
+    if (location.state?.homestay) return location.state.homestay;
+    try {
+      const raw = sessionStorage.getItem(`yen_cache_homestay_${id}`);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed.data) return parsed.data;
+      }
+    } catch (e) {}
+    if (id) {
+      const s = SAMPLE_HOMESTAYS.find(
+        (h) => String(h.id) === String(id) || h.name.toLowerCase() === decodeURIComponent(id).toLowerCase()
+      );
+      if (s) return s;
+    }
+    return null;
+  }, [id, location.state]);
+
   // State thông tin homestay và danh sách phòng từ Database
-  const [homestay, setHomestay] = useState(null);
+  const [homestay, setHomestay] = useState(initialHomestay);
   const [loading, setLoading] = useState(true);
-  const [rooms, setRooms] = useState(roomsData);
+  const [rooms, setRooms] = useState(() => {
+    if (initialHomestay?.rooms && initialHomestay.rooms.length > 0) return initialHomestay.rooms;
+    return roomsData;
+  });
 
   // Đánh giá thực tế lấy trực tiếp từ bảng reviews & users trong CSDL
   const [dbReviews, setDbReviews] = useState([]);
@@ -821,107 +848,73 @@ export default function HomestayDetail() {
   const reviewsSectionRef = useRef(null);
   const toastTimer = useRef(null);
 
-  const location = useLocation();
+  // Cuộn ngay lập tức lên đầu trang khi mở chi tiết homestay
+  useLayoutEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+  }, [id]);
 
-  // Tải đánh giá thực tế từ Database theo homestay ID
+  // Tải dữ liệu siêu tốc từ CSDL kèm bộ nhớ đệm
   useEffect(() => {
-    const targetId = homestay?.id || (id && !isNaN(id) ? Number(id) : null);
-    if (!targetId) return;
-
     let isMounted = true;
-    const loadRealReviews = async () => {
-      setLoadingReviews(true);
+    const homestayIdNum = id && !isNaN(id) ? Number(id) : null;
+
+    setLoading(true);
+
+    const loadData = async () => {
       try {
-        const [revs, stats] = await Promise.all([
-          reviewService.getReviewsByHomestayId(targetId),
-          reviewService.getReviewStats(targetId)
-        ]);
-        if (isMounted) {
-          setDbReviews(revs || []);
-          setReviewStats(stats);
-          setLoadingReviews(false);
-        }
-      } catch (err) {
-        console.warn('Lỗi khi tải đánh giá từ CSDL:', err);
-        if (isMounted) setLoadingReviews(false);
-      }
-    };
-
-    loadRealReviews();
-    return () => { isMounted = false; };
-  }, [homestay?.id, id]);
-
-  // Tải thông tin homestay và danh sách phòng thật từ SAMPLE_HOMESTAYS hoặc Database
-  useEffect(() => {
-    window.scrollTo(0, 0);
-    let isMounted = true;
-    const fetchHomestayAndRooms = async () => {
-      setLoading(true);
-      try {
-        let currentHomestay = null;
-        let homestayIdNum = id && !isNaN(id) ? Number(id) : null;
-
-        // 1. Ưu tiên tải từ database trước nếu id là số
+        // Tải Homestay từ CSDL (tốc độ cao có cache)
+        let activeH = null;
         if (homestayIdNum) {
-          try {
-            currentHomestay = await homestayService.getHomestayById(homestayIdNum);
-          } catch (error) {
-            console.error("Error fetching homestay from DB:", error);
-          }
+          activeH = await homestayService.getHomestayById(homestayIdNum);
         }
 
-        // 2. Nếu không tìm thấy trong database, tìm trong SAMPLE_HOMESTAYS
-        if (!currentHomestay && id) {
-          currentHomestay = SAMPLE_HOMESTAYS.find(
-            (h) => String(h.id) === String(id) || 
-                   h.name.toLowerCase() === decodeURIComponent(id).toLowerCase()
+        // Fallback SAMPLE_HOMESTAYS nếu DB chưa có ID này
+        if (!activeH && id) {
+          activeH = SAMPLE_HOMESTAYS.find(
+            (h) => String(h.id) === String(id) || h.name.toLowerCase() === decodeURIComponent(id).toLowerCase()
           );
         }
-        // 3. Nếu chưa có, tìm trong tất cả homestays từ database
-        if (!currentHomestay) {
-          const allDbHomestays = await homestayService.getAllHomestays();
-          if (allDbHomestays && allDbHomestays.length > 0) {
-            if (id) {
-              currentHomestay = allDbHomestays.find(
-                (h) => String(h.id) === String(id) || (h.city && id.includes(h.city))
-              );
+
+        if (!activeH) {
+          activeH = SAMPLE_HOMESTAYS[0];
+        }
+
+        if (isMounted && activeH) {
+          setHomestay(activeH);
+          if (activeH.rooms && activeH.rooms.length > 0) {
+            setRooms(activeH.rooms);
+          }
+          // Ngay khi có homestay & phòng, tắt loading để hiển thị trang tức thì
+          setLoading(false);
+        }
+
+        // Nạp song song Reviews và Stats trong nền
+        if (homestayIdNum) {
+          Promise.all([
+            reviewService.getReviewsByHomestayId(homestayIdNum),
+            reviewService.getReviewStats(homestayIdNum)
+          ]).then(([revs, stats]) => {
+            if (isMounted) {
+              if (revs && revs.length > 0) setDbReviews(revs);
+              if (stats) setReviewStats(stats);
+              setLoadingReviews(false);
             }
-            if (!currentHomestay) {
-              currentHomestay = allDbHomestays[0];
-            }
-          }
-        }
-
-        // 4. Fallback mặc định về homestay đầu tiên trong SAMPLE_HOMESTAYS
-        if (!currentHomestay) {
-          currentHomestay = SAMPLE_HOMESTAYS[0];
-        }
-
-        if (isMounted && currentHomestay) {
-          setHomestay(currentHomestay);
-          if (currentHomestay.rooms && currentHomestay.rooms.length > 0) {
-            setRooms(currentHomestay.rooms);
-            return;
-          }
-        }
-
-        // 5. Nếu homestay chưa có phòng sẵn, tải phòng từ database
-        const targetId = currentHomestay?.id || homestayIdNum || 1;
-        if (!isNaN(targetId)) {
-          const dbRooms = await roomService.getRoomsByHomestayId(Number(targetId));
-          if (isMounted && dbRooms && dbRooms.length > 0) {
-            setRooms(dbRooms);
-            return;
-          }
+          }).catch(err => {
+            console.warn('Lỗi tải đánh giá phụ:', err);
+          });
         }
       } catch (err) {
-        console.warn('Lỗi khi tải chi tiết homestay & phòng:', err);
+        console.warn('Lỗi khi tải dữ liệu homestay:', err);
       } finally {
-        if (isMounted) setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     };
 
-    fetchHomestayAndRooms();
+    loadData();
     return () => { isMounted = false; };
   }, [id]);
 
@@ -1047,12 +1040,6 @@ export default function HomestayDetail() {
     }));
   }, [homestay]);
 
-  const activeGallery = homestay?.gallery?.length > 0
-    ? homestay.gallery
-    : (homestay?.images?.length > 0 
-        ? homestay.images 
-        : (homestay?.image ? [homestay.image, ...galleryImages.slice(1)] : galleryImages));
-
   const homestayName = homestay?.name || 'The Pine Hill Retreat';
   const homestayAddress = homestay?.address || homestay?.location || 'Phường 3, TP. Đà Lạt, Lâm Đồng';
   const homestayDescription = homestay?.description || homestay?.desc || `Ẩn mình giữa đồi thông Đà Lạt, The Pine Hill Retreat mang đến không gian nghỉ dưỡng mộc mạc mà ấm cúng, nơi bạn có thể nhóm lửa sưởi ấm buổi tối se lạnh và ngắm mây trôi ngay từ bồn tắm gỗ ngoài trời. Homestay có nhiều loại phòng khác nhau, từ phòng đôi ấm cúng cho cặp đôi đến villa toàn căn cho nhóm đông, phù hợp cho mọi nhu cầu nghỉ dưỡng chậm rãi cùng người thân hoặc bạn bè.`;
@@ -1060,11 +1047,46 @@ export default function HomestayDetail() {
   const hostAvatar = homestay?.ownerAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=240&q=80';
   const hostBio = homestay?.ownerBio || `Xin chào! Tôi là ${hostName}, người sáng lập và quản lý homestay. Rất vui được đón tiếp quý khách đến nghỉ dưỡng và tận hưởng những ngày bình yên.`;
 
+  const activeGallery = homestay?.gallery?.length > 0
+    ? homestay.gallery
+    : (homestay?.images?.length > 0 
+        ? homestay.images 
+        : (homestay?.image ? [homestay.image, ...galleryImages.slice(1)] : galleryImages));
+
+  // Chuyển đổi danh sách ảnh của Homestay sang định dạng MediaItem của Interactive Bento Gallery
+  const bentoMediaItems = useMemo(() => {
+    return (activeGallery || []).map((url, idx) => ({
+      id: idx + 1,
+      type: (typeof url === 'string' && (url.includes('.mp4') || url.includes('video'))) ? 'video' : 'image',
+      title: idx === 0 
+        ? `Toàn cảnh ${homestayName}` 
+        : idx === 1 
+        ? `Không gian phòng ngủ & Nội thất tiện nghi` 
+        : idx === 2 
+        ? `Khuôn viên thiên nhiên & Kiến trúc homestay` 
+        : idx === 3 
+        ? `Ban công & Góc thư giãn ngắm cảnh` 
+        : `Góc check-in ${homestayName} #${idx + 1}`,
+      desc: `${homestayName} • Không gian nghỉ dưỡng ấm cúng, thoáng đãng và đậm chất thơ`,
+      url: typeof url === 'string' ? url : (url.full || url.thumb || ''),
+      span: idx === 0 ? "md:col-span-2 md:row-span-2 col-span-1" : "md:col-span-1 md:row-span-2 col-span-1",
+    }));
+  }, [activeGallery, homestayName]);
+
   if (loading) {
     return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', flexDirection: 'column', color: '#15803D' }}>
-        <i className="bi bi-arrow-repeat" style={{ animation: 'spin 1s linear infinite', fontSize: '2rem', marginBottom: '16px' }} />
-        <h2>Đang tải thông tin homestay...</h2>
+      <div className="hd-loading-screen">
+        <div className="hd-loading-card">
+          <div className="hd-loading-logo-wrap">
+            <div className="hd-loading-pulse-ring" />
+            <i className="bi bi-house-heart-fill hd-loading-icon" />
+          </div>
+          <h2 className="hd-loading-title">Đang chuẩn bị không gian nghỉ dưỡng</h2>
+          <p className="hd-loading-desc">Đang tải thông tin phòng, tiện nghi và giá tốt nhất từ cơ sở dữ liệu...</p>
+          <div className="hd-loading-bar-track">
+            <div className="hd-loading-bar-fill" />
+          </div>
+        </div>
       </div>
     );
   }
@@ -1114,12 +1136,29 @@ export default function HomestayDetail() {
         <div className="hd-container">
           <div className="gallery-wrap">
             <div className="gallery-grid">
-              <div className="gallery-main" onClick={() => setLightbox({ images: activeGallery, index: 0 })}>
+              <div
+                className="gallery-main"
+                onClick={() => {
+                  setSelectedBentoItem(bentoMediaItems[0] || null);
+                  setBentoModalOpen(true);
+                }}
+                style={{ cursor: 'pointer' }}
+                title="Nhấp để mở Bento Gallery tương tác"
+              >
                 <img src={activeGallery[0]} alt={`Toàn cảnh ${homestayName}`} />
               </div>
               <div className="gallery-side">
                 {activeGallery.slice(1, 5).map((src, i) => (
-                  <div key={i} className="gallery-thumb" onClick={() => setLightbox({ images: activeGallery, index: i + 1 })}>
+                  <div
+                    key={i}
+                    className="gallery-thumb"
+                    onClick={() => {
+                      setSelectedBentoItem(bentoMediaItems[i + 1] || bentoMediaItems[0]);
+                      setBentoModalOpen(true);
+                    }}
+                    style={{ cursor: 'pointer' }}
+                    title={`Nhấp để xem ảnh ${i + 2} trong Bento Gallery`}
+                  >
                     <img src={src} alt={`Ảnh ${i + 2}`} />
                   </div>
                 ))}
@@ -1129,8 +1168,14 @@ export default function HomestayDetail() {
               <span className="gallery-hint-text">
                 <i className="bi bi-images" /> Nhấp vào ảnh bất kỳ để xem toàn màn hình
               </span>
-              <button type="button" className="gallery-all-btn"
-                onClick={() => setLightbox({ images: activeGallery, index: 0 })}>
+              <button
+                type="button"
+                className="gallery-all-btn"
+                onClick={() => {
+                  setSelectedBentoItem(bentoMediaItems[0] || null);
+                  setBentoModalOpen(true);
+                }}
+              >
                 <i className="bi bi-grid-3x3-gap-fill" /> Xem tất cả {activeGallery.length} ảnh
               </button>
             </div>
@@ -1466,6 +1511,17 @@ export default function HomestayDetail() {
       />
 
       <Toast message={toast.msg} show={toast.show} />
+
+      {/* Interactive Bento Gallery Modal khi nhấp vào ảnh homestay */}
+      {bentoModalOpen && selectedBentoItem && (
+        <GalleryModal
+          isOpen={bentoModalOpen}
+          selectedItem={selectedBentoItem}
+          setSelectedItem={setSelectedBentoItem}
+          onClose={() => setBentoModalOpen(false)}
+          mediaItems={bentoMediaItems}
+        />
+      )}
     </div>
   );
 }

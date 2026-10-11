@@ -632,7 +632,7 @@ export default function SearchResult() {
                           <button
                             type="button"
                             className="btn-primary mui-btn choose-stay"
-                            onClick={() => navigate(`/homestay/${item.id}`)}
+                            onClick={() => navigate(`/homestay/${item.id}`, { state: { homestay: item } })}
                           >
                             Xem chi tiết
                           </button>

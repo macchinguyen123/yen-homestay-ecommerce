@@ -1243,3 +1243,124 @@ body {
 @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
 }
+
+/* ==========================================================================
+   HOMESTAY DETAIL LOADING SCREEN - BRANDED & PREMIUM
+   ========================================================================== */
+.hd-loading-screen {
+    min-height: 85vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 32px 16px;
+    background: linear-gradient(180deg, #F0FDF4 0%, #F8FAFC 100%);
+}
+
+.hd-loading-card {
+    background: #FFFFFF;
+    border: 1px solid rgba(21, 128, 61, 0.15);
+    border-radius: 24px;
+    padding: 44px 36px;
+    max-width: 480px;
+    width: 100%;
+    text-align: center;
+    box-shadow: 0 20px 45px rgba(15, 23, 42, 0.08), 0 4px 12px rgba(21, 128, 61, 0.06);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    animation: hdFadeIn 0.3s ease-out;
+}
+
+.hd-loading-logo-wrap {
+    position: relative;
+    width: 88px;
+    height: 88px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 24px;
+}
+
+.hd-loading-pulse-ring {
+    position: absolute;
+    inset: -6px;
+    border-radius: 50%;
+    border: 2.5px solid #15803D;
+    border-top-color: transparent;
+    border-right-color: transparent;
+    animation: hdSpin 1s cubic-bezier(0.68, -0.55, 0.27, 1.55) infinite;
+}
+
+.hd-loading-pulse-ring::after {
+    content: '';
+    position: absolute;
+    inset: -6px;
+    border-radius: 50%;
+    border: 1.5px dashed rgba(21, 128, 61, 0.35);
+    animation: hdSpinReverse 3s linear infinite;
+}
+
+.hd-loading-icon {
+    font-size: 2.6rem;
+    color: #15803D;
+    filter: drop-shadow(0 4px 10px rgba(21, 128, 61, 0.3));
+    animation: hdPulse 1.8s ease-in-out infinite;
+}
+
+.hd-loading-title {
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: #0F172A;
+    margin: 0 0 10px;
+    letter-spacing: -0.02em;
+}
+
+.hd-loading-desc {
+    font-size: 0.92rem;
+    color: #64748B;
+    line-height: 1.55;
+    margin: 0 0 24px;
+}
+
+.hd-loading-bar-track {
+    width: 100%;
+    max-width: 280px;
+    height: 6px;
+    background: #E2E8F0;
+    border-radius: 9999px;
+    overflow: hidden;
+    position: relative;
+}
+
+.hd-loading-bar-fill {
+    height: 100%;
+    width: 45%;
+    border-radius: 9999px;
+    background: linear-gradient(90deg, #15803D, #34D399, #15803D);
+    background-size: 200% 100%;
+    animation: hdShimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes hdSpin {
+    to { transform: rotate(360deg); }
+}
+
+@keyframes hdSpinReverse {
+    to { transform: rotate(-360deg); }
+}
+
+@keyframes hdPulse {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.08); opacity: 0.85; }
+}
+
+@keyframes hdShimmer {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(250%); }
+}
+
+@keyframes hdFadeIn {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+

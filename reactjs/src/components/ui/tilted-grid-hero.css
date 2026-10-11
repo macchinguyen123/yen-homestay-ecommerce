@@ -1,0 +1,75 @@
+/* ==========================================================================
+   Tilted Grid Hero - Continuous Panoramic Gliding Ribbon
+   Hardware-accelerated 60fps motion, clean cards without redundant layers
+   ========================================================================== */
+
+.tgh-wrapper {
+  position: relative !important;
+  overflow: hidden !important;
+  width: 100% !important;
+}
+
+.tgh-perspective-stage {
+  pointer-events: none !important;
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  perspective: 1200px !important;
+  -webkit-perspective: 1200px !important;
+  overflow: hidden !important;
+}
+
+.tgh-glide-track {
+  display: flex !important;
+  align-items: center !important;
+  width: max-content !important;
+  will-change: transform;
+  animation-name: tghContinuousGlide !important;
+  animation-timing-function: linear !important;
+  animation-iteration-count: infinite !important;
+  animation-duration: 28s;
+}
+
+@keyframes tghContinuousGlide {
+  0% {
+    transform: translate3d(0, 0, 0) rotateX(1.8deg);
+  }
+  100% {
+    transform: translate3d(-50%, 0, 0) rotateX(1.8deg);
+  }
+}
+
+.tgh-panoramic-card {
+  position: relative !important;
+  flex-shrink: 0 !important;
+  width: 270px !important;
+  height: 160px !important;
+  border-radius: 16px !important;
+  overflow: hidden !important;
+  background-color: #F8FAFC !important;
+  box-shadow: 0 10px 24px -4px rgba(0, 0, 0, 0.12), 0 4px 8px -2px rgba(0, 0, 0, 0.05) !important;
+  border: 1px solid rgba(255, 255, 255, 0.9) !important;
+  transform-style: preserve-3d !important;
+  transition: transform 0.25s ease, box-shadow 0.25s ease !important;
+}
+
+.tgh-card-img {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  display: block !important;
+  pointer-events: none !important;
+  user-select: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tgh-glide-track {
+    animation-play-state: paused !important;
+  }
+}
