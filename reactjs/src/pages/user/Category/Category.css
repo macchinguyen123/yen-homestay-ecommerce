@@ -14,56 +14,73 @@
   padding: 0 20px;
 }
 
-/* 1. HERO BANNER */
+/* 1. HERO BANNER WITH TILTED 3D GRID */
 .cat-hero-banner {
-  background: linear-gradient(135deg, #0F5132 0%, #15803D 50%, #166534 100%);
-  color: #FFFFFF;
-  padding: 44px 0 36px;
-  text-align: center;
+  background: #FFFFFF;
+  border-bottom: 1px solid #E2E8F0;
+  color: #0F172A;
   position: relative;
   overflow: hidden;
 }
 
-.cat-hero-banner::before {
-  content: '';
-  position: absolute;
-  top: -50%;
-  left: -50%;
-  width: 200%;
-  height: 200%;
-  background: radial-gradient(circle, rgba(255, 255, 255, 0.08) 0%, transparent 60%);
+.cat-tilted-hero-container {
+  height: 520px;
+  width: 100%;
+  position: relative;
+}
+
+.cat-hero-overlay {
+  position: relative;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  height: 100%;
+  padding: 30px 20px 24px;
+  text-align: center;
   pointer-events: none;
+  background: transparent;
+}
+
+.cat-hero-header-block {
+  pointer-events: auto;
+  max-width: 820px;
+  margin: 0 auto;
+  text-align: center;
 }
 
 .cat-hero-badge {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  background: rgba(255, 255, 255, 0.18);
-  backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  color: #FEF08A;
-  font-size: 0.82rem;
+  background: #ECFDF5;
+  border: 1px solid #A7F3D0;
+  color: #047857;
+  font-size: 0.84rem;
   font-weight: 700;
-  padding: 6px 16px;
+  padding: 6px 18px;
   border-radius: 9999px;
-  margin-bottom: 14px;
+  margin-bottom: 10px;
+  box-shadow: 0 1px 2px rgba(16, 185, 129, 0.08);
 }
 
 .cat-hero-title {
-  font-size: 2.2rem;
+  font-size: 2.25rem;
   font-weight: 800;
-  color: #FFFFFF;
-  margin-bottom: 10px;
-  letter-spacing: -0.02em;
+  color: #0F172A;
+  margin-bottom: 8px;
+  letter-spacing: -0.025em;
+  text-shadow: none;
 }
 
 .cat-hero-subtitle {
-  font-size: 1rem;
-  color: #E2E8F0;
-  max-width: 720px;
-  margin: 0 auto 28px;
+  font-size: 0.98rem;
+  color: #475569;
+  max-width: 700px;
+  margin: 0 auto;
   line-height: 1.5;
+  text-shadow: none;
 }
 
 /* CHIPS BANNER SCROLL */
@@ -72,34 +89,42 @@
   justify-content: center;
   flex-wrap: wrap;
   gap: 10px;
-  margin-top: 10px;
+  max-width: 1150px;
+  pointer-events: auto;
+  z-index: 20;
 }
 
 .cat-chip-btn {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  background: rgba(255, 255, 255, 0.15);
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  color: #FFFFFF;
+  background: #FFFFFF;
+  border: 1.5px solid #E2E8F0;
+  color: #334155;
   padding: 8px 18px;
   border-radius: 9999px;
   font-size: 0.88rem;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.25s ease;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
 }
 
 .cat-chip-btn:hover {
-  background: rgba(255, 255, 255, 0.3);
+  background: #F8FAFC;
+  border-color: #CBD5E1;
+  color: #0F172A;
   transform: translateY(-2px);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
 }
 
 .cat-chip-btn.active {
-  background: #FFFFFF;
-  color: #15803D;
+  background: #15803D;
+  border-color: #15803D;
+  color: #FFFFFF;
   font-weight: 700;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+  box-shadow: 0 4px 14px rgba(21, 128, 61, 0.28);
+  transform: translateY(-1px);
 }
 
 /* 2. FILTER BAR */

@@ -57,6 +57,27 @@ public class HomeController {
             map.put("desc", cat.getDescription());
             map.put("tag", cat.getShortLabel() != null && !cat.getShortLabel().isEmpty() ? cat.getShortLabel() : cat.getName());
             
+            // Map slug danh mục
+            String catSlug = "all";
+            if (cat.getId() != null) {
+                switch (cat.getId().intValue()) {
+                    case 1: catSlug = "miet-vuan"; break;
+                    case 2: catSlug = "nong-trai"; break;
+                    case 3: catSlug = "song-nuoc"; break;
+                    case 4: catSlug = "nha-que"; break;
+                    case 5: catSlug = "am-thuc"; break;
+                    case 6: catSlug = "lang-nghe"; break;
+                    case 7: catSlug = "thien-nhien"; break;
+                    case 8: catSlug = "doi-song"; break;
+                    case 9: catSlug = "van-hoa"; break;
+                    case 10: catSlug = "kham-pha"; break;
+                    case 11: catSlug = "thu-gian"; break;
+                    case 12: catSlug = "ban-dia"; break;
+                    default: catSlug = "all"; break;
+                }
+            }
+            map.put("cat", catSlug);
+
             String imgUrl = cat.getImageUrl();
             if (imgUrl == null || imgUrl.isEmpty()) {
                 String name = cat.getName().toLowerCase();

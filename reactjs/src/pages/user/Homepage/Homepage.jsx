@@ -10,6 +10,41 @@ const HERO_SLIDES = [
   { id: 3, img: 'https://images.unsplash.com/photo-1559592413-7cec4d0cae2b?auto=format&fit=crop&w=1600&q=80', title: 'Homestay Hội An cổ kính thơ mộng' },
 ];
 
+export const getCategorySlug = (exp) => {
+  if (!exp) return 'all';
+  if (exp.cat && exp.cat !== 'all') return exp.cat;
+  const idMap = {
+    1: 'miet-vuan',
+    2: 'nong-trai',
+    3: 'song-nuoc',
+    4: 'nha-que',
+    5: 'am-thuc',
+    6: 'lang-nghe',
+    7: 'thien-nhien',
+    8: 'doi-song',
+    9: 'van-hoa',
+    10: 'kham-pha',
+    11: 'thu-gian',
+    12: 'ban-dia'
+  };
+  if (exp.id && idMap[Number(exp.id)]) return idMap[Number(exp.id)];
+  
+  const title = (exp.title || exp.name || '').toLowerCase();
+  if (title.includes('miệt') || title.includes('vườn')) return 'miet-vuan';
+  if (title.includes('nông') || title.includes('trại')) return 'nong-trai';
+  if (title.includes('sông') || title.includes('nước')) return 'song-nuoc';
+  if (title.includes('nhà quê')) return 'nha-que';
+  if (title.includes('ẩm thực')) return 'am-thuc';
+  if (title.includes('làng nghề') || title.includes('nghề')) return 'lang-nghe';
+  if (title.includes('thiên nhiên') || title.includes('sinh thái')) return 'thien-nhien';
+  if (title.includes('đời sống')) return 'doi-song';
+  if (title.includes('văn hóa')) return 'van-hoa';
+  if (title.includes('khám phá')) return 'kham-pha';
+  if (title.includes('thư giãn') || title.includes('nghỉ dưỡng')) return 'thu-gian';
+  if (title.includes('bản địa')) return 'ban-dia';
+  return 'all';
+};
+
 const EXPERIENCES = [
   { id: 1, title: 'Miệt vườn', desc: 'Ở giữa vườn cây, hái trái, làm vườn', tag: 'Miệt vườn', cat: 'miet-vuan', img: 'https://images.unsplash.com/photo-1544644181-1484b3fdfc62?auto=format&fit=crop&w=600&q=80' },
   { id: 2, title: 'Nông trại', desc: 'Trồng rau, thu hoạch, chăm vật nuôi, làm ruộng', tag: 'Nông trại', cat: 'nong-trai', img: 'https://images.unsplash.com/photo-1500595046743-cd271d694d30?auto=format&fit=crop&w=600&q=80' },
@@ -174,7 +209,15 @@ export default function Homepage() {
         if (homeRes.ok) {
           const data = await homeRes.json();
           if (data && data.heroSlides && isMounted) {
-            setHomeData(prev => ({ ...prev, ...data }));
+            const mappedExperiences = (data.experiences || []).map(exp => ({
+              ...exp,
+              cat: exp.cat || getCategorySlug(exp)
+            }));
+            setHomeData(prev => ({
+              ...prev,
+              ...data,
+              experiences: mappedExperiences.length > 0 ? mappedExperiences : prev.experiences
+            }));
             setIsLoading(false);
             return; // Data loaded in 1 lightning-fast request!
           }
@@ -522,7 +565,15 @@ export default function Homepage() {
               else if (t.includes('bản địa')) iconClass = 'bi-people';
 
               return (
-                <div key={exp.id} className="experience-card" onClick={() => navigate(`/category?cat=${exp.cat || 'all'}`)} style={{ cursor: 'pointer' }}>
+                <div 
+                  key={exp.id} 
+                  className="experience-card" 
+                  onClick={() => {
+                    const targetCat = getCategorySlug(exp);
+                    navigate(`/category?cat=${targetCat}`);
+                  }} 
+                  style={{ cursor: 'pointer' }}
+                >
                   <div className="exp-img-wrapper">
                     <img src={exp.img} alt={exp.title} loading="lazy" />
                     <span className="exp-badge">
@@ -666,7 +717,7 @@ export default function Homepage() {
                   >
                     <i className={`bi ${wishlist.has(h.name) ? 'bi-heart-fill' : 'bi-heart'}`} />
                   </button>
-                  <Link to={`/homestay/${h.id || 'doi'}`} style={{ display: 'block', height: '100%' }}>
+                  <Link to={`/homestay/${h.id || 'doi'}`} state={{ homestay: h }} style={{ display: 'block', height: '100%' }}>
                     <img src={h.img || 'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=600&q=80'} alt={h.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   </Link>
                 </div>
@@ -675,14 +726,14 @@ export default function Homepage() {
                     <span className="card-location"><i className="bi bi-geo-alt-fill text-success" /> {h.location}</span>
                     <span className="card-rating"><i className="bi bi-star-fill" /> {h.rating} ({h.reviews})</span>
                   </div>
-                  <h3 className="card-title"><Link to={`/homestay/${h.id}`}>{h.name}</Link></h3>
+                  <h3 className="card-title"><Link to={`/homestay/${h.id}`} state={{ homestay: h }}>{h.name}</Link></h3>
                   <div className="card-specs">{h.distance}</div>
                   <div className="card-footer-row">
                     <div>
                       <span className="price-label">Giá từ:</span>
                       <span className="card-price">{h.price}</span>
                     </div>
-                    <Link to={`/homestay/${h.id}`} className="btn-view-room">Xem homestay</Link>
+                    <Link to={`/homestay/${h.id}`} state={{ homestay: h }} className="btn-view-room">Xem homestay</Link>
                   </div>
                 </div>
               </div>
@@ -723,7 +774,7 @@ export default function Homepage() {
                   >
                     <i className={`bi ${wishlist.has(h.name) ? 'bi-heart-fill' : 'bi-heart'}`} />
                   </button>
-                  <Link to={`/homestay/${h.id || 'doi'}`} style={{ display: 'block', height: '100%' }}>
+                  <Link to={`/homestay/${h.id || 'doi'}`} state={{ homestay: h }} style={{ display: 'block', height: '100%' }}>
                     <img src={h.img || 'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=600&q=80'} alt={h.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   </Link>
                 </div>
@@ -732,7 +783,7 @@ export default function Homepage() {
                     <span className="card-location"><i className="bi bi-geo-alt-fill text-success" /> {h.location}</span>
                     <span className="card-rating"><i className="bi bi-star-fill" /> {h.rating} ({h.reviews})</span>
                   </div>
-                  <h3 className="card-title"><Link to={`/homestay/${h.id}`}>{h.name}</Link></h3>
+                  <h3 className="card-title"><Link to={`/homestay/${h.id}`} state={{ homestay: h }}>{h.name}</Link></h3>
                   <div className="card-specs"><span>{h.specs}</span></div>
                   <div className="card-amenities-box">
                     <span className="amenities-label">Tiện nghi nổi bật:</span>
@@ -743,7 +794,7 @@ export default function Homepage() {
                       <span className="price-label">Giá từ:</span>
                       <span className="card-price">{h.price}</span>
                     </div>
-                    <Link to={`/homestay/${h.id}`} className="btn-view-room">Xem homestay</Link>
+                    <Link to={`/homestay/${h.id}`} state={{ homestay: h }} className="btn-view-room">Xem homestay</Link>
                   </div>
                 </div>
               </div>
@@ -805,7 +856,7 @@ export default function Homepage() {
                   >
                     <i className={`bi ${wishlist.has(h.name) ? 'bi-heart-fill' : 'bi-heart'}`} />
                   </button>
-                  <Link to={`/homestay/${h.id || 'doi'}`} style={{ display: 'block', height: '100%' }}>
+                  <Link to={`/homestay/${h.id || 'doi'}`} state={{ homestay: h }} style={{ display: 'block', height: '100%' }}>
                     <img src={h.img || 'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=600&q=80'} alt={h.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   </Link>
                 </div>
@@ -814,7 +865,7 @@ export default function Homepage() {
                     <span className="card-location"><i className="bi bi-geo-alt-fill text-success" /> {h.location}</span>
                     <span className="card-rating"><i className="bi bi-star-fill" /> {h.rating} ({h.reviews})</span>
                   </div>
-                  <h3 className="card-title"><Link to={`/homestay/${h.id}`}>{h.name}</Link></h3>
+                  <h3 className="card-title"><Link to={`/homestay/${h.id}`} state={{ homestay: h }}>{h.name}</Link></h3>
                   <div className="card-specs"><span>{h.specs}</span></div>
                   <div className="card-amenities-box">
                     <span className="amenities-label">Tiện nghi nổi bật:</span>
@@ -825,7 +876,7 @@ export default function Homepage() {
                       <span className="price-label">Giá từ:</span>
                       <span className="card-price">{h.price}</span>
                     </div>
-                    <Link to={`/homestay/${h.id}`} className="btn-view-room">Xem homestay</Link>
+                    <Link to={`/homestay/${h.id}`} state={{ homestay: h }} className="btn-view-room">Xem homestay</Link>
                   </div>
                 </div>
               </div>

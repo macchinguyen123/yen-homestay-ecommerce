@@ -4,6 +4,7 @@ import "./PersonalAccount.css";
 import { userService } from "../../../services/userService";
 import { authService } from "../../../services/authService";
 import { viewedHistoryService } from "../../../services/viewedHistoryService";
+import { cashbackService } from "../../../services/cashbackService";
 import { formatAmenities } from "../Category/Category";
 
 const PROVINCES_DATA = [
@@ -186,40 +187,73 @@ export default function PersonalAccount() {
   // Transactions Filter
   const [txnFilter, setTxnFilter] = useState("all");
 
-  // Cashback Wallet Balance & Transactions
-  const [balance, setBalance] = useState(350000);
-  const [walletLedger, setWalletLedger] = useState([
-    {
-      id: 1,
-      title: "Hoàn tiền 5% đơn đặt phòng #HS-98234",
-      date: "12/08/2026 10:15 • Pù Luông Eco Garden Homestay",
-      amount: "+65.000 VNĐ",
-      type: "plus",
-      status: "Thành công"
-    },
-    {
-      id: 2,
-      title: "Hoàn tiền 5% đơn đặt phòng #HS-87112",
-      date: "24/05/2026 16:40 • The Memory Valley Villa Đà Lạt",
-      amount: "+72.500 VNĐ",
-      type: "plus",
-      status: "Thành công"
-    },
-    {
-      id: 3,
-      title: "Rút tiền số dư về ngân hàng Vietcombank",
-      date: "01/05/2026 09:30 • Mã giao dịch VCB991203",
-      amount: "-200.000 VNĐ",
-      type: "minus",
-      status: "Đã chuyển khoản"
-    }
-  ]);
+  // Cashback Wallet Balance & Transactions (Khởi tạo từ cache cho tốc độ 0ms)
+  const [walletData, setWalletData] = useState(() => {
+    const currentUser = authService.getCurrentUser();
+    const uid = currentUser?.id || 21;
+    return cashbackService.getCachedWallet(uid) || {
+      balance: 350000,
+      totalCashback: 1250000,
+      cashbackRate: 5,
+      bankName: "Vietcombank",
+      accountNumber: "•••• 6868",
+      accountHolder: "Lê Hoàng Mai Chi",
+      isLinked: true,
+      isPinSet: true,
+      transactions: []
+    };
+  });
+  const [balance, setBalance] = useState(() => {
+    const currentUser = authService.getCurrentUser();
+    const uid = currentUser?.id || 21;
+    const cached = cashbackService.getCachedWallet(uid);
+    return cached?.balance !== undefined ? Number(cached.balance) : 350000;
+  });
+  const [walletLedger, setWalletLedger] = useState(() => {
+    const currentUser = authService.getCurrentUser();
+    const uid = currentUser?.id || 21;
+    const cached = cashbackService.getCachedWallet(uid);
+    return (cached?.transactions && cached.transactions.length > 0) ? cached.transactions : [
+      {
+        id: 1,
+        title: "Hoàn tiền 5% đơn đặt phòng #HS-98234",
+        date: "12/08/2026 10:15 • Pù Luông Eco Garden Homestay",
+        amount: "+65.000 VNĐ",
+        type: "plus",
+        status: "Thành công"
+      },
+      {
+        id: 2,
+        title: "Hoàn tiền 5% đơn đặt phòng #HS-87112",
+        date: "24/05/2026 16:40 • The Memory Valley Villa Đà Lạt",
+        amount: "+72.500 VNĐ",
+        type: "plus",
+        status: "Thành công"
+      },
+      {
+        id: 3,
+        title: "Rút tiền số dư về ngân hàng Vietcombank",
+        date: "01/05/2026 09:30 • Mã giao dịch VCB991203",
+        amount: "-200.000 VNĐ",
+        type: "minus",
+        status: "Đã chuyển khoản"
+      }
+    ];
+  });
+  const [walletLoading, setWalletLoading] = useState(false);
 
   // Modal States
   const [showPhoneModal, setShowPhoneModal] = useState(false);
   const [otpInput, setOtpInput] = useState("");
   const [showPwdModal, setShowPwdModal] = useState(false);
   const [showPinModal, setShowPinModal] = useState(false);
+  const [pinInput, setPinInput] = useState("");
+  const [showBankModal, setShowBankModal] = useState(false);
+  const [bankForm, setBankForm] = useState({
+    bankName: "Vietcombank",
+    accountNumber: "991203004005",
+    accountHolder: "Lê Hoàng Mai Chi"
+  });
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [showClearHistoryModal, setShowClearHistoryModal] = useState(false);
@@ -301,6 +335,42 @@ export default function PersonalAccount() {
     };
 
     fetchViewedHistory();
+  }, [activeTab]);
+
+  // Load cashback wallet data from Spring Boot backend (Neon PostgreSQL) - Cực nhanh & mượt mà
+  useEffect(() => {
+    const fetchWallet = async () => {
+      const currentUser = authService.getCurrentUser();
+      const userId = currentUser?.id || 21;
+
+      setWalletLoading(true);
+      const res = await cashbackService.getWallet(userId);
+      setWalletLoading(false);
+
+      if (res.success && res.data) {
+        setWalletData(res.data);
+        if (res.data.balance !== undefined) {
+          setBalance(Number(res.data.balance));
+        }
+        if (Array.isArray(res.data.transactions) && res.data.transactions.length > 0) {
+          setWalletLedger(res.data.transactions);
+        }
+        if (res.data.bankName) {
+          setBankForm({
+            bankName: res.data.bankName,
+            accountNumber: res.data.accountNumber || "991203004005",
+            accountHolder: res.data.accountHolder || profile.fullName || "Lê Hoàng Mai Chi"
+          });
+          setWithdrawForm(prev => ({
+            ...prev,
+            bank: res.data.bankName,
+            accNum: res.data.accountNumber && !res.data.accountNumber.includes('•') ? res.data.accountNumber : "991203004005"
+          }));
+        }
+      }
+    };
+
+    fetchWallet();
   }, [activeTab]);
 
   // Handlers
@@ -460,7 +530,7 @@ export default function PersonalAccount() {
     triggerToast("Đã copy", `Đã sao chép mã ${code} vào bộ nhớ tạm!`);
   };
 
-  const handleWithdrawSubmit = (e) => {
+  const handleWithdrawSubmit = async (e) => {
     e.preventDefault();
     const amt = parseInt(withdrawForm.amount, 10);
     if (isNaN(amt) || amt < 50000) {
@@ -468,10 +538,14 @@ export default function PersonalAccount() {
       return;
     }
     if (amt > balance) {
-      alert("Số dư không đủ để thực hiện giao dịch!");
+      alert(`Số dư khả dụng không đủ! Hiện tại bạn có ${balance.toLocaleString("vi-VN")}đ.`);
       return;
     }
-    setBalance((prev) => prev - amt);
+
+    const currentUser = authService.getCurrentUser();
+    const userId = currentUser?.id || 21;
+
+    // Phản hồi tức thì ngay trên giao diện (Optimistic UI - 0ms phản hồi)
     const newTxn = {
       id: Date.now(),
       title: `Rút tiền về ngân hàng ${withdrawForm.bank}`,
@@ -480,9 +554,72 @@ export default function PersonalAccount() {
       type: "minus",
       status: "Đang xử lý"
     };
-    setWalletLedger([newTxn, ...walletLedger]);
+
+    setBalance((prev) => Math.max(0, prev - amt));
+    setWalletLedger((prev) => [newTxn, ...prev]);
     setShowWithdrawModal(false);
     triggerToast("Yêu cầu rút tiền", `Đã gửi yêu cầu rút ${amt.toLocaleString("vi-VN")}đ thành công!`);
+
+    // Lưu thực tế vào cơ sở dữ liệu Spring Boot Neon PostgreSQL
+    try {
+      const res = await cashbackService.withdraw(userId, {
+        bank: withdrawForm.bank,
+        accNum: withdrawForm.accNum,
+        amount: amt
+      });
+
+      if (res.success && res.data) {
+        setWalletData(res.data);
+        if (res.data.balance !== undefined) setBalance(Number(res.data.balance));
+        if (Array.isArray(res.data.transactions)) setWalletLedger(res.data.transactions);
+      } else if (!res.success) {
+        triggerToast("Cảnh báo", res.error || "Có lỗi xảy ra khi lưu giao dịch vào CSDL.");
+      }
+    } catch (err) {
+      console.warn("Lỗi đồng bộ rút tiền:", err);
+    }
+  };
+
+  const handleBankSubmit = async (e) => {
+    e.preventDefault();
+    const currentUser = authService.getCurrentUser();
+    const userId = currentUser?.id || 21;
+
+    setShowBankModal(false);
+    setWalletData((prev) => ({
+      ...prev,
+      bankName: bankForm.bankName,
+      accountNumber: bankForm.accountNumber,
+      accountHolder: bankForm.accountHolder,
+      isLinked: true
+    }));
+    triggerToast("Liên kết ngân hàng", "Đã cập nhật thông tin tài khoản ngân hàng thành công!");
+
+    const res = await cashbackService.updateBank(userId, bankForm);
+    if (res.success && res.data) {
+      setWalletData(res.data);
+    }
+  };
+
+  const handlePinSubmit = async (e) => {
+    e.preventDefault();
+    if (pinInput.length !== 6) {
+      alert("Vui lòng nhập đầy đủ 6 chữ số mã PIN!");
+      return;
+    }
+
+    const currentUser = authService.getCurrentUser();
+    const userId = currentUser?.id || 21;
+
+    setShowPinModal(false);
+    setWalletData((prev) => ({ ...prev, isPinSet: true }));
+    triggerToast("Mã PIN Ví", "Đã cập nhật mã PIN Ví YÊN Pay thành công!");
+
+    const res = await cashbackService.updatePin(userId, { newPin: pinInput });
+    if (res.success && res.data) {
+      setWalletData(res.data);
+    }
+    setPinInput("");
   };
 
   const openInvoice = (code, name, loc, dates, paid, subTotal, discount, method, status, txnId) => {
@@ -1311,7 +1448,7 @@ export default function PersonalAccount() {
                     <div>
                       <div className="wallet-verified-badge">
                         <i className="bi bi-shield-check"></i>
-                        <span>Ví YÊN Pay • Đã xác thực</span>
+                        <span>Ví YÊN Pay • {walletData?.isLinked ? "Đã xác thực" : "Chưa kích hoạt"}</span>
                       </div>
                       <h2 className="wallet-hero-title">Ví Hoàn Tiền Cá Nhân</h2>
                     </div>
@@ -1340,11 +1477,13 @@ export default function PersonalAccount() {
                   <div className="wallet-sub-stats">
                     <div className="wallet-sub-stat-card">
                       <span className="sub-stat-title">TỔNG HOÀN LŨY KẾ</span>
-                      <span className="sub-stat-value text-emerald">1.250.000đ</span>
+                      <span className="sub-stat-value text-emerald">
+                        {Number(walletData?.totalCashback || 1250000).toLocaleString("vi-VN")}đ
+                      </span>
                     </div>
                     <div className="wallet-sub-stat-card">
                       <span className="sub-stat-title">TỶ LỆ HOÀN TIỀN</span>
-                      <span className="sub-stat-badge">5% / Đơn phòng</span>
+                      <span className="sub-stat-badge">{walletData?.cashbackRate || 5}% / Đơn phòng</span>
                     </div>
                   </div>
                 </div>
@@ -1352,31 +1491,51 @@ export default function PersonalAccount() {
 
               {/* Bank & PIN Information Cards */}
               <div className="wallet-info-grid">
-                <div className="wallet-info-card">
+                <div
+                  className="wallet-info-card"
+                  style={{ cursor: "pointer", transition: "transform 0.2s ease" }}
+                  onClick={() => setShowBankModal(true)}
+                  title="Nhấn để cập nhật tài khoản ngân hàng liên kết"
+                >
                   <div className="wallet-info-icon bg-emerald-light">
                     <i className="bi bi-bank2 text-emerald"></i>
                   </div>
                   <div className="wallet-info-content">
-                    <span className="wallet-info-label">Ngân hàng liên kết</span>
-                    <h6 className="wallet-info-title">Vietcombank •••• 6868</h6>
-                    <span className="wallet-info-sub">Chủ tài khoản: <strong>Lê Hoàng Mai Chi</strong></span>
+                    <div className="d-flex align-items-center justify-content-between">
+                      <span className="wallet-info-label">Ngân hàng liên kết</span>
+                      <small className="text-emerald fw-semibold text-xs"><i className="bi bi-pencil-square me-1"></i>Thay đổi</small>
+                    </div>
+                    <h6 className="wallet-info-title">
+                      {walletData?.bankName || "Vietcombank"} •••• {walletData?.accountNumber ? (walletData.accountNumber.length > 4 ? walletData.accountNumber.slice(-4) : walletData.accountNumber) : "6868"}
+                    </h6>
+                    <span className="wallet-info-sub">
+                      Chủ tài khoản: <strong>{walletData?.accountHolder || profile.fullName || "Lê Hoàng Mai Chi"}</strong>
+                    </span>
                   </div>
                   <span className="wallet-status-pill pill-success">
                     <i className="bi bi-check-circle-fill me-1"></i>Đã liên kết
                   </span>
                 </div>
 
-                <div className="wallet-info-card">
+                <div
+                  className="wallet-info-card"
+                  style={{ cursor: "pointer", transition: "transform 0.2s ease" }}
+                  onClick={() => setShowPinModal(true)}
+                  title="Nhấn để cài đặt / đổi mã PIN ví"
+                >
                   <div className="wallet-info-icon bg-amber-light">
                     <i className="bi bi-shield-lock-fill text-amber"></i>
                   </div>
                   <div className="wallet-info-content">
-                    <span className="wallet-info-label">Bảo mật giao dịch</span>
+                    <div className="d-flex align-items-center justify-content-between">
+                      <span className="wallet-info-label">Bảo mật giao dịch</span>
+                      <small className="text-amber fw-semibold text-xs"><i className="bi bi-key me-1"></i>Cài đặt</small>
+                    </div>
                     <h6 className="wallet-info-title">Mã PIN Ví 6 chữ số</h6>
-                    <span className="wallet-info-sub">Xác thực nhanh khi hoàn tiền & rút tiền</span>
+                    <span className="wallet-info-sub">Xác thực nhanh khi hoàn tiền &amp; rút tiền</span>
                   </div>
                   <span className="wallet-status-pill pill-amber">
-                    <i className="bi bi-shield-check me-1"></i>Đã kích hoạt
+                    <i className="bi bi-shield-check me-1"></i>{walletData?.isPinSet ? "Đã kích hoạt" : "Chưa kích hoạt"}
                   </span>
                 </div>
               </div>
@@ -1397,32 +1556,39 @@ export default function PersonalAccount() {
                 </div>
 
                 <div className="wallet-ledger-list">
-                  {walletLedger.map((item) => (
-                    <div key={item.id} className={`wallet-ledger-item ${item.type}`}>
-                      <div className="ledger-item-left">
-                        <div className={`ledger-type-circle ${item.type}`}>
-                          <i className={`bi ${item.type === "plus" ? "bi-arrow-down-left" : "bi-arrow-up-right"}`}></i>
-                        </div>
-                        <div className="ledger-item-details">
-                          <div className="ledger-item-title">{item.title}</div>
-                          <div className="ledger-item-date">
-                            <i className="bi bi-clock me-1"></i>
-                            {item.date}
+                  {walletLedger.length === 0 ? (
+                    <div className="text-center py-5 text-muted">
+                      <i className="bi bi-receipt-cutoff fs-2 d-block mb-2 text-secondary"></i>
+                      Chưa có giao dịch biến động số dư nào
+                    </div>
+                  ) : (
+                    walletLedger.map((item) => (
+                      <div key={item.id} className={`wallet-ledger-item ${item.type}`}>
+                        <div className="ledger-item-left">
+                          <div className={`ledger-type-circle ${item.type}`}>
+                            <i className={`bi ${item.type === "plus" ? "bi-arrow-down-left" : "bi-arrow-up-right"}`}></i>
+                          </div>
+                          <div className="ledger-item-details">
+                            <div className="ledger-item-title">{item.title}</div>
+                            <div className="ledger-item-date">
+                              <i className="bi bi-clock me-1"></i>
+                              {item.date}
+                            </div>
                           </div>
                         </div>
-                      </div>
 
-                      <div className="ledger-item-right">
-                        <div className={`ledger-amount ${item.type}`}>
-                          {item.amount}
+                        <div className="ledger-item-right">
+                          <div className={`ledger-amount ${item.type}`}>
+                            {item.amount}
+                          </div>
+                          <span className={`ledger-status-tag ${item.type}`}>
+                            <i className={`bi ${item.type === "plus" ? "bi-check-circle-fill" : "bi-arrow-right-circle-fill"} me-1`}></i>
+                            {item.status}
+                          </span>
                         </div>
-                        <span className={`ledger-status-tag ${item.type}`}>
-                          <i className={`bi ${item.type === "plus" ? "bi-check-circle-fill" : "bi-arrow-right-circle-fill"} me-1`}></i>
-                          {item.status}
-                        </span>
                       </div>
-                    </div>
-                  ))}
+                    ))
+                  )}
                 </div>
               </div>
             </div>
@@ -1523,32 +1689,100 @@ export default function PersonalAccount() {
 
       {/* 3. Modal PIN */}
       {showPinModal && (
-        <div className="modal show d-block" style={{ backgroundColor: "rgba(0,0,0,0.5)" }} tabindex="-1">
+        <div className="modal show d-block" style={{ backgroundColor: "rgba(0,0,0,0.5)" }} tabIndex="-1">
           <div className="modal-dialog modal-dialog-centered">
             <div className="modal-content rounded-4 border-0 shadow">
               <div className="modal-header border-0 pb-0">
-                <h5 className="modal-title fw-bold text-dark"><i className="bi bi-hash text-success me-2"></i>Cài đặt mã PIN thanh toán</h5>
+                <h5 className="modal-title fw-bold text-dark"><i className="bi bi-shield-lock-fill text-success me-2"></i>Cài đặt mã PIN Ví YÊN Pay</h5>
                 <button type="button" className="btn-close" onClick={() => setShowPinModal(false)}></button>
               </div>
-              <div className="modal-body py-4">
-                <p className="text-sm text-secondary mb-3">Tạo mã PIN 6 chữ số để xác thực nhanh khi hoàn tiền hoặc đặt Homestay nhanh.</p>
-                <div className="mb-3">
-                  <input type="password" className="form-control form-control-custom text-center fs-4" placeholder="• • • • • •" maxLength="6" />
+              <form onSubmit={handlePinSubmit}>
+                <div className="modal-body py-4">
+                  <p className="text-sm text-secondary mb-3">Tạo hoặc đổi mã PIN 6 chữ số để xác thực an toàn tuyệt đối khi rút tiền &amp; giao dịch ví.</p>
+                  <div className="mb-3">
+                    <input
+                      type="password"
+                      className="form-control form-control-custom text-center fs-4 letter-spacing-lg"
+                      placeholder="• • • • • •"
+                      maxLength="6"
+                      value={pinInput}
+                      onChange={(e) => setPinInput(e.target.value.replace(/\D/g, ""))}
+                      required
+                      autoFocus
+                    />
+                  </div>
+                  <small className="text-muted text-xs d-block text-center">
+                    Mã PIN hiện tại: <span className="text-success fw-semibold">{walletData?.isPinSet ? "Đã kích hoạt bảo mật" : "Chưa thiết lập"}</span>
+                  </small>
                 </div>
+                <div className="modal-footer border-0 pt-0">
+                  <button type="button" className="btn btn-light" onClick={() => setShowPinModal(false)}>Hủy</button>
+                  <button type="submit" className="btn btn-eco-save">
+                    Lưu mã PIN
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 3b. Modal Bank Link */}
+      {showBankModal && (
+        <div className="modal show d-block" style={{ backgroundColor: "rgba(0,0,0,0.5)" }} tabIndex="-1">
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content rounded-4 border-0 shadow">
+              <div className="modal-header border-0 pb-0">
+                <h5 className="modal-title fw-bold text-dark"><i className="bi bi-bank2 text-success me-2"></i>Tài khoản ngân hàng liên kết</h5>
+                <button type="button" className="btn-close" onClick={() => setShowBankModal(false)}></button>
               </div>
-              <div className="modal-footer border-0 pt-0">
-                <button type="button" className="btn btn-light" onClick={() => setShowPinModal(false)}>Hủy</button>
-                <button
-                  type="button"
-                  className="btn btn-eco-save"
-                  onClick={() => {
-                    setShowPinModal(false);
-                    triggerToast("Mã PIN", "Đã thiết lập mã PIN Ví YÊN Pay thành công!");
-                  }}
-                >
-                  Tạo mã PIN
-                </button>
-              </div>
+              <form onSubmit={handleBankSubmit}>
+                <div className="modal-body py-3">
+                  <p className="text-xs text-secondary mb-3">Tài khoản này được sử dụng để nhận tiền hoàn và giải ngân rút tiền tự động 24/7.</p>
+                  <div className="mb-3">
+                    <label className="form-label text-sm fw-semibold">Ngân hàng</label>
+                    <select
+                      className="form-select form-select-custom"
+                      value={bankForm.bankName}
+                      onChange={(e) => setBankForm({ ...bankForm, bankName: e.target.value })}
+                    >
+                      <option value="Vietcombank">Vietcombank (Ngân hàng Ngoại Thương)</option>
+                      <option value="MBBank">MBBank (Ngân hàng Quân Đội)</option>
+                      <option value="Techcombank">Techcombank (Ngân hàng Kỹ Thương)</option>
+                      <option value="BIDV">BIDV (Ngân hàng Đầu tư &amp; Phát triển)</option>
+                      <option value="VietinBank">VietinBank (Ngân hàng Công Thương)</option>
+                      <option value="ACB">ACB (Ngân hàng Á Châu)</option>
+                      <option value="VPBank">VPBank (Ngân hàng Việt Nam Thịnh Vượng)</option>
+                    </select>
+                  </div>
+                  <div className="mb-3">
+                    <label className="form-label text-sm fw-semibold">Số tài khoản ngân hàng</label>
+                    <input
+                      type="text"
+                      className="form-control form-control-custom"
+                      value={bankForm.accountNumber}
+                      onChange={(e) => setBankForm({ ...bankForm, accountNumber: e.target.value })}
+                      placeholder="VD: 991203004005"
+                      required
+                    />
+                  </div>
+                  <div className="mb-3">
+                    <label className="form-label text-sm fw-semibold">Tên chủ tài khoản (In hoa không dấu)</label>
+                    <input
+                      type="text"
+                      className="form-control form-control-custom"
+                      value={bankForm.accountHolder}
+                      onChange={(e) => setBankForm({ ...bankForm, accountHolder: e.target.value.toUpperCase() })}
+                      placeholder="VD: LE HOANG MAI CHI"
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="modal-footer border-0 pt-0">
+                  <button type="button" className="btn btn-light" onClick={() => setShowBankModal(false)}>Hủy</button>
+                  <button type="submit" className="btn btn-eco-save">Cập nhật ngay</button>
+                </div>
+              </form>
             </div>
           </div>
         </div>
@@ -1731,7 +1965,7 @@ export default function PersonalAccount() {
 
       {/* 8. Modal Withdraw */}
       {showWithdrawModal && (
-        <div className="modal show d-block" style={{ backgroundColor: "rgba(0,0,0,0.5)" }} tabindex="-1">
+        <div className="modal show d-block" style={{ backgroundColor: "rgba(0,0,0,0.5)" }} tabIndex="-1">
           <div className="modal-dialog modal-dialog-centered">
             <div className="modal-content rounded-4 border-0 shadow">
               <div className="modal-header border-0 pb-0">
@@ -1747,11 +1981,13 @@ export default function PersonalAccount() {
                       value={withdrawForm.bank}
                       onChange={(e) => setWithdrawForm({ ...withdrawForm, bank: e.target.value })}
                     >
-                      <option value="Vietcombank">Vietcombank (Ngân hàng TMCP Ngoại Thương)</option>
-                      <option value="Techcombank">Techcombank (Ngân hàng Kỹ Thương)</option>
+                      <option value="Vietcombank">Vietcombank (Ngân hàng Ngoại Thương)</option>
                       <option value="MBBank">MBBank (Ngân hàng Quân Đội)</option>
+                      <option value="Techcombank">Techcombank (Ngân hàng Kỹ Thương)</option>
                       <option value="BIDV">BIDV (Ngân hàng Đầu tư &amp; Phát triển)</option>
                       <option value="VietinBank">VietinBank (Ngân hàng Công Thương)</option>
+                      <option value="ACB">ACB (Ngân hàng Á Châu)</option>
+                      <option value="VPBank">VPBank (Ngân hàng Việt Nam Thịnh Vượng)</option>
                     </select>
                   </div>
                   <div className="mb-3">
@@ -1761,28 +1997,58 @@ export default function PersonalAccount() {
                       className="form-control form-control-custom"
                       value={withdrawForm.accNum}
                       onChange={(e) => setWithdrawForm({ ...withdrawForm, accNum: e.target.value })}
+                      placeholder="Nhập số tài khoản ngân hàng"
                       required
                     />
                   </div>
                   <div className="mb-3">
-                    <label className="form-label text-sm fw-semibold">Số tiền muốn rút (VNĐ)</label>
+                    <div className="d-flex align-items-center justify-content-between mb-1">
+                      <label className="form-label text-sm fw-semibold mb-0">Số tiền muốn rút (VNĐ)</label>
+                      <small className="text-muted text-xs">
+                        Số dư: <strong className="text-success">{balance.toLocaleString("vi-VN")}đ</strong>
+                      </small>
+                    </div>
                     <input
                       type="number"
-                      className="form-control form-control-custom"
+                      className="form-control form-control-custom fs-5 fw-bold text-success"
                       value={withdrawForm.amount}
                       onChange={(e) => setWithdrawForm({ ...withdrawForm, amount: e.target.value })}
                       min="50000"
                       max={balance}
+                      step="10000"
                       required
                     />
-                    <small className="text-muted text-xs mt-1 d-block">
-                      Số dư hiện tại: <strong className="text-success">{balance.toLocaleString("vi-VN")}đ</strong>
-                    </small>
+                    
+                    {/* Preset Amount Chips */}
+                    <div className="d-flex flex-wrap gap-2 mt-2">
+                      {[50000, 100000, 200000].map((presetAmt) => (
+                        <button
+                          key={presetAmt}
+                          type="button"
+                          className={`btn btn-sm ${Number(withdrawForm.amount) === presetAmt ? "btn-success" : "btn-outline-secondary"} rounded-pill text-xs px-2.5 py-1`}
+                          onClick={() => setWithdrawForm({ ...withdrawForm, amount: String(presetAmt) })}
+                          disabled={presetAmt > balance}
+                        >
+                          {presetAmt.toLocaleString("vi-VN")}đ
+                        </button>
+                      ))}
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-outline-success rounded-pill text-xs px-2.5 py-1 fw-bold"
+                        onClick={() => setWithdrawForm({ ...withdrawForm, amount: String(balance) })}
+                        disabled={balance < 50000}
+                      >
+                        Tất cả số dư
+                      </button>
+                    </div>
                   </div>
                 </div>
                 <div className="modal-footer border-0 pt-0">
                   <button type="button" className="btn btn-light" onClick={() => setShowWithdrawModal(false)}>Hủy</button>
-                  <button type="submit" className="btn btn-eco-save">Rút ngay</button>
+                  <button type="submit" className="btn btn-eco-save" disabled={balance < 50000}>
+                    <i className="bi bi-arrow-up-right-circle me-1.5"></i>
+                    Xác nhận rút ngay
+                  </button>
                 </div>
               </form>
             </div>
