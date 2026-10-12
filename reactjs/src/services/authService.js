@@ -190,21 +190,5 @@ export const authService = {
     sessionStorage.removeItem('isLoggedIn');
     sessionStorage.removeItem('userName');
     sessionStorage.removeItem('userRole');
-  },
-
-  /**
-   * Kiểm tra trực tiếp kết nối tới Database qua API Backend
-   */
-  async testDbConnection() {
-    try {
-      const response = await fetchAuth('/public/test-db', { method: 'GET' });
-      const data = await response.json();
-      return data;
-    } catch (err) {
-      return { 
-        status: 'OFFLINE_DEMO', 
-        message: 'Chưa chạy Spring Boot server ở port 8080/8081. Đang dùng chế độ Mock dữ liệu ở Frontend.' 
-      };
-    }
   }
 };

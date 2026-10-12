@@ -9,6 +9,9 @@ import java.util.Optional;
 @Repository
 public interface VoucherRepository extends JpaRepository<Voucher, Long> {
     Optional<Voucher> findByCode(String code);
+    Optional<Voucher> findByCodeIgnoreCase(String code);
+    java.util.List<Voucher> findByHomestayId(Long homestayId);
+    java.util.List<Voucher> findByHomestayIdOrHomestayIdIsNull(Long homestayId);
     long countByStatusIgnoreCase(String status);
 
     @org.springframework.data.jpa.repository.Query("SELECT COALESCE(SUM(v.usedCount), 0) FROM Voucher v")
