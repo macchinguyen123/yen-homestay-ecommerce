@@ -74,8 +74,22 @@ public class AdminHomestayController {
     public ResponseEntity<?> getAllHomestays() {
         List<Homestay> homestays = homestayRepository.findAll();
         List<User> allUsers = userRepository.findAll();
+        List<HomestayImage> allImages = homestayImageRepository.findAll();
 
-        Map<Long, User> userMap = allUsers.stream().collect(Collectors.toMap(User::getId, u -> u));
+        Map<Long, User> userMap = allUsers.stream().collect(Collectors.toMap(User::getId, u -> u, (a, b) -> a));
+        Map<Long, String> imageMap = allImages.stream().collect(Collectors.groupingBy(HomestayImage::getHomestayId))
+                .entrySet().stream().collect(Collectors.toMap(
+                        Map.Entry::getKey,
+                        entry -> {
+                            List<HomestayImage> imgs = entry.getValue();
+                            return imgs.stream()
+                                    .filter(img -> Boolean.TRUE.equals(img.getIsPrimary()))
+                                    .map(HomestayImage::getImageUrl)
+                                    .findFirst()
+                                    .orElse(imgs.get(0).getImageUrl());
+                        },
+                        (a, b) -> a
+                ));
 
         DateTimeFormatter dtf = DateTimeFormatter.ofPattern("dd/MM/yyyy");
         NumberFormat nf = NumberFormat.getInstance(new Locale("vi", "VN"));
@@ -119,7 +133,10 @@ public class AdminHomestayController {
             map.put("statusText", statusText);
             map.put("rooms", h.getNumRooms() != null ? h.getNumRooms() : 0);
             
-            String imgUrl = resolveHomestayImage(h.getId(), h.getCity());
+            String imgUrl = imageMap.get(h.getId());
+            if (imgUrl == null) {
+                imgUrl = resolveHomestayImage(h.getId(), h.getCity());
+            }
             map.put("img", imgUrl);
             
             return map;

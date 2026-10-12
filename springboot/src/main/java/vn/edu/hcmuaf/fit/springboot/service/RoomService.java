@@ -319,6 +319,21 @@ public class RoomService {
                 }
             }
 
+            // Khớp tên phòng, mã phòng hoặc loại phòng thuộc homestay
+            if (dto.getRooms() != null && !dto.getRooms().isEmpty()) {
+                for (RoomDTO room : dto.getRooms()) {
+                    if (room.getRoomName() != null && (room.getRoomName().toLowerCase().contains(cleanKw) || removeVietnameseTones(room.getRoomName()).contains(noToneKw))) {
+                        return true;
+                    }
+                    if (room.getRoomCode() != null && (room.getRoomCode().toLowerCase().contains(cleanKw) || removeVietnameseTones(room.getRoomCode()).contains(noToneKw))) {
+                        return true;
+                    }
+                    if (room.getRoomType() != null && (room.getRoomType().toLowerCase().contains(cleanKw) || removeVietnameseTones(room.getRoomType()).contains(noToneKw))) {
+                        return true;
+                    }
+                }
+            }
+
             return false;
         }).collect(Collectors.toList());
     }
@@ -387,6 +402,8 @@ public class RoomService {
                 .homestayName(homestayName)
                 .roomName(r.getRoomName())
                 .name(r.getRoomName())
+                .roomCode(r.getRoomCode() != null ? r.getRoomCode() : "P." + r.getId())
+                .code(r.getRoomCode() != null ? r.getRoomCode() : "P." + r.getId())
                 .roomType(r.getRoomType())
                 .bedCount(r.getBedCount())
                 .capacity(r.getCapacity())

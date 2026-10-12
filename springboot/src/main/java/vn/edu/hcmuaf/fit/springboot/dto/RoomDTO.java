@@ -15,6 +15,8 @@ public class RoomDTO {
     private String homestayName;
     private String roomName;
     private String name; // alias for roomName
+    private String roomCode;
+    private String code; // alias for roomCode
     private String roomType;
     private Integer bedCount;
     private Integer capacity;

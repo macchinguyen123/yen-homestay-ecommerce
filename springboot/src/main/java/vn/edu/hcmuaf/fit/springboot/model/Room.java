@@ -39,6 +39,15 @@ public class Room {
     @Builder.Default
     private String status = "AVAILABLE";
 
+    @Transient
+    @com.fasterxml.jackson.annotation.JsonProperty("roomCode")
+    private String roomCode;
+
+    @com.fasterxml.jackson.annotation.JsonProperty("code")
+    public String getCode() {
+        return this.roomCode != null && !this.roomCode.trim().isEmpty() ? this.roomCode : "P." + (this.id != null ? this.id : "");
+    }
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
