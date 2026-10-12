@@ -30,6 +30,36 @@ public class GuestTask {
     @Column(name = "reward_note")
     private String rewardNote;
 
+    @Column(name = "icon")
+    private String icon;
+
+    @Column(name = "reward_type")
+    private String rewardType;
+
+    @Column(name = "reward_value")
+    private String rewardValue;
+
+    @Column(name = "reward_extra")
+    private String rewardExtra;
+
+    @Column(name = "from_date")
+    private String fromDate;
+
+    @Column(name = "to_date")
+    private String toDate;
+
+    @Builder.Default
+    @Column(name = "need_photo")
+    private Boolean needPhoto = true;
+
+    @Builder.Default
+    @Column(name = "auto_approve")
+    private Boolean autoApprove = false;
+
+    @Builder.Default
+    @Column(name = "given_count")
+    private Integer givenCount = 0;
+
     @Builder.Default
     private String status = "ACTIVE";
 

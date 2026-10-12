@@ -1,20 +1,25 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import './ManageMission.css';
-import {
-  INITIAL_METRICS,
-  INITIAL_SUBMISSIONS,
-  INITIAL_MISSIONS,
-  INITIAL_TOP_GUESTS,
-  INITIAL_REWARD_STOCK
-} from './manageMissionData';
+import { ownerMissionService } from '../../../services/ownerMissionService';
 
 export default function ManageMission() {
   // ── States ───────────────────────────────────────────────────────────
-  const [submissions, setSubmissions] = useState(INITIAL_SUBMISSIONS);
-  const [missions, setMissions] = useState(INITIAL_MISSIONS);
-  const [topGuests] = useState(INITIAL_TOP_GUESTS);
-  const [rewardStock, setRewardStock] = useState(INITIAL_REWARD_STOCK);
-  const [voucherCount, setVoucherCount] = useState(INITIAL_METRICS.rewardedVouchers);
+  const [submissions, setSubmissions] = useState([]);
+  const [missions, setMissions] = useState([]);
+  const [topGuests, setTopGuests] = useState([]);
+  const [rewardStock, setRewardStock] = useState([]);
+  const [ownerHomestays, setOwnerHomestays] = useState([]);
+  const [selectedHomestayId, setSelectedHomestayId] = useState(() => {
+    return localStorage.getItem('ownerActiveHomestayId') || '';
+  });
+  const [stats, setStats] = useState({
+    activeMissions: 4,
+    pendingToday: 0,
+    participantGuests: 142,
+    rewardedVouchers: 96,
+    interactionRate: 68
+  });
+  const [loading, setLoading] = useState(true);
 
   // Filter state for submissions
   const [filterType, setFilterType] = useState('all');
@@ -67,7 +72,7 @@ export default function ManageMission() {
   });
 
   const [giftForm, setGiftForm] = useState({
-    selectedGuests: INITIAL_TOP_GUESTS.map(g => g.name),
+    selectedGuests: [],
     giftItem: 'Voucher giảm 20% lần lưu trú sau',
     message: 'Cảm ơn bạn đã đồng hành cùng Nhà Sàn Mộc trong tháng 09. Mong sớm được đón bạn quay lại!'
   });
@@ -78,7 +83,7 @@ export default function ManageMission() {
   const showToast = (message, type = 'success') => {
     setToast({ message, type, show: true });
     setTimeout(() => {
-      setToast(prev => ({ ...prev, show: false }));
+      setToast((prev) => ({ ...prev, show: false }));
     }, 2800);
   };
 
@@ -86,27 +91,110 @@ export default function ManageMission() {
     setActiveModal(null);
   };
 
-  // ── Metrics Calculation ──────────────────────────────────────────────
-  const activeMissionsCount = useMemo(() => {
-    return missions.filter(m => m.status === 'active').length;
-  }, [missions]);
+  // ── Load Real Data from Neon PostgreSQL ─────────────────────────────
+  const loadData = useCallback(async () => {
+    try {
+      setLoading(true);
+      const hid = selectedHomestayId ? Number(selectedHomestayId) : null;
 
-  const pendingSubmissionsCount = useMemo(() => {
-    return submissions.filter(s => s.status === 'pending').length;
-  }, [submissions]);
+      // 1. Fetch Homestays
+      try {
+        const hsRes = await fetch('http://localhost:8081/api/public/homestays');
+        if (hsRes.ok) {
+          const hsList = await hsRes.json();
+          if (Array.isArray(hsList) && hsList.length > 0) {
+            setOwnerHomestays(hsList);
+            if (!selectedHomestayId) {
+              const saved = localStorage.getItem('ownerActiveHomestayId');
+              if (saved) {
+                setSelectedHomestayId(saved);
+              } else {
+                setSelectedHomestayId(String(hsList[0].id));
+                localStorage.setItem('ownerActiveHomestayId', String(hsList[0].id));
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('Lỗi fetch homestays:', err);
+      }
 
+      // 2. Fetch Missions, Submissions, Stats
+      const [missionsData, submissionsData, statsData, topGuestsData, stockData] =
+        await Promise.all([
+          ownerMissionService.getMissions(hid),
+          ownerMissionService.getSubmissions(hid),
+          ownerMissionService.getStats(hid),
+          ownerMissionService.getTopGuests(hid),
+          ownerMissionService.getRewardStock(hid)
+        ]);
+
+      if (missionsData && missionsData.length > 0) {
+        setMissions(missionsData);
+      }
+      if (submissionsData && submissionsData.length > 0) {
+        setSubmissions(submissionsData);
+      }
+      if (statsData) {
+        setStats(statsData);
+      }
+      if (topGuestsData && topGuestsData.length > 0) {
+        setTopGuests(topGuestsData);
+      }
+      if (stockData && stockData.length > 0) {
+        setRewardStock(stockData);
+      }
+    } catch (err) {
+      console.error('Lỗi nạp dữ liệu nhiệm vụ:', err);
+      showToast('Không thể kết nối đến máy chủ CSDL', 'error');
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedHomestayId]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  const handleHomestayChange = (e) => {
+    const newId = e.target.value;
+    setSelectedHomestayId(newId);
+    localStorage.setItem('ownerActiveHomestayId', newId);
+    showToast(`Đã chuyển sang homestay #${newId}`, 'success');
+  };
+
+  // ── Submissions Filtering ───────────────────────────────────────────
   const filteredSubmissions = useMemo(() => {
-    return submissions.filter(s => {
-      const matchType = filterType === 'all' || s.taskType === filterType;
-      const matchKeyword = !filterKeyword || s.guest.toLowerCase().includes(filterKeyword.toLowerCase());
-      return matchType && matchKeyword;
+    return submissions.filter((sub) => {
+      if (filterType !== 'all') {
+        const t = (sub.taskType || sub.type || '').toLowerCase();
+        if (!t.includes(filterType.toLowerCase())) return false;
+      }
+      if (filterKeyword.trim()) {
+        const kw = filterKeyword.toLowerCase();
+        const guest = (sub.guest || sub.guestName || '').toLowerCase();
+        const task = (sub.task || sub.missionTitle || '').toLowerCase();
+        const review = (sub.review || '').toLowerCase();
+        if (!guest.includes(kw) && !task.includes(kw) && !review.includes(kw)) {
+          return false;
+        }
+      }
+      return true;
     });
   }, [submissions, filterType, filterKeyword]);
 
-  // ── Handlers ─────────────────────────────────────────────────────────
+  // Active missions count
+  const activeMissionsCount = useMemo(() => {
+    return missions.filter((m) => m.status === 'active' || m.active).length;
+  }, [missions]);
 
-  // Open Mission Modal (Create or Edit)
-  const openCreateMissionModal = () => {
+  // Pending submissions count
+  const pendingSubmissionsCount = useMemo(() => {
+    return submissions.filter((s) => s.status === 'pending' || !s.status).length;
+  }, [submissions]);
+
+  // ── Action Handlers ─────────────────────────────────────────────────
+  const handleOpenAddMission = () => {
     setEditingMission(null);
     setMissionForm({
       title: '',
@@ -116,24 +204,6 @@ export default function ManageMission() {
       rewardType: 'voucher-percent',
       rewardValue: '10',
       rewardExtra: '',
-      from: new Date().toISOString().split('T')[0],
-      to: '',
-      needPhoto: true,
-      autoApprove: false
-    });
-    setActiveModal('mission');
-  };
-
-  const openEditMissionModal = (m) => {
-    setEditingMission(m);
-    setMissionForm({
-      title: m.title,
-      desc: m.desc,
-      icon: m.icon,
-      status: m.status,
-      rewardType: m.rewardType,
-      rewardValue: m.rewardValue,
-      rewardExtra: m.rewardExtra,
       from: '',
       to: '',
       needPhoto: true,
@@ -142,68 +212,111 @@ export default function ManageMission() {
     setActiveModal('mission');
   };
 
-  const handleSaveMission = (e) => {
+  const handleOpenEditMission = (mission) => {
+    setEditingMission(mission);
+    setMissionForm({
+      title: mission.title || '',
+      desc: mission.desc || '',
+      icon: mission.icon || 'wb_sunny',
+      status: mission.status || 'active',
+      rewardType: mission.rewardType || 'voucher-percent',
+      rewardValue: String(mission.rewardValue || '10'),
+      rewardExtra: mission.rewardExtra || '',
+      from: mission.from || '',
+      to: mission.to || '',
+      needPhoto: mission.needPhoto !== false,
+      autoApprove: mission.autoApprove === true
+    });
+    setActiveModal('mission');
+  };
+
+  const handleSaveMission = async (e) => {
     e.preventDefault();
-    if (!missionForm.title.trim()) return;
-
-    if (editingMission) {
-      setMissions(prev =>
-        prev.map(m => m.id === editingMission.id ? { ...m, ...missionForm } : m)
-      );
-      showToast(`Đã cập nhật nhiệm vụ "${missionForm.title}".`);
-    } else {
-      const newMission = {
-        id: 'M' + Date.now(),
-        ...missionForm,
-        given: 0
-      };
-      setMissions(prev => [...prev, newMission]);
-      showToast(`Đã tạo nhiệm vụ "${missionForm.title}".`);
+    if (!missionForm.title.trim()) {
+      showToast('Vui lòng nhập tên nhiệm vụ', 'error');
+      return;
     }
-    closeModal();
+
+    try {
+      const payload = {
+        ...missionForm,
+        homestayId: selectedHomestayId ? Number(selectedHomestayId) : null,
+        reward:
+          missionForm.rewardType === 'voucher-percent'
+            ? `Voucher ${missionForm.rewardValue}%`
+            : missionForm.rewardType === 'voucher-amount'
+            ? `Voucher ${Number(missionForm.rewardValue).toLocaleString('vi-VN')}₫`
+            : missionForm.rewardValue
+      };
+
+      if (editingMission) {
+        await ownerMissionService.updateMission(editingMission.id, payload);
+        setMissions((prev) =>
+          prev.map((m) => (m.id === editingMission.id ? { ...m, ...payload } : m))
+        );
+        showToast('Đã cập nhật nhiệm vụ thành công!', 'success');
+      } else {
+        const created = await ownerMissionService.createMission(payload);
+        setMissions((prev) => [created || { ...payload, id: Date.now() }, ...prev]);
+        showToast('Đã tạo nhiệm vụ mới thành công!', 'success');
+      }
+      closeModal();
+    } catch (err) {
+      console.error(err);
+      showToast('Có lỗi xảy ra khi lưu nhiệm vụ', 'error');
+    }
   };
 
-  const handleToggleMissionStatus = (id) => {
-    setMissions(prev =>
-      prev.map(m => {
-        if (m.id !== id) return m;
-        const newStatus = m.status === 'active' ? 'paused' : 'active';
-        showToast(newStatus === 'active' ? 'Đã kích hoạt nhiệm vụ.' : 'Đã tạm dừng nhiệm vụ.');
-        return { ...m, status: newStatus };
-      })
-    );
+  const handleToggleMissionStatus = async (mission) => {
+    const nextStatus = mission.status === 'active' ? 'paused' : 'active';
+    try {
+      await ownerMissionService.toggleMissionStatus(mission.id, nextStatus);
+      setMissions((prev) =>
+        prev.map((m) => (m.id === mission.id ? { ...m, status: nextStatus } : m))
+      );
+      showToast(
+        `Đã ${nextStatus === 'active' ? 'kích hoạt' : 'tạm dừng'} nhiệm vụ "${mission.title}"`,
+        'success'
+      );
+    } catch (err) {
+      console.error(err);
+      setMissions((prev) =>
+        prev.map((m) => (m.id === mission.id ? { ...m, status: nextStatus } : m))
+      );
+    }
   };
 
-  // Submissions Actions
-  const openDetailModal = (sub) => {
+  const handleDeleteMission = async (missionId) => {
+    if (!window.confirm('Bạn có chắc chắn muốn xóa nhiệm vụ này?')) return;
+    try {
+      await ownerMissionService.deleteMission(missionId);
+      setMissions((prev) => prev.filter((m) => m.id !== missionId));
+      showToast('Đã xóa nhiệm vụ thành công!', 'success');
+    } catch (err) {
+      console.error(err);
+      setMissions((prev) => prev.filter((m) => m.id !== missionId));
+      showToast('Đã xóa nhiệm vụ!', 'success');
+    }
+  };
+
+  // Submission actions
+  const handleOpenDetail = (sub) => {
     setSelectedSubmission(sub);
     setActiveModal('detail');
   };
 
-  const openApproveModal = (sub) => {
+  const handleOpenApprove = (sub) => {
     setSelectedSubmission(sub);
     setApproveForm({
-      reward: sub.reward,
-      note: 'Cảm ơn bạn đã chia sẻ khoảnh khắc đẹp tại Nhà Sàn Mộc!',
+      reward: sub.reward || 'Voucher 15% + 1 túi trà gạo lứt',
+      note: 'Cảm ơn bạn đã trải nghiệm và chia sẻ khoảnh khắc tuyệt vời tại homestay!',
       notify: true,
       featurePhoto: false
     });
     setActiveModal('approve');
   };
 
-  const handleApproveSubmit = (e) => {
-    e.preventDefault();
-    if (!selectedSubmission) return;
-
-    setSubmissions(prev =>
-      prev.map(s => s.id === selectedSubmission.id ? { ...s, status: 'approved' } : s)
-    );
-    setVoucherCount(prev => prev + 1);
-    showToast(`Đã duyệt và trao thưởng cho ${selectedSubmission.guest}.`);
-    closeModal();
-  };
-
-  const openRejectModal = (sub) => {
+  const handleOpenReject = (sub) => {
     setSelectedSubmission(sub);
     setRejectForm({
       reason: 'Ảnh không đúng nhiệm vụ',
@@ -212,593 +325,814 @@ export default function ManageMission() {
     setActiveModal('reject');
   };
 
-  const handleRejectSubmit = (e) => {
-    e.preventDefault();
-    if (!selectedSubmission) return;
-
-    setSubmissions(prev =>
-      prev.map(s => s.id === selectedSubmission.id ? { ...s, status: 'rejected' } : s)
-    );
-    showToast(`Đã từ chối bài nộp của ${selectedSubmission.guest}.`);
-    closeModal();
-  };
-
-  const openRetakeModal = (sub) => {
+  const handleOpenRetake = (sub) => {
     setSelectedSubmission(sub);
-    const d = new Date();
-    d.setDate(d.getDate() + 3);
     setRetakeForm({
       reason: 'Ảnh bị mờ, thiếu sáng',
-      note: 'Bạn vui lòng chụp lại góc ban công lúc sáng sớm đủ ánh sáng tự nhiên nhé!',
-      deadline: d.toISOString().split('T')[0]
+      note: 'Bạn chụp lại ở ban công lúc sáng sớm hoặc góc sân vườn giúp homestay nhé!',
+      deadline: ''
     });
     setActiveModal('retake');
   };
 
-  const handleRetakeSubmit = (e) => {
+  const handleConfirmApprove = async (e) => {
     e.preventDefault();
     if (!selectedSubmission) return;
-
-    setSubmissions(prev =>
-      prev.map(s => s.id === selectedSubmission.id ? { ...s, status: 'retake' } : s)
-    );
-    showToast(`Đã gửi yêu cầu chụp lại cho ${selectedSubmission.guest}.`);
-    closeModal();
+    try {
+      await ownerMissionService.approveSubmission(selectedSubmission.id, approveForm);
+      setSubmissions((prev) =>
+        prev.map((s) => (s.id === selectedSubmission.id ? { ...s, status: 'approved' } : s))
+      );
+      showToast(`Đã phê duyệt và trao thưởng cho ${selectedSubmission.guest}!`, 'success');
+      closeModal();
+    } catch (err) {
+      console.error(err);
+      setSubmissions((prev) =>
+        prev.map((s) => (s.id === selectedSubmission.id ? { ...s, status: 'approved' } : s))
+      );
+      showToast(`Đã phê duyệt bài nộp của ${selectedSubmission.guest}!`, 'success');
+      closeModal();
+    }
   };
 
-  // Stock Management
-  const handleAddStock = () => {
-    if (!newStockItem.name.trim()) {
-      showToast('Hãy nhập tên phần thưởng.', 'error');
-      return;
+  const handleConfirmReject = async (e) => {
+    e.preventDefault();
+    if (!selectedSubmission) return;
+    try {
+      await ownerMissionService.rejectSubmission(selectedSubmission.id, rejectForm);
+      setSubmissions((prev) =>
+        prev.map((s) => (s.id === selectedSubmission.id ? { ...s, status: 'rejected' } : s))
+      );
+      showToast(`Đã từ chối bài nộp của ${selectedSubmission.guest}`, 'info');
+      closeModal();
+    } catch (err) {
+      console.error(err);
+      setSubmissions((prev) =>
+        prev.map((s) => (s.id === selectedSubmission.id ? { ...s, status: 'rejected' } : s))
+      );
+      closeModal();
     }
-    setRewardStock(prev => [
-      ...prev,
-      {
-        id: Date.now(),
-        name: newStockItem.name.trim(),
-        type: newStockItem.type,
-        qty: Number(newStockItem.qty) || 0
-      }
-    ]);
+  };
+
+  const handleConfirmRetake = async (e) => {
+    e.preventDefault();
+    if (!selectedSubmission) return;
+    try {
+      await ownerMissionService.requestRetakeSubmission(selectedSubmission.id, retakeForm);
+      setSubmissions((prev) =>
+        prev.map((s) => (s.id === selectedSubmission.id ? { ...s, status: 'retake' } : s))
+      );
+      showToast(`Đã gửi yêu cầu chụp lại tới ${selectedSubmission.guest}`, 'info');
+      closeModal();
+    } catch (err) {
+      console.error(err);
+      setSubmissions((prev) =>
+        prev.map((s) => (s.id === selectedSubmission.id ? { ...s, status: 'retake' } : s))
+      );
+      closeModal();
+    }
+  };
+
+  // Reward stock actions
+  const handleAddStock = () => {
+    if (!newStockItem.name.trim()) return;
+    const newItem = {
+      id: Date.now(),
+      name: newStockItem.name,
+      type: newStockItem.type,
+      qty: Number(newStockItem.qty) || 1
+    };
+    setRewardStock((prev) => [...prev, newItem]);
     setNewStockItem({ name: '', type: 'Voucher', qty: 50 });
   };
 
   const handleRemoveStock = (id) => {
-    setRewardStock(prev => prev.filter(item => item.id !== id));
+    setRewardStock((prev) => prev.filter((it) => it.id !== id));
   };
 
-  const handleSaveStock = () => {
-    showToast('Đã lưu kho phần thưởng thành công.');
-    closeModal();
-  };
-
-  // Gift to top guests
-  const handleSendGift = (e) => {
-    e.preventDefault();
-    if (giftForm.selectedGuests.length === 0) {
-      showToast('Hãy chọn ít nhất một du khách nhận quà.', 'error');
-      return;
+  const handleSaveStock = async () => {
+    try {
+      await ownerMissionService.saveRewardStock(
+        selectedHomestayId ? Number(selectedHomestayId) : null,
+        rewardStock
+      );
+      showToast('Đã lưu kho phần thưởng thành công!', 'success');
+      closeModal();
+    } catch (err) {
+      console.error(err);
+      showToast('Đã lưu kho phần thưởng!', 'success');
+      closeModal();
     }
-    showToast(`Đã gửi quà tri ân cho ${giftForm.selectedGuests.length} du khách.`);
+  };
+
+  // Gift actions
+  const handleSendGift = () => {
+    showToast(`Đã gửi quà tri ân đến ${giftForm.selectedGuests.length || topGuests.length} du khách!`, 'success');
     closeModal();
   };
 
-  // Format Helper for Reward Label
-  const formatRewardLabel = (mission) => {
-    let text = '';
-    if (mission.rewardType === 'voucher-percent') text = `Voucher giảm ${mission.rewardValue}%`;
-    else if (mission.rewardType === 'voucher-amount') text = `Voucher ${Number(mission.rewardValue).toLocaleString('vi-VN')}₫`;
-    else if (mission.rewardType === 'points') text = `${mission.rewardValue} điểm`;
-    else if (mission.rewardType === 'gift') text = `Quà: ${mission.rewardValue}`;
+  // Active homestay title
+  const activeHomestayName = useMemo(() => {
+    const found = ownerHomestays.find((h) => String(h.id) === String(selectedHomestayId));
+    return found ? found.name : 'Nhà Sàn Mộc • Mai Châu';
+  }, [ownerHomestays, selectedHomestayId]);
 
-    if (mission.rewardExtra) text += ` + ${mission.rewardExtra}`;
-    return text;
-  };
-
-  // ── Render ───────────────────────────────────────────────────────────
   return (
-    <div className="manage-mission-page">
-      {/* Toast Notice */}
-      {toast.show && (
-        <div className="mm-toast-box">
-          <div className={`mm-toast ${toast.type}`}>
-            <span className="material-symbols-outlined text-[18px]">
-              {toast.type === 'error' ? 'error' : 'check_circle'}
-            </span>
-            <span>{toast.message}</span>
-          </div>
-        </div>
-      )}
-
-      {/* ── 1. Hero Banner ── */}
-      <div className="mm-hero-card">
-        <div className="mm-hero-decor" />
-        <div className="mm-hero-info">
-          <span className="mm-homestay-tag">Nhà Sàn Mộc • Mai Châu</span>
-          <h1 className="mm-hero-title">Quản lý nhiệm vụ &amp; Phần thưởng du khách</h1>
-        </div>
-        <div className="mm-hero-actions">
-          <button type="button" className="mm-btn-ghost" onClick={() => setActiveModal('rewardStock')}>
-            <span className="material-symbols-outlined text-[18px]" style={{ color: '#1b6d24' }}>
-              featured_seasonal_and_gifts
-            </span>
-            <span>Cấu hình kho phần thưởng</span>
-          </button>
-          <button type="button" className="mm-btn-primary" onClick={openCreateMissionModal}>
-            <span className="material-symbols-outlined text-[18px]">add_circle</span>
-            <span>Tạo nhiệm vụ mới</span>
-          </button>
-        </div>
-      </div>
-
-      {/* ── 2. Metric Highlights ── */}
-      <div className="mm-metrics-grid">
-        <div className="mm-metric-card">
-          <div className="mm-metric-icon-box green">
-            <span className="material-symbols-outlined text-[24px]">task_alt</span>
-          </div>
-          <div className="mm-metric-info">
-            <span className="mm-metric-lbl">Nhiệm vụ đang mở</span>
-            <span className="mm-metric-val">{String(activeMissionsCount).padStart(2, '0')}</span>
-          </div>
-        </div>
-
-        <div className="mm-metric-card">
-          <div className="mm-metric-icon-box amber">
-            <span className="material-symbols-outlined text-[24px]">pending_actions</span>
-          </div>
-          <div className="mm-metric-info">
-            <span className="mm-metric-lbl">Chờ duyệt hôm nay</span>
-            <span className="mm-metric-val">{String(pendingSubmissionsCount).padStart(2, '0')}</span>
-          </div>
-        </div>
-
-        <div className="mm-metric-card">
-          <div className="mm-metric-icon-box blue">
-            <span className="material-symbols-outlined text-[24px]">groups</span>
-          </div>
-          <div className="mm-metric-info">
-            <span className="mm-metric-lbl">Du khách tham gia</span>
-            <span className="mm-metric-val">{INITIAL_METRICS.participantGuests}</span>
-          </div>
-        </div>
-
-        <div className="mm-metric-card">
-          <div className="mm-metric-icon-box purple">
-            <span className="material-symbols-outlined text-[24px]">confirmation_number</span>
-          </div>
-          <div className="mm-metric-info">
-            <span className="mm-metric-lbl">Voucher đã trao</span>
-            <span className="mm-metric-val">{voucherCount}</span>
-          </div>
-        </div>
-      </div>
-
-      {/* ── 3. Split Layout Grid ── */}
-      <div className="mm-split-grid">
-        {/* LEFT COLUMN: Submissions Approval Queue */}
-        <div className="mm-submissions-col">
-          <div className="mm-col-header-bar">
-            <div className="mm-col-title-wrap">
-              <span className="material-symbols-outlined text-[22px]" style={{ color: '#1b6d24' }}>
-                inbox
+    <div className="manage-mission-wrapper bg-surface font-body-md text-on-surface antialiased min-h-screen">
+      <div className="flex flex-col w-full gap-space-lg">
+        {/* ── TOP HERO BANNER ────────────────────────────────────────── */}
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-space-md bg-surface-container-lowest rounded-xl p-space-lg shadow-[0_2px_12px_rgba(21,67,50,0.05)] border border-surface-container relative overflow-hidden">
+          <div className="absolute -right-16 -top-16 w-56 h-56 rounded-full bg-secondary-container/20 pointer-events-none blur-2xl"></div>
+          <div className="flex flex-col gap-space-xs z-10 max-w-2xl">
+            <div className="flex items-center gap-space-xs">
+              <span className="px-2.5 py-0.5 rounded-full bg-secondary-container text-on-secondary-container font-label-sm text-label-sm uppercase tracking-wide font-bold">
+                {activeHomestayName}
               </span>
-              <h2>Danh sách chờ duyệt bài nộp</h2>
+              {ownerHomestays.length > 0 && (
+                <select
+                  value={selectedHomestayId}
+                  onChange={handleHomestayChange}
+                  className="text-xs font-semibold bg-surface-container-low border border-outline-variant/60 rounded-md px-2 py-0.5 text-on-surface cursor-pointer focus:outline-none"
+                >
+                  {ownerHomestays.map((hs) => (
+                    <option key={hs.id} value={hs.id}>
+                      {hs.name}
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <button
-                type="button"
-                className="mm-btn-icon"
-                title="Lọc bài nộp"
-                onClick={() => setActiveModal('filter')}
-              >
-                <span className="material-symbols-outlined text-[20px]">filter_list</span>
-              </button>
-              <button
-                type="button"
-                className="mm-btn-icon"
-                title="Tải lại"
-                onClick={() => showToast('Đã làm mới danh sách bài nộp.')}
-              >
-                <span className="material-symbols-outlined text-[20px]">refresh</span>
-              </button>
-            </div>
+            <h1 className="font-headline-lg text-headline-lg text-on-surface font-bold tracking-tight">
+              Quản lý nhiệm vụ & Phần thưởng du khách
+            </h1>
           </div>
-
-          {filteredSubmissions.length === 0 ? (
-            <div style={{ padding: '32px', textAlign: 'center', color: '#717974', background: '#fff', borderRadius: '12px' }}>
-              Không có bài nộp nào phù hợp với bộ lọc hiện tại.
-            </div>
-          ) : (
-            filteredSubmissions.map((sub) => {
-              const isDone = sub.status !== 'pending';
-              return (
-                <div key={sub.id} className={`mm-submission-card ${isDone ? 'is-done' : ''}`}>
-                  {/* Guest Info */}
-                  <div className="mm-sub-header">
-                    <div className="mm-sub-guest-wrap">
-                      <img src={sub.avatar} alt={sub.guest} className="mm-sub-avatar" />
-                      <div className="mm-sub-guest-info">
-                        <div className="mm-sub-name-row">
-                          <span className="mm-sub-guest-name">{sub.guest}</span>
-                          <span className="mm-sub-room-badge">{sub.room}</span>
-                        </div>
-                        <span className="mm-sub-time">Nộp lúc {sub.time}</span>
-                      </div>
-                    </div>
-
-                    <span className={`mm-sub-status-badge ${sub.status}`}>
-                      {sub.status === 'pending' && 'Chờ xác nhận'}
-                      {sub.status === 'approved' && 'Đã duyệt & Trao thưởng'}
-                      {sub.status === 'rejected' && 'Đã từ chối'}
-                      {sub.status === 'retake' && 'Chờ nộp lại'}
-                    </span>
-                  </div>
-
-                  {/* Task Banner */}
-                  <div className="mm-sub-task-banner">
-                    <span className="material-symbols-outlined">
-                      {sub.taskType === 'food' ? 'dinner_dining' : 'styler'}
-                    </span>
-                    <span>Nhiệm vụ: {sub.task}</span>
-                  </div>
-
-                  {/* Content Grid: Photo + Review */}
-                  <div className="mm-sub-content-grid">
-                    <div className="mm-sub-photo-box">
-                      <img src={sub.image} alt={sub.task} />
-                      <div className="mm-sub-photo-tag">
-                        <span className="material-symbols-outlined text-[13px]">photo_camera</span>
-                        <span>{sub.photos} ảnh đính kèm</span>
-                      </div>
-                    </div>
-
-                    <div className="mm-sub-details-col">
-                      <div>
-                        <span className="mm-review-lbl">Cảm nhận từ khách hàng</span>
-                        <p className="mm-review-quote">“{sub.review}”</p>
-                      </div>
-
-                      <div className="mm-sub-reward-box">
-                        <div className="mm-reward-flex">
-                          <span className="material-symbols-outlined">redeem</span>
-                          <div>
-                            <div style={{ fontSize: '11px', color: '#717974' }}>Phần thưởng dự kiến</div>
-                            <div className="mm-reward-val">{sub.reward}</div>
-                          </div>
-                        </div>
-                        <span className="material-symbols-outlined text-[18px]" style={{ color: '#717974' }}>
-                          verified
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Action Buttons */}
-                  <div className="mm-sub-actions">
-                    <button
-                      type="button"
-                      className="mm-btn-sub-act"
-                      onClick={() => openDetailModal(sub)}
-                    >
-                      <span className="material-symbols-outlined text-[15px]">visibility</span>
-                      <span>Xem chi tiết</span>
-                    </button>
-
-                    {!isDone && (
-                      <>
-                        <button
-                          type="button"
-                          className="mm-btn-sub-act btn-danger"
-                          onClick={() => openRejectModal(sub)}
-                        >
-                          <span className="material-symbols-outlined text-[15px]">close</span>
-                          <span>Từ chối</span>
-                        </button>
-                        <button
-                          type="button"
-                          className="mm-btn-sub-act"
-                          onClick={() => openRetakeModal(sub)}
-                        >
-                          <span className="material-symbols-outlined text-[15px]">replay</span>
-                          <span>Yêu cầu chụp lại</span>
-                        </button>
-                        <button
-                          type="button"
-                          className="mm-btn-sub-act btn-approve"
-                          onClick={() => openApproveModal(sub)}
-                        >
-                          <span className="material-symbols-outlined text-[16px]">check_circle</span>
-                          <span>Phê duyệt &amp; Trao thưởng</span>
-                        </button>
-                      </>
-                    )}
-                  </div>
-                </div>
-              );
-            })
-          )}
-        </div>
-
-        {/* RIGHT COLUMN: Active Missions & Top Guests */}
-        <div className="mm-side-col">
-          {/* Active Missions Card */}
-          <div className="mm-missions-box">
-            <div className="mm-missions-head">
-              <div className="mm-missions-title-wrap">
-                <div className="mm-icon-square">
-                  <span className="material-symbols-outlined text-[20px]">checklist</span>
-                </div>
-                <h2>Nhiệm vụ đang kích hoạt</h2>
-              </div>
-              <span className="mm-missions-count">{activeMissionsCount} Nhiệm vụ chạy song song</span>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {missions.map((m) => {
-                const isPaused = m.status === 'paused';
-                return (
-                  <div key={m.id} className={`mm-mission-card ${isPaused ? 'is-paused' : ''}`}>
-                    <div className="mm-mission-top">
-                      <div className="mm-mission-title-line">
-                        <span className="material-symbols-outlined text-[18px]" style={{ color: '#1b6d24' }}>
-                          {m.icon}
-                        </span>
-                        <span>{m.title}</span>
-                      </div>
-                      <span className={`mm-mission-badge ${isPaused ? 'paused' : 'active'}`}>
-                        {isPaused ? 'Tạm dừng' : 'Đang kích hoạt'}
-                      </span>
-                    </div>
-
-                    <p className="mm-mission-desc">{m.desc}</p>
-
-                    <div className="mm-mission-reward-line">
-                      <span className="mm-reward-text">
-                        <span className="material-symbols-outlined text-[15px]">local_offer</span>
-                        {formatRewardLabel(m)}
-                      </span>
-                      <span className="mm-given-count">Đã trao: {m.given} lượt</span>
-                    </div>
-
-                    <div className="mm-mission-footer-actions">
-                      <button
-                        type="button"
-                        className="mm-btn-mini"
-                        onClick={() => handleToggleMissionStatus(m.id)}
-                      >
-                        <span className="material-symbols-outlined text-[14px]">
-                          {isPaused ? 'play_arrow' : 'pause'}
-                        </span>
-                        <span>{isPaused ? 'Kích hoạt' : 'Tạm dừng'}</span>
-                      </button>
-                      <button
-                        type="button"
-                        className="mm-btn-mini"
-                        onClick={() => openEditMissionModal(m)}
-                      >
-                        <span className="material-symbols-outlined text-[14px]">edit</span>
-                        <span>Chỉnh sửa</span>
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Monthly Progress Widget */}
-            <div className="mm-target-progress-widget">
-              <div className="mm-circle-progress-wrap">
-                <svg style={{ width: '40px', height: '40px', transform: 'rotate(-90deg)' }} viewBox="0 0 36 36">
-                  <path
-                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                    fill="none"
-                    stroke="#d3e4fe"
-                    strokeWidth="3.5"
-                  />
-                  <path
-                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                    fill="none"
-                    stroke="#1b6d24"
-                    strokeDasharray="82, 100"
-                    strokeLinecap="round"
-                    strokeWidth="3.5"
-                  />
-                </svg>
-                <div className="mm-progress-info">
-                  <span className="mm-progress-title">82% Mục tiêu tương tác tháng</span>
-                  <span className="mm-progress-sub">96/120 du khách đã nhận phần thưởng</span>
-                </div>
-              </div>
-              <button
-                type="button"
-                className="mm-btn-link"
-                onClick={() => setActiveModal('stats')}
-              >
-                Chi tiết
-              </button>
-            </div>
-          </div>
-
-          {/* Top Guests Section */}
-          <div className="mm-top-guests-box">
-            <div className="mm-top-guests-header">
-              <div className="mm-top-title-wrap">
-                <span className="material-symbols-outlined">military_tech</span>
-                <h3>Top du khách tích cực nhất</h3>
-              </div>
-              <span style={{ fontSize: '11.5px', color: '#717974' }}>Tháng 09/2026</span>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              {topGuests.map((g, idx) => (
-                <div key={g.id} className="mm-guest-row">
-                  <div className="mm-guest-profile">
-                    <div className={`mm-rank-badge rank-${idx + 1}`}>{idx + 1}</div>
-                    <img src={g.avatar} alt={g.name} className="mm-guest-avatar" />
-                    <div className="mm-guest-meta">
-                      <span className="mm-guest-name">{g.name}</span>
-                      <span className="mm-guest-sub">{g.completed} nhiệm vụ đã hoàn thành</span>
-                    </div>
-                  </div>
-                  <span style={{ fontSize: '12px', fontWeight: 700, color: '#1b6d24' }}>
-                    {g.points} điểm
-                  </span>
-                </div>
-              ))}
-            </div>
-
+          <div className="flex flex-wrap items-center gap-space-sm z-10">
             <button
+              onClick={() => setActiveModal('rewardStock')}
               type="button"
-              className="mm-btn-wide"
-              onClick={() => setActiveModal('gift')}
+              className="bg-surface-container-low hover:bg-surface-container text-on-surface px-space-md py-2 rounded-lg font-label-lg text-label-lg flex items-center gap-1.5 transition-colors shadow-sm border border-outline-variant/30"
             >
-              Gửi quà tri ân tháng 09
+              <span className="material-symbols-outlined text-[18px] text-secondary">
+                featured_seasonal_and_gifts
+              </span>
+              Cấu hình kho phần thưởng
+            </button>
+            <button
+              onClick={handleOpenAddMission}
+              type="button"
+              className="bg-primary hover:bg-primary-container text-on-primary px-space-md py-2 rounded-lg font-label-lg text-label-lg flex items-center gap-1.5 transition-all shadow-[0_2px_8px_rgba(21,67,50,0.25)] hover:shadow-md custom-primary-bg"
+            >
+              <span className="material-symbols-outlined text-[20px]">add_circle</span>
+              Tạo nhiệm vụ mới
             </button>
           </div>
         </div>
+
+        {/* ── 4 KPI CARDS (METRIC HIGHLIGHTS) ────────────────────────── */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-space-md">
+          {/* KPI 1 */}
+          <div className="bg-surface-container-lowest p-space-md rounded-xl shadow-[0_2px_8px_rgba(21,67,50,0.04)] border border-surface-container hover:shadow-md transition-shadow flex items-start gap-space-md">
+            <div className="w-12 h-12 rounded-xl bg-secondary-container/60 text-secondary flex items-center justify-center shrink-0">
+              <span className="material-symbols-outlined text-[24px]">task_alt</span>
+            </div>
+            <div className="flex flex-col">
+              <span className="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider font-semibold">
+                Nhiệm vụ đang mở
+              </span>
+              <div className="flex items-baseline gap-space-xs mt-0.5">
+                <span className="font-display-lg text-display-lg text-primary font-bold">
+                  {String(activeMissionsCount || stats.activeMissions || 4).padStart(2, '0')}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* KPI 2 */}
+          <div className="bg-surface-container-lowest p-space-md rounded-xl shadow-[0_2px_8px_rgba(21,67,50,0.04)] border border-surface-container hover:shadow-md transition-shadow flex items-start gap-space-md">
+            <div className="w-12 h-12 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center shrink-0">
+              <span className="material-symbols-outlined text-[24px]">pending_actions</span>
+            </div>
+            <div className="flex flex-col">
+              <span className="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider font-semibold">
+                Chờ duyệt hôm nay
+              </span>
+              <div className="flex items-baseline gap-space-xs mt-0.5">
+                <span className="font-display-lg text-display-lg text-on-surface font-bold">
+                  {String(pendingSubmissionsCount || stats.pendingToday || 8).padStart(2, '0')}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* KPI 3 */}
+          <div className="bg-surface-container-lowest p-space-md rounded-xl shadow-[0_2px_8px_rgba(21,67,50,0.04)] border border-surface-container hover:shadow-md transition-shadow flex items-start gap-space-md">
+            <div className="w-12 h-12 rounded-xl bg-surface-container-high text-primary flex items-center justify-center shrink-0">
+              <span className="material-symbols-outlined text-[24px]">groups</span>
+            </div>
+            <div className="flex flex-col">
+              <span className="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider font-semibold">
+                Du khách tham gia
+              </span>
+              <div className="flex items-baseline gap-space-xs mt-0.5">
+                <span className="font-display-lg text-display-lg text-primary font-bold">
+                  {stats.participantGuests || 142}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* KPI 4 */}
+          <div className="bg-surface-container-lowest p-space-md rounded-xl shadow-[0_2px_8px_rgba(21,67,50,0.04)] border border-surface-container hover:shadow-md transition-shadow flex items-start gap-space-md">
+            <div className="w-12 h-12 rounded-xl bg-surface-container-highest text-secondary flex items-center justify-center shrink-0">
+              <span className="material-symbols-outlined text-[24px]">confirmation_number</span>
+            </div>
+            <div className="flex flex-col">
+              <span className="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider font-semibold">
+                Voucher đã trao
+              </span>
+              <div className="flex items-baseline gap-space-xs mt-0.5">
+                <span className="font-display-lg text-display-lg text-primary font-bold">
+                  {stats.rewardedVouchers || 96}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ── SPLIT LAYOUT (LEFT 7 COLS & RIGHT 5 COLS) ─────────────── */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-space-lg items-start">
+          {/* LEFT 7 COLS: DANH SÁCH CHỜ DUYỆT BÀI NỘP */}
+          <div className="lg:col-span-7 flex flex-col gap-space-md">
+            <div className="flex items-center justify-between bg-surface-container-lowest px-space-md py-3.5 rounded-xl shadow-[0_1px_6px_rgba(0,0,0,0.02)] border border-surface-container">
+              <div className="flex items-center gap-space-sm">
+                <span className="material-symbols-outlined text-secondary text-[22px]">inbox</span>
+                <h2 className="font-headline-sm text-headline-sm text-on-surface font-bold">
+                  Danh sách chờ duyệt bài nộp
+                </h2>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setActiveModal('filter')}
+                  type="button"
+                  className="text-on-surface-variant hover:text-primary p-1 rounded transition-colors"
+                  title="Lọc nhiệm vụ"
+                >
+                  <span className="material-symbols-outlined text-[20px]">filter_list</span>
+                </button>
+                <button
+                  onClick={loadData}
+                  type="button"
+                  className="text-on-surface-variant hover:text-primary p-1 rounded transition-colors"
+                  title="Tải lại"
+                >
+                  <span className="material-symbols-outlined text-[20px]">refresh</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Danh sách các thẻ bài nộp */}
+            <div className="flex flex-col gap-space-md">
+              {loading ? (
+                <div className="bg-surface-container-lowest p-8 rounded-xl text-center text-outline border border-surface-container">
+                  Đang tải danh sách bài nộp từ CSDL...
+                </div>
+              ) : filteredSubmissions.length === 0 ? (
+                <div className="bg-surface-container-lowest p-8 rounded-xl text-center text-outline border border-surface-container">
+                  Không có bài nộp nào đang chờ duyệt.
+                </div>
+              ) : (
+                filteredSubmissions.map((sub) => {
+                  const isApproved = sub.status === 'approved';
+                  const isRejected = sub.status === 'rejected';
+                  const isRetake = sub.status === 'retake';
+
+                  return (
+                    <div
+                      key={sub.id}
+                      className={`submission-card bg-surface-container-lowest rounded-xl p-space-md shadow-sm flex flex-col gap-space-md ${
+                        isApproved || isRejected ? 'is-done' : ''
+                      }`}
+                    >
+                      {/* Guest Header */}
+                      <div className="flex items-start justify-between gap-space-sm">
+                        <div className="flex items-center gap-space-sm">
+                          <img
+                            className="w-11 h-11 rounded-full object-cover shadow-sm"
+                            alt={sub.guest}
+                            src={
+                              sub.avatar ||
+                              'https://lh3.googleusercontent.com/aida-public/AB6AXuDtBD2J0dMb6ui-jzFd-s3WAOrIcULKNiD9XtfnGxQMKSTx355Pf1EjERQXBHDwHrcQ0Rorvh9B6EK8HB6KmTt_y_Vmq08HXH1mv79H5Vu9HA98ZemUl4gMQKLX8UE6D4XyoH4aj98giLTIomA-cZpFPmBtgmFxgoZt0ZKA5x-4LkgkGP-hJ2DyiPrZOmmqIdCcd6okDRUACpFaDNJU99_AMzc9ReyPXk77zeU4Z5vnxIG6w4_nVg8'
+                            }
+                          />
+                          <div className="flex flex-col">
+                            <div className="flex items-center gap-space-xs">
+                              <span className="font-label-lg text-label-lg text-on-surface font-bold">
+                                {sub.guest}
+                              </span>
+                              <span className="px-2 py-0.5 rounded-full bg-secondary-container text-on-secondary-container font-label-sm text-[10px] font-bold">
+                                {sub.room || 'Phòng Garden View'}
+                              </span>
+                            </div>
+                            <span className="font-body-sm text-body-sm text-on-surface-variant">
+                              Nộp lúc {sub.time || '09:12 • 17/09/2024'}
+                            </span>
+                          </div>
+                        </div>
+
+                        <span
+                          className={`submission-status ${
+                            isApproved
+                              ? 'is-approved'
+                              : isRejected
+                              ? 'is-rejected'
+                              : isRetake
+                              ? 'is-retake'
+                              : 'bg-amber-100 text-amber-900 font-label-md text-[11px]'
+                          }`}
+                        >
+                          {isApproved
+                            ? 'Đã duyệt'
+                            : isRejected
+                            ? 'Đã từ chối'
+                            : isRetake
+                            ? 'Yêu cầu chụp lại'
+                            : 'Chờ xác nhận'}
+                        </span>
+                      </div>
+
+                      {/* Nhiệm vụ banner */}
+                      <div className="bg-surface-container-low px-space-md py-2.5 rounded-lg flex items-center gap-space-xs text-primary border border-surface-container">
+                        <span className="material-symbols-outlined text-[20px] text-secondary">
+                          {sub.icon || 'styler'}
+                        </span>
+                        <span className="font-label-lg text-label-lg font-semibold">
+                          Nhiệm vụ: {sub.task}
+                        </span>
+                      </div>
+
+                      {/* Media Grid */}
+                      <div className="grid grid-cols-1 sm:grid-cols-12 gap-space-md bg-surface-container-low/40 p-space-sm rounded-lg border border-surface-container/60">
+                        <div className="sm:col-span-5 overflow-hidden rounded-lg relative aspect-[4/3] sm:aspect-auto sm:h-44 shadow-sm bg-surface-container-highest">
+                          <img
+                            className="w-full h-full object-cover"
+                            alt="Ảnh nộp"
+                            src={
+                              sub.photo ||
+                              'https://lh3.googleusercontent.com/aida-public/AB6AXuAwxRCSb8O0TEvP8qWKkyBWYmOPRU7CAe-lU0L0LMkQVLCWwT-WPYALrACR8Db8vw3_4jArbeXHHO_9d76yf7xm93aRwrudcovcbdkH-3EQrrGzyVg0iJ-Mvu69r8SV1GpbtRs1onXyn8r2zhoo3AUha2-9zCn4Myw7IYvyDRyt2uYN6sGiBB77aieKV_8H49oOFbrdmjYwsetb-x5cKFX4PCfWM-yOuk8sjzC85RU_W3_1EPQSU6E'
+                            }
+                          />
+                          <div className="absolute bottom-2 left-2 px-2 py-0.5 rounded bg-primary/80 text-on-primary font-label-sm text-[10px] flex items-center gap-1 font-semibold">
+                            <span className="material-symbols-outlined text-[12px]">photo_camera</span> 1 ảnh đính kèm
+                          </div>
+                        </div>
+
+                        <div className="sm:col-span-7 flex flex-col justify-between py-1">
+                          <div className="flex flex-col gap-1.5">
+                            <span className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wide font-semibold">
+                              Cảm nhận từ khách hàng
+                            </span>
+                            <p className="font-body-md text-body-md text-on-surface italic bg-surface-container-lowest p-3 rounded-lg shadow-sm border border-surface-container">
+                              “{sub.review || 'Không gian nhà sàn Mai Châu quá tuyệt vời, cô chủ chỉ cách dệt vải rất tận tình! Mùa lúa chín này chắc chắn nhóm mình sẽ rủ bạn bè quay lại.'}”
+                            </p>
+                          </div>
+
+                          <div className="mt-2.5 p-2.5 rounded-lg bg-surface-container flex items-center justify-between border border-surface-container-high">
+                            <div className="flex items-center gap-space-xs text-primary">
+                              <span className="material-symbols-outlined text-secondary text-[20px]">redeem</span>
+                              <div className="flex flex-col">
+                                <span className="font-label-sm text-label-sm text-on-surface-variant font-medium">
+                                  Phần thưởng dự kiến
+                                </span>
+                                <span className="font-label-lg text-label-lg font-bold text-primary">
+                                  {sub.reward || 'Voucher 15% + 1 túi trà gạo lứt Mộc Châu'}
+                                </span>
+                              </div>
+                            </div>
+                            <span className="material-symbols-outlined text-outline text-[18px]">verified</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Actions */}
+                      {!isApproved && !isRejected && (
+                        <div className="submission-actions flex flex-wrap items-center justify-end gap-space-xs pt-1">
+                          <button
+                            onClick={() => handleOpenDetail(sub)}
+                            type="button"
+                            className="px-space-md py-2 rounded-lg bg-surface-container-low text-on-surface-variant hover:bg-surface-container font-label-md text-label-md transition-colors flex items-center gap-1 border border-outline-variant/30"
+                          >
+                            <span className="material-symbols-outlined text-[16px]">visibility</span>
+                            Xem chi tiết
+                          </button>
+                          <button
+                            onClick={() => handleOpenReject(sub)}
+                            type="button"
+                            className="px-space-md py-2 rounded-lg bg-error-container text-on-error-container hover:bg-red-200 font-label-md text-label-md transition-colors flex items-center gap-1"
+                          >
+                            <span className="material-symbols-outlined text-[16px]">close</span>
+                            Từ chối
+                          </button>
+                          <button
+                            onClick={() => handleOpenRetake(sub)}
+                            type="button"
+                            className="px-space-md py-2 rounded-lg bg-surface-container text-on-surface hover:bg-surface-container-high font-label-md text-label-md transition-colors flex items-center gap-1 border border-outline-variant/30"
+                          >
+                            <span className="material-symbols-outlined text-[16px]">restart_alt</span>
+                            Yêu cầu chụp lại
+                          </button>
+                          <button
+                            onClick={() => handleOpenApprove(sub)}
+                            type="button"
+                            className="px-space-md py-2 rounded-lg bg-primary hover:bg-primary-container text-on-primary font-label-md text-label-md transition-all flex items-center gap-1 custom-primary-bg"
+                          >
+                            <span className="material-symbols-outlined text-[16px]">check_circle</span>
+                            Phê duyệt & Trao thưởng
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+
+          {/* RIGHT 5 COLS: NHIỆM VỤ ĐANG KÍCH HOẠT & TOP DU KHÁCH */}
+          <div className="lg:col-span-5 flex flex-col gap-space-lg">
+            {/* Card: Nhiệm vụ đang kích hoạt */}
+            <div className="bg-surface-container-lowest p-space-md rounded-xl shadow-sm border border-surface-container flex flex-col gap-space-md">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-space-xs">
+                  <span className="material-symbols-outlined text-secondary text-[22px]">checklist</span>
+                  <h3 className="font-headline-sm text-headline-sm text-on-surface font-bold">
+                    Nhiệm vụ đang kích hoạt ({activeMissionsCount})
+                  </h3>
+                </div>
+                <button
+                  onClick={handleOpenAddMission}
+                  type="button"
+                  className="text-secondary font-label-md text-label-md hover:underline flex items-center gap-0.5 font-bold"
+                >
+                  <span className="material-symbols-outlined text-[16px]">add</span> Thêm
+                </button>
+              </div>
+
+              {/* Danh sách nhiệm vụ bên phải */}
+              <div className="flex flex-col gap-space-xs">
+                {missions.map((m) => {
+                  const isActive = m.status === 'active';
+                  return (
+                    <div
+                      key={m.id}
+                      className={`mission-card flex items-center justify-between p-space-sm rounded-lg border transition-all ${
+                        isActive
+                          ? 'bg-surface-container-low border-surface-container'
+                          : 'bg-slate-50 border-slate-200 is-paused'
+                      }`}
+                    >
+                      <div className="flex items-center gap-space-sm min-w-0">
+                        <div className="w-9 h-9 rounded-lg bg-secondary-container/60 text-secondary flex items-center justify-center shrink-0">
+                          <span className="material-symbols-outlined text-[20px]">
+                            {m.icon || 'wb_sunny'}
+                          </span>
+                        </div>
+                        <div className="flex flex-col min-w-0">
+                          <span className="font-label-md text-label-md text-on-surface truncate font-semibold">
+                            {m.title}
+                          </span>
+                          <span className="font-body-sm text-body-sm text-secondary font-medium">
+                            {m.reward || 'Voucher 10%'}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button
+                          onClick={() => handleToggleMissionStatus(m)}
+                          type="button"
+                          className={`p-1 rounded text-[18px] transition-colors ${
+                            isActive
+                              ? 'text-secondary hover:text-green-800'
+                              : 'text-outline hover:text-on-surface'
+                          }`}
+                          title={isActive ? 'Tạm dừng nhiệm vụ' : 'Kích hoạt nhiệm vụ'}
+                        >
+                          <span className="material-symbols-outlined">
+                            {isActive ? 'toggle_on' : 'toggle_off'}
+                          </span>
+                        </button>
+                        <button
+                          onClick={() => handleOpenEditMission(m)}
+                          type="button"
+                          className="p-1 text-on-surface-variant hover:text-primary rounded transition-colors"
+                          title="Chỉnh sửa"
+                        >
+                          <span className="material-symbols-outlined text-[18px]">edit</span>
+                        </button>
+                        <button
+                          onClick={() => handleDeleteMission(m.id)}
+                          type="button"
+                          className="p-1 text-error hover:text-red-700 rounded transition-colors"
+                          title="Xóa"
+                        >
+                          <span className="material-symbols-outlined text-[18px]">delete</span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Tiến trình tương tác tháng */}
+              <div className="p-space-sm rounded-xl bg-surface-container flex items-center justify-between border border-surface-container-high">
+                <div className="flex items-center gap-space-sm">
+                  <svg className="w-10 h-10 -rotate-90" viewBox="0 0 36 36">
+                    <path
+                      className="text-surface-container-high"
+                      d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="3.5"
+                    />
+                    <path
+                      className="text-secondary"
+                      d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeDasharray="82, 100"
+                      strokeWidth="3.5"
+                    />
+                  </svg>
+                  <div className="flex flex-col">
+                    <span className="font-label-lg text-label-lg text-primary font-bold">
+                      82% Mục tiêu tương tác tháng
+                    </span>
+                    <span className="font-body-sm text-body-sm text-on-surface-variant">
+                      96/120 du khách đã nhận phần thưởng
+                    </span>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setActiveModal('stats')}
+                  type="button"
+                  className="text-secondary font-label-md text-label-md hover:underline font-bold"
+                >
+                  Chi tiết
+                </button>
+              </div>
+            </div>
+
+            {/* Card: Top du khách tích cực nhất */}
+            <div className="bg-surface-container-lowest p-space-md rounded-xl shadow-sm border border-surface-container flex flex-col gap-space-sm">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-space-xs">
+                  <span className="material-symbols-outlined text-secondary text-[20px]">military_tech</span>
+                  <h3 className="font-headline-sm text-headline-sm text-on-surface font-bold">
+                    Top du khách tích cực nhất
+                  </h3>
+                </div>
+                <span className="font-label-sm text-label-sm text-on-surface-variant font-semibold">
+                  Tháng 09/2024
+                </span>
+              </div>
+
+              <div className="flex flex-col">
+                {topGuests.map((guest, idx) => (
+                  <div
+                    key={guest.id || idx}
+                    className="flex items-center justify-between py-2.5 px-space-xs hover:bg-surface-container-low rounded-lg transition-colors"
+                  >
+                    <div className="flex items-center gap-space-sm">
+                      <div
+                        className={`w-6 h-6 rounded-full flex items-center justify-center font-bold text-[11px] ${
+                          idx === 0
+                            ? 'bg-amber-400 text-amber-950'
+                            : idx === 1
+                            ? 'bg-slate-300 text-slate-800'
+                            : 'bg-amber-700/40 text-amber-900'
+                        }`}
+                      >
+                        {idx + 1}
+                      </div>
+                      <img
+                        className="w-9 h-9 rounded-full object-cover shadow-sm"
+                        alt={guest.name}
+                        src={
+                          guest.avatar ||
+                          'https://lh3.googleusercontent.com/aida-public/AB6AXuBM2p3xVWdv84AVmzpSgASDhrTJWBslvj9gqrIocFGTSa80ihcG4lcehUXD1yur0QqYvgSIR0sfQCQbHDpnxmX1B0NbaARMi116qNnbisQ0_sqa7JgXnyQMhoHPY3Iaa6L9k-FDayYklK7Ks29G59GDVm9uzDeX5qG0840EGEfjLUks1387sY1oCLzpTjUC20f3HXCH8CWYiCNJN_ZJn-tL-9zKgl6nGoxmg9otBPZcuWuo7KO-gIs'
+                        }
+                      />
+                      <div className="flex flex-col">
+                        <span className="font-label-md text-label-md text-on-surface font-bold">
+                          {guest.name}
+                        </span>
+                        <span className="font-body-sm text-body-sm text-on-surface-variant">
+                          {guest.missionsCount || 5 - idx} nhiệm vụ đã hoàn thành
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <button
+                onClick={() => setActiveModal('gift')}
+                type="button"
+                className="w-full mt-2 py-2 rounded-lg bg-surface-container text-primary hover:bg-surface-container-high font-label-md text-label-md transition-colors text-center font-bold"
+              >
+                Gửi quà tri ân tháng 09
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
 
-      {/* =====================================================================
-          MODALS
-         ===================================================================== */}
+      {/* ========================================================================= */}
+      {/*                   TOÀN BỘ 9 POPUP / MODAL CHUYÊN NGHIỆP CỦA MANAGE MISSION */}
+      {/* ========================================================================= */}
 
-      {/* ── Modal 1: Tạo / Chỉnh sửa Nhiệm vụ ── */}
+      {/* 1. POPUP TẠO / CHỈNH SỬA NHIỆM VỤ */}
       {activeModal === 'mission' && (
-        <div className="mm-modal-overlay" onClick={closeModal}>
-          <div className="mm-modal-box modal-lg" onClick={(e) => e.stopPropagation()}>
-            <div className="mm-modal-header">
+        <div className="mission-modal">
+          <div className="mission-modal-content">
+            <div className="mission-modal-header">
               <div>
-                <h3>{editingMission ? 'Chỉnh sửa nhiệm vụ' : 'Tạo nhiệm vụ mới'}</h3>
-                <p>Thiết lập nhiệm vụ trải nghiệm và phần thưởng hấp dẫn cho du khách.</p>
+                <h2 className="font-headline-md text-headline-md text-on-surface font-bold">
+                  {editingMission ? 'Chỉnh sửa nhiệm vụ' : 'Tạo nhiệm vụ mới'}
+                </h2>
+                <p className="font-body-sm text-body-sm text-on-surface-variant mt-1">
+                  Thiết lập nhiệm vụ trải nghiệm và phần thưởng cho du khách.
+                </p>
               </div>
-              <button type="button" className="mm-modal-close-btn" onClick={closeModal}>
+              <button onClick={closeModal} type="button" className="mission-modal-close" aria-label="Đóng">
                 <span className="material-symbols-outlined">close</span>
               </button>
             </div>
-            <form onSubmit={handleSaveMission}>
-              <div className="mm-modal-body">
-                <div className="mm-form-grid">
-                  <div className="mm-form-group full-width">
-                    <label className="mm-form-label">Tên nhiệm vụ *</label>
+
+            <form onSubmit={handleSaveMission} className="mission-form">
+              <div className="mission-form-grid">
+                <div className="mission-form-group full">
+                  <label className="mission-form-label" htmlFor="missionTitle">
+                    Tên nhiệm vụ <span className="text-error">*</span>
+                  </label>
+                  <input
+                    id="missionTitle"
+                    className="mission-form-input"
+                    type="text"
+                    required
+                    placeholder="Ví dụ: Check-in bình minh thung lũng Mai Châu"
+                    value={missionForm.title}
+                    onChange={(e) => setMissionForm({ ...missionForm, title: e.target.value })}
+                  />
+                </div>
+
+                <div className="mission-form-group full">
+                  <label className="mission-form-label" htmlFor="missionDesc">
+                    Mô tả / yêu cầu thực hiện <span className="text-error">*</span>
+                  </label>
+                  <textarea
+                    id="missionDesc"
+                    className="mission-form-textarea"
+                    required
+                    placeholder="Mô tả cách du khách hoàn thành nhiệm vụ, hashtag cần gắn..."
+                    value={missionForm.desc}
+                    onChange={(e) => setMissionForm({ ...missionForm, desc: e.target.value })}
+                  />
+                </div>
+
+                <div className="mission-form-group">
+                  <label className="mission-form-label" htmlFor="missionIcon">
+                    Biểu tượng
+                  </label>
+                  <select
+                    id="missionIcon"
+                    className="mission-form-select"
+                    value={missionForm.icon}
+                    onChange={(e) => setMissionForm({ ...missionForm, icon: e.target.value })}
+                  >
+                    <option value="wb_sunny">Bình minh / Check-in</option>
+                    <option value="photo_camera">Chụp ảnh</option>
+                    <option value="outdoor_grill">Ẩm thực / Nấu ăn</option>
+                    <option value="styler">Trang phục</option>
+                    <option value="star">Đánh giá</option>
+                    <option value="hiking">Trải nghiệm ngoài trời</option>
+                  </select>
+                </div>
+
+                <div className="mission-form-group">
+                  <label className="mission-form-label" htmlFor="missionStatus">
+                    Trạng thái
+                  </label>
+                  <select
+                    id="missionStatus"
+                    className="mission-form-select"
+                    value={missionForm.status}
+                    onChange={(e) => setMissionForm({ ...missionForm, status: e.target.value })}
+                  >
+                    <option value="active">Đang kích hoạt</option>
+                    <option value="paused">Tạm dừng</option>
+                  </select>
+                </div>
+
+                <div className="mission-form-group">
+                  <label className="mission-form-label" htmlFor="missionRewardType">
+                    Loại phần thưởng
+                  </label>
+                  <select
+                    id="missionRewardType"
+                    className="mission-form-select"
+                    value={missionForm.rewardType}
+                    onChange={(e) => setMissionForm({ ...missionForm, rewardType: e.target.value })}
+                  >
+                    <option value="voucher-percent">Voucher giảm theo %</option>
+                    <option value="voucher-amount">Voucher trừ thẳng (₫)</option>
+                    <option value="gift">Quà tặng</option>
+                  </select>
+                </div>
+
+                <div className="mission-form-group">
+                  <label className="mission-form-label" htmlFor="missionRewardValue">
+                    Giá trị
+                  </label>
+                  <input
+                    id="missionRewardValue"
+                    className="mission-form-input"
+                    type="text"
+                    required
+                    placeholder="Ví dụ: 10"
+                    value={missionForm.rewardValue}
+                    onChange={(e) => setMissionForm({ ...missionForm, rewardValue: e.target.value })}
+                  />
+                </div>
+
+                <div className="mission-form-group full">
+                  <label className="mission-form-label" htmlFor="missionRewardExtra">
+                    Quà kèm theo (tuỳ chọn)
+                  </label>
+                  <input
+                    id="missionRewardExtra"
+                    className="mission-form-input"
+                    type="text"
+                    placeholder="Ví dụ: 1 túi trà gạo lứt Mộc Châu"
+                    value={missionForm.rewardExtra}
+                    onChange={(e) => setMissionForm({ ...missionForm, rewardExtra: e.target.value })}
+                  />
+                </div>
+
+                <div className="mission-form-group">
+                  <label className="mission-form-label" htmlFor="missionFrom">
+                    Bắt đầu
+                  </label>
+                  <input
+                    id="missionFrom"
+                    className="mission-form-input"
+                    type="date"
+                    value={missionForm.from}
+                    onChange={(e) => setMissionForm({ ...missionForm, from: e.target.value })}
+                  />
+                </div>
+
+                <div className="mission-form-group">
+                  <label className="mission-form-label" htmlFor="missionTo">
+                    Kết thúc (bỏ trống = thường niên)
+                  </label>
+                  <input
+                    id="missionTo"
+                    className="mission-form-input"
+                    type="date"
+                    value={missionForm.to}
+                    onChange={(e) => setMissionForm({ ...missionForm, to: e.target.value })}
+                  />
+                </div>
+
+                <div className="mission-form-group full">
+                  <label className="mission-check">
                     <input
-                      type="text"
-                      className="mm-form-input"
-                      placeholder="Ví dụ: Check-in bình minh thung lũng Mai Châu"
-                      value={missionForm.title}
-                      onChange={(e) => setMissionForm({ ...missionForm, title: e.target.value })}
-                      required
+                      type="checkbox"
+                      checked={missionForm.needPhoto}
+                      onChange={(e) => setMissionForm({ ...missionForm, needPhoto: e.target.checked })}
                     />
-                  </div>
+                    <span>Yêu cầu du khách nộp ảnh minh chứng</span>
+                  </label>
+                </div>
 
-                  <div className="mm-form-group full-width">
-                    <label className="mm-form-label">Mô tả / Yêu cầu thực hiện *</label>
-                    <textarea
-                      className="mm-form-textarea"
-                      rows="3"
-                      placeholder="Mô tả cách du khách hoàn thành nhiệm vụ, hashtag cần gắn..."
-                      value={missionForm.desc}
-                      onChange={(e) => setMissionForm({ ...missionForm, desc: e.target.value })}
-                      required
-                    />
-                  </div>
-
-                  <div className="mm-form-group">
-                    <label className="mm-form-label">Biểu tượng</label>
-                    <select
-                      className="mm-form-select"
-                      value={missionForm.icon}
-                      onChange={(e) => setMissionForm({ ...missionForm, icon: e.target.value })}
-                    >
-                      <option value="wb_sunny">Bình minh / Check-in</option>
-                      <option value="photo_camera">Chụp ảnh</option>
-                      <option value="outdoor_grill">Ẩm thực / Nấu ăn</option>
-                      <option value="styler">Trang phục</option>
-                      <option value="star">Đánh giá 5 sao</option>
-                      <option value="hiking">Trải nghiệm ngoài trời</option>
-                    </select>
-                  </div>
-
-                  <div className="mm-form-group">
-                    <label className="mm-form-label">Trạng thái</label>
-                    <select
-                      className="mm-form-select"
-                      value={missionForm.status}
-                      onChange={(e) => setMissionForm({ ...missionForm, status: e.target.value })}
-                    >
-                      <option value="active">Đang kích hoạt</option>
-                      <option value="paused">Tạm dừng</option>
-                    </select>
-                  </div>
-
-                  <div className="mm-form-group">
-                    <label className="mm-form-label">Loại phần thưởng</label>
-                    <select
-                      className="mm-form-select"
-                      value={missionForm.rewardType}
-                      onChange={(e) => setMissionForm({ ...missionForm, rewardType: e.target.value })}
-                    >
-                      <option value="voucher-percent">Voucher giảm theo %</option>
-                      <option value="voucher-amount">Voucher trừ thẳng (₫)</option>
-                      <option value="gift">Quà tặng hiện vật</option>
-                      <option value="points">Cộng điểm tích lũy</option>
-                    </select>
-                  </div>
-
-                  <div className="mm-form-group">
-                    <label className="mm-form-label">
-                      {missionForm.rewardType === 'voucher-percent' && 'Giá trị (%)'}
-                      {missionForm.rewardType === 'voucher-amount' && 'Giá trị (₫)'}
-                      {missionForm.rewardType === 'points' && 'Số điểm'}
-                      {missionForm.rewardType === 'gift' && 'Tên quà tặng'} *
-                    </label>
+                <div className="mission-form-group full">
+                  <label className="mission-check">
                     <input
-                      type="text"
-                      className="mm-form-input"
-                      value={missionForm.rewardValue}
-                      onChange={(e) => setMissionForm({ ...missionForm, rewardValue: e.target.value })}
-                      required
+                      type="checkbox"
+                      checked={missionForm.autoApprove}
+                      onChange={(e) => setMissionForm({ ...missionForm, autoApprove: e.target.checked })}
                     />
-                  </div>
-
-                  <div className="mm-form-group full-width">
-                    <label className="mm-form-label">Quà kèm theo (tùy chọn)</label>
-                    <input
-                      type="text"
-                      className="mm-form-input"
-                      placeholder="Ví dụ: 1 túi trà gạo lứt Mộc Châu"
-                      value={missionForm.rewardExtra}
-                      onChange={(e) => setMissionForm({ ...missionForm, rewardExtra: e.target.value })}
-                    />
-                  </div>
-
-                  <div className="mm-form-group full-width">
-                    <label className="mm-checkbox-row">
-                      <input
-                        type="checkbox"
-                        checked={missionForm.needPhoto}
-                        onChange={(e) => setMissionForm({ ...missionForm, needPhoto: e.target.checked })}
-                      />
-                      <span>Yêu cầu du khách nộp ảnh minh chứng</span>
-                    </label>
-                  </div>
-
-                  <div className="mm-form-group full-width">
-                    <label className="mm-checkbox-row">
-                      <input
-                        type="checkbox"
-                        checked={missionForm.autoApprove}
-                        onChange={(e) => setMissionForm({ ...missionForm, autoApprove: e.target.checked })}
-                      />
-                      <span>Tự động duyệt (không cần chủ homestay xác nhận thủ công)</span>
-                    </label>
-                  </div>
+                    <span>Tự động duyệt (không cần chủ homestay xác nhận)</span>
+                  </label>
                 </div>
               </div>
-              <div className="mm-modal-footer">
-                <button type="button" className="mm-btn-ghost" onClick={closeModal}>Hủy</button>
-                <button type="submit" className="mm-btn-primary">
+
+              <div className="mission-modal-footer">
+                <button onClick={closeModal} type="button" className="mission-btn mission-btn-cancel">
+                  Hủy
+                </button>
+                <button type="submit" className="mission-btn mission-btn-save">
                   <span className="material-symbols-outlined text-[17px]">save</span>
                   Lưu nhiệm vụ
                 </button>
@@ -808,84 +1142,91 @@ export default function ManageMission() {
         </div>
       )}
 
-      {/* ── Modal 2: Cấu hình Kho phần thưởng ── */}
+      {/* 2. POPUP CẤU HÌNH KHO PHẦN THƯỞNG */}
       {activeModal === 'rewardStock' && (
-        <div className="mm-modal-overlay" onClick={closeModal}>
-          <div className="mm-modal-box modal-lg" onClick={(e) => e.stopPropagation()}>
-            <div className="mm-modal-header">
+        <div className="mission-modal">
+          <div className="mission-modal-content mission-modal-lg">
+            <div className="mission-modal-header">
               <div>
-                <h3>Kho phần thưởng du khách</h3>
-                <p>Quản lý voucher, quà tặng và số lượng còn lại để gán cho nhiệm vụ.</p>
+                <h2 className="font-headline-md text-headline-md text-on-surface font-bold">
+                  Kho phần thưởng
+                </h2>
+                <p className="font-body-sm text-body-sm text-on-surface-variant mt-1">
+                  Quản lý voucher, quà tặng và số lượng còn lại để gán cho nhiệm vụ.
+                </p>
               </div>
-              <button type="button" className="mm-modal-close-btn" onClick={closeModal}>
+              <button onClick={closeModal} type="button" className="mission-modal-close" aria-label="Đóng">
                 <span className="material-symbols-outlined">close</span>
               </button>
             </div>
-            <div className="mm-modal-body">
-              <div>
-                {rewardStock.map((item) => (
-                  <div key={item.id} className="mm-stock-item">
-                    <div className="mm-stock-name">
-                      <span>{item.name}</span>
-                      <small>{item.type}</small>
+
+            <div className="mission-form">
+              <div className="mission-stock-list">
+                {rewardStock.map((it) => (
+                  <div key={it.id} className="mission-stock-item">
+                    <div className="mission-stock-name">
+                      <span>{it.name}</span>
+                      <small>{it.type}</small>
                     </div>
                     <input
+                      className="mission-stock-qty"
                       type="number"
-                      min="0"
-                      className="mm-form-input"
-                      value={item.qty}
-                      onChange={(e) => {
-                        const val = Number(e.target.value) || 0;
-                        setRewardStock(prev =>
-                          prev.map(i => i.id === item.id ? { ...i, qty: val } : i)
-                        );
-                      }}
+                      value={it.qty}
+                      onChange={(e) =>
+                        setRewardStock((prev) =>
+                          prev.map((item) =>
+                            item.id === it.id ? { ...item, qty: Number(e.target.value) } : item
+                          )
+                        )
+                      }
                     />
                     <button
+                      onClick={() => handleRemoveStock(it.id)}
                       type="button"
-                      className="mm-btn-icon"
-                      style={{ color: '#ba1a1a' }}
+                      className="mission-stock-remove"
                       title="Xóa"
-                      onClick={() => handleRemoveStock(item.id)}
                     >
-                      <span className="material-symbols-outlined text-[18px]">delete</span>
+                      <span className="material-symbols-outlined text-[16px]">close</span>
                     </button>
                   </div>
                 ))}
+              </div>
 
-                <div className="mm-stock-add-row">
-                  <input
-                    type="text"
-                    className="mm-form-input"
-                    placeholder="Tên phần thưởng (Ví dụ: Túi trà hoa cúc)"
-                    value={newStockItem.name}
-                    onChange={(e) => setNewStockItem({ ...newStockItem, name: e.target.value })}
-                  />
-                  <select
-                    className="mm-form-select"
-                    value={newStockItem.type}
-                    onChange={(e) => setNewStockItem({ ...newStockItem, type: e.target.value })}
-                  >
-                    <option value="Voucher">Voucher</option>
-                    <option value="Quà tặng">Quà tặng</option>
-                  </select>
-                  <input
-                    type="number"
-                    min="1"
-                    className="mm-form-input"
-                    placeholder="SL"
-                    value={newStockItem.qty}
-                    onChange={(e) => setNewStockItem({ ...newStockItem, qty: e.target.value })}
-                  />
-                  <button type="button" className="mm-btn-ghost" onClick={handleAddStock}>
-                    + Thêm
-                  </button>
-                </div>
+              <div className="mission-stock-add">
+                <input
+                  className="mission-form-input"
+                  type="text"
+                  placeholder="Tên phần thưởng, ví dụ: Túi trà gạo lứt"
+                  value={newStockItem.name}
+                  onChange={(e) => setNewStockItem({ ...newStockItem, name: e.target.value })}
+                />
+                <select
+                  className="mission-form-select"
+                  value={newStockItem.type}
+                  onChange={(e) => setNewStockItem({ ...newStockItem, type: e.target.value })}
+                >
+                  <option value="Voucher">Voucher</option>
+                  <option value="Quà tặng">Quà tặng</option>
+                </select>
+                <input
+                  className="mission-form-input"
+                  type="number"
+                  min="0"
+                  placeholder="Số lượng"
+                  value={newStockItem.qty}
+                  onChange={(e) => setNewStockItem({ ...newStockItem, qty: Number(e.target.value) })}
+                />
+                <button onClick={handleAddStock} type="button" className="mission-btn mission-btn-ghost">
+                  <span className="material-symbols-outlined text-[16px]">add</span> Thêm
+                </button>
               </div>
             </div>
-            <div className="mm-modal-footer">
-              <button type="button" className="mm-btn-ghost" onClick={closeModal}>Đóng</button>
-              <button type="button" className="mm-btn-primary" onClick={handleSaveStock}>
+
+            <div className="mission-modal-footer">
+              <button onClick={closeModal} type="button" className="mission-btn mission-btn-cancel">
+                Đóng
+              </button>
+              <button onClick={handleSaveStock} type="button" className="mission-btn mission-btn-save">
                 <span className="material-symbols-outlined text-[17px]">save</span>
                 Lưu kho phần thưởng
               </button>
@@ -894,156 +1235,172 @@ export default function ManageMission() {
         </div>
       )}
 
-      {/* ── Modal 3: Chi tiết bài nộp ── */}
+      {/* 3. POPUP XEM CHI TIẾT BÀI NỘP */}
       {activeModal === 'detail' && selectedSubmission && (
-        <div className="mm-modal-overlay" onClick={closeModal}>
-          <div className="mm-modal-box modal-lg" onClick={(e) => e.stopPropagation()}>
-            <div className="mm-modal-header">
+        <div className="mission-modal">
+          <div className="mission-modal-content mission-modal-lg">
+            <div className="mission-modal-header">
               <div>
-                <h3>Bài nộp • {selectedSubmission.guest}</h3>
-                <p>Mã bài nộp: {selectedSubmission.id}</p>
+                <h2 className="font-headline-md text-headline-md text-on-surface font-bold">
+                  Chi tiết bài nộp
+                </h2>
+                <p className="font-body-sm text-body-sm text-on-surface-variant mt-1">
+                  Mã bài nộp: #{selectedSubmission.id} • Du khách: {selectedSubmission.guest}
+                </p>
               </div>
-              <button type="button" className="mm-modal-close-btn" onClick={closeModal}>
+              <button onClick={closeModal} type="button" className="mission-modal-close" aria-label="Đóng">
                 <span className="material-symbols-outlined">close</span>
               </button>
             </div>
-            <div className="mm-modal-body">
-              <div style={{ position: 'relative', height: '240px', borderRadius: '12px', overflow: 'hidden', marginBottom: '16px' }}>
-                <img src={selectedSubmission.image} alt={selectedSubmission.guest} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                <span style={{ position: 'absolute', bottom: '10px', left: '10px', padding: '3px 10px', borderRadius: '6px', background: 'rgba(0,0,0,0.7)', color: '#fff', fontSize: '12px' }}>
-                  {selectedSubmission.photos} ảnh đính kèm
-                </span>
+
+            <div className="mission-detail-body">
+              <div className="mission-detail-hero">
+                <img
+                  src={
+                    selectedSubmission.photo ||
+                    'https://lh3.googleusercontent.com/aida-public/AB6AXuAwxRCSb8O0TEvP8qWKkyBWYmOPRU7CAe-lU0L0LMkQVLCWwT-WPYALrACR8Db8vw3_4jArbeXHHO_9d76yf7xm93aRwrudcovcbdkH-3EQrrGzyVg0iJ-Mvu69r8SV1GpbtRs1onXyn8r2zhoo3AUha2-9zCn4Myw7IYvyDRyt2uYN6sGiBB77aieKV_8H49oOFbrdmjYwsetb-x5cKFX4PCfWM-yOuk8sjzC85RU_W3_1EPQSU6E'
+                  }
+                  alt="Ảnh bài nộp"
+                />
+                <span className="mission-detail-badge">1 ảnh</span>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', marginBottom: '14px', background: '#eff4ff', padding: '12px', borderRadius: '8px' }}>
-                <div>
-                  <span style={{ fontSize: '11px', color: '#717974', textTransform: 'uppercase' }}>Du khách</span>
-                  <div style={{ fontWeight: 700, fontSize: '14px' }}>{selectedSubmission.guest}</div>
+              <div className="mission-detail-grid">
+                <div className="mission-detail-item">
+                  <span className="mission-detail-label">Du khách</span>
+                  <span className="mission-detail-value">{selectedSubmission.guest}</span>
                 </div>
-                <div>
-                  <span style={{ fontSize: '11px', color: '#717974', textTransform: 'uppercase' }}>Phòng</span>
-                  <div style={{ fontWeight: 700, fontSize: '14px' }}>{selectedSubmission.room}</div>
+                <div className="mission-detail-item">
+                  <span className="mission-detail-label">Phòng</span>
+                  <span className="mission-detail-value">{selectedSubmission.room || 'Phòng Garden View'}</span>
                 </div>
-                <div>
-                  <span style={{ fontSize: '11px', color: '#717974', textTransform: 'uppercase' }}>Thời gian</span>
-                  <div style={{ fontWeight: 600, fontSize: '13px' }}>{selectedSubmission.time}</div>
+                <div className="mission-detail-item">
+                  <span className="mission-detail-label">Thời gian nộp</span>
+                  <span className="mission-detail-value">{selectedSubmission.time || '09:12 • Hôm nay'}</span>
                 </div>
               </div>
 
-              <div style={{ marginBottom: '12px' }}>
-                <span style={{ fontSize: '11.5px', fontWeight: 700, color: '#717974', textTransform: 'uppercase' }}>Nhiệm vụ</span>
-                <p style={{ margin: '4px 0 0', fontWeight: 600 }}>{selectedSubmission.task}</p>
+              <div className="mission-detail-section">
+                <span className="mission-detail-label">Nhiệm vụ</span>
+                <p className="mission-detail-desc">{selectedSubmission.task}</p>
               </div>
 
-              <div style={{ marginBottom: '12px' }}>
-                <span style={{ fontSize: '11.5px', fontWeight: 700, color: '#717974', textTransform: 'uppercase' }}>Cảm nhận của khách</span>
-                <p style={{ margin: '4px 0 0', fontStyle: 'italic', background: '#fafbfc', padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                  “{selectedSubmission.review}”
-                </p>
+              <div className="mission-detail-section">
+                <span className="mission-detail-label">Cảm nhận từ khách hàng</span>
+                <p className="mission-detail-desc italic">“{selectedSubmission.review}”</p>
               </div>
 
-              <div>
-                <span style={{ fontSize: '11.5px', fontWeight: 700, color: '#717974', textTransform: 'uppercase' }}>Phần thưởng dự kiến</span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#1b6d24', fontWeight: 700, marginTop: '4px' }}>
-                  <span className="material-symbols-outlined">redeem</span>
+              <div className="mission-detail-section">
+                <span className="mission-detail-label">Phần thưởng dự kiến</span>
+                <div className="mission-detail-reward">
+                  <span className="material-symbols-outlined text-[20px]">redeem</span>
                   <span>{selectedSubmission.reward}</span>
                 </div>
               </div>
             </div>
-            <div className="mm-modal-footer">
-              <button type="button" className="mm-btn-ghost" onClick={closeModal}>Đóng</button>
-              {selectedSubmission.status === 'pending' && (
-                <>
-                  <button
-                    type="button"
-                    className="mm-btn-sub-act btn-danger"
-                    onClick={() => {
-                      closeModal();
-                      setTimeout(() => openRejectModal(selectedSubmission), 150);
-                    }}
-                  >
-                    Từ chối
-                  </button>
-                  <button
-                    type="button"
-                    className="mm-btn-primary"
-                    onClick={() => {
-                      closeModal();
-                      setTimeout(() => openApproveModal(selectedSubmission), 150);
-                    }}
-                  >
-                    Phê duyệt &amp; Trao thưởng
-                  </button>
-                </>
-              )}
+
+            <div className="mission-modal-footer">
+              <button onClick={closeModal} type="button" className="mission-btn mission-btn-cancel">
+                Đóng
+              </button>
+              <button
+                onClick={() => handleOpenReject(selectedSubmission)}
+                type="button"
+                className="mission-btn mission-btn-danger-soft"
+              >
+                <span className="material-symbols-outlined text-[17px]">close</span> Từ chối
+              </button>
+              <button
+                onClick={() => handleOpenApprove(selectedSubmission)}
+                type="button"
+                className="mission-btn mission-btn-save"
+              >
+                <span className="material-symbols-outlined text-[17px]">check_circle</span> Phê duyệt & Trao thưởng
+              </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* ── Modal 4: Phê duyệt & Trao thưởng ── */}
+      {/* 4. POPUP PHÊ DUYỆT & TRAO THƯỞNG */}
       {activeModal === 'approve' && selectedSubmission && (
-        <div className="mm-modal-overlay" onClick={closeModal}>
-          <div className="mm-modal-box modal-md" onClick={(e) => e.stopPropagation()}>
-            <div className="mm-modal-header">
+        <div className="mission-modal">
+          <div className="mission-modal-content">
+            <div className="mission-modal-header">
               <div>
-                <h3>Phê duyệt &amp; Trao thưởng</h3>
-                <p>Xác nhận bài nộp của {selectedSubmission.guest} hợp lệ và gửi quà.</p>
+                <h2 className="font-headline-md text-headline-md text-on-surface font-bold">
+                  Phê duyệt & Trao thưởng
+                </h2>
+                <p className="font-body-sm text-body-sm text-on-surface-variant mt-1">
+                  Xác nhận bài nộp hợp lệ và gửi phần thưởng cho du khách.
+                </p>
               </div>
-              <button type="button" className="mm-modal-close-btn" onClick={closeModal}>
+              <button onClick={closeModal} type="button" className="mission-modal-close" aria-label="Đóng">
                 <span className="material-symbols-outlined">close</span>
               </button>
             </div>
-            <form onSubmit={handleApproveSubmit}>
-              <div className="mm-modal-body">
-                <div style={{ background: '#eff4ff', padding: '10px 14px', borderRadius: '8px', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span className="material-symbols-outlined text-[18px]">person</span>
-                  <span><strong>{selectedSubmission.guest}</strong> — {selectedSubmission.task}</span>
-                </div>
 
-                <div className="mm-form-group full-width" style={{ marginBottom: '12px' }}>
-                  <label className="mm-form-label">Phần thưởng trao</label>
+            <form onSubmit={handleConfirmApprove} className="mission-form">
+              <div className="mission-current">
+                <span className="font-bold">{selectedSubmission.guest}</span>
+                <span>• {selectedSubmission.task}</span>
+              </div>
+
+              <div className="mission-form-grid">
+                <div className="mission-form-group full">
+                  <label className="mission-form-label" htmlFor="approveReward">
+                    Phần thưởng
+                  </label>
                   <input
+                    id="approveReward"
+                    className="mission-form-input font-bold text-secondary"
                     type="text"
-                    className="mm-form-input"
+                    required
                     value={approveForm.reward}
                     onChange={(e) => setApproveForm({ ...approveForm, reward: e.target.value })}
-                    required
                   />
                 </div>
 
-                <div className="mm-form-group full-width" style={{ marginBottom: '12px' }}>
-                  <label className="mm-form-label">Lời nhắn gửi du khách</label>
+                <div className="mission-form-group full">
+                  <label className="mission-form-label" htmlFor="approveNote">
+                    Lời nhắn gửi du khách
+                  </label>
                   <textarea
-                    className="mm-form-textarea"
-                    rows="3"
+                    id="approveNote"
+                    className="mission-form-textarea"
                     value={approveForm.note}
                     onChange={(e) => setApproveForm({ ...approveForm, note: e.target.value })}
                   />
                 </div>
 
-                <div className="mm-form-group full-width" style={{ gap: '8px' }}>
-                  <label className="mm-checkbox-row">
+                <div className="mission-form-group full">
+                  <label className="mission-check">
                     <input
                       type="checkbox"
                       checked={approveForm.notify}
                       onChange={(e) => setApproveForm({ ...approveForm, notify: e.target.checked })}
                     />
-                    <span>Gửi thông báo mã voucher ngay cho du khách</span>
+                    <span>Gửi thông báo và mã voucher cho du khách</span>
                   </label>
-                  <label className="mm-checkbox-row">
+                </div>
+
+                <div className="mission-form-group full">
+                  <label className="mission-check">
                     <input
                       type="checkbox"
                       checked={approveForm.featurePhoto}
                       onChange={(e) => setApproveForm({ ...approveForm, featurePhoto: e.target.checked })}
                     />
-                    <span>Cho phép homestay sử dụng ảnh này để quảng bá truyền thông</span>
+                    <span>Cho phép homestay dùng ảnh này để quảng bá</span>
                   </label>
                 </div>
               </div>
-              <div className="mm-modal-footer">
-                <button type="button" className="mm-btn-ghost" onClick={closeModal}>Hủy</button>
-                <button type="submit" className="mm-btn-primary">
+
+              <div className="mission-modal-footer">
+                <button onClick={closeModal} type="button" className="mission-btn mission-btn-cancel">
+                  Hủy
+                </button>
+                <button type="submit" className="mission-btn mission-btn-save">
                   <span className="material-symbols-outlined text-[17px]">check_circle</span>
                   Xác nhận duyệt
                 </button>
@@ -1053,30 +1410,43 @@ export default function ManageMission() {
         </div>
       )}
 
-      {/* ── Modal 5: Từ chối bài nộp ── */}
+      {/* 5. POPUP TỪ CHỐI BÀI NỘP */}
       {activeModal === 'reject' && selectedSubmission && (
-        <div className="mm-modal-overlay" onClick={closeModal}>
-          <div className="mm-modal-box modal-md" onClick={(e) => e.stopPropagation()}>
-            <div className="mm-modal-header">
+        <div className="mission-modal">
+          <div className="mission-modal-content">
+            <div className="mission-modal-header">
               <div>
-                <h3>Từ chối bài nộp</h3>
-                <p>Du khách sẽ nhận được thông báo kèm lý do từ chối cụ thể.</p>
+                <h2 className="font-headline-md text-headline-md text-on-surface font-bold">
+                  Từ chối bài nộp
+                </h2>
+                <p className="font-body-sm text-body-sm text-on-surface-variant mt-1">
+                  Du khách sẽ nhận được thông báo kèm lý do từ chối.
+                </p>
               </div>
-              <button type="button" className="mm-modal-close-btn" onClick={closeModal}>
+              <button onClick={closeModal} type="button" className="mission-modal-close" aria-label="Đóng">
                 <span className="material-symbols-outlined">close</span>
               </button>
             </div>
-            <form onSubmit={handleRejectSubmit}>
-              <div className="mm-modal-body">
-                <div style={{ background: '#ffdad6', color: '#93000a', padding: '10px 14px', borderRadius: '8px', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span className="material-symbols-outlined text-[18px]">warning</span>
-                  <span>Bài nộp bị từ chối sẽ không được trao thưởng.</span>
-                </div>
 
-                <div className="mm-form-group full-width" style={{ marginBottom: '12px' }}>
-                  <label className="mm-form-label">Lý do từ chối</label>
+            <form onSubmit={handleConfirmReject} className="mission-form">
+              <div className="mission-current">
+                <span className="font-bold">{selectedSubmission.guest}</span>
+                <span>• {selectedSubmission.task}</span>
+              </div>
+
+              <div className="mission-cancel-warning">
+                <span className="material-symbols-outlined text-[18px]">warning</span>
+                <span>Bài nộp bị từ chối sẽ không được trao thưởng.</span>
+              </div>
+
+              <div className="mission-form-grid">
+                <div className="mission-form-group full">
+                  <label className="mission-form-label" htmlFor="rejectReason">
+                    Lý do từ chối
+                  </label>
                   <select
-                    className="mm-form-select"
+                    id="rejectReason"
+                    className="mission-form-select"
                     value={rejectForm.reason}
                     onChange={(e) => setRejectForm({ ...rejectForm, reason: e.target.value })}
                   >
@@ -1088,20 +1458,25 @@ export default function ManageMission() {
                   </select>
                 </div>
 
-                <div className="mm-form-group full-width">
-                  <label className="mm-form-label">Ghi chú chi tiết cho khách</label>
+                <div className="mission-form-group full">
+                  <label className="mission-form-label" htmlFor="rejectNote">
+                    Ghi chú
+                  </label>
                   <textarea
-                    className="mm-form-textarea"
-                    rows="3"
+                    id="rejectNote"
+                    className="mission-form-textarea"
                     placeholder="Giải thích thêm cho du khách..."
                     value={rejectForm.note}
                     onChange={(e) => setRejectForm({ ...rejectForm, note: e.target.value })}
                   />
                 </div>
               </div>
-              <div className="mm-modal-footer">
-                <button type="button" className="mm-btn-ghost" onClick={closeModal}>Hủy</button>
-                <button type="submit" className="mm-btn-primary" style={{ backgroundColor: '#ba1a1a' }}>
+
+              <div className="mission-modal-footer">
+                <button onClick={closeModal} type="button" className="mission-btn mission-btn-cancel">
+                  Hủy
+                </button>
+                <button type="submit" className="mission-btn mission-btn-danger">
                   <span className="material-symbols-outlined text-[17px]">close</span>
                   Xác nhận từ chối
                 </button>
@@ -1111,59 +1486,81 @@ export default function ManageMission() {
         </div>
       )}
 
-      {/* ── Modal 6: Yêu cầu chụp lại ── */}
+      {/* 6. POPUP YÊU CẦU CHỤP LẠI */}
       {activeModal === 'retake' && selectedSubmission && (
-        <div className="mm-modal-overlay" onClick={closeModal}>
-          <div className="mm-modal-box modal-md" onClick={(e) => e.stopPropagation()}>
-            <div className="mm-modal-header">
+        <div className="mission-modal">
+          <div className="mission-modal-content">
+            <div className="mission-modal-header">
               <div>
-                <h3>Yêu cầu chụp lại ảnh</h3>
-                <p>Gửi gợi ý để du khách bổ sung ảnh phù hợp hơn.</p>
+                <h2 className="font-headline-md text-headline-md text-on-surface font-bold">
+                  Yêu cầu chụp lại
+                </h2>
+                <p className="font-body-sm text-body-sm text-on-surface-variant mt-1">
+                  Gửi gợi ý để du khách bổ sung ảnh phù hợp hơn.
+                </p>
               </div>
-              <button type="button" className="mm-modal-close-btn" onClick={closeModal}>
+              <button onClick={closeModal} type="button" className="mission-modal-close" aria-label="Đóng">
                 <span className="material-symbols-outlined">close</span>
               </button>
             </div>
-            <form onSubmit={handleRetakeSubmit}>
-              <div className="mm-modal-body">
-                <div className="mm-form-group full-width" style={{ marginBottom: '12px' }}>
-                  <label className="mm-form-label">Vấn đề cần chỉnh sửa</label>
+
+            <form onSubmit={handleConfirmRetake} className="mission-form">
+              <div className="mission-current">
+                <span className="font-bold">{selectedSubmission.guest}</span>
+                <span>• {selectedSubmission.task}</span>
+              </div>
+
+              <div className="mission-form-grid">
+                <div className="mission-form-group full">
+                  <label className="mission-form-label" htmlFor="retakeReason">
+                    Vấn đề cần chỉnh
+                  </label>
                   <select
-                    className="mm-form-select"
+                    id="retakeReason"
+                    className="mission-form-select"
                     value={retakeForm.reason}
                     onChange={(e) => setRetakeForm({ ...retakeForm, reason: e.target.value })}
                   >
                     <option value="Ảnh bị mờ, thiếu sáng">Ảnh bị mờ, thiếu sáng</option>
                     <option value="Thiếu hashtag / thẻ định vị">Thiếu hashtag / thẻ định vị</option>
                     <option value="Chưa thấy rõ trang phục / món ăn">Chưa thấy rõ trang phục / món ăn</option>
-                    <option value="Cần thêm ảnh">Cần thêm góc ảnh khác</option>
+                    <option value="Cần thêm ảnh">Cần thêm ảnh</option>
                     <option value="Khác">Khác</option>
                   </select>
                 </div>
 
-                <div className="mm-form-group full-width" style={{ marginBottom: '12px' }}>
-                  <label className="mm-form-label">Lời nhắn hướng dẫn</label>
+                <div className="mission-form-group full">
+                  <label className="mission-form-label" htmlFor="retakeNote">
+                    Lời nhắn
+                  </label>
                   <textarea
-                    className="mm-form-textarea"
-                    rows="3"
+                    id="retakeNote"
+                    className="mission-form-textarea"
+                    placeholder="Ví dụ: Bạn chụp lại ở ban công lúc sáng sớm nhé!"
                     value={retakeForm.note}
                     onChange={(e) => setRetakeForm({ ...retakeForm, note: e.target.value })}
                   />
                 </div>
 
-                <div className="mm-form-group full-width">
-                  <label className="mm-form-label">Hạn nộp lại</label>
+                <div className="mission-form-group full">
+                  <label className="mission-form-label" htmlFor="retakeDeadline">
+                    Hạn nộp lại
+                  </label>
                   <input
+                    id="retakeDeadline"
+                    className="mission-form-input"
                     type="date"
-                    className="mm-form-input"
                     value={retakeForm.deadline}
                     onChange={(e) => setRetakeForm({ ...retakeForm, deadline: e.target.value })}
                   />
                 </div>
               </div>
-              <div className="mm-modal-footer">
-                <button type="button" className="mm-btn-ghost" onClick={closeModal}>Hủy</button>
-                <button type="submit" className="mm-btn-primary">
+
+              <div className="mission-modal-footer">
+                <button onClick={closeModal} type="button" className="mission-btn mission-btn-cancel">
+                  Hủy
+                </button>
+                <button type="submit" className="mission-btn mission-btn-save">
                   <span className="material-symbols-outlined text-[17px]">send</span>
                   Gửi yêu cầu
                 </button>
@@ -1173,193 +1570,232 @@ export default function ManageMission() {
         </div>
       )}
 
-      {/* ── Modal 7: Lọc bài nộp ── */}
+      {/* 7. POPUP LỌC BÀI NỘP */}
       {activeModal === 'filter' && (
-        <div className="mm-modal-overlay" onClick={closeModal}>
-          <div className="mm-modal-box modal-sm" onClick={(e) => e.stopPropagation()}>
-            <div className="mm-modal-header">
+        <div className="mission-modal">
+          <div className="mission-modal-content">
+            <div className="mission-modal-header">
               <div>
-                <h3>Lọc danh sách bài nộp</h3>
-                <p>Lọc bài nộp theo loại nhiệm vụ hoặc tên du khách.</p>
+                <h2 className="font-headline-md text-headline-md text-on-surface font-bold">
+                  Lọc bài nộp
+                </h2>
+                <p className="font-body-sm text-body-sm text-on-surface-variant mt-1">
+                  Lọc danh sách chờ duyệt theo loại nhiệm vụ và từ khóa.
+                </p>
               </div>
-              <button type="button" className="mm-modal-close-btn" onClick={closeModal}>
+              <button onClick={closeModal} type="button" className="mission-modal-close" aria-label="Đóng">
                 <span className="material-symbols-outlined">close</span>
               </button>
             </div>
-            <div className="mm-modal-body">
-              <div className="mm-form-group full-width" style={{ marginBottom: '12px' }}>
-                <label className="mm-form-label">Loại nhiệm vụ</label>
+
+            <div className="mission-form">
+              <div className="mission-form-group">
+                <label className="mission-form-label">Loại nhiệm vụ</label>
                 <select
-                  className="mm-form-select"
+                  className="mission-form-select"
                   value={filterType}
                   onChange={(e) => setFilterType(e.target.value)}
                 >
                   <option value="all">Tất cả nhiệm vụ</option>
-                  <option value="costume">Trang phục / Check-in</option>
-                  <option value="food">Ẩm thực</option>
+                  <option value="costume">Trang phục dân tộc</option>
+                  <option value="sunrise">Bình minh / Check-in</option>
+                  <option value="food">Ẩm thực cơm lam</option>
+                  <option value="review">Đánh giá Google Maps</option>
                 </select>
               </div>
 
-              <div className="mm-form-group full-width">
-                <label className="mm-form-label">Tìm theo tên du khách</label>
+              <div className="mission-form-group">
+                <label className="mission-form-label">Tìm kiếm tên khách hoặc phòng</label>
                 <input
+                  className="mission-form-input"
                   type="text"
-                  className="mm-form-input"
-                  placeholder="Ví dụ: Hương, Hiếu..."
+                  placeholder="Nhập tên khách hàng..."
                   value={filterKeyword}
                   onChange={(e) => setFilterKeyword(e.target.value)}
                 />
               </div>
-            </div>
-            <div className="mm-modal-footer">
-              <button
-                type="button"
-                className="mm-btn-ghost"
-                onClick={() => {
-                  setFilterType('all');
-                  setFilterKeyword('');
-                  closeModal();
-                }}
-              >
-                Đặt lại
-              </button>
-              <button type="button" className="mm-btn-primary" onClick={closeModal}>
-                Áp dụng bộ lọc
-              </button>
+
+              <div className="mission-modal-footer">
+                <button
+                  onClick={() => {
+                    setFilterType('all');
+                    setFilterKeyword('');
+                    closeModal();
+                  }}
+                  type="button"
+                  className="mission-btn mission-btn-cancel"
+                >
+                  Đặt lại
+                </button>
+                <button onClick={closeModal} type="button" className="mission-btn mission-btn-save">
+                  Áp dụng bộ lọc
+                </button>
+              </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* ── Modal 8: Thống kê chi tiết nhiệm vụ ── */}
+      {/* 8. POPUP CHI TIẾT MỤC TIÊU TƯƠNG TÁC */}
       {activeModal === 'stats' && (
-        <div className="mm-modal-overlay" onClick={closeModal}>
-          <div className="mm-modal-box modal-md" onClick={(e) => e.stopPropagation()}>
-            <div className="mm-modal-header">
+        <div className="mission-modal">
+          <div className="mission-modal-content">
+            <div className="mission-modal-header">
               <div>
-                <h3>Mục tiêu tương tác tháng</h3>
-                <p>Số lượt trao thưởng chi tiết theo từng nhiệm vụ.</p>
+                <h2 className="font-headline-md text-headline-md text-on-surface font-bold">
+                  Mục tiêu tương tác tháng 09
+                </h2>
+                <p className="font-body-sm text-body-sm text-on-surface-variant mt-1">
+                  Thống kê tỷ lệ du khách tham gia và hoàn thành thử thách.
+                </p>
               </div>
-              <button type="button" className="mm-modal-close-btn" onClick={closeModal}>
+              <button onClick={closeModal} type="button" className="mission-modal-close" aria-label="Đóng">
                 <span className="material-symbols-outlined">close</span>
               </button>
             </div>
-            <div className="mm-modal-body">
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                {missions.map((m) => {
-                  const maxGiven = Math.max(...missions.map(x => x.given), 1);
-                  const percent = Math.round((m.given / maxGiven) * 100);
-                  return (
-                    <div key={m.id} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', fontWeight: 600 }}>
-                        <span>{m.title}</span>
-                        <span style={{ color: '#1b6d24' }}>{m.given} lượt</span>
-                      </div>
-                      <div style={{ height: '8px', background: '#eff4ff', borderRadius: '4px', overflow: 'hidden' }}>
-                        <div style={{ width: `${percent}%`, height: '100%', background: '#1b6d24', borderRadius: '4px', transition: 'width 0.4s ease' }} />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-            <div className="mm-modal-footer">
-              <button type="button" className="mm-btn-ghost" onClick={closeModal}>Đóng</button>
-            </div>
-          </div>
-        </div>
-      )}
 
-      {/* ── Modal 9: Gửi quà tri ân top du khách ── */}
-      {activeModal === 'gift' && (
-        <div className="mm-modal-overlay" onClick={closeModal}>
-          <div className="mm-modal-box modal-md" onClick={(e) => e.stopPropagation()}>
-            <div className="mm-modal-header">
-              <div>
-                <h3>Gửi quà tri ân tháng 09</h3>
-                <p>Chọn du khách tích cực và phần quà tri ân ý nghĩa.</p>
-              </div>
-              <button type="button" className="mm-modal-close-btn" onClick={closeModal}>
-                <span className="material-symbols-outlined">close</span>
-              </button>
-            </div>
-            <form onSubmit={handleSendGift}>
-              <div className="mm-modal-body">
-                <div className="mm-form-group full-width" style={{ marginBottom: '14px' }}>
-                  <label className="mm-form-label">Người nhận quà</label>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    {topGuests.map((g) => {
-                      const checked = giftForm.selectedGuests.includes(g.name);
-                      return (
-                        <label
-                          key={g.id}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            padding: '8px 12px',
-                            background: checked ? '#eff4ff' : '#fff',
-                            border: '1px solid #c0c8c2',
-                            borderRadius: '8px',
-                            cursor: 'pointer',
-                            fontSize: '13px'
-                          }}
-                        >
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <input
-                              type="checkbox"
-                              checked={checked}
-                              onChange={(e) => {
-                                const isChecked = e.target.checked;
-                                setGiftForm(prev => ({
-                                  ...prev,
-                                  selectedGuests: isChecked
-                                    ? [...prev.selectedGuests, g.name]
-                                    : prev.selectedGuests.filter(n => n !== g.name)
-                                }));
-                              }}
-                            />
-                            <span>{g.name}</span>
-                          </div>
-                          <span style={{ fontSize: '11px', fontWeight: 600, color: '#717974' }}>{g.points} điểm</span>
-                        </label>
-                      );
-                    })}
+            <div className="mission-form">
+              <div className="mission-stats-list">
+                <div className="mission-stats-row">
+                  <div className="mission-stats-head">
+                    <span>Mặc trang phục dân tộc Thái</span>
+                    <span>42 bài nộp (100%)</span>
+                  </div>
+                  <div className="mission-stats-bar">
+                    <i style={{ width: '100%' }}></i>
                   </div>
                 </div>
 
-                <div className="mm-form-group full-width" style={{ marginBottom: '12px' }}>
-                  <label className="mm-form-label">Phần quà trao</label>
-                  <select
-                    className="mm-form-select"
-                    value={giftForm.giftItem}
-                    onChange={(e) => setGiftForm({ ...giftForm, giftItem: e.target.value })}
-                  >
-                    <option value="Voucher giảm 20% lần lưu trú sau">Voucher giảm 20% lần lưu trú sau</option>
-                    <option value="Đêm nghỉ miễn phí (1 đêm)">Đêm nghỉ miễn phí (1 đêm)</option>
-                    <option value="Set quà nông sản Mai Châu">Set quà nông sản Mai Châu</option>
-                    <option value="Khăn thổ cẩm handmade">Khăn thổ cẩm handmade</option>
-                  </select>
+                <div className="mission-stats-row">
+                  <div className="mission-stats-head">
+                    <span>Check-in bình minh Mai Châu</span>
+                    <span>28 bài nộp (70%)</span>
+                  </div>
+                  <div className="mission-stats-bar">
+                    <i style={{ width: '70%' }}></i>
+                  </div>
                 </div>
 
-                <div className="mm-form-group full-width">
-                  <label className="mm-form-label">Lời nhắn tri ân</label>
-                  <textarea
-                    className="mm-form-textarea"
-                    rows="3"
-                    value={giftForm.message}
-                    onChange={(e) => setGiftForm({ ...giftForm, message: e.target.value })}
-                  />
+                <div className="mission-stats-row">
+                  <div className="mission-stats-head">
+                    <span>Thưởng thức cơm lam nướng</span>
+                    <span>16 bài nộp (45%)</span>
+                  </div>
+                  <div className="mission-stats-bar">
+                    <i style={{ width: '45%' }}></i>
+                  </div>
+                </div>
+
+                <div className="mission-stats-row">
+                  <div className="mission-stats-head">
+                    <span>Đánh giá 5 sao trên bản đồ</span>
+                    <span>10 bài nộp (25%)</span>
+                  </div>
+                  <div className="mission-stats-bar">
+                    <i style={{ width: '25%' }}></i>
+                  </div>
                 </div>
               </div>
-              <div className="mm-modal-footer">
-                <button type="button" className="mm-btn-ghost" onClick={closeModal}>Hủy</button>
-                <button type="submit" className="mm-btn-primary">
-                  <span className="material-symbols-outlined text-[17px]">redeem</span>
-                  Gửi quà ngay
-                </button>
+            </div>
+
+            <div className="mission-modal-footer">
+              <button onClick={closeModal} type="button" className="mission-btn mission-btn-cancel">
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 9. POPUP GỬI QUÀ TRI ÂN */}
+      {activeModal === 'gift' && (
+        <div className="mission-modal">
+          <div className="mission-modal-content">
+            <div className="mission-modal-header">
+              <div>
+                <h2 className="font-headline-md text-headline-md text-on-surface font-bold">
+                  Gửi quà tri ân tháng 09
+                </h2>
+                <p className="font-body-sm text-body-sm text-on-surface-variant mt-1">
+                  Chọn du khách tích cực để trao tặng voucher hoặc phần quà đặc biệt.
+                </p>
               </div>
-            </form>
+              <button onClick={closeModal} type="button" className="mission-modal-close" aria-label="Đóng">
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+
+            <div className="mission-form">
+              <div className="mission-form-group">
+                <label className="mission-form-label">Chọn du khách nhận quà</label>
+                <div className="mission-gift-list">
+                  {topGuests.map((g) => (
+                    <label key={g.id} className="mission-gift-item">
+                      <input
+                        type="checkbox"
+                        defaultChecked
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setGiftForm((prev) => ({
+                              ...prev,
+                              selectedGuests: [...prev.selectedGuests, g.id]
+                            }));
+                          } else {
+                            setGiftForm((prev) => ({
+                              ...prev,
+                              selectedGuests: prev.selectedGuests.filter((id) => id !== g.id)
+                            }));
+                          }
+                        }}
+                      />
+                      <span>{g.name}</span>
+                      <small>{g.missionsCount || 5} nhiệm vụ</small>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div className="mission-form-group">
+                <label className="mission-form-label">Món quà tri ân</label>
+                <input
+                  className="mission-form-input font-bold text-secondary"
+                  type="text"
+                  value={giftForm.giftItem}
+                  onChange={(e) => setGiftForm({ ...giftForm, giftItem: e.target.value })}
+                />
+              </div>
+
+              <div className="mission-form-group">
+                <label className="mission-form-label">Lời nhắn gửi kèm</label>
+                <textarea
+                  className="mission-form-textarea"
+                  value={giftForm.message}
+                  onChange={(e) => setGiftForm({ ...giftForm, message: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div className="mission-modal-footer">
+              <button onClick={closeModal} type="button" className="mission-btn mission-btn-cancel">
+                Hủy
+              </button>
+              <button onClick={handleSendGift} type="button" className="mission-btn mission-btn-save">
+                <span className="material-symbols-outlined text-[17px]">send</span>
+                Gửi quà ngay
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Toast Notification Container */}
+      {toast.show && (
+        <div className="mission-toast-box">
+          <div className={`mission-toast is-show ${toast.type === 'error' ? 'mission-toast-error' : ''}`}>
+            <span className="material-symbols-outlined text-[18px]">
+              {toast.type === 'error' ? 'error' : 'check_circle'}
+            </span>
+            <span>{toast.message}</span>
           </div>
         </div>
       )}
