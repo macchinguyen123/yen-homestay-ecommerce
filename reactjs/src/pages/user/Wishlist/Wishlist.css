@@ -1,7 +1,8 @@
 /* ==========================================================================
    YÊN Homestay — Wishlist Page Stylesheet
-   Design System: Forest Green (#15803D), Cream (#FCF9F4), Slate (#0F172A)
+   Design System: Forest Green (#15803D), Crisp White (#FFFFFF), Slate (#0F172A)
    Grid: 4 Homestays Per Row on Desktop
+   Card Frame: Matches Homepage, PersonalAccount & Category
    ========================================================================== */
 
 :root {
@@ -13,7 +14,7 @@
   --wl-muted: #64748B;
   --wl-bg: #FCF9F4;
   --wl-card-bg: #FFFFFF;
-  --wl-border: #E2E8F0;
+  --wl-border: #CBD5E1;
   --wl-amber: #D97706;
   --wl-amber-soft: #FEF3C7;
   --wl-rose: #E11D48;
@@ -27,7 +28,23 @@
   min-height: calc(100vh - 380px);
 }
 
-/* ── Hero Banner Section (Bo Cong Xuống Sang Trọng) ── */
+/* ── Container 80% Chiều Rộng Trang Giống Homepage (.hp-container) ── */
+.wl-container {
+  width: 80%;
+  max-width: 80%;
+  margin: 0 auto;
+  padding: 0 16px;
+}
+
+@media (max-width: 1024px) {
+  .wl-container {
+    width: 95%;
+    max-width: 95%;
+    padding: 0 12px;
+  }
+}
+
+/* ── Hero Banner Section ── */
 .wl-hero-section {
   position: relative;
   background: 
@@ -39,7 +56,6 @@
   overflow: hidden;
 }
 
-/* Geometric decoration mesh lines */
 .wl-hero-section::before {
   content: '';
   position: absolute;
@@ -50,7 +66,6 @@
   pointer-events: none;
 }
 
-/* Smooth curved bottom mask curve */
 .wl-hero-section::after {
   content: '';
   position: absolute;
@@ -72,87 +87,360 @@
   backdrop-filter: blur(8px);
   color: #FEF08A;
   font-size: 0.85rem;
-  font-weight: 600;
-  padding: 0.35rem 0.9rem;
+  font-weight: 700;
+  padding: 0.35rem 0.95rem;
   border-radius: 50px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  margin-bottom: 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  margin-bottom: 0.85rem;
+  letter-spacing: 0.01em;
 }
 
 .wl-hero-title {
-  font-size: 2.25rem;
+  font-size: 2.35rem;
   font-weight: 800;
   letter-spacing: -0.02em;
   margin-bottom: 0.5rem;
   color: #FFFFFF;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.25);
 }
 
 .wl-hero-sub {
   color: #E2E8F0;
-  font-size: 1rem;
-  max-width: 640px;
+  font-size: 1.05rem;
+  max-width: 660px;
   line-height: 1.6;
+  font-weight: 400;
 }
 
-/* ── Toolbar: Filter & Sort ── */
+/* ── Modern Interactive Toolbar Card ── */
 .wl-toolbar-card {
   background: #FFFFFF;
-  border: 1px solid var(--wl-border, #E2E8F0);
-  border-radius: 16px;
-  padding: 1rem 1.25rem;
-  margin-bottom: 1.75rem;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.03);
+  border: 1.5px solid var(--wl-border, #CBD5E1);
+  border-radius: 20px;
+  padding: 1rem 1.4rem;
+  margin-bottom: 2rem;
+  box-shadow: 0 4px 20px rgba(15, 23, 42, 0.04);
+}
+
+.wl-toolbar-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.25rem;
+}
+
+@media (max-width: 992px) {
+  .wl-toolbar-inner {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1rem;
+  }
+}
+
+/* 1. Left: Dynamic Region Filter Pills */
+.wl-pills-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  overflow-x: auto;
+  padding-bottom: 3px;
+  padding-top: 2px;
+  flex: 1;
 }
 
 .wl-pill-btn {
-  background: var(--wl-bg, #FCF9F4);
-  color: var(--wl-slate, #334155);
-  border: 1px solid var(--wl-border, #E2E8F0);
-  border-radius: 50px;
-  padding: 0.45rem 1.1rem;
-  font-size: 0.85rem;
-  font-weight: 600;
-  transition: all 0.2s ease;
+  background: #F8FAFC;
+  border: 1.5px solid #E2E8F0;
+  border-radius: 9999px;
+  padding: 0.45rem 1rem 0.45rem 1.15rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
   white-space: nowrap;
-  cursor: pointer;
-}
-
-.wl-pill-btn:hover {
-  background: var(--wl-primary-soft, #DCFCE7);
-  color: var(--wl-primary, #15803D);
-  border-color: var(--wl-primary, #15803D);
-}
-
-.wl-pill-btn.active {
-  background: var(--wl-primary, #15803D);
-  color: #FFFFFF;
-  border-color: var(--wl-primary, #15803D);
-  box-shadow: 0 4px 12px rgba(21, 128, 61, 0.25);
-}
-
-.wl-sort-select {
-  border: 1px solid var(--wl-border, #E2E8F0);
-  background-color: var(--wl-bg, #FCF9F4);
-  border-radius: 50px;
-  padding: 0.45rem 1.25rem 0.45rem 1rem;
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--wl-dark, #0F172A);
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.wl-sort-select:focus {
-  border-color: var(--wl-primary, #15803D);
-  box-shadow: 0 0 0 3px rgba(21, 128, 61, 0.15);
   outline: none;
 }
 
-/* Hide scrollbar for Chrome, Safari and Opera */
+.wl-pill-label {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #1E293B;
+  transition: color 0.2s ease;
+}
+
+.wl-pill-count {
+  background: #E2E8F0;
+  color: #475569;
+  font-size: 0.76rem;
+  font-weight: 800;
+  padding: 2px 7px;
+  border-radius: 12px;
+  transition: all 0.2s ease;
+  line-height: 1.2;
+}
+
+.wl-pill-btn:hover {
+  background: #DCFCE7;
+  border-color: #15803D;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(21, 128, 61, 0.15);
+}
+
+.wl-pill-btn:hover .wl-pill-label {
+  color: #15803D;
+}
+
+.wl-pill-btn:hover .wl-pill-count {
+  background: #BBF7D0;
+  color: #166534;
+}
+
+.wl-pill-btn.active {
+  background: linear-gradient(135deg, #15803D 0%, #166534 100%);
+  border-color: #15803D;
+  box-shadow: 0 6px 18px rgba(21, 128, 61, 0.35);
+  transform: translateY(-1px);
+}
+
+.wl-pill-btn.active .wl-pill-label {
+  color: #FFFFFF;
+}
+
+.wl-pill-btn.active .wl-pill-count {
+  background: rgba(255, 255, 255, 0.25);
+  color: #FFFFFF;
+}
+
+.wl-pill-btn:active {
+  transform: scale(0.96);
+}
+
+/* 2. Right: Action Controls (Custom Sort Dropdown + Clear All) */
+.wl-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+@media (max-width: 992px) {
+  .wl-toolbar-actions {
+    margin-left: 0;
+    justify-content: flex-end;
+  }
+}
+
+/* Custom Interactive Sort Dropdown */
+.wl-sort-dropdown-wrap {
+  position: relative;
+}
+
+.wl-sort-trigger-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.65rem;
+  background: #F8FAFC;
+  border: 1.5px solid #CBD5E1;
+  border-radius: 9999px;
+  padding: 0.4rem 1.15rem 0.4rem 0.55rem;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  outline: none;
+  white-space: nowrap;
+}
+
+.wl-sort-icon-box {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #DCFCE7;
+  color: #15803D;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.92rem;
+  font-weight: 700;
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.wl-sort-text {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.88rem;
+  line-height: 1;
+}
+
+.wl-sort-prefix {
+  color: #64748B;
+  font-weight: 600;
+}
+
+.wl-sort-selected-label {
+  color: #0F172A;
+  font-weight: 800;
+}
+
+.wl-sort-chevron {
+  font-size: 0.82rem;
+  color: #64748B;
+  transition: transform 0.25s ease;
+  margin-left: 0.2rem;
+}
+
+.wl-sort-chevron.rotate {
+  transform: rotate(180deg);
+}
+
+.wl-sort-trigger-btn:hover,
+.wl-sort-trigger-btn.active {
+  border-color: #15803D;
+  background: #FFFFFF;
+  box-shadow: 0 4px 16px rgba(21, 128, 61, 0.16);
+  transform: translateY(-1px);
+}
+
+.wl-sort-trigger-btn:hover .wl-sort-icon-box,
+.wl-sort-trigger-btn.active .wl-sort-icon-box {
+  background: #15803D;
+  color: #FFFFFF;
+  transform: rotate(180deg);
+}
+
+/* Floating Dropdown Menu */
+.wl-sort-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 240px;
+  background: #FFFFFF;
+  border: 1.5px solid #E2E8F0;
+  border-radius: 16px;
+  box-shadow: 0 18px 40px -8px rgba(15, 23, 42, 0.16);
+  padding: 0.45rem;
+  z-index: 1000;
+  backdrop-filter: blur(10px);
+}
+
+.wl-sort-menu-header {
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #64748B;
+  padding: 0.45rem 0.75rem 0.35rem;
+  border-bottom: 1px solid #F1F5F9;
+  margin-bottom: 0.35rem;
+  display: flex;
+  align-items: center;
+}
+
+.wl-sort-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.6rem 0.85rem;
+  border-radius: 10px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  outline: none;
+}
+
+.wl-sort-item-icon {
+  font-size: 0.95rem;
+  color: #64748B;
+  transition: transform 0.2s;
+}
+
+.wl-sort-item-name {
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: #334155;
+  transition: color 0.2s;
+}
+
+.wl-sort-item:hover {
+  background: #F8FAFC;
+  transform: translateX(3px);
+}
+
+.wl-sort-item:hover .wl-sort-item-name {
+  color: #0F172A;
+  font-weight: 700;
+}
+
+.wl-sort-item:hover .wl-sort-item-icon {
+  transform: scale(1.15);
+}
+
+.wl-sort-item.selected {
+  background: #F0FDF4;
+}
+
+.wl-sort-item.selected .wl-sort-item-icon {
+  color: #15803D;
+}
+
+.wl-sort-item.selected .wl-sort-item-name {
+  color: #15803D;
+  font-weight: 800;
+}
+
+@keyframes popMenu {
+  0% {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.96);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-pop {
+  animation: popMenu 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Clear All Action Button */
+.wl-clear-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: #FFF1F2;
+  color: #E11D48;
+  border: 1.5px solid #FECDD3;
+  border-radius: 9999px;
+  padding: 0.55rem 1.25rem;
+  font-size: 0.86rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  white-space: nowrap;
+  outline: none;
+}
+
+.wl-clear-btn:hover {
+  background: #E11D48;
+  color: #FFFFFF;
+  border-color: #E11D48;
+  box-shadow: 0 6px 18px rgba(225, 29, 72, 0.32);
+  transform: translateY(-2px);
+}
+
+.wl-clear-btn:active {
+  transform: scale(0.96);
+}
+
+/* Hide scrollbar for smooth pills scrolling */
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
-/* Hide scrollbar for IE, Edge and Firefox */
 .no-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
@@ -171,266 +459,274 @@
   }
 }
 
-@media (max-width: 992px) {
+@media (max-width: 900px) {
   .wl-homestay-grid {
     grid-template-columns: repeat(2, 1fr);
   }
 }
 
-@media (max-width: 576px) {
+@media (max-width: 580px) {
   .wl-homestay-grid {
     grid-template-columns: 1fr;
   }
 }
 
-/* ── Homestay Card Component ── */
-.wl-card-col {
-  transition: transform 0.3s ease, opacity 0.3s ease;
-}
-
-.wl-card {
+/* ── Homestay Card Component (Matches Homepage & Category & PersonalAccount) ── */
+.homestay-card {
   background: #FFFFFF;
-  border: 1px solid #E2E8F0;
+  border: 1.5px solid #CBD5E1;
   border-radius: 18px;
   overflow: hidden;
-  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  transition: all 0.3s ease;
   display: flex;
   flex-direction: column;
-  height: 100%;
   position: relative;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.03);
 }
 
-.wl-card:hover {
-  transform: translateY(-6px);
-  box-shadow: 0 16px 32px rgba(15, 23, 42, 0.08);
-  border-color: rgba(21, 128, 61, 0.3);
+.homestay-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 28px -4px rgba(15, 23, 42, 0.12);
+  border-color: rgba(21, 128, 61, 0.4);
 }
 
-/* Card Image Wrapper */
-.wl-card-img-wrap {
+.card-img-wrapper {
   position: relative;
-  width: 100%;
-  padding-top: 66.66%; /* 3:2 ratio */
+  height: 180px;
   overflow: hidden;
-  background-color: #F1F5F9;
+  background: #F1F5F9;
 }
 
-.wl-card-img {
-  position: absolute;
-  top: 0;
-  left: 0;
+.card-img-wrapper img {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  transition: transform 0.6s ease;
+  transition: transform 0.4s ease;
 }
 
-.wl-card:hover .wl-card-img {
-  transform: scale(1.08);
+.homestay-card:hover .card-img-wrapper img {
+  transform: scale(1.06);
 }
 
-/* Top Left Pill Badge */
-.wl-top-badge {
+.card-top-tag {
   position: absolute;
   top: 12px;
   left: 12px;
-  background: #FFE2E5;
-  color: #E11D48;
-  font-size: 0.78rem;
-  font-weight: 700;
-  padding: 0.3rem 0.75rem;
-  border-radius: 10px;
-  z-index: 5;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  background: #15803D;
+  color: #FFFFFF;
+  font-size: 0.74rem;
+  font-weight: 800;
+  padding: 3px 10px;
+  border-radius: 9999px;
+  z-index: 2;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
 }
 
-/* Floating Heart / Remove Button */
-.wl-wishlist-btn {
+.card-top-tag.tag-hot {
+  background: #E11D48;
+}
+
+.card-wishlist-btn {
   position: absolute;
-  top: 12px;
-  right: 12px;
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  background: #FFFFFF;
+  top: 10px;
+  right: 10px;
+  background: transparent;
   border: none;
-  color: #E11D48;
+  padding: 4px;
+  cursor: pointer;
+  z-index: 5;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.05rem;
-  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.12);
-  transition: all 0.2s ease;
-  z-index: 5;
-  cursor: pointer;
+  outline: none;
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-.wl-wishlist-btn:hover {
-  background: #E11D48;
-  color: #FFFFFF;
-  transform: scale(1.1);
+.card-wishlist-btn i {
+  font-size: 1.55rem;
+  color: #E11D48;
+  filter: drop-shadow(0 4px 14px rgba(225, 29, 72, 0.7));
+  transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-/* Card Body */
-.wl-card-body {
-  padding: 1.15rem;
+.card-wishlist-btn:hover i {
+  transform: scale(1.22);
+  filter: drop-shadow(0 6px 18px rgba(225, 29, 72, 0.85));
+}
+
+.card-wishlist-btn.active i {
+  color: #E11D48;
+  filter: drop-shadow(0 4px 14px rgba(225, 29, 72, 0.7));
+}
+
+.card-body {
+  padding: 18px;
   display: flex;
   flex-direction: column;
-  flex: 1;
-  justify-content: space-between;
+  gap: 8px;
+  flex-grow: 1;
 }
 
-.wl-card-location {
-  font-size: 0.82rem;
+.card-location-rating {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.84rem;
+}
+
+.card-location {
   color: #64748B;
-  font-weight: 600;
+  font-weight: 700;
   display: flex;
   align-items: center;
 }
 
-.wl-card-rating {
-  font-size: 0.82rem;
-  color: #0F172A;
+.card-rating {
+  color: #F59E0B;
+  font-weight: 800;
 }
 
-.wl-card-title {
-  font-size: 1.1rem;
-  font-weight: 700;
+.card-rating .review-count {
+  color: #94A3B8;
+  font-weight: 500;
+  font-size: 0.8rem;
+}
+
+.card-title {
+  font-size: 1.05rem;
+  font-weight: 800;
   color: #0F172A;
   line-height: 1.35;
-  margin-top: 0.35rem;
-  margin-bottom: 0.4rem;
-  display: -webkit-box;
-  -webkit-line-clamp: 1;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+  margin: 0;
 }
 
-.wl-card-specs {
-  font-size: 0.82rem;
-  color: #64748B;
-  font-weight: 500;
-  margin-bottom: 0.85rem;
+.card-title a {
+  text-decoration: none;
+  color: #0F172A;
+  transition: color 0.2s ease;
+}
+
+.card-title a:hover {
+  color: #15803D;
+}
+
+.card-specs {
   display: flex;
   align-items: center;
+  gap: 8px;
+  font-size: 0.82rem;
+  color: #334155;
+  font-weight: 500;
 }
 
-/* Highlight Box (Tiện nghi nổi bật) */
-.wl-feature-box {
+.card-amenities-box {
   background: #F8FAFC;
-  border: 1px solid #E2E8F0;
-  border-radius: 12px;
-  padding: 0.65rem 0.85rem;
-  margin-bottom: 1rem;
+  border: 1px solid #F1F5F9;
+  padding: 8px 10px;
+  border-radius: 8px;
 }
 
-.wl-feature-title {
-  font-size: 0.78rem;
+.amenities-label {
+  font-size: 0.72rem;
   font-weight: 700;
-  color: #475569;
-  margin-bottom: 0.15rem;
+  color: #64748B;
+  display: block;
+  margin-bottom: 2px;
 }
 
-.wl-feature-text {
-  font-size: 0.78rem;
-  color: #64748B;
+.amenities-items {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #1E293B;
+  margin: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-/* Card Footer & Price */
-.wl-card-footer {
+.card-footer-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 10px;
   border-top: 1px solid #F1F5F9;
-  padding-top: 0.85rem;
   margin-top: auto;
 }
 
-.wl-price-label {
-  font-size: 0.75rem;
-  color: #94A3B8;
-  font-weight: 500;
-}
-
-.wl-price-val {
-  font-size: 1.25rem;
-  font-weight: 800;
-  color: #15803D;
-  line-height: 1.2;
-}
-
-.wl-btn-book {
-  background: #15803D;
-  color: #FFFFFF;
-  border: none;
-  font-size: 0.85rem;
+.price-label {
+  font-size: 0.74rem;
+  color: #64748B;
   font-weight: 600;
-  border-radius: 50px;
-  padding: 0.5rem 1.25rem;
-  transition: all 0.2s ease;
-  box-shadow: 0 4px 10px rgba(21, 128, 61, 0.2);
+  display: block;
+}
+
+.card-price {
+  font-size: 1.15rem;
+  font-weight: 900;
+  color: #15803D;
+}
+
+.btn-view-room {
+  background: #15803D;
+  color: #FFFFFF !important;
+  font-size: 0.84rem;
+  font-weight: 700;
+  padding: 6px 14px;
+  border-radius: 8px;
   text-decoration: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+  transition: all 0.2s ease;
+  display: inline-block;
 }
 
-.wl-btn-book:hover {
+.btn-view-room:hover {
   background: #166534;
-  color: #FFFFFF;
-  box-shadow: 0 6px 16px rgba(21, 128, 61, 0.3);
+  transform: translateY(-1px);
 }
 
-/* Empty State Box */
+/* ── Empty State ── */
 .wl-empty-card {
   background: #FFFFFF;
-  border: 2px dashed var(--wl-border, #E2E8F0);
+  border: 1.5px dashed #CBD5E1;
   border-radius: 20px;
-  padding: 4rem 2rem;
-  text-align: center;
+  padding: 3.5rem 1.5rem;
 }
 
 .wl-empty-icon {
-  width: 80px;
-  height: 80px;
+  width: 72px;
+  height: 72px;
+  background: #FFE4E6;
+  color: #E11D48;
   border-radius: 50%;
-  background: var(--wl-rose-soft, #FFE4E6);
-  color: var(--wl-rose, #E11D48);
-  font-size: 2.5rem;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: 1.25rem;
+  font-size: 2rem;
+  box-shadow: 0 4px 12px rgba(225, 29, 72, 0.15);
 }
 
-/* Toast Container */
+/* ── Toast Notification ── */
 .wl-toast {
   position: fixed;
-  bottom: 24px;
-  right: 24px;
-  background: var(--wl-dark, #0F172A);
+  bottom: 28px;
+  right: 28px;
+  background: #0F172A;
   color: #FFFFFF;
-  padding: 0.85rem 1.35rem;
+  padding: 0.85rem 1.4rem;
   border-radius: 50px;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
   display: flex;
   align-items: center;
-  gap: 0.65rem;
-  font-size: 0.88rem;
-  font-weight: 500;
-  z-index: 1080;
+  gap: 0.75rem;
+  z-index: 9999;
+  transform: translateY(100px);
   opacity: 0;
-  transform: translateY(20px);
-  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
   pointer-events: none;
+  font-size: 0.92rem;
 }
 
 .wl-toast.show {
-  opacity: 1;
   transform: translateY(0);
+  opacity: 1;
   pointer-events: auto;
 }

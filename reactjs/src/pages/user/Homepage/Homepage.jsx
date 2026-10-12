@@ -2,6 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import './Homepage.css';
 import { homestayService } from '../../../services/homestayService';
+import { wishlistService } from '../../../services/wishlistService';
+import { authService } from '../../../services/authService';
 import { formatAmenities } from '../Category/Category';
 
 const HERO_SLIDES = [
@@ -156,9 +158,26 @@ export default function Homepage() {
   const [visibleFavoritesCount, setVisibleFavoritesCount] = useState(4);
   const [visibleHotCount, setVisibleHotCount] = useState(4);
 
-  // Wishlist State
-  const [wishlist, setWishlist] = useState(new Set());
+  // Wishlist State (Đồng bộ trực tiếp với CSDL)
+  const [currentUser, setCurrentUser] = useState(authService.getCurrentUser());
+  const [wishlistIds, setWishlistIds] = useState(new Set());
   const [toast, setToast] = useState({ show: false, msg: '' });
+
+  // Tải danh sách homestay yêu thích từ CSDL
+  useEffect(() => {
+    const user = authService.getCurrentUser();
+    setCurrentUser(user);
+    const cached = wishlistService.getCachedWishlist(user ? user.id : null);
+    if (cached && Array.isArray(cached)) {
+      setWishlistIds(new Set(cached.map(item => Number(item.id || item.homestayId))));
+    }
+
+    wishlistService.getWishlist(user ? user.id : null).then(res => {
+      if (res && Array.isArray(res.data)) {
+        setWishlistIds(new Set(res.data.map(item => Number(item.id || item.homestayId))));
+      }
+    });
+  }, []);
 
   // Dynamic Data State
   const [homeData, setHomeData] = useState({
@@ -313,18 +332,41 @@ export default function Homepage() {
     setTimeout(() => setToast({ show: false, msg: '' }), 2800);
   };
 
-  const toggleWishlist = (name) => {
-    setWishlist((prev) => {
+  const isWishlisted = (id, name) => {
+    return wishlistIds.has(Number(id)) || (name && wishlistIds.has(name));
+  };
+
+  const toggleWishlist = async (h, e) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    const id = Number(h.id || h.homestayId || 1);
+    const name = h.name || h.title || 'Homestay';
+    const alreadyLiked = isWishlisted(id, name);
+
+    setWishlistIds((prev) => {
       const next = new Set(prev);
-      if (next.has(name)) {
+      if (alreadyLiked) {
+        next.delete(id);
         next.delete(name);
-        triggerToast(`Đã bỏ lưu "${name}" khỏi Wishlist.`);
       } else {
-        next.add(name);
-        triggerToast(`Đã thêm "${name}" vào danh sách Yêu thích!`);
+        next.add(id);
       }
       return next;
     });
+
+    try {
+      if (alreadyLiked) {
+        await wishlistService.removeFromWishlist(currentUser ? currentUser.id : null, id);
+        triggerToast(`Đã bỏ lưu "${name}" khỏi Wishlist.`);
+      } else {
+        await wishlistService.addToWishlist(currentUser ? currentUser.id : null, id, h);
+        triggerToast(`Đã thêm "${name}" vào danh sách Yêu thích!`);
+      }
+    } catch (err) {
+      console.warn('Lỗi lưu CSDL wishlist:', err);
+    }
   };
 
   const handleSearchSubmit = (e) => {
@@ -712,10 +754,11 @@ export default function Homepage() {
                   <span className="card-top-tag">{h.tag}</span>
                   <button
                     type="button"
-                    className={`card-wishlist-btn ${wishlist.has(h.name) ? 'active' : ''}`}
-                    onClick={() => toggleWishlist(h.name)}
+                    className={`card-wishlist-btn ${isWishlisted(h.id, h.name) ? 'active' : ''}`}
+                    onClick={(e) => toggleWishlist(h, e)}
+                    title={isWishlisted(h.id, h.name) ? 'Bỏ yêu thích' : 'Lưu vào yêu thích'}
                   >
-                    <i className={`bi ${wishlist.has(h.name) ? 'bi-heart-fill' : 'bi-heart'}`} />
+                    <i className={`bi ${isWishlisted(h.id, h.name) ? 'bi-heart-fill' : 'bi-heart'}`} />
                   </button>
                   <Link to={`/homestay/${h.id || 'doi'}`} state={{ homestay: h }} style={{ display: 'block', height: '100%' }}>
                     <img src={h.img || 'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=600&q=80'} alt={h.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -769,10 +812,11 @@ export default function Homepage() {
                   <span className="card-top-tag tag-hot"><i className="bi bi-fire" /> {h.tag}</span>
                   <button
                     type="button"
-                    className={`card-wishlist-btn ${wishlist.has(h.name) ? 'active' : ''}`}
-                    onClick={() => toggleWishlist(h.name)}
+                    className={`card-wishlist-btn ${isWishlisted(h.id, h.name) ? 'active' : ''}`}
+                    onClick={(e) => toggleWishlist(h, e)}
+                    title={isWishlisted(h.id, h.name) ? 'Bỏ yêu thích' : 'Lưu vào yêu thích'}
                   >
-                    <i className={`bi ${wishlist.has(h.name) ? 'bi-heart-fill' : 'bi-heart'}`} />
+                    <i className={`bi ${isWishlisted(h.id, h.name) ? 'bi-heart-fill' : 'bi-heart'}`} />
                   </button>
                   <Link to={`/homestay/${h.id || 'doi'}`} state={{ homestay: h }} style={{ display: 'block', height: '100%' }}>
                     <img src={h.img || 'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=600&q=80'} alt={h.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -851,10 +895,11 @@ export default function Homepage() {
                   <span className="card-top-tag">{h.tag}</span>
                   <button
                     type="button"
-                    className={`card-wishlist-btn ${wishlist.has(h.name) ? 'active' : ''}`}
-                    onClick={() => toggleWishlist(h.name)}
+                    className={`card-wishlist-btn ${isWishlisted(h.id, h.name) ? 'active' : ''}`}
+                    onClick={(e) => toggleWishlist(h, e)}
+                    title={isWishlisted(h.id, h.name) ? 'Bỏ yêu thích' : 'Lưu vào yêu thích'}
                   >
-                    <i className={`bi ${wishlist.has(h.name) ? 'bi-heart-fill' : 'bi-heart'}`} />
+                    <i className={`bi ${isWishlisted(h.id, h.name) ? 'bi-heart-fill' : 'bi-heart'}`} />
                   </button>
                   <Link to={`/homestay/${h.id || 'doi'}`} state={{ homestay: h }} style={{ display: 'block', height: '100%' }}>
                     <img src={h.img || 'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=600&q=80'} alt={h.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
