@@ -65,6 +65,30 @@ public class Booking {
     @Builder.Default
     private String status = "PENDING";
 
+    @Column(name = "source")
+    private String source;
+
+    @Column(name = "guest_name")
+    private String guestName;
+
+    @Column(name = "guest_phone")
+    private String guestPhone;
+
+    @Column(name = "guest_cccd")
+    private String guestCccd;
+
+    @Column(name = "guest_city")
+    private String guestCity;
+
+    @Column(name = "guest_email")
+    private String guestEmail;
+
+    @Column(name = "special_request", columnDefinition = "TEXT")
+    private String specialRequest;
+
+    @Column(name = "notes", columnDefinition = "TEXT")
+    private String notes;
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
@@ -75,6 +99,9 @@ public class Booking {
         }
         if (this.status == null) {
             this.status = "PENDING";
+        }
+        if (this.source == null) {
+            this.source = "Trực tiếp";
         }
     }
 }

@@ -25,4 +25,7 @@ public class BookingExtra {
     private Integer quantity;
 
     private BigDecimal price;
+
+    @Column(name = "service_name")
+    private String serviceName;
 }
