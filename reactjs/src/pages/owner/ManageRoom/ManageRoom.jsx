@@ -2,54 +2,98 @@ import React, { useState, useEffect, useMemo } from 'react';
 import './ManageRoom.css';
 import { initialRoomsData } from './manageRoomData';
 
+// Hàm chuẩn hóa loại bỏ dấu tiếng Việt để tìm kiếm phòng thông minh
+function removeVietnameseTones(str) {
+  if (!str) return '';
+  let s = String(str).normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  s = s.replace(/đ/g, 'd').replace(/Đ/g, 'd');
+  return s.toLowerCase().trim();
+}
+
 export default function ManageRoom() {
-  const [roomsList, setRoomsList] = useState(initialRoomsData.rooms);
-  const [viewMode, setViewMode] = useState('both'); // 'cards' | 'timeline' | 'both'
+  const [roomsList, setRoomsList] = useState([]);
+  const [viewMode, setViewMode] = useState('cards'); // 'cards' | 'timeline' | 'both'
   const [activeTab, setActiveTab] = useState('all'); // 'all' | 'occupied' | 'available' | 'maintenance'
   const [searchQuery, setSearchQuery] = useState('');
+  const [sortBy, setSortBy] = useState('default'); // 'default' | 'price-asc' | 'price-desc' | 'name-asc' | 'code-asc'
   const [loading, setLoading] = useState(false);
 
-  // Fetch real rooms from backend DB
+  const [activeHomestayId, setActiveHomestayId] = useState(localStorage.getItem('ownerActiveHomestayId') || 'all');
+  const [homestaysList, setHomestaysList] = useState([]);
+
+  const currentHomestayName = useMemo(() => {
+    if (!activeHomestayId || activeHomestayId === 'all') return 'Tất cả cơ sở Homestay';
+    const found = homestaysList.find(h => String(h.id) === String(activeHomestayId));
+    return found ? found.name : 'Tất cả cơ sở Homestay';
+  }, [homestaysList, activeHomestayId]);
+
+  // Fetch real rooms from backend DB & sync with Active Homestay selection
   React.useEffect(() => {
     fetchRealRooms();
+
+    const handleSync = () => {
+      setActiveHomestayId(localStorage.getItem('ownerActiveHomestayId'));
+    };
+    window.addEventListener('ownerActiveHomestayChanged', handleSync);
+    return () => window.removeEventListener('ownerActiveHomestayChanged', handleSync);
   }, []);
 
   const fetchRealRooms = async () => {
     setLoading(true);
     try {
-      const response = await fetch('http://localhost:8081/api/public/homestays');
-      if (response.ok) {
-        const data = await response.json();
-        if (data && data.length > 0) {
-          const allFetchedRooms = [];
-          data.forEach(hs => {
-            if (hs.rooms && hs.rooms.length > 0) {
-              hs.rooms.forEach(r => {
-                allFetchedRooms.push({
-                  code: `P.${r.id || Math.floor(Math.random()*100+100)}`,
-                  name: `${r.name || r.roomName} (${hs.name})`,
-                  type: r.roomType || 'Garden View',
-                  capacity: r.capacity || 2,
-                  capacityLabel: `${r.capacity || 2} khách`,
-                  bed: r.specs?.beds || '1 Giường đôi',
-                  floor: 'Tầng 1',
-                  price: r.price || r.pricePerNight || 850000,
-                  status: (r.status || 'AVAILABLE').toLowerCase() === 'available' ? 'available' : ((r.status || '').toLowerCase() === 'occupied' ? 'occupied' : 'available'),
-                  description: r.description || `Không gian nghỉ dưỡng tại ${hs.name}`,
-                  amenities: r.amenities || ['Wifi', 'Điều hòa', 'Phòng tắm riêng'],
-                  image: r.thumb || r.primaryImage || hs.image || 'https://images.unsplash.com/photo-1590490360182-c33d57733427?auto=format&fit=crop&w=800&q=80',
-                  stay: 'Phòng sạch sẽ sẵn sàng đón khách'
-                });
-              });
-            }
+      let homestayMap = {};
+      const hsRes = await fetch('http://localhost:8081/api/public/homestays');
+      if (hsRes.ok) {
+        const hsData = await hsRes.json();
+        if (Array.isArray(hsData)) {
+          setHomestaysList(hsData);
+          hsData.forEach(h => {
+            homestayMap[h.id] = h.name;
           });
-          if (allFetchedRooms.length > 0) {
-            setRoomsList(allFetchedRooms);
-          }
         }
       }
+
+      const roomRes = await fetch('http://localhost:8081/api/public/admin/rooms');
+      if (roomRes.ok) {
+        const roomsData = await roomRes.json();
+        if (Array.isArray(roomsData) && roomsData.length > 0) {
+          const mappedRooms = roomsData.map(r => {
+            const hsName = homestayMap[r.homestayId] || 'Homestay';
+            const rName = r.roomName || r.name || `Phòng ${r.id}`;
+            const rCode = r.code || r.roomCode || `P.${r.id}`;
+            return {
+              id: r.id,
+              homestayId: r.homestayId || 1,
+              homestayName: hsName,
+              code: rCode,
+              name: rName,
+              fullName: `${rName} (${hsName})`,
+              type: r.roomType || 'Garden View',
+              capacity: r.capacity || 2,
+              capacityLabel: `${r.capacity || 2} khách`,
+              bed: r.bedCount ? `${r.bedCount} Giường đôi` : '1 Giường King',
+              floor: 'Tầng 1',
+              price: r.pricePerNight ? Number(r.pricePerNight) : (r.price ? Number(r.price) : 850000),
+              status: (r.status || 'AVAILABLE').toLowerCase() === 'available' ? 'available' : ((r.status || '').toLowerCase() === 'occupied' ? 'occupied' : ((r.status || '').toLowerCase() === 'maintenance' ? 'maintenance' : 'available')),
+              description: r.description || `Không gian nghỉ dưỡng tại ${hsName}`,
+              amenities: r.amenities || ['Wifi', 'Điều hòa Inverter', 'Phòng tắm riêng'],
+              image: r.thumb || r.primaryImage || 'https://images.unsplash.com/photo-1590490360182-c33d57733427?auto=format&fit=crop&w=800&q=80',
+              stay: 'Phòng sạch sẽ sẵn sàng đón khách'
+            };
+          });
+          setRoomsList(prev => {
+            if (!prev || prev.length === 0) return mappedRooms;
+            const idsInMapped = new Set(mappedRooms.map(r => String(r.id)));
+            const localOnly = prev.filter(r => r && r.id && !idsInMapped.has(String(r.id)));
+            return [...localOnly, ...mappedRooms];
+          });
+          return;
+        }
+      }
+      setRoomsList(prev => (prev && prev.length > 0 ? prev : initialRoomsData.rooms));
     } catch (err) {
       console.error('Lỗi nạp phòng từ CSDL:', err);
+      setRoomsList(prev => (prev && prev.length > 0 ? prev : initialRoomsData.rooms));
     } finally {
       setLoading(false);
     }
@@ -69,6 +113,7 @@ export default function ManageRoom() {
   const [roomFormData, setRoomFormData] = useState({
     code: '',
     name: '',
+    homestayId: 1,
     type: 'Garden View',
     capacity: 2,
     bed: '',
@@ -107,26 +152,187 @@ export default function ManageRoom() {
     return { total, occupied, booked, available, maintenance };
   }, [roomsList]);
 
-  // Lọc phòng theo Tab và Tìm kiếm
+  // Lọc & Sắp xếp phòng theo Active Homestay, Tab, Tìm kiếm và Thứ tự sắp xếp
   const filteredRooms = useMemo(() => {
-    return roomsList.filter((r) => {
-      // Tab filter
+    let result = roomsList.filter((r) => {
+      // 1. Khi đang gõ từ khóa tìm kiếm: Ưu tiên tìm kiếm trên TẤT CẢ các phòng & TẤT CẢ cơ sở homestay
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase().trim();
+        const qNoTone = removeVietnameseTones(q);
+
+        const codeNoTone = removeVietnameseTones(r.code);
+        const nameNoTone = removeVietnameseTones(r.name);
+        const fullNameNoTone = removeVietnameseTones(r.fullName);
+        const typeNoTone = removeVietnameseTones(r.type);
+        const guestNoTone = removeVietnameseTones(r.guest);
+        const homestayNameNoTone = removeVietnameseTones(r.homestayName);
+        const descNoTone = removeVietnameseTones(r.description);
+        const idStr = String(r.id || '');
+        const priceStr = String(r.price || '');
+
+        const matchCode = codeNoTone.includes(qNoTone) || (r.code || '').toLowerCase().includes(q);
+        const matchName = nameNoTone.includes(qNoTone) || (r.name || '').toLowerCase().includes(q);
+        const matchFullName = fullNameNoTone.includes(qNoTone) || (r.fullName || '').toLowerCase().includes(q);
+        const matchType = typeNoTone.includes(qNoTone) || (r.type || '').toLowerCase().includes(q);
+        const matchGuest = guestNoTone.includes(qNoTone) || (r.guest || '').toLowerCase().includes(q);
+        const matchHomestayName = homestayNameNoTone.includes(qNoTone) || (r.homestayName || '').toLowerCase().includes(q);
+        const matchDescription = descNoTone.includes(qNoTone) || (r.description || '').toLowerCase().includes(q);
+        const matchId = idStr.includes(q);
+        const matchPrice = priceStr.includes(q);
+
+        return matchCode || matchName || matchFullName || matchType || matchGuest || matchHomestayName || matchDescription || matchId || matchPrice;
+      }
+
+      // 2. Khi KHÔNG gõ tìm kiếm: Lọc theo Cơ sở Homestay đang được chọn
+      if (activeHomestayId && activeHomestayId !== 'all' && r.homestayId && String(r.homestayId) !== String(activeHomestayId)) {
+        return false;
+      }
+
+      // 3. Tab filter trạng thái phòng
       if (activeTab === 'occupied' && r.status !== 'occupied') return false;
+      if (activeTab === 'booked' && r.status !== 'booked') return false;
       if (activeTab === 'available' && r.status !== 'available') return false;
       if (activeTab === 'maintenance' && r.status !== 'maintenance') return false;
 
-      // Search filter
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase();
-        const matchCode = r.code.toLowerCase().includes(q);
-        const matchName = r.name.toLowerCase().includes(q);
-        const matchType = r.type.toLowerCase().includes(q);
-        const matchGuest = r.guest?.toLowerCase().includes(q);
-        if (!matchCode && !matchName && !matchType && !matchGuest) return false;
-      }
       return true;
     });
-  }, [roomsList, activeTab, searchQuery]);
+
+    // 4. Sắp xếp danh sách phòng
+    let sorted = [...result];
+    if (sortBy === 'price-asc') {
+      sorted.sort((a, b) => (Number(a.price) || 0) - (Number(b.price) || 0));
+    } else if (sortBy === 'price-desc') {
+      sorted.sort((a, b) => (Number(b.price) || 0) - (Number(a.price) || 0));
+    } else if (sortBy === 'name-asc') {
+      sorted.sort((a, b) => (a.name || '').localeCompare(b.name || '', 'vi'));
+    } else if (sortBy === 'code-asc') {
+      sorted.sort((a, b) => (a.code || '').localeCompare(b.code || '', 'vi'));
+    }
+
+    return sorted;
+  }, [roomsList, activeTab, searchQuery, activeHomestayId, sortBy]);
+
+  // Phân trang 6 phòng mỗi trang (2 hàng ngang x 3 phòng)
+  const ROOMS_PER_PAGE = 6;
+  const [currentPage, setCurrentPage] = useState(1);
+
+  // Tự động về trang 1 khi từ khóa tìm kiếm, tab, homestay hoặc tiêu chí sắp xếp thay đổi
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, activeTab, activeHomestayId, sortBy]);
+
+  const totalPages = Math.ceil(filteredRooms.length / ROOMS_PER_PAGE) || 1;
+
+  const paginatedRooms = useMemo(() => {
+    const start = (currentPage - 1) * ROOMS_PER_PAGE;
+    return filteredRooms.slice(start, start + ROOMS_PER_PAGE);
+  }, [filteredRooms, currentPage]);
+
+  // Thuật toán hiển thị dải số trang thông minh (Smart Page Windowing) tránh vỡ layout khi có nhiều trang
+  const renderPageNumbers = () => {
+    const pages = [];
+    const maxButtons = 5;
+
+    let startPage = Math.max(1, currentPage - 2);
+    let endPage = Math.min(totalPages, startPage + maxButtons - 1);
+
+    if (endPage - startPage + 1 < maxButtons) {
+      startPage = Math.max(1, endPage - maxButtons + 1);
+    }
+
+    if (startPage > 1) {
+      pages.push(
+        <button
+          key={1}
+          type="button"
+          className={`room-page-btn ${currentPage === 1 ? 'active' : ''}`}
+          onClick={() => {
+            setCurrentPage(1);
+            window.scrollTo({ top: 300, behavior: 'smooth' });
+          }}
+        >
+          1
+        </button>
+      );
+      if (startPage > 2) {
+        pages.push(
+          <span key="dots-1" className="room-page-dots" style={{ color: '#94a3b8', padding: '0 4px', fontSize: '13px' }}>...</span>
+        );
+      }
+    }
+
+    for (let p = startPage; p <= endPage; p++) {
+      pages.push(
+        <button
+          key={p}
+          type="button"
+          className={`room-page-btn ${currentPage === p ? 'active' : ''}`}
+          onClick={() => {
+            setCurrentPage(p);
+            window.scrollTo({ top: 300, behavior: 'smooth' });
+          }}
+        >
+          {p}
+        </button>
+      );
+    }
+
+    if (endPage < totalPages) {
+      if (endPage < totalPages - 1) {
+        pages.push(
+          <span key="dots-2" className="room-page-dots" style={{ color: '#94a3b8', padding: '0 4px', fontSize: '13px' }}>...</span>
+        );
+      }
+      pages.push(
+        <button
+          key={totalPages}
+          type="button"
+          className={`room-page-btn ${currentPage === totalPages ? 'active' : ''}`}
+          onClick={() => {
+            setCurrentPage(totalPages);
+            window.scrollTo({ top: 300, behavior: 'smooth' });
+          }}
+        >
+          {totalPages}
+        </button>
+      );
+    }
+
+    return pages;
+  };
+
+  // Tạo dải Lịch Timeline 7 ngày động từ danh sách phòng CSDL Neon thực tế
+  const dynamicTimelineRows = useMemo(() => {
+    if (filteredRooms.length === 0) return [];
+    return filteredRooms.map((room) => {
+      let segments = [];
+      if (room.status === 'occupied') {
+        segments = [
+          { span: 3, status: 'occupied', label: room.guest ? `Khách: ${room.guest}` : 'Đang có khách lưu trú' },
+          { span: 4, status: 'available', label: 'Sẵn sàng đón lượt tiếp theo' }
+        ];
+      } else if (room.status === 'booked') {
+        segments = [
+          { span: 2, status: 'booked', label: room.guest ? `Đã cọc: ${room.guest}` : 'Đã đặt - Chờ nhận phòng' },
+          { span: 5, status: 'available', label: 'Lịch còn trống' }
+        ];
+      } else if (room.status === 'maintenance') {
+        segments = [
+          { span: 2, status: 'maintenance', label: 'Bảo trì / Dọn buồng' },
+          { span: 5, status: 'available', label: 'Mở bán lại sau bảo trì' }
+        ];
+      } else {
+        segments = [
+          { span: 7, status: 'available', label: 'Phòng trống 100% sẵn sàng đón khách' }
+        ];
+      }
+      return {
+        roomCode: room.code,
+        roomShortName: `${room.code} - ${room.name}`,
+        segments
+      };
+    });
+  }, [filteredRooms]);
 
   // Hành động mở modal chi tiết
   const handleOpenDetail = (room) => {
@@ -136,9 +342,11 @@ export default function ManageRoom() {
 
   // Hành động mở modal Thêm mới phòng
   const handleOpenAddRoom = () => {
+    const currentHsId = activeHomestayId || localStorage.getItem('ownerActiveHomestayId') || (homestaysList[0]?.id || 1);
     setRoomFormData({
       code: `P.${100 + roomsList.length + 1}`,
       name: '',
+      homestayId: Number(currentHsId),
       type: 'Garden View',
       capacity: 2,
       bed: 'Giường King 1m8',
@@ -158,6 +366,7 @@ export default function ManageRoom() {
     setRoomFormData({
       code: room.code,
       name: room.name,
+      homestayId: room.homestayId || 1,
       type: room.type,
       capacity: room.capacity,
       bed: room.bed,
@@ -171,45 +380,136 @@ export default function ManageRoom() {
   };
 
   // Lưu thông tin phòng (Thêm mới hoặc Cập nhật)
-  const handleSaveRoom = (e) => {
+  const handleSaveRoom = async (e) => {
     e.preventDefault();
     const amenitiesArr = roomFormData.amenities
       .split(',')
       .map((item) => item.trim())
       .filter(Boolean);
 
+    const token = localStorage.getItem('token');
+    const targetHomestayId = Number(roomFormData.homestayId) || (activeHomestayId ? Number(activeHomestayId) : 1);
+
     if (selectedRoom) {
-      // Cập nhật
+      // Cập nhật local
       setRoomsList((prev) =>
         prev.map((r) =>
           r.code === selectedRoom.code
             ? {
                 ...r,
                 ...roomFormData,
+                homestayId: targetHomestayId,
                 amenities: amenitiesArr
               }
             : r
         )
       );
+
+      // Async DB Update
+      if (selectedRoom.id) {
+        try {
+          const payload = {
+            homestayId: targetHomestayId,
+            name: roomFormData.name,
+            type: roomFormData.type,
+            capacity: Number(roomFormData.capacity),
+            price: Number(roomFormData.price),
+            status: roomFormData.status
+          };
+          let res = await fetch(`http://localhost:8081/api/admin/rooms/${selectedRoom.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify(payload)
+          });
+          if (!res.ok) {
+            await fetch(`http://localhost:8081/api/public/admin/rooms/${selectedRoom.id}`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload)
+            });
+          }
+        } catch (err) {
+          console.error('Lỗi cập nhật phòng Neon CSDL:', err);
+        }
+      }
       showToast(`Đã cập nhật phòng ${roomFormData.code} thành công!`);
     } else {
-      // Thêm mới
-      const newRoom = {
-        ...roomFormData,
-        capacityLabel: `${roomFormData.capacity} khách`,
-        amenities: amenitiesArr,
-        image:
-          'https://images.unsplash.com/photo-1590490360182-c33d57733427?auto=format&fit=crop&w=800&q=80',
-        stay: 'Phòng mới sẵn sàng đón khách'
-      };
-      setRoomsList((prev) => [newRoom, ...prev]);
-      showToast(`Đã thêm phòng mới ${roomFormData.name} thành công!`);
+      // Async DB Create
+      try {
+        const payload = {
+          homestayId: targetHomestayId,
+          name: roomFormData.name,
+          code: roomFormData.code,
+          type: roomFormData.type,
+          capacity: Number(roomFormData.capacity),
+          price: Number(roomFormData.price),
+          status: 'AVAILABLE'
+        };
+
+        let createdData = null;
+        let res = await fetch('http://localhost:8081/api/admin/rooms', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+          body: JSON.stringify(payload)
+        });
+        if (res.ok) {
+          createdData = await res.json();
+        } else {
+          let res2 = await fetch('http://localhost:8081/api/public/admin/rooms', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+          if (res2.ok) {
+            createdData = await res2.json();
+          }
+        }
+
+        const newId = createdData?.id || Date.now();
+        const targetHsObj = homestaysList.find(h => String(h.id) === String(targetHomestayId));
+        const targetHsName = targetHsObj ? targetHsObj.name : 'Homestay';
+
+        const newRoomObj = {
+          id: newId,
+          homestayId: targetHomestayId,
+          homestayName: targetHsName,
+          code: roomFormData.code || `P.${newId}`,
+          name: roomFormData.name,
+          fullName: `${roomFormData.name} (${targetHsName})`,
+          type: roomFormData.type,
+          capacity: Number(roomFormData.capacity),
+          capacityLabel: `${roomFormData.capacity} khách`,
+          bed: roomFormData.bed || '1 Giường King',
+          floor: roomFormData.floor || 'Tầng 1',
+          price: Number(roomFormData.price),
+          status: 'available',
+          description: roomFormData.description,
+          amenities: amenitiesArr,
+          image: 'https://images.unsplash.com/photo-1590490360182-c33d57733427?auto=format&fit=crop&w=800&q=80',
+          stay: 'Phòng mới sẵn sàng đón khách'
+        };
+
+        // Chuyển active homestay về tất cả & reset tìm kiếm/tab/trang
+        setActiveHomestayId('all');
+        localStorage.setItem('ownerActiveHomestayId', 'all');
+        window.dispatchEvent(new Event('ownerActiveHomestayChanged'));
+
+        setRoomsList(prev => [newRoomObj, ...prev]);
+        setActiveTab('all');
+        setSearchQuery('');
+        setCurrentPage(1);
+
+        setTimeout(() => fetchRealRooms(), 400);
+      } catch (err) {
+        console.error('Lỗi tạo phòng mới trong Neon CSDL:', err);
+      }
+      showToast(`🎉 Đã khởi tạo thành công phòng ${roomFormData.name} vào Neon CSDL!`);
     }
     setIsEditModalOpen(false);
   };
 
   // Check-out nhanh
-  const handleConfirmCheckout = (room) => {
+  const handleConfirmCheckout = async (room) => {
     setRoomsList((prev) =>
       prev.map((r) =>
         r.code === room.code
@@ -222,12 +522,23 @@ export default function ManageRoom() {
           : r
       )
     );
+    if (room && room.id) {
+      try {
+        await fetch(`http://localhost:8081/api/public/admin/rooms/${room.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: 'MAINTENANCE' })
+        });
+      } catch (err) {
+        console.error('Lỗi cập nhật trạng thái phòng:', err);
+      }
+    }
     setIsCheckoutModalOpen(false);
     showToast(`Đã check-out phòng ${room.code}. Phòng chuyển sang Dọn dẹp/Bảo trì.`);
   };
 
   // Check-in nhanh
-  const handleDirectCheckin = (room) => {
+  const handleDirectCheckin = async (room) => {
     setRoomsList((prev) =>
       prev.map((r) =>
         r.code === room.code
@@ -239,11 +550,22 @@ export default function ManageRoom() {
           : r
       )
     );
+    if (room && room.id) {
+      try {
+        await fetch(`http://localhost:8081/api/public/admin/rooms/${room.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: 'OCCUPIED' })
+        });
+      } catch (err) {
+        console.error('Lỗi check-in phòng:', err);
+      }
+    }
     showToast(`Đã nhận phòng (Check-in) thành công cho phòng ${room.code}!`);
   };
 
   // Xác nhận chặn ngày phòng
-  const handleConfirmBlock = (room) => {
+  const handleConfirmBlock = async (room) => {
     setRoomsList((prev) =>
       prev.map((r) =>
         r.code === room.code
@@ -255,6 +577,17 @@ export default function ManageRoom() {
           : r
       )
     );
+    if (room && room.id) {
+      try {
+        await fetch(`http://localhost:8081/api/public/admin/rooms/${room.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: 'MAINTENANCE' })
+        });
+      } catch (err) {
+        console.error('Lỗi chặn phòng:', err);
+      }
+    }
     setIsBlockModalOpen(false);
     showToast(`Đã khóa phòng ${room.code} trong khoảng ngày đã chọn.`);
   };
@@ -289,6 +622,24 @@ export default function ManageRoom() {
     showToast(`Đã cập nhật giá mới cho ${bulkSelectedRooms.length} phòng!`);
   };
 
+  const isAllSelected = useMemo(() => {
+    return filteredRooms.length > 0 && bulkSelectedRooms.length === filteredRooms.length;
+  }, [filteredRooms, bulkSelectedRooms]);
+
+  const isNoneSelected = useMemo(() => {
+    return bulkSelectedRooms.length === 0;
+  }, [bulkSelectedRooms]);
+
+  const availableCodes = useMemo(() => {
+    return filteredRooms.filter(r => r.status === 'available').map(r => r.code);
+  }, [filteredRooms]);
+
+  const isOnlyAvailableSelected = useMemo(() => {
+    return availableCodes.length > 0 &&
+      bulkSelectedRooms.length === availableCodes.length &&
+      availableCodes.every(code => bulkSelectedRooms.includes(code));
+  }, [availableCodes, bulkSelectedRooms]);
+
   return (
     <div className="manage-room-container">
       {/* Banner & Action Toolbar */}
@@ -297,7 +648,7 @@ export default function ManageRoom() {
         <div className="room-banner-info">
           <div className="room-banner-badge">
             <span className="material-symbols-outlined text-[15px]">cottage</span>
-            {initialRoomsData.propertyInfo.name}
+            {currentHomestayName}
           </div>
           <h1 className="room-banner-title">Quản lý phòng &amp; Tình trạng phòng</h1>
         </div>
@@ -307,7 +658,7 @@ export default function ManageRoom() {
           <div className="view-mode-toggle">
             <button
               type="button"
-              className={`view-mode-btn ${viewMode === 'cards' || viewMode === 'both' ? 'active' : ''}`}
+              className={`view-mode-btn ${viewMode === 'cards' ? 'active' : ''}`}
               onClick={() => setViewMode('cards')}
             >
               <span className="material-symbols-outlined text-[17px]">grid_view</span>
@@ -320,6 +671,14 @@ export default function ManageRoom() {
             >
               <span className="material-symbols-outlined text-[17px]">calendar_view_week</span>
               Lịch Timeline
+            </button>
+            <button
+              type="button"
+              className={`view-mode-btn ${viewMode === 'both' ? 'active' : ''}`}
+              onClick={() => setViewMode('both')}
+            >
+              <span className="material-symbols-outlined text-[17px]">dashboard</span>
+              Hiển thị cả 2
             </button>
           </div>
 
@@ -339,14 +698,21 @@ export default function ManageRoom() {
         </div>
       </div>
 
-      {/* 4 Thẻ Thống Kê Nhanh (Key Metrics) */}
+      {/* 4 Thẻ Thống Kê Nhanh (Key Metrics) - Bấm trực tiếp vào thẻ để lọc trạng thái */}
       <div className="room-stats-grid">
-        <div className="room-stat-card">
+        <div
+          className={`room-stat-card clickable ${activeTab === 'all' ? 'active-filter' : ''}`}
+          onClick={() => setActiveTab('all')}
+          title="Bấm để xem tất cả phòng"
+        >
           <div className="room-stat-icon slate">
             <span className="material-symbols-outlined">apartment</span>
           </div>
           <div className="room-stat-content">
-            <span className="room-stat-label">Tổng số phòng</span>
+            <div className="room-stat-header-row">
+              <span className="room-stat-label">Tổng số phòng</span>
+              {activeTab === 'all' && <span className="stat-active-badge">Đang xem</span>}
+            </div>
             <div className="room-stat-num">
               {stats.total}
               <span className="room-stat-unit">phòng</span>
@@ -355,26 +721,40 @@ export default function ManageRoom() {
           </div>
         </div>
 
-        <div className="room-stat-card">
+        <div
+          className={`room-stat-card clickable ${activeTab === 'occupied' ? 'active-filter' : ''}`}
+          onClick={() => setActiveTab(activeTab === 'occupied' ? 'all' : 'occupied')}
+          title="Bấm để lọc phòng đang đón khách"
+        >
           <div className="room-stat-icon emerald">
             <span className="material-symbols-outlined">hotel</span>
           </div>
           <div className="room-stat-content">
-            <span className="room-stat-label">Đang đón khách</span>
+            <div className="room-stat-header-row">
+              <span className="room-stat-label">Đang đón khách</span>
+              {activeTab === 'occupied' && <span className="stat-active-badge">Đang lọc</span>}
+            </div>
             <div className="room-stat-num text-emerald-800">
               {stats.occupied}/{stats.total}
               <span className="room-stat-unit">phòng</span>
             </div>
-            <span className="room-stat-sub">Tỷ lệ lấp đầy: {Math.round((stats.occupied / stats.total) * 100)}%</span>
+            <span className="room-stat-sub">Tỷ lệ lấp đầy: {stats.total ? Math.round((stats.occupied / stats.total) * 100) : 0}%</span>
           </div>
         </div>
 
-        <div className="room-stat-card">
+        <div
+          className={`room-stat-card clickable ${activeTab === 'booked' ? 'active-filter' : ''}`}
+          onClick={() => setActiveTab(activeTab === 'booked' ? 'all' : 'booked')}
+          title="Bấm để lọc phòng đã đặt / chờ check-in"
+        >
           <div className="room-stat-icon amber">
             <span className="material-symbols-outlined">key</span>
           </div>
           <div className="room-stat-content">
-            <span className="room-stat-label">Đã đặt / Chờ check-in</span>
+            <div className="room-stat-header-row">
+              <span className="room-stat-label">Đã đặt / Chờ check-in</span>
+              {activeTab === 'booked' && <span className="stat-active-badge">Đang lọc</span>}
+            </div>
             <div className="room-stat-num text-amber-800">
               {stats.booked}
               <span className="room-stat-unit">phòng</span>
@@ -383,12 +763,19 @@ export default function ManageRoom() {
           </div>
         </div>
 
-        <div className="room-stat-card">
+        <div
+          className={`room-stat-card clickable ${activeTab === 'maintenance' ? 'active-filter' : ''}`}
+          onClick={() => setActiveTab(activeTab === 'maintenance' ? 'all' : 'maintenance')}
+          title="Bấm để lọc phòng bảo trì & dọn buồng"
+        >
           <div className="room-stat-icon red">
             <span className="material-symbols-outlined">cleaning_services</span>
           </div>
           <div className="room-stat-content">
-            <span className="room-stat-label">Bảo trì &amp; Dọn buồng</span>
+            <div className="room-stat-header-row">
+              <span className="room-stat-label">Bảo trì &amp; Dọn buồng</span>
+              {activeTab === 'maintenance' && <span className="stat-active-badge">Đang lọc</span>}
+            </div>
             <div className="room-stat-num text-red-700">
               {stats.maintenance}
               <span className="room-stat-unit">phòng</span>
@@ -398,59 +785,98 @@ export default function ManageRoom() {
         </div>
       </div>
 
-      {/* Thanh Bộ Lọc & Tìm Kiếm */}
-      <div className="room-filter-toolbar">
-        <div className="room-tabs-group">
-          <button
-            type="button"
-            className={`room-tab-btn ${activeTab === 'all' ? 'active' : ''}`}
-            onClick={() => setActiveTab('all')}
-          >
-            Tất cả
-            <span className="tab-badge-pill">{stats.total}</span>
-          </button>
-          <button
-            type="button"
-            className={`room-tab-btn ${activeTab === 'occupied' ? 'active' : ''}`}
-            onClick={() => setActiveTab('occupied')}
-          >
-            Đang đón khách
-            <span className="tab-badge-pill">{stats.occupied}</span>
-          </button>
-          <button
-            type="button"
-            className={`room-tab-btn ${activeTab === 'available' ? 'active' : ''}`}
-            onClick={() => setActiveTab('available')}
-          >
-            Còn trống hôm nay
-            <span className="tab-badge-pill">{stats.available}</span>
-          </button>
-          <button
-            type="button"
-            className={`room-tab-btn ${activeTab === 'maintenance' ? 'active' : ''}`}
-            onClick={() => setActiveTab('maintenance')}
-          >
-            Bảo trì / Dọn phòng
-            <span className="tab-badge-pill">{stats.maintenance}</span>
-          </button>
+      {/* Thanh Tiêu Đề Danh Sách & Điều Khiển Cân Đối (Balanced List Header Bar) */}
+      <div className="room-balanced-header-bar">
+        {/* Bên Trái: Tiêu đề danh sách & số lượng phòng */}
+        <div className="room-balanced-left">
+          <div className="room-balanced-title-row">
+            <h2 className="room-balanced-title">Danh sách phòng nghỉ</h2>
+            <span className="room-balanced-count-pill">
+              {filteredRooms.length} phòng
+            </span>
+          </div>
+          <p className="room-balanced-subtext">
+            {activeHomestayId && activeHomestayId !== 'all'
+              ? `Cơ sở: ${currentHomestayName}`
+              : 'Quản lý toàn bộ hệ thống phòng tại các cơ sở homestay'}
+          </p>
         </div>
 
-        <div className="room-search-wrapper">
-          <span className="material-symbols-outlined">search</span>
-          <input
-            type="text"
-            className="room-search-input"
-            placeholder="Tìm theo tên/mã phòng/khách..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
+        {/* Bên Phải: Chọn cơ sở & Ô tìm kiếm cùng kích thước chuẩn 40px */}
+        <div className="room-balanced-right">
+          {/* 1. Chọn cơ sở Homestay */}
+          {homestaysList.length > 0 && (
+            <div className="room-balanced-select-wrap">
+              <span className="material-symbols-outlined select-icon text-emerald-700">cottage</span>
+              <select
+                className="room-balanced-select"
+                value={activeHomestayId || 'all'}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setActiveHomestayId(val);
+                  localStorage.setItem('ownerActiveHomestayId', val);
+                  window.dispatchEvent(new Event('ownerActiveHomestayChanged'));
+                }}
+              >
+                <option value="all">🏠 Tất cả cơ sở ({homestaysList.length})</option>
+                {homestaysList.map((h) => (
+                  <option key={h.id} value={String(h.id)}>
+                    🏡 {h.name}
+                  </option>
+                ))}
+              </select>
+              <span className="material-symbols-outlined select-arrow">expand_more</span>
+            </div>
+          )}
+
+          {/* 2. Ô tìm kiếm phòng */}
+          <div className="room-balanced-search-wrap">
+            <span className="material-symbols-outlined search-icon">search</span>
+            <input
+              type="text"
+              className="room-balanced-search-input"
+              placeholder="Tìm theo tên phòng, mã phòng, loại..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                className="search-clear-btn"
+                onClick={() => setSearchQuery('')}
+                title="Xóa từ khóa tìm kiếm"
+              >
+                <span className="material-symbols-outlined text-[15px]">close</span>
+              </button>
+            )}
+          </div>
+
+          {/* 3. Nút Đặt lại nhỏ gọn */}
+          {(searchQuery.trim() || (activeHomestayId && activeHomestayId !== 'all') || activeTab !== 'all') && (
+            <button
+              type="button"
+              className="room-balanced-reset-btn"
+              onClick={() => {
+                setActiveTab('all');
+                setSearchQuery('');
+                setActiveHomestayId('all');
+                localStorage.setItem('ownerActiveHomestayId', 'all');
+                window.dispatchEvent(new Event('ownerActiveHomestayChanged'));
+              }}
+              title="Đặt lại bộ lọc về mặc định"
+            >
+              <span className="material-symbols-outlined text-[15px]">restart_alt</span>
+              Đặt lại
+            </button>
+          )}
         </div>
       </div>
 
       {/* DẠNG THẺ (Cards View) */}
       {(viewMode === 'cards' || viewMode === 'both') && (
-        <div className="room-grid-cards">
-          {filteredRooms.map((room) => {
+        <>
+          <div className="room-grid-cards">
+          {paginatedRooms.map((room) => {
             const isOccupied = room.status === 'occupied';
             const isBooked = room.status === 'booked';
             const isAvailable = room.status === 'available';
@@ -629,37 +1055,62 @@ export default function ManageRoom() {
                     </div>
                   )}
 
-                  {/* Nút tác vụ chân card */}
-                  <div className="room-card-actions-row">
-                    <div className="room-sub-actions-group">
-                      <button
-                        type="button"
-                        className="btn-card-sub"
-                        onClick={() => {
-                          setSelectedRoom(room);
-                          setIsBlockModalOpen(true);
-                        }}
-                      >
-                        <span className="material-symbols-outlined text-[15px]">lock_clock</span>
-                        Chặn ngày
-                      </button>
-                      <button
-                        type="button"
-                        className="btn-card-sub"
-                        onClick={() => handleOpenEditRoom(room)}
-                      >
-                        <span className="material-symbols-outlined text-[15px]">edit</span>
-                        Sửa
-                      </button>
-                    </div>
+                  {/* Nút tác vụ chân card: 3 nút trên 1 hàng ngang duy nhất */}
+                  <div
+                    className="room-card-actions-row"
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: '1fr 1fr 1.15fr',
+                      gap: '6px',
+                      width: '100%',
+                      marginTop: 'auto',
+                      paddingTop: '12px',
+                      borderTop: '1px solid #f1f5f9'
+                    }}
+                  >
+                    <button
+                      type="button"
+                      className="btn-card-sub"
+                      onClick={() => {
+                        setSelectedRoom(room);
+                        setIsBlockModalOpen(true);
+                      }}
+                      style={{
+                        padding: '7px 4px',
+                        fontSize: '12px',
+                        justifyContent: 'center',
+                        whiteSpace: 'nowrap'
+                      }}
+                    >
+                      Chặn ngày
+                    </button>
+
+                    <button
+                      type="button"
+                      className="btn-card-sub"
+                      onClick={() => handleOpenEditRoom(room)}
+                      style={{
+                        padding: '7px 4px',
+                        fontSize: '12px',
+                        justifyContent: 'center',
+                        whiteSpace: 'nowrap'
+                      }}
+                    >
+                      Sửa
+                    </button>
 
                     <button
                       type="button"
                       className="btn-card-detail"
                       onClick={() => handleOpenDetail(room)}
+                      style={{
+                        padding: '7px 4px',
+                        fontSize: '12px',
+                        justifyContent: 'center',
+                        whiteSpace: 'nowrap'
+                      }}
                     >
-                      <span>Xem chi tiết</span>
-                      <span className="material-symbols-outlined text-[15px]">arrow_forward</span>
+                      Xem chi tiết
                     </button>
                   </div>
                 </div>
@@ -667,6 +1118,36 @@ export default function ManageRoom() {
             );
           })}
         </div>
+
+        {/* THANH PHÂN TRANG */}
+        {totalPages > 1 && (
+          <div className="room-pagination-bar">
+            <button
+              type="button"
+              className="room-page-btn room-page-nav"
+              disabled={currentPage === 1}
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+            >
+              <span className="material-symbols-outlined text-[16px]">chevron_left</span>
+              Trước
+            </button>
+
+            <div className="room-page-numbers">
+              {renderPageNumbers()}
+            </div>
+
+            <button
+              type="button"
+              className="room-page-btn room-page-nav"
+              disabled={currentPage === totalPages}
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+            >
+              Sau
+              <span className="material-symbols-outlined text-[16px]">chevron_right</span>
+            </button>
+          </div>
+        )}
+      </>
       )}
 
       {/* DẢNG LỊCH TIMELINE 7 NGÀY */}
@@ -715,8 +1196,8 @@ export default function ManageRoom() {
                 ))}
               </div>
 
-              {/* Các hàng phòng */}
-              {initialRoomsData.timelineRows.map((row, rIdx) => (
+              {/* Các hàng phòng từ Neon CSDL thực tế */}
+              {dynamicTimelineRows.map((row, rIdx) => (
                 <div key={rIdx} className="timeline-row-grid">
                   <div className="timeline-room-name">{row.roomShortName}</div>
                   {row.segments.map((seg, sIdx) => (
@@ -736,83 +1217,174 @@ export default function ManageRoom() {
       )}
 
       {/* ========================================================= */}
-      {/* 1. MODAL CHI TIẾT PHÒNG */}
+      {/* 1. MODAL CHI TIẾT PHÒNG (REDESIGNED) */}
       {/* ========================================================= */}
       {isDetailModalOpen && selectedRoom && (
         <div className="room-modal-backdrop" onClick={() => setIsDetailModalOpen(false)}>
           <div
             className="room-modal-panel modal-lg"
+            style={{ maxWidth: '720px', borderRadius: '20px', overflow: 'hidden' }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="room-modal-head">
-              <div>
-                <h3 className="room-modal-title">Chi tiết {selectedRoom.name}</h3>
-                <p className="room-modal-desc">
-                  Mã phòng: {selectedRoom.code} • {selectedRoom.floor}
-                </p>
+            {/* Hero Image Card Header */}
+            <div className="detail-hero-card">
+              <img
+                src={selectedRoom.image}
+                alt={selectedRoom.name}
+                className="detail-hero-img"
+              />
+              <div className="detail-hero-overlay">
+                <div className="detail-hero-top">
+                  <div className="detail-badge-code">
+                    <span className="material-symbols-outlined text-[16px]">meeting_room</span>
+                    {selectedRoom.code} • {selectedRoom.floor || 'Tầng 1'}
+                  </div>
+                  <div className={`detail-badge-status ${selectedRoom.status}`}>
+                    <span className="status-pulse-dot" />
+                    <span>
+                      {selectedRoom.status === 'occupied' && '🔴 Đang có khách lưu trú'}
+                      {selectedRoom.status === 'booked' && '🟠 Đã đặt cọc • Chờ nhận phòng'}
+                      {selectedRoom.status === 'available' && '🟢 Còn trống hôm nay'}
+                      {selectedRoom.status === 'maintenance' && '🛠 Bảo trì / Dọn buồng'}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="detail-hero-bottom">
+                  <h2 className="detail-hero-title">{selectedRoom.name}</h2>
+                  <div className="detail-hero-sub">
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <span className="material-symbols-outlined text-[16px] text-emerald-400">cottage</span>
+                      {selectedRoom.homestayName || 'Yên Homestay'}
+                    </span>
+                    <span>•</span>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <span className="material-symbols-outlined text-[16px] text-amber-400">star</span>
+                      5.0 (Đánh giá xuất sắc)
+                    </span>
+                  </div>
+                </div>
               </div>
-              <button
-                type="button"
-                className="btn-close-modal"
-                onClick={() => setIsDetailModalOpen(false)}
-              >
-                <span className="material-symbols-outlined text-[18px]">close</span>
-              </button>
             </div>
 
-            <div className="room-modal-body">
-              <div className="rounded-xl overflow-hidden h-64 relative">
-                <img
-                  src={selectedRoom.image}
-                  alt={selectedRoom.name}
-                  className="w-full h-full object-cover"
-                />
+            <div className="room-modal-body" style={{ gap: '18px', padding: '20px 24px' }}>
+              {/* 4 Thẻ Key Specs */}
+              <div className="detail-specs-grid">
+                <div className="detail-spec-card">
+                  <div className="detail-spec-icon">
+                    <span className="material-symbols-outlined text-[20px]">group</span>
+                  </div>
+                  <div className="detail-spec-info">
+                    <span className="detail-spec-label">Sức chứa</span>
+                    <span className="detail-spec-val">{selectedRoom.capacityLabel || `${selectedRoom.capacity} khách`}</span>
+                  </div>
+                </div>
+
+                <div className="detail-spec-card">
+                  <div className="detail-spec-icon">
+                    <span className="material-symbols-outlined text-[20px]">bed</span>
+                  </div>
+                  <div className="detail-spec-info">
+                    <span className="detail-spec-label">Giường ngủ</span>
+                    <span className="detail-spec-val">{selectedRoom.bed || 'Giường King'}</span>
+                  </div>
+                </div>
+
+                <div className="detail-spec-card">
+                  <div className="detail-spec-icon" style={{ background: '#dcfce7', color: '#166534' }}>
+                    <span className="material-symbols-outlined text-[20px]">payments</span>
+                  </div>
+                  <div className="detail-spec-info">
+                    <span className="detail-spec-label">Giá niêm yết</span>
+                    <span className="detail-spec-val" style={{ color: '#166534' }}>{formatMoney(selectedRoom.price)}</span>
+                  </div>
+                </div>
+
+                <div className="detail-spec-card">
+                  <div className="detail-spec-icon" style={{ background: '#e0f2fe', color: '#0369a1' }}>
+                    <span className="material-symbols-outlined text-[20px]">style</span>
+                  </div>
+                  <div className="detail-spec-info">
+                    <span className="detail-spec-label">Loại phòng</span>
+                    <span className="detail-spec-val" style={{ color: '#0369a1' }}>{selectedRoom.type || 'Standard'}</span>
+                  </div>
+                </div>
               </div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                <div className="bg-slate-50 p-3 rounded-lg">
-                  <span className="text-xs text-slate-500 block">Sức chứa</span>
-                  <strong className="text-sm text-slate-800">
-                    {selectedRoom.capacityLabel || `${selectedRoom.capacity} khách`}
-                  </strong>
+              {/* Khách lưu trú (nếu có) */}
+              {selectedRoom.guest && (
+                <div style={{
+                  padding: '14px 18px',
+                  background: '#f0fdf4',
+                  border: '1px solid #bbf7d0',
+                  borderRadius: '12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div style={{
+                      width: '40px',
+                      height: '40px',
+                      borderRadius: '50%',
+                      background: '#166534',
+                      color: '#ffffff',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontWeight: 700,
+                      fontSize: '14px'
+                    }}>
+                      {selectedRoom.guest.slice(0, 2).toUpperCase()}
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '13.5px', fontWeight: 700, color: '#166534' }}>Khách đang ở: {selectedRoom.guest}</div>
+                      <div style={{ fontSize: '12px', color: '#475569', marginTop: '2px' }}>{selectedRoom.stay || 'Lưu trú tại homestay'}</div>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => showToast(`Đang kết nối liên lạc với ${selectedRoom.guest}...`)}
+                    style={{
+                      padding: '6px 14px',
+                      borderRadius: '8px',
+                      background: '#166534',
+                      color: '#ffffff',
+                      border: 'none',
+                      fontWeight: 600,
+                      fontSize: '12.5px',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}
+                  >
+                    <span className="material-symbols-outlined text-[15px]">call</span> Gọi điện
+                  </button>
                 </div>
-                <div className="bg-slate-50 p-3 rounded-lg">
-                  <span className="text-xs text-slate-500 block">Giường ngủ</span>
-                  <strong className="text-sm text-slate-800">{selectedRoom.bed}</strong>
-                </div>
-                <div className="bg-slate-50 p-3 rounded-lg">
-                  <span className="text-xs text-slate-500 block">Giá gốc / đêm</span>
-                  <strong className="text-sm text-emerald-800">
-                    {formatMoney(selectedRoom.price)}
-                  </strong>
-                </div>
-                <div className="bg-slate-50 p-3 rounded-lg">
-                  <span className="text-xs text-slate-500 block">Trạng thái</span>
-                  <strong className="text-sm text-slate-800 capitalize">
-                    {selectedRoom.status}
-                  </strong>
-                </div>
-              </div>
+              )}
 
-              <div>
-                <span className="text-xs font-bold text-slate-600 uppercase block mb-1">
-                  Mô tả không gian
-                </span>
-                <p className="text-sm text-slate-700 leading-relaxed">
-                  {selectedRoom.description || 'Chưa cập nhật mô tả chi tiết cho phòng này.'}
+              {/* Mô tả chi tiết */}
+              <div className="detail-block">
+                <div className="detail-block-title">
+                  <span className="material-symbols-outlined text-[17px]">description</span>
+                  Mô tả không gian &amp; Điểm nổi bật
+                </div>
+                <p style={{ margin: 0, fontSize: '13.5px', color: '#334155', lineHeight: 1.6 }}>
+                  {selectedRoom.description || `Phòng ${selectedRoom.name} mang tới trải nghiệm nghỉ dưỡng đích thực tại Yên Homestay với không gian thoáng đãng, chan hòa ánh sáng tự nhiên và đầy đủ tiện ích sang trọng.`}
                 </p>
               </div>
 
-              <div>
-                <span className="text-xs font-bold text-slate-600 uppercase block mb-2">
-                  Tiện nghi trang bị
-                </span>
-                <div className="flex flex-wrap gap-2">
-                  {(selectedRoom.amenities || []).map((a, i) => (
-                    <span
-                      key={i}
-                      className="px-3 py-1 bg-emerald-50 text-emerald-900 border border-emerald-200 rounded-lg text-xs font-semibold"
-                    >
+              {/* Tiện nghi trang bị */}
+              <div className="detail-block">
+                <div className="detail-block-title">
+                  <span className="material-symbols-outlined text-[17px]">auto_awesome</span>
+                  Tiện nghi trang bị đầy đủ
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                  {(selectedRoom.amenities || ['Wifi tốc độ cao', 'Điều hòa Inverter', 'Phòng tắm riêng', 'Máy sấy tóc']).map((a, i) => (
+                    <span key={i} className="detail-amenity-pill">
+                      <span className="material-symbols-outlined text-[14px]">check</span>
                       {a}
                     </span>
                   ))}
@@ -820,7 +1392,7 @@ export default function ManageRoom() {
               </div>
             </div>
 
-            <div className="room-modal-foot">
+            <div className="room-modal-foot" style={{ padding: '16px 24px', background: '#f8fafc', borderTop: '1px solid #f1f5f9' }}>
               <button
                 type="button"
                 className="btn-modal-cancel"
@@ -870,6 +1442,22 @@ export default function ManageRoom() {
               </div>
 
               <div className="room-modal-body">
+                {/* Chọn Cơ sở Homestay */}
+                {homestaysList.length > 0 && (
+                  <div className="room-form-row">
+                    <label className="room-form-label">Cơ sở Homestay phụ thuộc *</label>
+                    <select
+                      className="room-form-select"
+                      value={roomFormData.homestayId}
+                      onChange={(e) => setRoomFormData({ ...roomFormData, homestayId: Number(e.target.value) })}
+                    >
+                      {homestaysList.map((h) => (
+                        <option key={h.id} value={h.id}>{h.name} ({h.region || h.city})</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
                 <div className="room-form-row">
                   <label className="room-form-label">Tên phòng *</label>
                   <input
@@ -1140,17 +1728,20 @@ export default function ManageRoom() {
       )}
 
       {/* ========================================================= */}
-      {/* 5. MODAL CẬP NHẬT GIÁ HÀNG LOẠT */}
+      {/* 5. MODAL CẬP NHẬT GIÁ HÀNG LOẠT (REDESIGNED) */}
       {/* ========================================================= */}
       {isBulkPriceModalOpen && (
         <div className="room-modal-backdrop" onClick={() => setIsBulkPriceModalOpen(false)}>
-          <div className="room-modal-panel modal-lg" onClick={(e) => e.stopPropagation()}>
+          <div className="room-modal-panel modal-lg bulk-modal-box" onClick={(e) => e.stopPropagation()}>
             <form onSubmit={handleApplyBulkPrice}>
               <div className="room-modal-head">
                 <div>
-                  <h3 className="room-modal-title">Cập nhật giá hàng loạt</h3>
+                  <h3 className="room-modal-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span className="material-symbols-outlined text-emerald-800 text-[22px]">price_change</span>
+                    Cập nhật giá phòng hàng loạt
+                  </h3>
                   <p className="room-modal-desc">
-                    Tăng/giảm giá đồng loạt cho các phòng trong mùa cao điểm hoặc khuyến mãi.
+                    Tăng/giảm hoặc thiết lập lại bảng giá cho nhiều phòng cùng lúc trong đợt lễ Tết, cuối tuần hoặc khuyến mãi.
                   </p>
                 </div>
                 <button
@@ -1162,59 +1753,205 @@ export default function ManageRoom() {
                 </button>
               </div>
 
-              <div className="room-modal-body">
+              <div className="room-modal-body" style={{ gap: '20px' }}>
+                {/* Step 1: Chọn phòng áp dụng */}
                 <div>
-                  <label className="room-form-label mb-2 block">Chọn danh sách phòng áp dụng</label>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                    {roomsList.map((r) => (
-                      <label
-                        key={r.code}
-                        className="flex items-center gap-2 p-2 rounded-lg border border-slate-200 text-xs font-semibold cursor-pointer"
+                  <div className="bulk-section-title">
+                    <span>1. Chọn danh sách phòng áp dụng ({bulkSelectedRooms.length}/{filteredRooms.length})</span>
+                    <div className="bulk-quick-actions">
+                      <button
+                        type="button"
+                        className={`bulk-quick-btn ${isAllSelected ? 'active' : ''}`}
+                        onClick={() => setBulkSelectedRooms(filteredRooms.map(r => r.code))}
                       >
-                        <input
-                          type="checkbox"
-                          checked={bulkSelectedRooms.includes(r.code)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setBulkSelectedRooms([...bulkSelectedRooms, r.code]);
-                            } else {
+                        Chọn tất cả ({filteredRooms.length})
+                      </button>
+                      <button
+                        type="button"
+                        className={`bulk-quick-btn ${isNoneSelected ? 'active' : ''}`}
+                        onClick={() => setBulkSelectedRooms([])}
+                      >
+                        Tự chọn
+                      </button>
+                      <button
+                        type="button"
+                        className={`bulk-quick-btn ${isOnlyAvailableSelected ? 'active' : ''}`}
+                        onClick={() => setBulkSelectedRooms(availableCodes)}
+                      >
+                        Chỉ chọn phòng trống ({availableCodes.length})
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="bulk-rooms-grid">
+                    {filteredRooms.map((r) => {
+                      const isSelected = bulkSelectedRooms.includes(r.code);
+                      return (
+                        <div
+                          key={r.code}
+                          className={`bulk-room-card ${isSelected ? 'selected' : ''}`}
+                          onClick={() => {
+                            if (isSelected) {
                               setBulkSelectedRooms(bulkSelectedRooms.filter((c) => c !== r.code));
+                            } else {
+                              setBulkSelectedRooms([...bulkSelectedRooms, r.code]);
                             }
                           }}
-                        />
-                        <span>{r.code}</span>
-                      </label>
-                    ))}
+                        >
+                          <div className="bulk-room-info">
+                            <span className="bulk-room-code">{r.code}</span>
+                            <span style={{ fontSize: '11px', color: '#64748b' }}>{r.name.slice(0, 18)}</span>
+                            <span className="bulk-room-price">{formatMoney(r.price)}</span>
+                          </div>
+                          <span
+                            className="material-symbols-outlined text-[18px]"
+                            style={{ color: isSelected ? '#166534' : '#cbd5e1' }}
+                          >
+                            {isSelected ? 'check_circle' : 'radio_button_unchecked'}
+                          </span>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
 
-                <div className="room-form-grid-2">
-                  <div className="room-form-row">
-                    <label className="room-form-label">Phương thức điều chỉnh</label>
-                    <select
-                      className="room-form-select"
-                      value={bulkMode}
-                      onChange={(e) => setBulkMode(e.target.value)}
-                    >
-                      <option value="percent-up">Tăng theo %</option>
-                      <option value="percent-down">Giảm theo %</option>
-                      <option value="amount-up">Tăng số tiền cố định (₫)</option>
-                      <option value="amount-down">Giảm số tiền cố định (₫)</option>
-                      <option value="fixed">Đặt giá cố định (₫)</option>
-                    </select>
-                  </div>
-                  <div className="room-form-row">
-                    <label className="room-form-label">Giá trị áp dụng</label>
-                    <input
-                      type="number"
-                      required
-                      min="0"
-                      className="room-form-input"
-                      value={bulkValue}
-                      onChange={(e) => setBulkValue(Number(e.target.value))}
-                    />
+                {/* Step 2: Quy tắc điều chỉnh giá */}
+                <div>
+                  <div className="bulk-section-title">2. Phương thức điều chỉnh &amp; Mức áp dụng</div>
+                  <div className="room-form-grid-2" style={{ alignItems: 'flex-start' }}>
+                    <div>
+                      <label className="room-form-label mb-2 block">Loại điều chỉnh</label>
+                      <div className="bulk-methods-grid">
+                        <button
+                          type="button"
+                          className={`bulk-method-pill ${bulkMode === 'percent-up' ? 'active' : ''}`}
+                          onClick={() => setBulkMode('percent-up')}
+                        >Tăng %
+                        </button>
+                        <button
+                          type="button"
+                          className={`bulk-method-pill ${bulkMode === 'percent-down' ? 'active' : ''}`}
+                          onClick={() => setBulkMode('percent-down')}
+                        >Giảm %
+                        </button>
+                        <button
+                          type="button"
+                          className={`bulk-method-pill ${bulkMode === 'amount-up' ? 'active' : ''}`}
+                          onClick={() => setBulkMode('amount-up')}
+                        >Tăng ₫
+                        </button>
+                        <button
+                          type="button"
+                          className={`bulk-method-pill ${bulkMode === 'amount-down' ? 'active' : ''}`}
+                          onClick={() => setBulkMode('amount-down')}
+                        >Giảm ₫
+                        </button>
+                        <button
+                          type="button"
+                          className={`bulk-method-pill ${bulkMode === 'fixed' ? 'active' : ''}`}
+                          onClick={() => setBulkMode('fixed')}
+                        >Cố định ₫
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="room-form-row">
+                      <label className="room-form-label">
+                        {bulkMode.includes('percent') ? 'Tỷ lệ % điều chỉnh' : 'Giá trị số tiền (₫)'} *
+                      </label>
+                      <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                        <input
+                          type="number"
+                          required
+                          min="0"
+                          step={bulkMode.includes('percent') ? '1' : '10000'}
+                          className="room-form-input"
+                          style={{ width: '100%', paddingRight: '45px' }}
+                          value={bulkValue}
+                          onChange={(e) => setBulkValue(Number(e.target.value))}
+                        />
+                        <span style={{ position: 'absolute', right: '14px', fontSize: '13px', fontWeight: 700, color: '#64748b' }}>
+                          {bulkMode.includes('percent') ? '%' : '₫'}
+                        </span>
+                      </div>
+                      <span style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>
+                        {bulkMode === 'percent-up' && `Ví dụ: Giá 800,000₫ tăng ${bulkValue}% ➔ ${(800000 * (1 + bulkValue / 100)).toLocaleString()}₫`}
+                        {bulkMode === 'percent-down' && `Ví dụ: Giá 800,000₫ giảm ${bulkValue}% ➔ ${(800000 * (1 - bulkValue / 100)).toLocaleString()}₫`}
+                        {bulkMode === 'amount-up' && `Tăng thêm ${bulkValue.toLocaleString()}₫ vào giá hiện tại`}
+                        {bulkMode === 'amount-down' && `Giảm đi ${bulkValue.toLocaleString()}₫ từ giá hiện tại`}
+                        {bulkMode === 'fixed' && `Thiết lập giá mới của phòng thành ${bulkValue.toLocaleString()}₫/đêm`}
+                      </span>
+                    </div>
                   </div>
                 </div>
+
+                {/* Step 3: Xem trước kết quả giá mới */}
+                {bulkSelectedRooms.length > 0 && (
+                  <div>
+                    <div className="bulk-section-title">
+                      <span>3. Xem trước giá thay đổi ({bulkSelectedRooms.length} phòng được chọn)</span>
+                    </div>
+
+                    <div className="bulk-preview-table-wrap">
+                      <table className="bulk-preview-table">
+                        <thead>
+                          <tr>
+                            <th>Mã phòng</th>
+                            <th>Tên phòng</th>
+                            <th>Giá hiện tại</th>
+                            <th>Giá mới sau áp dụng</th>
+                            <th>Biến động</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {filteredRooms
+                            .filter((r) => bulkSelectedRooms.includes(r.code))
+                            .slice(0, 5)
+                            .map((r) => {
+                              let newP = r.price;
+                              const val = Number(bulkValue) || 0;
+                              if (bulkMode === 'percent-up') newP = r.price * (1 + val / 100);
+                              else if (bulkMode === 'percent-down') newP = r.price * (1 - val / 100);
+                              else if (bulkMode === 'amount-up') newP = r.price + val;
+                              else if (bulkMode === 'amount-down') newP = Math.max(0, r.price - val);
+                              else if (bulkMode === 'fixed') newP = val;
+
+                              newP = Math.round(newP / 1000) * 1000;
+                              const diff = newP - r.price;
+
+                              return (
+                                <tr key={r.code}>
+                                  <td style={{ fontWeight: 700 }}>{r.code}</td>
+                                  <td>{r.name}</td>
+                                  <td style={{ textDecoration: diff !== 0 ? 'line-through' : 'none', color: '#64748b' }}>
+                                    {formatMoney(r.price)}
+                                  </td>
+                                  <td style={{ fontWeight: 800, color: '#166534' }}>
+                                    {formatMoney(newP)}
+                                  </td>
+                                  <td>
+                                    {diff > 0 && (
+                                      <span style={{ color: '#15803d', fontWeight: 700, fontSize: '11.5px', background: '#dcfce7', padding: '2px 8px', borderRadius: '12px' }}>
+                                        +{formatMoney(diff)}
+                                      </span>
+                                    )}
+                                    {diff < 0 && (
+                                      <span style={{ color: '#b91c1c', fontWeight: 700, fontSize: '11.5px', background: '#fee2e2', padding: '2px 8px', borderRadius: '12px' }}>
+                                        {formatMoney(diff)}
+                                      </span>
+                                    )}
+                                    {diff === 0 && (
+                                      <span style={{ color: '#64748b', fontSize: '11.5px' }}>Không đổi</span>
+                                    )}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="room-modal-foot">
@@ -1223,11 +1960,16 @@ export default function ManageRoom() {
                   className="btn-modal-cancel"
                   onClick={() => setIsBulkPriceModalOpen(false)}
                 >
-                  Hủy
+                  Hủy bỏ
                 </button>
-                <button type="submit" className="btn-modal-save">
-                  <span className="material-symbols-outlined text-[16px]">save</span>
-                  Áp dụng cho {bulkSelectedRooms.length} phòng
+                <button
+                  type="submit"
+                  className="btn-modal-save"
+                  disabled={bulkSelectedRooms.length === 0}
+                  style={{ opacity: bulkSelectedRooms.length === 0 ? 0.6 : 1 }}
+                >
+                  <span className="material-symbols-outlined text-[16px]">task_alt</span>
+                  Xác nhận đổi giá cho {bulkSelectedRooms.length} phòng
                 </button>
               </div>
             </form>
@@ -1235,11 +1977,34 @@ export default function ManageRoom() {
         </div>
       )}
 
-      {/* Toast Notification */}
+      {/* Toast Notification Banner */}
       {toastMessage && (
-        <div className="review-toast">
-          <span className="material-symbols-outlined text-emerald-400">check_circle</span>
+        <div style={{
+          position: 'fixed',
+          top: '24px',
+          right: '24px',
+          zIndex: 99999,
+          background: '#154332',
+          color: '#ffffff',
+          padding: '14px 22px',
+          borderRadius: '12px',
+          boxShadow: '0 10px 25px rgba(0,0,0,0.25)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px',
+          fontWeight: 600,
+          fontSize: '14px',
+          animation: 'mh-fade-in 0.3s ease'
+        }}>
+          <span className="material-symbols-outlined" style={{ color: '#88d982', fontSize: '20px' }}>check_circle</span>
           <span>{toastMessage}</span>
+          <button
+            type="button"
+            onClick={() => setToastMessage(null)}
+            style={{ background: 'none', border: 'none', color: '#ffffff', opacity: 0.8, cursor: 'pointer', marginLeft: '12px', fontSize: '15px' }}
+          >
+            ✕
+          </button>
         </div>
       )}
     </div>
