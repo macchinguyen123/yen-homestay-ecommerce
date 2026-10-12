@@ -115,13 +115,10 @@ export default function ManageBooking() {
           const hsList = await hsRes.json();
           if (Array.isArray(hsList) && hsList.length > 0) {
             setOwnerHomestays(hsList);
-            if (!targetHomestayId) {
+            if (targetHomestayId === undefined) {
               const saved = localStorage.getItem('ownerActiveHomestayId');
-              if (saved) {
+              if (saved !== null && saved !== undefined && saved !== '') {
                 setSelectedHomestayId(saved);
-              } else {
-                setSelectedHomestayId(String(hsList[0].id));
-                localStorage.setItem('ownerActiveHomestayId', String(hsList[0].id));
               }
             }
           }
@@ -182,12 +179,27 @@ export default function ManageBooking() {
     }
   };
 
+  const normalizeStatus = (status) => {
+    if (!status) return 'pending';
+    const s = String(status).toLowerCase();
+    if (s.includes('chờ xác nhận') || s.includes('pending')) return 'pending';
+    if (s.includes('check-in') || s.includes('cọc') || s.includes('confirmed') || s.includes('deposit')) return 'deposit';
+    if (s.includes('đang ở') || s.includes('ở') || s.includes('staying') || s.includes('occupied') || s.includes('checked_in')) return 'staying';
+    if (s.includes('hoàn tất') || s.includes('completed')) return 'completed';
+    if (s.includes('hủy') || s.includes('cancel') || s.includes('rejected')) return 'cancelled';
+    return 'pending';
+  };
+
   const handleHomestayChange = (e) => {
     const newId = e.target.value;
     setSelectedHomestayId(newId);
     localStorage.setItem('ownerActiveHomestayId', newId);
     loadAllData(newId);
-    showToast(`Đã chuyển sang homestay #${newId}`, 'success');
+    if (!newId) {
+      showToast('Đang hiển thị đơn của tất cả homestay', 'success');
+    } else {
+      showToast(`Đã chuyển sang homestay #${newId}`, 'success');
+    }
   };
 
   // ─── Filtered Bookings List ───────────────────────────────────
@@ -195,17 +207,11 @@ export default function ManageBooking() {
     return bookings.filter((b) => {
       // Filter by status
       if (statusFilter !== 'all') {
-        const s = (b.status || '').toLowerCase();
-        if (statusFilter === 'pending' && !s.includes('pending') && !s.includes('chờ')) return false;
-        if (statusFilter === 'deposit' && !s.includes('deposit') && !s.includes('cọc') && !s.includes('confirmed'))
-          return false;
-        if (statusFilter === 'staying' && !s.includes('checked_in') && !s.includes('ở') && !s.includes('occupied'))
-          return false;
-        if (statusFilter === 'completed' && !s.includes('completed') && !s.includes('hoàn tất')) return false;
-        if (statusFilter === 'cancelled' && !s.includes('cancelled') && !s.includes('hủy')) return false;
+        const norm = normalizeStatus(b.status);
+        if (statusFilter !== norm) return false;
       }
       // Filter by room
-      if (roomFilter && !(b.roomName || '').toLowerCase().includes(roomFilter.toLowerCase())) {
+      if (roomFilter && !(b.roomName || b.roomCode || '').toLowerCase().includes(roomFilter.toLowerCase())) {
         return false;
       }
       // Filter by search keyword
@@ -214,7 +220,8 @@ export default function ManageBooking() {
         const code = (b.bookingCode || '').toLowerCase();
         const guest = (b.guestName || '').toLowerCase();
         const phone = (b.guestPhone || b.phone || '').toLowerCase();
-        if (!code.includes(q) && !guest.includes(q) && !phone.includes(q)) {
+        const hsName = (b.homestayName || '').toLowerCase();
+        if (!code.includes(q) && !guest.includes(q) && !phone.includes(q) && !hsName.includes(q)) {
           return false;
         }
       }
@@ -224,38 +231,58 @@ export default function ManageBooking() {
 
   // ─── KPI Calculations ─────────────────────────────────────────
   const kpiData = useMemo(() => {
-    const pending = bookings.filter((b) =>
-      ['PENDING', 'pending', 'chờ xác nhận'].includes(b.status)
-    ).length;
-    const checkinToday = bookings.filter((b) =>
-      ['CONFIRMED', 'DEPOSIT', 'đã cọc'].includes(b.status)
-    ).length;
-    const checkoutToday = bookings.filter((b) =>
-      ['CHECKED_IN', 'OCCUPIED', 'đang ở'].includes(b.status)
-    ).length;
-    const totalDeposit = bookings.reduce((sum, b) => sum + (Number(b.depositAmount) || 0), 0);
+    let pending = 0;
+    let checkinToday = 0;
+    let checkoutToday = 0;
+    let totalDeposit = 0;
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    bookings.forEach((b) => {
+      const norm = normalizeStatus(b.status);
+      if (norm === 'pending') pending++;
+      if (norm === 'deposit' || (b.checkInDate && String(b.checkInDate).startsWith(todayStr))) checkinToday++;
+      if (norm === 'staying' || (b.checkOutDate && String(b.checkOutDate).startsWith(todayStr))) checkoutToday++;
+      totalDeposit += Number(b.depositAmount) || 0;
+    });
 
     return {
-      pending: pending || 6,
-      checkinToday: checkinToday || 3,
-      checkoutToday: checkoutToday || 2,
-      totalDeposit: totalDeposit > 0 ? totalDeposit : 18600000
+      pending,
+      checkinToday,
+      checkoutToday,
+      totalDeposit
     };
   }, [bookings]);
 
   // Status Tab Counts
   const statusCounts = useMemo(() => {
+    let p = 0, d = 0, s = 0, c = 0, x = 0;
+    bookings.forEach((b) => {
+      const norm = normalizeStatus(b.status);
+      if (norm === 'pending') p++;
+      else if (norm === 'deposit') d++;
+      else if (norm === 'staying') s++;
+      else if (norm === 'completed') c++;
+      else if (norm === 'cancelled') x++;
+    });
     return {
-      all: bookings.length || 24,
-      pending: bookings.filter((b) => ['PENDING', 'pending', 'chờ xác nhận'].includes(b.status)).length || 6,
-      deposit: bookings.filter((b) => ['CONFIRMED', 'DEPOSIT', 'đã cọc'].includes(b.status)).length || 11,
-      staying: bookings.filter((b) => ['CHECKED_IN', 'OCCUPIED', 'đang ở'].includes(b.status)).length || 4,
-      completed: bookings.filter((b) => ['COMPLETED', 'completed', 'đã hoàn tất'].includes(b.status)).length || 3,
-      cancelled: bookings.filter((b) => ['CANCELLED', 'cancelled', 'đã hủy'].includes(b.status)).length || 0
+      all: bookings.length,
+      pending: p,
+      deposit: d,
+      staying: s,
+      completed: c,
+      cancelled: x
     };
   }, [bookings]);
 
   // ─── Modal Triggers ───────────────────────────────────────────
+  const createNights = useMemo(() => {
+    if (!newBooking.checkIn || !newBooking.checkOut) return 1;
+    const d1 = new Date(newBooking.checkIn);
+    const d2 = new Date(newBooking.checkOut);
+    const diff = Math.round((d2 - d1) / (1000 * 60 * 60 * 24));
+    return Math.max(1, isNaN(diff) ? 1 : diff);
+  }, [newBooking.checkIn, newBooking.checkOut]);
+
   const openModal = (modalName, bookingId = null) => {
     if (bookingId) setCurrentBookingId(bookingId);
     setActiveModal(modalName);
@@ -274,149 +301,87 @@ export default function ManageBooking() {
     }
 
     try {
+      const targetHsId = selectedHomestayId ? Number(selectedHomestayId) : (ownerHomestays[0]?.id || 1);
+      const targetRoomId = newBooking.roomId ? Number(newBooking.roomId) : (availableRooms[0]?.id || null);
+
       const payload = {
-        homestayId: selectedHomestayId ? Number(selectedHomestayId) : null,
-        guestName: newBooking.guestName,
-        guestPhone: newBooking.phone,
-        guestEmail: 'direct_guest@homestay.vn',
-        guestCccd: newBooking.cccd,
-        guestCity: newBooking.city,
-        roomId: newBooking.roomId ? Number(newBooking.roomId) : null,
-        roomName: newBooking.roomCode,
+        homestayId: targetHsId,
+        guestName: newBooking.guestName.trim(),
+        phone: newBooking.phone.trim(),
+        cccd: newBooking.cccd ? newBooking.cccd.trim() : 'Chưa cập nhật',
+        city: newBooking.city ? newBooking.city.trim() : 'Hà Nội',
+        roomId: targetRoomId,
+        roomCode: newBooking.roomCode,
         roomType: newBooking.roomType,
-        guestsCount: Number(newBooking.guestsCount),
-        checkInDate: newBooking.checkIn,
-        checkOutDate: newBooking.checkOut,
-        totalAmount: Number(newBooking.pricePerNight) * 2,
-        depositAmount: Number(newBooking.depositAmount),
-        source: 'Trực tiếp (Hotline/Zalo)',
-        status: 'CONFIRMED',
-        specialRequest: newBooking.specialRequest
+        guestsCount: Number(newBooking.guestsCount) || 2,
+        checkIn: newBooking.checkIn,
+        checkOut: newBooking.checkOut,
+        pricePerNight: Number(newBooking.pricePerNight) || 950000,
+        depositAmount: Number(newBooking.depositAmount) || Math.round((Number(newBooking.pricePerNight) || 950000) * createNights * 0.5),
+        paymentMethod: newBooking.paymentMethod || 'Chuyển khoản VietQR',
+        specialRequest: newBooking.specialRequest ? newBooking.specialRequest.trim() : '',
+        source: 'Trực tiếp'
       };
 
-      const res = await ownerBookingService.createBooking(payload);
-      if (res && res.id) {
-        setBookings((prev) => [res, ...prev]);
-        showToast(`Đã tạo thành công đơn đặt phòng #${res.bookingCode || res.id}!`, 'success');
-      } else {
-        // Fallback local state
-        const mockNew = {
-          ...payload,
-          id: Date.now(),
-          bookingCode: `BK-${Math.floor(1000 + Math.random() * 9000)}`,
-          paymentStatus: 'PAID_DEPOSIT'
-        };
-        setBookings((prev) => [mockNew, ...prev]);
-        showToast(`Đã tạo thành công đơn đặt phòng #${mockNew.bookingCode}!`, 'success');
-      }
+      const res = await ownerBookingService.createDirectBooking(payload);
+      showToast(`Đã tạo thành công đơn đặt phòng #${res?.booking?.bookingCode || res?.bookingCode || 'mới'}!`, 'success');
       closeModal();
+      loadAllData(selectedHomestayId);
     } catch (err) {
       console.error(err);
-      showToast('Có lỗi xảy ra khi tạo đơn đặt phòng', 'error');
+      showToast('Có lỗi xảy ra khi tạo đơn đặt phòng: ' + (err.response?.data?.message || err.message), 'error');
     }
   };
 
   const handleConfirmCheckin = async () => {
     try {
-      await ownerBookingService.checkinBooking(currentBooking.id || currentBookingId);
-      setBookings((prev) =>
-        prev.map((b) =>
-          b.id === currentBooking.id || b.bookingCode === currentBookingId
-            ? { ...b, status: 'CHECKED_IN' }
-            : b
-        )
-      );
+      const bId = currentBooking.id || currentBookingId;
+      await ownerBookingService.checkinBooking(bId, checkinForm);
       showToast(`Đã hoàn tất check-in nhận phòng cho đơn #${currentBooking.bookingCode || currentBookingId}!`, 'success');
       closeModal();
+      loadAllData(selectedHomestayId);
     } catch (err) {
       console.error(err);
-      showToast('Check-in thành công!', 'success');
-      setBookings((prev) =>
-        prev.map((b) =>
-          b.id === currentBooking.id || b.bookingCode === currentBookingId
-            ? { ...b, status: 'CHECKED_IN' }
-            : b
-        )
-      );
-      closeModal();
+      showToast('Lỗi Check-in: ' + err.message, 'error');
     }
   };
 
   const handleConfirmCheckout = async () => {
     try {
-      await ownerBookingService.checkoutBooking(currentBooking.id || currentBookingId);
-      setBookings((prev) =>
-        prev.map((b) =>
-          b.id === currentBooking.id || b.bookingCode === currentBookingId
-            ? { ...b, status: 'COMPLETED' }
-            : b
-        )
-      );
+      const bId = currentBooking.id || currentBookingId;
+      await ownerBookingService.checkoutBooking(bId, checkoutForm);
       showToast(`Đã quyết toán & hoàn tất check-out cho đơn #${currentBooking.bookingCode || currentBookingId}!`, 'success');
       closeModal();
+      loadAllData(selectedHomestayId);
     } catch (err) {
       console.error(err);
-      showToast('Quyết toán thành công!', 'success');
-      setBookings((prev) =>
-        prev.map((b) =>
-          b.id === currentBooking.id || b.bookingCode === currentBookingId
-            ? { ...b, status: 'COMPLETED' }
-            : b
-        )
-      );
-      closeModal();
+      showToast('Lỗi Check-out: ' + err.message, 'error');
     }
   };
 
   const handleApproveBooking = async () => {
     try {
-      await ownerBookingService.approveBooking(currentBooking.id || currentBookingId);
-      setBookings((prev) =>
-        prev.map((b) =>
-          b.id === currentBooking.id || b.bookingCode === currentBookingId
-            ? { ...b, status: 'CONFIRMED' }
-            : b
-        )
-      );
+      const bId = currentBooking.id || currentBookingId;
+      await ownerBookingService.approveBooking(bId, { confirmDeposit: true, note: 'Chủ nhà đã duyệt đơn qua hệ thống' });
       showToast(`Đã duyệt đơn và xác nhận giữ phòng #${currentBooking.bookingCode || currentBookingId}!`, 'success');
       closeModal();
+      loadAllData(selectedHomestayId);
     } catch (err) {
       console.error(err);
-      showToast('Đã xác nhận cọc thành công!', 'success');
-      setBookings((prev) =>
-        prev.map((b) =>
-          b.id === currentBooking.id || b.bookingCode === currentBookingId
-            ? { ...b, status: 'CONFIRMED' }
-            : b
-        )
-      );
-      closeModal();
+      showToast('Lỗi duyệt đơn: ' + err.message, 'error');
     }
   };
 
   const handleRejectBooking = async () => {
     try {
-      await ownerBookingService.rejectBooking(currentBooking.id || currentBookingId, rejectForm.reason);
-      setBookings((prev) =>
-        prev.map((b) =>
-          b.id === currentBooking.id || b.bookingCode === currentBookingId
-            ? { ...b, status: 'CANCELLED' }
-            : b
-        )
-      );
+      const bId = currentBooking.id || currentBookingId;
+      await ownerBookingService.rejectBooking(bId, rejectForm);
       showToast(`Đã từ chối đơn đặt phòng #${currentBooking.bookingCode || currentBookingId}!`, 'success');
       closeModal();
+      loadAllData(selectedHomestayId);
     } catch (err) {
       console.error(err);
-      showToast('Đã hủy đơn thành công!', 'success');
-      setBookings((prev) =>
-        prev.map((b) =>
-          b.id === currentBooking.id || b.bookingCode === currentBookingId
-            ? { ...b, status: 'CANCELLED' }
-            : b
-        )
-      );
-      closeModal();
+      showToast('Lỗi từ chối đơn: ' + err.message, 'error');
     }
   };
 
@@ -435,9 +400,33 @@ export default function ManageBooking() {
     }, 0);
   }, [serviceQty]);
 
-  const handleSaveServices = () => {
-    showToast(`Đã ghi nhận ${formatVND(calculateAddedServicesTotal)} dịch vụ vào đơn #${currentBooking.bookingCode || currentBookingId}!`, 'success');
-    closeModal();
+  const handleSaveServices = async () => {
+    try {
+      const bId = currentBooking.id || currentBookingId;
+      const selectedServices = Object.entries(serviceQty)
+        .filter(([_, qty]) => qty > 0)
+        .map(([id, qty]) => {
+          const s = AVAILABLE_SERVICES.find((item) => item.id === Number(id));
+          return {
+            extraId: Number(id),
+            name: s ? s.name : 'Dịch vụ phụ trợ',
+            qty,
+            price: s ? s.price : 0
+          };
+        });
+
+      if (selectedServices.length > 0) {
+        await ownerBookingService.addServices(bId, {
+          services: selectedServices
+        });
+        showToast(`Đã thêm ${selectedServices.length} dịch vụ (${formatVND(calculateAddedServicesTotal)}) vào đơn #${currentBooking.bookingCode || currentBookingId}!`, 'success');
+        loadAllData(selectedHomestayId);
+      }
+      closeModal();
+    } catch (err) {
+      console.error(err);
+      showToast('Thêm dịch vụ thất bại: ' + err.message, 'error');
+    }
   };
 
   const handlePrintInvoice = () => {
@@ -461,53 +450,53 @@ export default function ManageBooking() {
 
   // Helper render status badge
   const renderStatusBadge = (status) => {
-    const s = (status || '').toUpperCase();
-    if (s.includes('PENDING') || s.includes('CHỜ')) {
-      return (
-        <span className="px-2.5 py-1 rounded-full bg-amber-100 text-amber-900 font-label-sm text-[11px] font-bold">
-          Chờ xác nhận
-        </span>
-      );
+    if (!status) return null;
+    const norm = normalizeStatus(status);
+    switch (norm) {
+      case 'pending':
+        return (
+          <span className="px-2.5 py-1 rounded-full bg-amber-100 text-amber-900 font-label-sm text-[11px] font-bold">
+            Chờ xác nhận
+          </span>
+        );
+      case 'deposit':
+        return (
+          <span className="px-2.5 py-1 rounded-full bg-blue-100 text-blue-900 font-label-sm text-[11px] font-bold">
+            {String(status).includes('Check-in') ? 'Chờ Check-in' : 'Đã cọc'}
+          </span>
+        );
+      case 'staying':
+        return (
+          <span className="px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-900 font-label-sm text-[11px] font-bold">
+            Đang ở
+          </span>
+        );
+      case 'completed':
+        return (
+          <span className="px-2.5 py-1 rounded-full bg-slate-100 text-slate-800 font-label-sm text-[11px] font-bold">
+            Đã hoàn tất
+          </span>
+        );
+      case 'cancelled':
+        return (
+          <span className="px-2.5 py-1 rounded-full bg-red-100 text-red-800 font-label-sm text-[11px] font-bold">
+            Đã hủy
+          </span>
+        );
+      default:
+        return (
+          <span className="px-2.5 py-1 rounded-full bg-slate-100 text-slate-800 font-label-sm text-[11px] font-bold">
+            {status}
+          </span>
+        );
     }
-    if (s.includes('CONFIRMED') || s.includes('DEPOSIT') || s.includes('CỌC')) {
-      return (
-        <span className="px-2.5 py-1 rounded-full bg-blue-100 text-blue-900 font-label-sm text-[11px] font-bold">
-          Đã cọc
-        </span>
-      );
-    }
-    if (s.includes('CHECKED_IN') || s.includes('OCCUPIED') || s.includes('Ở')) {
-      return (
-        <span className="px-2.5 py-1 rounded-full bg-secondary-container text-on-secondary-container font-label-sm text-[11px] font-bold">
-          Đang ở
-        </span>
-      );
-    }
-    if (s.includes('COMPLETED') || s.includes('HOÀN TẤT')) {
-      return (
-        <span className="px-2.5 py-1 rounded-full bg-slate-100 text-slate-800 font-label-sm text-[11px] font-bold">
-          Đã hoàn tất
-        </span>
-      );
-    }
-    if (s.includes('CANCEL') || s.includes('HỦY')) {
-      return (
-        <span className="px-2.5 py-1 rounded-full bg-red-100 text-red-800 font-label-sm text-[11px] font-bold">
-          Đã hủy
-        </span>
-      );
-    }
-    return (
-      <span className="px-2.5 py-1 rounded-full bg-slate-100 text-slate-800 font-label-sm text-[11px] font-bold">
-        {status}
-      </span>
-    );
   };
 
   // Current Homestay Name
   const activeHomestayName = useMemo(() => {
+    if (!selectedHomestayId) return 'Tất cả Homestay';
     const found = ownerHomestays.find((h) => String(h.id) === String(selectedHomestayId));
-    return found ? found.name : 'Nhà Sàn Mộc • Mai Châu';
+    return found ? found.name : `Homestay #${selectedHomestayId}`;
   }, [ownerHomestays, selectedHomestayId]);
 
   return (
@@ -528,6 +517,7 @@ export default function ManageBooking() {
                     onChange={handleHomestayChange}
                     className="text-xs font-semibold bg-surface-container-low border border-outline-variant/60 rounded-md px-2 py-0.5 text-on-surface cursor-pointer focus:outline-none"
                   >
+                    <option value="">Tất cả Homestay ({bookings.length} đơn)</option>
                     {ownerHomestays.map((hs) => (
                       <option key={hs.id} value={hs.id}>
                         {hs.name}
@@ -805,24 +795,26 @@ export default function ManageBooking() {
                                 {b.roomName || 'Mountain View #01'}
                               </span>
                               <span className="text-body-sm font-body-sm text-outline">
-                                {b.guestsCount || 2} khách
+                                {b.guestsCount ? `${b.guestsCount} khách` : (b.guestsLabel || '1 khách')}
                               </span>
                             </div>
                           </td>
                           <td className="py-3.5 px-4">
                             <div className="flex flex-col">
                               <span className="font-label-md text-label-md text-secondary font-bold">
-                                {b.checkInDate ? b.checkInDate.substring(0, 10) : '17/09'} -{' '}
-                                {b.checkOutDate ? b.checkOutDate.substring(0, 10) : '20/09'}
+                                {b.checkInDate ? String(b.checkInDate).substring(0, 10) : (b.checkIn || '—')} -{' '}
+                                {b.checkOutDate ? String(b.checkOutDate).substring(0, 10) : (b.checkOut || '—')}
                               </span>
-                              <span className="text-body-sm font-body-sm text-outline">3 đêm</span>
+                              <span className="text-body-sm font-body-sm text-outline">
+                                {b.nights ? `${b.nights} đêm` : '1 đêm'}
+                              </span>
                             </div>
                           </td>
                           <td className="py-3.5 px-4 text-right font-label-md text-label-md text-secondary font-semibold">
-                            {formatVND(b.depositAmount || 1500000)}
+                            {formatVND(b.depositAmount !== undefined && b.depositAmount !== null ? b.depositAmount : 0)}
                           </td>
                           <td className="py-3.5 px-4 text-right font-headline-sm text-headline-sm text-on-surface font-bold">
-                            {formatVND(b.totalAmount || 2850000)}
+                            {formatVND(b.totalAmount !== undefined && b.totalAmount !== null ? b.totalAmount : 0)}
                           </td>
                           <td className="py-3.5 px-4 text-center">
                             {renderStatusBadge(b.status)}
@@ -839,29 +831,29 @@ export default function ManageBooking() {
                               </button>
 
                               {/* Action buttons based on status */}
-                              {['PENDING', 'pending', 'chờ xác nhận'].includes(b.status) && (
+                              {normalizeStatus(b.status) === 'pending' && (
                                 <button
                                   onClick={() => openModal('approveBookingModal', b.bookingCode || b.id)}
-                                  title="Duyệt đơn"
-                                  className="w-8 h-8 rounded-lg bg-secondary text-on-secondary flex items-center justify-center transition-colors custom-secondary-bg"
+                                  title="Duyệt đơn & Giữ phòng"
+                                  className="w-8 h-8 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white flex items-center justify-center transition-colors shadow-sm"
                                   type="button"
                                 >
                                   <span className="material-symbols-outlined text-[17px]">check_circle</span>
                                 </button>
                               )}
 
-                              {['CONFIRMED', 'DEPOSIT', 'đã cọc'].includes(b.status) && (
+                              {normalizeStatus(b.status) === 'deposit' && (
                                 <button
                                   onClick={() => openModal('checkinModal', b.bookingCode || b.id)}
-                                  title="Check-in"
-                                  className="w-8 h-8 rounded-lg bg-secondary text-on-secondary flex items-center justify-center transition-colors custom-secondary-bg"
+                                  title="Check-in nhận phòng"
+                                  className="w-8 h-8 rounded-lg bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center transition-colors shadow-sm"
                                   type="button"
                                 >
                                   <span className="material-symbols-outlined text-[17px]">login</span>
                                 </button>
                               )}
 
-                              {['CHECKED_IN', 'OCCUPIED', 'đang ở'].includes(b.status) && (
+                              {normalizeStatus(b.status) === 'staying' && (
                                 <>
                                   <button
                                     onClick={() => openModal('addServiceModal', b.bookingCode || b.id)}
@@ -873,13 +865,24 @@ export default function ManageBooking() {
                                   </button>
                                   <button
                                     onClick={() => openModal('checkoutModal', b.bookingCode || b.id)}
-                                    title="Check-out"
-                                    className="w-8 h-8 rounded-lg bg-amber-500 text-white flex items-center justify-center transition-colors"
+                                    title="Check-out & Quyết toán"
+                                    className="w-8 h-8 rounded-lg bg-amber-500 hover:bg-amber-600 text-white flex items-center justify-center transition-colors"
                                     type="button"
                                   >
                                     <span className="material-symbols-outlined text-[17px]">logout</span>
                                   </button>
                                 </>
+                              )}
+
+                              {(normalizeStatus(b.status) === 'pending' || normalizeStatus(b.status) === 'deposit') && (
+                                <button
+                                  onClick={() => openModal('rejectModal', b.bookingCode || b.id)}
+                                  title="Từ chối / Hủy đơn"
+                                  className="w-8 h-8 rounded-lg bg-red-100 hover:bg-red-200 text-red-700 flex items-center justify-center transition-colors"
+                                  type="button"
+                                >
+                                  <span className="material-symbols-outlined text-[17px]">cancel</span>
+                                </button>
                               )}
 
                               <button
@@ -940,33 +943,33 @@ export default function ManageBooking() {
                   <div className="flex items-center justify-between">
                     <span className="font-body-sm text-body-sm text-on-surface-variant">Phòng chỉ định:</span>
                     <span className="font-label-md text-label-md text-on-surface font-bold">
-                      {currentBooking.roomName || 'Mountain View #01'}
+                      {currentBooking.roomName || 'Chưa xếp phòng'}
                     </span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="font-body-sm text-body-sm text-on-surface-variant">Giờ dự kiến đến:</span>
                     <span className="font-label-md text-label-md text-secondary font-bold flex items-center gap-1">
-                      <span className="material-symbols-outlined text-[15px]">schedule</span> 14:00 (Hôm nay)
+                      <span className="material-symbols-outlined text-[15px]">schedule</span>{' '}
+                      {currentBooking.checkInTime || '14:00'} ({currentBooking.checkIn || (currentBooking.checkInDate ? String(currentBooking.checkInDate).substring(0, 10) : 'Hôm nay')})
                     </span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="font-body-sm text-body-sm text-on-surface-variant">Số lượng khách:</span>
                     <span className="font-label-md text-label-md text-on-surface">
-                      {currentBooking.guestsCount || 2} Người lớn
+                      {currentBooking.guestsCount ? `${currentBooking.guestsCount} người lớn` : (currentBooking.guestsLabel || '2 người lớn')}
                     </span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="font-body-sm text-body-sm text-on-surface-variant">Tình trạng cọc sàn:</span>
                     <span className="font-label-md text-label-md text-secondary font-bold">
-                      Đã thu: {formatVND(currentBooking.depositAmount || 1500000)}
+                      Đã thu: {formatVND(currentBooking.depositAmount || 0)}
                     </span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="font-body-sm text-body-sm text-on-surface-variant">Còn phải thu tại quầy:</span>
                     <span className="font-label-md text-label-md text-error font-bold">
                       {formatVND(
-                        (currentBooking.totalAmount || 2850000) -
-                          (currentBooking.depositAmount || 1500000)
+                        Math.max(0, (currentBooking.totalAmount || 0) - (currentBooking.depositAmount || 0))
                       )}
                     </span>
                   </div>
@@ -981,20 +984,52 @@ export default function ManageBooking() {
                       Yêu cầu & Ghi chú đặc biệt:
                     </span>
                     <p className="font-body-sm text-body-sm mt-0.5 text-amber-900 italic">
-                      “{currentBooking.specialRequest || 'Ăn tối cơm lam thịt nướng tại homestay lúc 18h30. Nhờ chuẩn bị trước lò nướng than mộc ngoài sân.'}”
+                      “{currentBooking.specialRequest || 'Không có ghi chú đặc biệt.'}”
                     </p>
                   </div>
                 </div>
 
                 <div className="flex flex-col gap-space-xs pt-space-xs">
-                  <button
-                    onClick={() => openModal('checkinModal', currentBooking.bookingCode || currentBooking.id)}
-                    className="w-full py-2.5 px-space-md rounded-lg bg-secondary hover:bg-secondary/95 text-on-secondary font-label-lg text-label-lg font-bold shadow-sm transition-all flex items-center justify-center gap-space-xs custom-secondary-bg"
-                    type="button"
-                  >
-                    <span className="material-symbols-outlined text-[20px]">how_to_reg</span>
-                    <span>Đánh dấu khách đã nhận phòng</span>
-                  </button>
+                  {normalizeStatus(currentBooking.status) === 'pending' && (
+                    <button
+                      onClick={() => openModal('approveBookingModal', currentBooking.bookingCode || currentBooking.id)}
+                      className="w-full py-2.5 px-space-md rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-label-lg text-label-lg font-bold shadow-sm transition-all flex items-center justify-center gap-space-xs"
+                      type="button"
+                    >
+                      <span className="material-symbols-outlined text-[20px]">check_circle</span>
+                      <span>Duyệt đơn & Giữ phòng</span>
+                    </button>
+                  )}
+                  {normalizeStatus(currentBooking.status) === 'deposit' && (
+                    <button
+                      onClick={() => openModal('checkinModal', currentBooking.bookingCode || currentBooking.id)}
+                      className="w-full py-2.5 px-space-md rounded-lg bg-secondary hover:bg-secondary/95 text-on-secondary font-label-lg text-label-lg font-bold shadow-sm transition-all flex items-center justify-center gap-space-xs custom-secondary-bg"
+                      type="button"
+                    >
+                      <span className="material-symbols-outlined text-[20px]">how_to_reg</span>
+                      <span>Đánh dấu khách đã nhận phòng</span>
+                    </button>
+                  )}
+                  {normalizeStatus(currentBooking.status) === 'staying' && (
+                    <button
+                      onClick={() => openModal('checkoutModal', currentBooking.bookingCode || currentBooking.id)}
+                      className="w-full py-2.5 px-space-md rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-label-lg text-label-lg font-bold shadow-sm transition-all flex items-center justify-center gap-space-xs"
+                      type="button"
+                    >
+                      <span className="material-symbols-outlined text-[20px]">logout</span>
+                      <span>Check-out & Quyết toán</span>
+                    </button>
+                  )}
+                  {normalizeStatus(currentBooking.status) === 'completed' && (
+                    <button
+                      onClick={() => openModal('invoiceModal', currentBooking.bookingCode || currentBooking.id)}
+                      className="w-full py-2.5 px-space-md rounded-lg bg-primary hover:bg-primary/95 text-on-primary font-label-lg text-label-lg font-bold shadow-sm transition-all flex items-center justify-center gap-space-xs custom-primary-bg"
+                      type="button"
+                    >
+                      <span className="material-symbols-outlined text-[20px]">receipt</span>
+                      <span>Xem hóa đơn thanh toán</span>
+                    </button>
+                  )}
                   <div className="grid grid-cols-2 gap-space-xs">
                     <button
                       onClick={() => {
@@ -1227,12 +1262,12 @@ export default function ManageBooking() {
                   </div>
                   <div className="flex items-center justify-between text-body-sm">
                     <span className="text-on-surface-variant">Thời gian lưu trú:</span>
-                    <span className="font-semibold text-secondary">2 đêm</span>
+                    <span className="font-semibold text-secondary">{createNights} đêm</span>
                   </div>
                   <div className="flex items-center justify-between text-body-md border-t border-surface-container pt-1">
                     <span className="font-bold text-on-surface">Tạm tính tiền phòng:</span>
                     <span className="font-headline-sm text-primary font-bold">
-                      {formatVND(newBooking.pricePerNight * 2)}
+                      {formatVND(newBooking.pricePerNight * createNights)}
                     </span>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-space-sm pt-2">
@@ -1316,19 +1351,19 @@ export default function ManageBooking() {
                     </div>
                     <div className="flex flex-col min-w-0">
                       <span className="font-headline-sm text-headline-sm text-on-surface font-bold truncate">
-                        {currentBooking.guestName || 'Nguyễn Thị Mai'}
+                        {currentBooking.guestName || 'Khách lưu trú'}
                       </span>
                       <span className="font-body-sm text-body-sm text-outline flex items-center gap-1">
                         <span className="material-symbols-outlined text-[14px]">phone</span>
-                        <span>{currentBooking.guestPhone || currentBooking.phone || '0982 341 112'}</span>
+                        <span>{currentBooking.guestPhone || currentBooking.phone || 'Chưa cập nhật'}</span>
                         <span>•</span>
-                        <span>Hà Nội</span>
+                        <span>{currentBooking.city || 'Việt Nam'}</span>
                       </span>
                       <span className="text-body-sm text-[11px] text-on-surface-variant flex items-center gap-1 mt-0.5">
                         <span className="material-symbols-outlined text-[13px]">mail</span>
-                        <span>mai.nguyen@gmail.com</span>
+                        <span>{currentBooking.email || 'Chưa cập nhật'}</span>
                         <span>• CCCD:</span>
-                        <span className="font-medium">001198034521</span>
+                        <span className="font-medium">{currentBooking.cccd || 'Chưa cập nhật'}</span>
                       </span>
                     </div>
                   </div>
@@ -1338,27 +1373,27 @@ export default function ManageBooking() {
                     <div className="flex items-center justify-between">
                       <span className="font-body-sm text-on-surface-variant">Phòng chỉ định:</span>
                       <span className="font-label-md text-on-surface font-bold">
-                        {currentBooking.roomName || 'Mountain View #01'}
+                        {currentBooking.roomName || 'Chưa xếp phòng'}
                       </span>
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="font-body-sm text-on-surface-variant">Loại phòng:</span>
                       <span className="font-label-md text-on-surface">
-                        {currentBooking.roomType || 'Phòng Mountain View (Nhà Gỗ)'}
+                        {currentBooking.roomType || 'Phòng tiêu chuẩn'}
                       </span>
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="font-body-sm text-on-surface-variant">Số lượng khách:</span>
                       <span className="font-label-md text-on-surface">
-                        {currentBooking.guestsCount || 2} người lớn
+                        {currentBooking.guestsCount ? `${currentBooking.guestsCount} người lớn` : (currentBooking.guestsLabel || '2 người lớn')}
                       </span>
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="font-body-sm text-on-surface-variant">Lịch trình lưu trú:</span>
                       <span className="font-label-md text-secondary font-bold">
-                        {currentBooking.checkInDate ? currentBooking.checkInDate.substring(0, 10) : '17/09'} -{' '}
-                        {currentBooking.checkOutDate ? currentBooking.checkOutDate.substring(0, 10) : '20/09'}{' '}
-                        (3 đêm)
+                        {currentBooking.checkInDate ? String(currentBooking.checkInDate).substring(0, 10) : (currentBooking.checkIn || '—')} -{' '}
+                        {currentBooking.checkOutDate ? String(currentBooking.checkOutDate).substring(0, 10) : (currentBooking.checkOut || '—')}{' '}
+                        ({currentBooking.nights ? `${currentBooking.nights} đêm` : '1 đêm'})
                       </span>
                     </div>
                   </div>
@@ -1370,7 +1405,7 @@ export default function ManageBooking() {
                       đặc biệt của khách:
                     </span>
                     <p className="font-body-sm text-amber-900 italic leading-relaxed">
-                      “{currentBooking.specialRequest || 'Ăn tối cơm lam thịt nướng tại homestay lúc 18h30. Nhờ chuẩn bị trước lò nướng than mộc ngoài sân.'}”
+                      “{currentBooking.specialRequest || 'Không có yêu cầu đặc biệt.'}”
                     </p>
                   </div>
                 </div>
@@ -1385,20 +1420,20 @@ export default function ManageBooking() {
                     <div className="flex items-center justify-between text-body-sm">
                       <span className="text-on-surface-variant">Tổng tiền đơn:</span>
                       <span className="font-headline-sm text-on-surface font-bold">
-                        {formatVND(currentBooking.totalAmount || 2850000)}
+                        {formatVND(currentBooking.totalAmount || 0)}
                       </span>
                     </div>
                     <div className="flex items-center justify-between text-body-sm">
                       <span className="text-on-surface-variant">Đã cọc (Sàn/CK):</span>
                       <span className="font-label-md text-secondary font-bold">
-                        {formatVND(currentBooking.depositAmount || 1500000)}
+                        {formatVND(currentBooking.depositAmount || 0)}
                       </span>
                     </div>
                     <div className="flex items-center justify-between text-body-md border-t border-surface-container pt-1.5">
                       <span className="font-bold text-error">Còn phải thu tại quầy:</span>
                       <span className="font-headline-sm text-error font-bold">
                         {formatVND(
-                          (currentBooking.totalAmount || 2850000) - (currentBooking.depositAmount || 1500000)
+                          Math.max(0, (currentBooking.totalAmount || 0) - (currentBooking.depositAmount || 0))
                         )}
                       </span>
                     </div>
@@ -1412,16 +1447,22 @@ export default function ManageBooking() {
                         <span className="material-symbols-outlined text-[16px]">check_circle</span>
                         <span>Đã tạo & xác nhận cọc sàn thành công</span>
                       </div>
-                      <div className="flex items-center gap-2 text-secondary font-semibold">
-                        <span className="material-symbols-outlined text-[16px]">check_circle</span>
+                      <div className={`flex items-center gap-2 ${normalizeStatus(currentBooking.status) !== 'pending' ? 'text-secondary font-semibold' : 'text-outline'}`}>
+                        <span className="material-symbols-outlined text-[16px]">
+                          {normalizeStatus(currentBooking.status) !== 'pending' ? 'check_circle' : 'radio_button_unchecked'}
+                        </span>
                         <span>Phòng đã được dọn sạch sẵn sàng đón khách</span>
                       </div>
-                      <div className="flex items-center gap-2 text-outline">
-                        <span className="material-symbols-outlined text-[16px]">radio_button_unchecked</span>
+                      <div className={`flex items-center gap-2 ${['staying', 'completed'].includes(normalizeStatus(currentBooking.status)) ? 'text-secondary font-semibold' : 'text-outline'}`}>
+                        <span className="material-symbols-outlined text-[16px]">
+                          {['staying', 'completed'].includes(normalizeStatus(currentBooking.status)) ? 'check_circle' : 'radio_button_unchecked'}
+                        </span>
                         <span>Check-in nhận phòng & bàn giao chìa khóa</span>
                       </div>
-                      <div className="flex items-center gap-2 text-outline">
-                        <span className="material-symbols-outlined text-[16px]">radio_button_unchecked</span>
+                      <div className={`flex items-center gap-2 ${normalizeStatus(currentBooking.status) === 'completed' ? 'text-secondary font-semibold' : 'text-outline'}`}>
+                        <span className="material-symbols-outlined text-[16px]">
+                          {normalizeStatus(currentBooking.status) === 'completed' ? 'check_circle' : 'radio_button_unchecked'}
+                        </span>
                         <span>Quyết toán dịch vụ & Check-out</span>
                       </div>
                     </div>
@@ -1448,14 +1489,46 @@ export default function ManageBooking() {
                   <span className="material-symbols-outlined text-[18px]">room_service</span>
                   <span>Thêm dịch vụ</span>
                 </button>
-                <button
-                  onClick={() => openModal('checkinModal', currentBooking.bookingCode || currentBooking.id)}
-                  className="bk-btn bk-btn-save"
-                  type="button"
-                >
-                  <span className="material-symbols-outlined text-[18px]">how_to_reg</span>
-                  <span>Check-in nhận phòng</span>
-                </button>
+                {normalizeStatus(currentBooking.status) === 'pending' && (
+                  <button
+                    onClick={() => openModal('approveBookingModal', currentBooking.bookingCode || currentBooking.id)}
+                    className="bk-btn bk-btn-secondary"
+                    type="button"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">check_circle</span>
+                    <span>Duyệt đơn & Giữ phòng</span>
+                  </button>
+                )}
+                {normalizeStatus(currentBooking.status) === 'deposit' && (
+                  <button
+                    onClick={() => openModal('checkinModal', currentBooking.bookingCode || currentBooking.id)}
+                    className="bk-btn bk-btn-save"
+                    type="button"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">how_to_reg</span>
+                    <span>Check-in nhận phòng</span>
+                  </button>
+                )}
+                {normalizeStatus(currentBooking.status) === 'staying' && (
+                  <button
+                    onClick={() => openModal('checkoutModal', currentBooking.bookingCode || currentBooking.id)}
+                    className="bk-btn bk-btn-secondary"
+                    type="button"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">logout</span>
+                    <span>Check-out & Quyết toán</span>
+                  </button>
+                )}
+                {normalizeStatus(currentBooking.status) === 'completed' && (
+                  <button
+                    onClick={() => openModal('invoiceModal', currentBooking.bookingCode || currentBooking.id)}
+                    className="bk-btn bk-btn-save"
+                    type="button"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">receipt</span>
+                    <span>Xem hóa đơn</span>
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -1486,17 +1559,20 @@ export default function ManageBooking() {
               <div className="p-space-sm rounded-xl bg-surface-container-low flex items-center justify-between border border-surface-container">
                 <div className="flex flex-col">
                   <span className="font-headline-sm text-on-surface font-bold">
-                    {currentBooking.guestName || 'Nguyễn Thị Mai'}
+                    {currentBooking.guestName || 'Khách lưu trú'}
                   </span>
                   <span className="font-body-sm text-outline">
-                    {currentBooking.guestPhone || currentBooking.phone || '0982 341 112'}
+                    {currentBooking.guestPhone || currentBooking.phone || 'Chưa cập nhật'}
                   </span>
                 </div>
                 <div className="flex flex-col items-end">
                   <span className="font-label-md text-secondary font-bold">
-                    {currentBooking.roomName || 'Mountain View #01'}
+                    {currentBooking.roomName || 'Chưa xếp phòng'}
                   </span>
-                  <span className="font-body-sm text-outline">17/09 - 20/09</span>
+                  <span className="font-body-sm text-outline">
+                    {currentBooking.checkInDate ? String(currentBooking.checkInDate).substring(0, 10) : (currentBooking.checkIn || '—')} -{' '}
+                    {currentBooking.checkOutDate ? String(currentBooking.checkOutDate).substring(0, 10) : (currentBooking.checkOut || '—')}
+                  </span>
                 </div>
               </div>
 
@@ -1531,7 +1607,7 @@ export default function ManageBooking() {
                   <span className="text-body-sm text-on-surface-variant">Số tiền phải thu tại quầy:</span>
                   <span className="font-headline-sm text-error font-bold">
                     {formatVND(
-                      (currentBooking.totalAmount || 2850000) - (currentBooking.depositAmount || 1500000)
+                      Math.max(0, (currentBooking.totalAmount || 0) - (currentBooking.depositAmount || 0))
                     )}
                   </span>
                 </div>
@@ -1631,16 +1707,18 @@ export default function ManageBooking() {
               <div className="p-space-sm rounded-xl bg-surface-container-low flex items-center justify-between border border-surface-container">
                 <div className="flex flex-col">
                   <span className="font-headline-sm text-on-surface font-bold">
-                    {currentBooking.guestName || 'Lê Văn Hiếu'}
+                    {currentBooking.guestName || 'Khách lưu trú'}
                   </span>
-                  <span className="font-body-sm text-outline">Đã lưu trú: 2 đêm</span>
+                  <span className="font-body-sm text-outline">
+                    Đã lưu trú: {currentBooking.nights ? `${currentBooking.nights} đêm` : '1 đêm'}
+                  </span>
                 </div>
                 <div className="flex flex-col items-end">
                   <span className="font-label-md text-primary font-bold">
-                    {currentBooking.roomName || 'Lake View #02'}
+                    {currentBooking.roomName || 'Chưa xếp phòng'}
                   </span>
                   <span className="px-2 py-0.5 rounded-full bg-secondary-container text-on-secondary-container text-[11px] font-bold">
-                    Đang ở
+                    {currentBooking.status || 'Đang ở'}
                   </span>
                 </div>
               </div>
@@ -1677,15 +1755,31 @@ export default function ManageBooking() {
                 </span>
                 <div className="flex items-center justify-between text-body-sm py-1 border-b border-surface-container">
                   <span className="text-on-surface-variant">Tiền phòng còn thiếu:</span>
-                  <span className="font-semibold text-on-surface">1.200.000đ</span>
+                  <span className="font-semibold text-on-surface">
+                    {formatVND(Math.max(0, (currentBooking.totalAmount || 0) - (currentBooking.depositAmount || 0)))}
+                  </span>
                 </div>
-                <div className="flex items-center justify-between text-body-sm py-1 border-b border-surface-container">
-                  <span className="text-on-surface-variant">Dịch vụ dùng thêm (Gà đồi nướng):</span>
-                  <span className="font-bold text-on-surface">280.000đ</span>
-                </div>
+                {Array.isArray(currentBooking.services) && currentBooking.services.length > 0 ? (
+                  currentBooking.services.map((s, idx) => (
+                    <div key={idx} className="flex items-center justify-between text-body-sm py-1 border-b border-surface-container">
+                      <span className="text-on-surface-variant">Dịch vụ ({s.name} x{s.quantity}):</span>
+                      <span className="font-bold text-on-surface">{formatVND(s.total || ((s.price || 0) * (s.quantity || 1)))}</span>
+                    </div>
+                  ))
+                ) : (
+                  <div className="flex items-center justify-between text-body-sm py-1 border-b border-surface-container">
+                    <span className="text-on-surface-variant">Dịch vụ dùng thêm:</span>
+                    <span className="font-bold text-on-surface">0đ</span>
+                  </div>
+                )}
                 <div className="flex items-center justify-between text-headline-sm pt-2 border-t-2 border-surface-container-high">
                   <span className="font-bold text-on-surface">TỔNG CỘNG THANH TOÁN:</span>
-                  <span className="font-headline-lg text-secondary font-bold">1.480.000đ</span>
+                  <span className="font-headline-lg text-secondary font-bold">
+                    {formatVND(
+                      Math.max(0, (currentBooking.totalAmount || 0) - (currentBooking.depositAmount || 0)) +
+                      (Array.isArray(currentBooking.services) ? currentBooking.services.reduce((acc, s) => acc + (s.total || ((s.price || 0) * (s.quantity || 1))), 0) : 0)
+                    )}
+                  </span>
                 </div>
               </div>
 
@@ -1999,16 +2093,16 @@ export default function ManageBooking() {
               <div className="p-space-sm rounded-xl bg-surface-container-low flex items-center justify-between border border-surface-container">
                 <div className="flex flex-col">
                   <span className="font-headline-sm text-on-surface font-bold">
-                    {currentBooking.guestName || 'Trần Tuấn Kiệt'}
+                    {currentBooking.guestName || 'Khách lưu trú'}
                   </span>
                   <span className="font-body-sm text-outline">
-                    {currentBooking.roomName || 'Nhà Sàn Tập Thể (6 khách)'}
+                    {currentBooking.roomName || 'Phòng tiêu chuẩn'}
                   </span>
                 </div>
                 <div className="flex flex-col items-end">
                   <span className="font-label-sm text-outline text-[11px]">Tiền cọc cần xác nhận:</span>
                   <span className="font-headline-sm text-secondary font-bold">
-                    {formatVND(currentBooking.depositAmount || 2100000)}
+                    {formatVND(currentBooking.depositAmount || 0)}
                   </span>
                 </div>
               </div>
@@ -2021,16 +2115,20 @@ export default function ManageBooking() {
                 <div className="flex flex-col gap-1 text-body-sm">
                   <div className="flex items-center justify-between">
                     <span className="text-on-surface-variant">Ngân hàng:</span>
-                    <span className="font-medium text-on-surface">Vietcombank - GD FT24261899201</span>
+                    <span className="font-medium text-on-surface">
+                      {currentBooking.bankTransferInfo?.bankName || 'Vietcombank - Đã ghi nhận'}
+                    </span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-on-surface-variant">Thời gian nhận:</span>
-                    <span className="font-medium text-on-surface">17/09/2024 08:35:12</span>
+                    <span className="font-medium text-on-surface">
+                      {currentBooking.bankTransferInfo?.transferDate || (currentBooking.createdAt ? String(currentBooking.createdAt).substring(0, 16) : 'Hôm nay')}
+                    </span>
                   </div>
                   <div className="flex flex-col gap-0.5 pt-1">
                     <span className="text-on-surface-variant text-[11px]">Nội dung chuyển khoản đối soát:</span>
                     <span className="p-2 rounded-lg bg-surface-container font-mono text-[12px] text-on-surface border border-surface-container-high">
-                      BK{currentBooking.bookingCode || '9850'} dat phong {currentBooking.roomName || 'nha san'}
+                      {currentBooking.bankTransferInfo?.transferContent || `${currentBooking.bookingCode || 'BK'} ${currentBooking.guestName || ''}`}
                     </span>
                   </div>
                 </div>
@@ -2312,15 +2410,15 @@ export default function ManageBooking() {
                   </div>
                   <div className="flex flex-col items-center">
                     <span className="font-headline-sm text-headline-sm text-on-surface font-bold">
-                      {currentBooking.guestName || 'Nguyễn Thị Mai'}
+                      {currentBooking.guestName || 'Khách lưu trú'}
                     </span>
                     <span className="text-headline-md font-bold text-secondary mt-0.5">
-                      {currentBooking.guestPhone || currentBooking.phone || '0982 341 112'}
+                      {currentBooking.guestPhone || currentBooking.phone || 'Chưa cập nhật'}
                     </span>
                   </div>
                   <div className="flex items-center gap-2 w-full pt-2">
                     <a
-                      href={`tel:${currentBooking.guestPhone || '0982341112'}`}
+                      href={`tel:${currentBooking.guestPhone || currentBooking.phone || ''}`}
                       className="bk-btn bk-btn-secondary flex-1 !py-2.5"
                     >
                       <span className="material-symbols-outlined text-[18px]">call</span>
@@ -2328,7 +2426,7 @@ export default function ManageBooking() {
                     </a>
                     <button
                       onClick={() =>
-                        showToast(`Đang mở kết nối Zalo với số ${currentBooking.guestPhone || '0982341112'}...`, 'info')
+                        showToast(`Đang mở kết nối Zalo với số ${currentBooking.guestPhone || currentBooking.phone || 'khách'}...`, 'info')
                       }
                       className="bk-btn bk-btn-ghost flex-1 !py-2.5"
                       type="button"
@@ -2345,24 +2443,24 @@ export default function ManageBooking() {
                     <button
                       onClick={() =>
                         setChatMessage(
-                          'Chào bạn, Homestay Nhà Sàn Mộc đã chuẩn bị xong phòng đón bạn vào lúc 14h00 hôm nay. Nếu cần đón từ ngã ba Bản Lác, bạn nhắn homestay nhé!'
+                          `Chào bạn, ${activeHomestayName} đã chuẩn bị xong phòng ${currentBooking.roomName || ''} đón bạn vào lúc ${currentBooking.checkInTime || '14h00'}. Nếu cần hỗ trợ chỉ đường, bạn nhắn lại nhé!`
                         )
                       }
                       className="p-2 rounded-lg bg-surface-container-low hover:bg-surface-container border border-surface-container text-left text-body-sm text-on-surface transition-colors"
                       type="button"
                     >
-                      <strong>1. Nhắc nhận phòng:</strong> Phòng đã sẵn sàng đón lúc 14h00...
+                      <strong>1. Nhắc nhận phòng:</strong> Phòng đã sẵn sàng đón lúc {currentBooking.checkInTime || '14h00'}...
                     </button>
                     <button
                       onClick={() =>
                         setChatMessage(
-                          'Homestay đã chuẩn bị xong suất cơm lam thịt nướng cho bữa tối lúc 18h30 theo yêu cầu của bạn ạ.'
+                          `Homestay ${activeHomestayName} đã ghi nhận yêu cầu: "${currentBooking.specialRequest || 'đặt phòng'}" và chuẩn bị sẵn sàng phục vụ bạn ạ.`
                         )
                       }
                       className="p-2 rounded-lg bg-surface-container-low hover:bg-surface-container border border-surface-container text-left text-body-sm text-on-surface transition-colors"
                       type="button"
                     >
-                      <strong>2. Xác nhận ăn tối:</strong> Cơm lam thịt nướng sẵn sàng lúc 18h30...
+                      <strong>2. Xác nhận yêu cầu:</strong> Chuẩn bị sẵn sàng theo yêu cầu...
                     </button>
                   </div>
 
