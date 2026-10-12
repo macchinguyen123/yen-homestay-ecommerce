@@ -128,10 +128,10 @@ export default function Promotions() {
     setRedeemInput('');
   };
 
-  // Thống kê nhanh tính từ dữ liệu thật
+  // Thống kê nhanh tính từ dữ liệu thật Neon PostgreSQL
   const totalHomestaysCount = new Set(
     vouchers.filter((v) => v.homestayId).map((v) => v.homestayId)
-  ).size || (vouchers.length > 0 ? vouchers.length : 12);
+  ).size || vouchers.length;
 
   const savedCount = vouchers.filter((v) => isVoucherSaved(v)).length;
   const urgentCount = vouchers.filter((v) => v.isUrgent).length;
@@ -139,7 +139,6 @@ export default function Promotions() {
   // Lọc voucher theo Section và Search query
   const filterBySection = (sec) => {
     return vouchers.filter((v) => {
-      // Nếu danh sách ít và không có mục nào theo sec, phân chia đều
       if (v.section !== sec) return false;
       if (!searchQuery) return true;
       const q = searchQuery.toLowerCase().trim();
@@ -180,16 +179,64 @@ export default function Promotions() {
 
       return (
         <div key={item.id} className={`nearby-card compact-card ${isExpired ? 'opacity-75' : ''}`}>
-          <div className="nearby-img-box compact-img-box">
-            <span className={`nearby-tag ${item.tagClass}`}>{item.collectionBadge}</span>
+          <div className="nearby-img-box compact-img-box" style={{ position: 'relative' }}>
+            <span
+              className={`nearby-tag ${item.tagClass}`}
+              style={{
+                position: 'absolute',
+                top: '10px',
+                left: '10px',
+                right: 'auto',
+                zIndex: 5
+              }}
+            >
+              {item.collectionBadge}
+            </span>
             <button
               className={`nearby-heart-btn ${saved ? 'active text-danger' : ''}`}
-              onClick={() => handleToggleSave(item)}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleToggleSave(item);
+              }}
               title={saved ? 'Bỏ lưu voucher' : 'Lưu voucher vào ví'}
+              style={{
+                position: 'absolute',
+                top: '10px',
+                right: '10px',
+                left: 'auto',
+                bottom: 'auto',
+                zIndex: 10,
+                width: '32px',
+                height: '32px',
+                borderRadius: '50%',
+                backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                border: 'none',
+                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.18)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                padding: 0
+              }}
             >
-              <i className={`bi ${saved ? 'bi-heart-fill text-danger' : 'bi-heart'}`}></i>
+              <i
+                className={`bi ${saved ? 'bi-heart-fill text-danger' : 'bi-heart'}`}
+                style={{
+                  fontSize: '0.95rem',
+                  color: saved ? '#E11D48' : '#475569',
+                  lineHeight: 1
+                }}
+              ></i>
             </button>
-            <img src={item.homestayImg} alt={item.homestayName} loading="lazy" />
+            <img
+              src={item.homestayImg}
+              alt={item.homestayName}
+              loading="lazy"
+              onError={(e) => {
+                e.target.onerror = null;
+                e.target.src = 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=600&q=80';
+              }}
+            />
           </div>
 
           <div className="nearby-body compact-body">
