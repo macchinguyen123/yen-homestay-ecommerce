@@ -2,6 +2,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import './Category.css';
 import { homestayService } from '../../../services/homestayService';
+import { wishlistService } from '../../../services/wishlistService';
+import { authService } from '../../../services/authService';
 import { TiltedGridHero } from '@/components/ui/tilted-grid-hero';
 
 // Hàm chuẩn hóa làm sạch chuỗi tiện nghi nổi bật (loại bỏ {" ", " }, "...")
@@ -265,9 +267,26 @@ export default function Category() {
   const [sortBy, setSortBy] = useState('rating-desc');
   const [currentPage, setCurrentPage] = useState(1);
 
-  // Wishlist state
-  const [wishlist, setWishlist] = useState(new Set());
+  // Wishlist state (Đồng bộ trực tiếp với CSDL)
+  const [currentUser, setCurrentUser] = useState(authService.getCurrentUser());
+  const [wishlistIds, setWishlistIds] = useState(new Set());
   const [toast, setToast] = useState({ show: false, msg: '' });
+
+  // Tải danh sách yêu thích từ CSDL
+  useEffect(() => {
+    const user = authService.getCurrentUser();
+    setCurrentUser(user);
+    const cached = wishlistService.getCachedWishlist(user ? user.id : null);
+    if (cached && Array.isArray(cached)) {
+      setWishlistIds(new Set(cached.map(item => Number(item.id || item.homestayId))));
+    }
+
+    wishlistService.getWishlist(user ? user.id : null).then(res => {
+      if (res && Array.isArray(res.data)) {
+        setWishlistIds(new Set(res.data.map(item => Number(item.id || item.homestayId))));
+      }
+    });
+  }, []);
 
   // Homestays data list from DB & fallback
   const [homestays, setHomestays] = useState(SAMPLE_CATEGORY_HOMESTAYS);
@@ -343,19 +362,41 @@ export default function Category() {
     setTimeout(() => setToast({ show: false, msg: '' }), 2500);
   };
 
-  const toggleWishlist = (nameOrId, e) => {
-    if (e) e.stopPropagation();
-    setWishlist((prev) => {
+  const isWishlisted = (id, name) => {
+    return wishlistIds.has(Number(id)) || (name && wishlistIds.has(name));
+  };
+
+  const toggleWishlist = async (h, e) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    const id = Number(h.id || h.homestayId || 1);
+    const name = h.name || h.title || 'Homestay';
+    const alreadyLiked = isWishlisted(id, name);
+
+    setWishlistIds((prev) => {
       const next = new Set(prev);
-      if (next.has(nameOrId)) {
-        next.delete(nameOrId);
-        triggerToast('Đã bỏ homestay khỏi danh sách yêu thích.');
+      if (alreadyLiked) {
+        next.delete(id);
+        next.delete(name);
       } else {
-        next.add(nameOrId);
-        triggerToast('Đã thêm homestay vào danh sách yêu thích!');
+        next.add(id);
       }
       return next;
     });
+
+    try {
+      if (alreadyLiked) {
+        await wishlistService.removeFromWishlist(currentUser ? currentUser.id : null, id);
+        triggerToast(`Đã bỏ "${name}" khỏi danh sách yêu thích.`);
+      } else {
+        await wishlistService.addToWishlist(currentUser ? currentUser.id : null, id, h);
+        triggerToast(`Đã thêm "${name}" vào danh sách yêu thích!`);
+      }
+    } catch (err) {
+      console.warn('Lỗi lưu CSDL wishlist:', err);
+    }
   };
 
   // Switch category tab
@@ -702,11 +743,11 @@ export default function Category() {
                       </span>
                       <button
                         type="button"
-                        className={`card-wishlist-btn ${wishlist.has(h.name || h.id) ? 'active' : ''}`}
-                        onClick={(e) => toggleWishlist(h.name || h.id, e)}
-                        title={wishlist.has(h.name || h.id) ? 'Bỏ yêu thích' : 'Yêu thích'}
+                        className={`card-wishlist-btn ${isWishlisted(h.id, h.name) ? 'active' : ''}`}
+                        onClick={(e) => toggleWishlist(h, e)}
+                        title={isWishlisted(h.id, h.name) ? 'Bỏ yêu thích' : 'Yêu thích'}
                       >
-                        <i className={`bi ${wishlist.has(h.name || h.id) ? 'bi-heart-fill' : 'bi-heart'}`} />
+                        <i className={`bi ${isWishlisted(h.id, h.name) ? 'bi-heart-fill' : 'bi-heart'}`} />
                       </button>
                       <Link to={`/homestay/${h.id}`} style={{ display: 'block', height: '100%' }}>
                         <img src={h.img} alt={h.name} loading="lazy" />
