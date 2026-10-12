@@ -14,8 +14,12 @@ const mapBooking = (b) => ({
 export default function Bookings() {
   const currentUser = authService.getCurrentUser();
   const userId = currentUser?.id;
-  const [userBookings, setUserBookings] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const initialData = useMemo(() => {
+    return bookingService.getCachedUserBookings(userId).map(mapBooking);
+  }, [userId]);
+
+  const [userBookings, setUserBookings] = useState(initialData);
+  const [loading, setLoading] = useState(initialData.length === 0);
   const [currentFilter, setCurrentFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [toast, setToast] = useState({ show: false, msg: '' });
@@ -43,7 +47,6 @@ export default function Bookings() {
 
   const loadBookings = useCallback(async () => {
     if (!userId) { setUserBookings([]); setLoading(false); return; }
-    setLoading(true);
     const data = await bookingService.getUserBookings(userId);
     setUserBookings(data.map(mapBooking));
     setLoading(false);

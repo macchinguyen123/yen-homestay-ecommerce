@@ -5,6 +5,7 @@ import { homestayService } from '../../../services/homestayService';
 import { wishlistService } from '../../../services/wishlistService';
 import { authService } from '../../../services/authService';
 import { formatAmenities } from '../Category/Category';
+import VisualSearchModal from '../../../components/VisualSearchModal/VisualSearchModal';
 
 const HERO_SLIDES = [
   { id: 1, img: 'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=1920&q=80', title: 'Homestay giữa núi rừng bản địa chân thực' },
@@ -92,29 +93,35 @@ const COMBOS = [
   },
 ];
 
-const FESTIVALS = {
-  diff: {
+const DEFAULT_FESTIVALS = [
+  {
+    key: 'diff',
+    id: 'diff',
     badge: 'Sắp diễn ra vào tháng 6',
     name: 'Lễ Hội Pháo Hoa Quốc Tế Đà Nẵng (DIFF)',
     location: 'Sân khấu bờ sông Hàn, TP. Đà Nẵng',
     date: '08/06 - 13/07/2026',
+    imageUrl: 'https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?auto=format&fit=crop&w=1200&q=80',
     homestays: [
       { id: 'f1', name: 'Han River Glass House', location: 'Bờ sông Hàn, Đà Nẵng', distance: 'Cách điểm bắn pháo hoa 450m', rating: '4.95', reviews: '184', price: '1.150.000đ', tag: 'Gần khán đài pháo hoa', img: 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=600&q=80' },
       { id: 'f2', name: 'Danang Riverside Cozy Villa', location: 'Đường Trần Hưng Đạo, Đà Nẵng', distance: 'Cách điểm tổ chức 700m', rating: '4.92', reviews: '142', price: '1.450.000đ', tag: 'Đi bộ ra lễ hội', img: 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=600&q=80' },
       { id: 'f3', name: 'Sơn Trà Sunset Infinity Villa', location: 'Quận Sơn Trà, Đà Nẵng', distance: 'Cách điểm tổ chức 1.2km', rating: '4.94', reviews: '215', price: '2.750.000đ', tag: 'View biển vô cực', img: 'https://images.unsplash.com/photo-1580587771525-78b9dba3b914?auto=format&fit=crop&w=600&q=80' },
     ],
   },
-  dalat: {
+  {
+    key: 'dalat',
+    id: 'dalat',
     badge: 'Khai mạc cuối năm',
     name: 'Festival Hoa Đà Lạt Sắc Màu Xứ Ngàn Hoa',
     location: 'Quảng trường Lâm Viên & Hồ Xuân Hương, Đà Lạt',
     date: '18/12 - 31/12/2026',
+    imageUrl: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=1200&q=80',
     homestays: [
       { id: 'f4', name: 'Dalat Blooming Garden Homestay', location: 'Hồ Xuân Hương, Đà Lạt', distance: 'Cách Quảng trường 400m', rating: '4.97', reviews: '230', price: '950.000đ', tag: 'Đi bộ ra Festival', img: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=600&q=80' },
       { id: 'f5', name: 'The Memory Valley Villa', location: 'Hồ Tuyền Lâm, Đà Lạt', distance: 'Cách điểm tổ chức 1.5km', rating: '4.96', reviews: '340', price: '1.450.000đ', tag: 'Săn mây thung lũng', img: 'https://images.unsplash.com/photo-1518780664697-55e3ad937233?auto=format&fit=crop&w=600&q=80' },
     ],
   },
-};
+];
 
 const HOT_HOMESTAYS = [
   { id: 1, name: 'The Memory Valley Villa', city: 'dalat', location: 'Đà Lạt', rating: 4.96, reviews: 340, specs: '3 phòng ngủ · 6 khách', amenities: 'Bể bơi nước ấm · Lò sưởi củi · Sân BBQ đồi thông', price: '1.450.000đ', tag: 'Top 1 Bán Chạy', img: 'https://images.unsplash.com/photo-1518780664697-55e3ad937233?auto=format&fit=crop&w=600&q=80' },
@@ -143,14 +150,15 @@ export default function Homepage() {
   const [guests, setGuests] = useState(2);
   const [rooms, setRooms] = useState(1);
   const [popoverOpen, setPopoverOpen] = useState(false);
+  const [isVisualSearchOpen, setIsVisualSearchOpen] = useState(false);
 
   // Featured Combo Slider
   const [comboIndex, setComboIndex] = useState(0);
 
   // Festival Section State
   const [activeFestivalKey, setActiveFestivalKey] = useState('diff');
-  const [databaseFestivals, setDatabaseFestivals] = useState([]);
-  const [festivalLoading, setFestivalLoading] = useState(true);
+  const [databaseFestivals, setDatabaseFestivals] = useState(DEFAULT_FESTIVALS);
+  const [festivalLoading, setFestivalLoading] = useState(false);
   const [visibleFestivalCount, setVisibleFestivalCount] = useState(4);
 
   // Favorites Filter City State
@@ -184,7 +192,7 @@ export default function Homepage() {
     heroSlides: HERO_SLIDES,
     experiences: EXPERIENCES,
     combos: COMBOS,
-    festivals: FESTIVALS,
+    festivals: DEFAULT_FESTIVALS,
     hotHomestays: HOT_HOMESTAYS,
     favoritesHomestays: FAVORITES_HOMESTAYS
   });
@@ -192,23 +200,50 @@ export default function Homepage() {
 
   useEffect(() => {
     let cancelled = false;
-    fetch('http://localhost:8081/api/public/festivals')
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3500);
+
+    fetch('http://localhost:8081/api/public/festivals', { signal: controller.signal })
       .then(response => response.ok ? response.json() : Promise.reject(new Error('Festival API unavailable')))
       .then(rows => {
+        clearTimeout(timeoutId);
         if (cancelled) return;
-        if (!Array.isArray(rows)) { setDatabaseFestivals([]); return; }
-        const mapped = rows.map(festival => ({
-          ...festival,
-          key: String(festival.id),
-          badge: festival.badgeInfo || 'Sắp diễn ra',
-          date: [festival.startDate, festival.endDate].filter(Boolean).join(' – '),
-          location: [festival.location, festival.city].filter(Boolean).join(', '),
-          homestays: festival.homestays || [],
-        }));
+        if (!Array.isArray(rows) || rows.length === 0) return;
+        const mapped = rows.map(festival => {
+          let homestays = festival.homestays || [];
+          if (homestays.length === 0 && DEFAULT_FESTIVALS[0]?.homestays) {
+            homestays = DEFAULT_FESTIVALS[0].homestays;
+          }
+          return {
+            ...festival,
+            key: String(festival.id || festival.key),
+            badge: festival.badgeInfo || 'Sắp diễn ra',
+            date: [festival.startDate, festival.endDate].filter(Boolean).join(' – ') || 'Sắp diễn ra',
+            location: [festival.location, festival.city].filter(Boolean).join(', ') || 'Việt Nam',
+            imageUrl: festival.imageUrl || 'https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?auto=format&fit=crop&w=1200&q=80',
+            homestays: homestays.map(h => ({
+              ...h,
+              price: typeof h.price === 'number' ? h.price.toLocaleString('vi-VN') + 'đ' : (h.price ? (h.price.toString().includes('đ') ? h.price : Number(h.price).toLocaleString('vi-VN') + 'đ') : '1.200.000đ'),
+              img: h.imageUrl || h.img || 'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=600&q=80',
+              distance: h.distanceLabel || h.distance || 'Cách điểm tổ chức 500m'
+            })),
+          };
+        });
         setDatabaseFestivals(mapped);
-        setActiveFestivalKey(mapped[0].key);
-      }).catch(() => {}).finally(() => { if (!cancelled) setFestivalLoading(false); });
-    return () => { cancelled = true; };
+        if (mapped.length > 0) {
+          setActiveFestivalKey(prev => mapped.some(m => m.key === prev) ? prev : mapped[0].key);
+        }
+      })
+      .catch(() => {})
+      .finally(() => {
+        clearTimeout(timeoutId);
+        if (!cancelled) setFestivalLoading(false);
+      });
+    return () => {
+      cancelled = true;
+      clearTimeout(timeoutId);
+      controller.abort();
+    };
   }, []);
 
   const expGridRef = useRef(null);
@@ -388,8 +423,8 @@ export default function Homepage() {
     return h.city === favCityFilter;
   });
 
-  const festivalTabs = databaseFestivals;
-  const activeFestData = databaseFestivals.find(festival => festival.key === activeFestivalKey) || databaseFestivals[0];
+  const festivalTabs = databaseFestivals.length > 0 ? databaseFestivals : DEFAULT_FESTIVALS;
+  const activeFestData = festivalTabs.find(festival => festival.key === activeFestivalKey) || festivalTabs[0];
 
   return (
     <div className="homepage-wrapper">
@@ -526,6 +561,16 @@ export default function Homepage() {
                       </div>
                     )}
                   </div>
+
+                  {/* Camera / Visual Search button */}
+                  <button
+                    type="button"
+                    className="search-visual-btn"
+                    title="Tìm kiếm bằng hình ảnh (AI CLIP)"
+                    onClick={() => setIsVisualSearchOpen(true)}
+                  >
+                    <i className="bi bi-camera-fill" />
+                  </button>
 
                   {/* Submit */}
                   <button type="submit" className="search-submit-btn">
@@ -722,66 +767,68 @@ export default function Homepage() {
             <span style={{ color: '#15803D' }}><i className="bi bi-house-heart-fill" /> Homestay gần đó dễ dàng di chuyển</span>
           </div>
 
-          {festivalLoading && <div className="festival-loading">Đang tải lễ hội...</div>}
-          {!festivalLoading && festivalTabs.length === 0 && <div className="festival-loading">Chưa có dữ liệu lễ hội.</div>}
-          {!festivalLoading && festivalTabs.length > 0 && <div className="festival-tabs">
+          <div className="festival-tabs">
             {festivalTabs.map(festival => (
               <button key={festival.key} type="button" className={`festival-tab-btn ${activeFestivalKey === festival.key ? 'active' : ''}`} onClick={() => { setActiveFestivalKey(festival.key); setVisibleFestivalCount(4); }}>
                 <i className="bi bi-calendar-event" /> {festival.name}
               </button>
             ))}
-          </div>}
-
-          {!festivalLoading && activeFestData && <><div className="festival-banner-card">
-            <div className="festival-banner-backdrop" style={activeFestData.imageUrl ? { backgroundImage: `url(${activeFestData.imageUrl})` } : undefined} />
-            <div>
-              <span className="fest-badge">{activeFestData.badge}</span>
-              <h3 className="fest-name">{activeFestData.name}</h3>
-              <div className="fest-meta">
-                <span><i className="bi bi-geo-alt-fill" /> <strong>{activeFestData.location}</strong></span>
-                <span><i className="bi bi-clock-fill" /> <strong>{activeFestData.date}</strong></span>
-              </div>
-            </div>
-            <Link to="/search" className="btn-view-room" style={{ background: '#D97706', whiteSpace: 'nowrap' }}>
-              Xem homestay gần nhất
-            </Link>
           </div>
 
-          <div className="festival-homestays-grid">
-            {(activeFestData.homestays || []).slice(0, visibleFestivalCount).map((h) => (
-              <div key={h.id} className="homestay-card">
-                <div className="card-img-wrapper">
-                  <span className="card-top-tag">{h.tag}</span>
-                  <button
-                    type="button"
-                    className={`card-wishlist-btn ${isWishlisted(h.id, h.name) ? 'active' : ''}`}
-                    onClick={(e) => toggleWishlist(h, e)}
-                    title={isWishlisted(h.id, h.name) ? 'Bỏ yêu thích' : 'Lưu vào yêu thích'}
-                  >
-                    <i className={`bi ${isWishlisted(h.id, h.name) ? 'bi-heart-fill' : 'bi-heart'}`} />
-                  </button>
-                  <Link to={`/homestay/${h.id || 'doi'}`} state={{ homestay: h }} style={{ display: 'block', height: '100%' }}>
-                    <img src={h.img || 'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=600&q=80'} alt={h.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  </Link>
-                </div>
-                <div className="card-body">
-                  <div className="card-location-rating">
-                    <span className="card-location"><i className="bi bi-geo-alt-fill text-success" /> {h.location}</span>
-                    <span className="card-rating"><i className="bi bi-star-fill" /> {h.rating} ({h.reviews})</span>
-                  </div>
-                  <h3 className="card-title"><Link to={`/homestay/${h.id}`} state={{ homestay: h }}>{h.name}</Link></h3>
-                  <div className="card-specs">{h.distance}</div>
-                  <div className="card-footer-row">
-                    <div>
-                      <span className="price-label">Giá từ:</span>
-                      <span className="card-price">{h.price}</span>
-                    </div>
-                    <Link to={`/homestay/${h.id}`} state={{ homestay: h }} className="btn-view-room">Xem homestay</Link>
+          {activeFestData && (
+            <>
+              <div className="festival-banner-card">
+                <div className="festival-banner-backdrop" style={{ backgroundImage: `url(${activeFestData.imageUrl || 'https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?auto=format&fit=crop&w=1200&q=80'})` }} />
+                <div>
+                  <span className="fest-badge">{activeFestData.badge || 'Sôi động mùa lễ hội'}</span>
+                  <h3 className="fest-name">{activeFestData.name}</h3>
+                  <div className="fest-meta">
+                    <span><i className="bi bi-geo-alt-fill" /> <strong>{activeFestData.location || 'Việt Nam'}</strong></span>
+                    <span><i className="bi bi-clock-fill" /> <strong>{activeFestData.date || 'Sắp diễn ra'}</strong></span>
                   </div>
                 </div>
+                <Link to="/search" className="btn-view-room" style={{ background: '#D97706', whiteSpace: 'nowrap' }}>
+                  Xem homestay gần nhất
+                </Link>
               </div>
-            ))}
-          </div></>}
+
+              <div className="festival-homestays-grid">
+                {(activeFestData.homestays || []).slice(0, visibleFestivalCount).map((h) => (
+                  <div key={h.id} className="homestay-card">
+                    <div className="card-img-wrapper">
+                      <span className="card-top-tag">{h.tag || 'Gần điểm lễ hội'}</span>
+                      <button
+                        type="button"
+                        className={`card-wishlist-btn ${isWishlisted(h.id, h.name) ? 'active' : ''}`}
+                        onClick={(e) => toggleWishlist(h, e)}
+                        title={isWishlisted(h.id, h.name) ? 'Bỏ yêu thích' : 'Lưu vào yêu thích'}
+                      >
+                        <i className={`bi ${isWishlisted(h.id, h.name) ? 'bi-heart-fill' : 'bi-heart'}`} />
+                      </button>
+                      <Link to={`/homestay/${h.id || 'doi'}`} state={{ homestay: h }} style={{ display: 'block', height: '100%' }}>
+                        <img src={h.img || h.imageUrl || 'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=600&q=80'} alt={h.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      </Link>
+                    </div>
+                    <div className="card-body">
+                      <div className="card-location-rating">
+                        <span className="card-location"><i className="bi bi-geo-alt-fill text-success" /> {h.location}</span>
+                        <span className="card-rating"><i className="bi bi-star-fill" /> {h.rating || '5.0'} ({h.reviews || 0})</span>
+                      </div>
+                      <h3 className="card-title"><Link to={`/homestay/${h.id}`} state={{ homestay: h }}>{h.name}</Link></h3>
+                      <div className="card-specs">{h.distance || h.distanceLabel || 'Cách điểm tổ chức 500m'}</div>
+                      <div className="card-footer-row">
+                        <div>
+                          <span className="price-label">Giá từ:</span>
+                          <span className="card-price">{typeof h.price === 'number' ? h.price.toLocaleString('vi-VN') + 'đ' : (h.price ? (h.price.toString().includes('đ') ? h.price : Number(h.price).toLocaleString('vi-VN') + 'đ') : '1.200.000đ')}</span>
+                        </div>
+                        <Link to={`/homestay/${h.id}`} state={{ homestay: h }} className="btn-view-room">Xem homestay</Link>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
 
           {activeFestData && visibleFestivalCount < (activeFestData.homestays || []).length && (
             <div style={{ textAlign: 'center', marginTop: '32px' }}>
@@ -948,6 +995,12 @@ export default function Homepage() {
         <i className="bi bi-check-circle-fill" />
         <span>{toast.msg}</span>
       </div>
+
+      {/* Visual Search Modal */}
+      <VisualSearchModal
+        isOpen={isVisualSearchOpen}
+        onClose={() => setIsVisualSearchOpen(false)}
+      />
     </div>
   );
 }

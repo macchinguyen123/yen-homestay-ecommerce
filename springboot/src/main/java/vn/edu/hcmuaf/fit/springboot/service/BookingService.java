@@ -2,6 +2,8 @@ package vn.edu.hcmuaf.fit.springboot.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -36,9 +38,21 @@ public class BookingService {
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
     private static final Locale VI_LOCALE = new Locale("vi", "VN");
 
+    public record RawBooking(
+        Long bookingId, String bookingCode, Long touristId, String touristName, String touristAvatar,
+        Long homestayId, String homestayName, String homestayCity, String homestayAddress,
+        Long roomId, String roomName, String roomType,
+        LocalDate checkInDate, LocalDate checkOutDate, int guestsCount,
+        BigDecimal totalPrice, BigDecimal discountAmount, BigDecimal depositAmount, BigDecimal remainingAmount,
+        String paymentType, String depositStatus, String status, LocalDateTime createdAt,
+        String homestayImage, String roomImage
+    ) {}
+
     /**
      * Lấy toàn bộ danh sách đặt phòng thực tế của người dùng từ CSDL Neon PostgreSQL
+     * Đã tối ưu hóa BATCH FETCHING (giảm từ 3N+1 queries xuống còn 3-4 queries) + CACHE
      */
+    @Cacheable(value = "userBookings", key = "#touristId")
     public List<UserBookingDTO> getUserBookings(Long touristId) {
         String sql = """
             SELECT 
@@ -59,7 +73,38 @@ public class BookingService {
         """;
 
         try {
-            return jdbcTemplate.query(sql, this::mapRowToUserBookingDTO, touristId);
+            List<RawBooking> rawList = jdbcTemplate.query(sql, (rs, rowNum) -> mapRawBooking(rs), touristId);
+            if (rawList.isEmpty()) {
+                return Collections.emptyList();
+            }
+
+            List<Long> bookingIds = rawList.stream().map(RawBooking::bookingId).distinct().toList();
+            List<Long> homestayIds = rawList.stream().map(RawBooking::homestayId).distinct().toList();
+
+            // BATCH FETCH 1: Reports (chỉ 1 query duy nhất cho toàn bộ danh sách)
+            Map<Long, Report> reportMap = new HashMap<>();
+            if (!bookingIds.isEmpty()) {
+                reportRepository.findByBookingIdIn(bookingIds).forEach(r -> reportMap.putIfAbsent(r.getBookingId(), r));
+            }
+
+            // BATCH FETCH 2: Reviews (chỉ 1 query duy nhất cho toàn bộ danh sách)
+            Map<Long, Review> reviewMap = new HashMap<>();
+            if (!bookingIds.isEmpty()) {
+                reviewRepository.findByBookingIdIn(bookingIds).forEach(r -> reviewMap.putIfAbsent(r.getBookingId(), r));
+            }
+
+            // BATCH FETCH 3: Guest Tasks (chỉ 1 query duy nhất cho toàn bộ danh sách)
+            Map<Long, GuestTask> taskMap = new HashMap<>();
+            if (!homestayIds.isEmpty()) {
+                guestTaskRepository.findByHomestayIdIn(homestayIds).forEach(t -> taskMap.putIfAbsent(t.getHomestayId(), t));
+            }
+
+            // Lắp ráp UserBookingDTO trong RAM O(1), không tốn thêm bất kỳ query DB nào
+            List<UserBookingDTO> result = new ArrayList<>();
+            for (RawBooking raw : rawList) {
+                result.add(convertRawToDTO(raw, reportMap.get(raw.bookingId()), reviewMap.get(raw.bookingId()), taskMap.get(raw.homestayId())));
+            }
+            return result;
         } catch (Exception e) {
             log.error("Lỗi khi truy vấn danh sách đặt phòng của người dùng {}: {}", touristId, e.getMessage(), e);
             return Collections.emptyList();
@@ -89,8 +134,13 @@ public class BookingService {
         """;
 
         try {
-            List<UserBookingDTO> list = jdbcTemplate.query(sql, this::mapRowToUserBookingDTO, bookingCode);
-            return list.isEmpty() ? null : list.get(0);
+            List<RawBooking> list = jdbcTemplate.query(sql, (rs, rowNum) -> mapRawBooking(rs), bookingCode);
+            if (list.isEmpty()) return null;
+            RawBooking raw = list.get(0);
+            Report report = reportRepository.findFirstByBookingId(raw.bookingId()).orElse(null);
+            Review review = reviewRepository.findFirstByBookingId(raw.bookingId()).orElse(null);
+            GuestTask task = guestTaskRepository.findByHomestayId(raw.homestayId()).stream().findFirst().orElse(null);
+            return convertRawToDTO(raw, report, review, task);
         } catch (Exception e) {
             log.error("Lỗi khi truy vấn đơn đặt phòng theo mã {}: {}", bookingCode, e.getMessage());
             return null;
@@ -100,6 +150,7 @@ public class BookingService {
     /**
      * Tạo mới đơn đặt phòng vào Neon PostgreSQL
      */
+    @CacheEvict(value = "userBookings", allEntries = true)
     @Transactional
     public Booking createBooking(CreateBookingRequest req) {
         String code = "YEN-" + LocalDate.now().getYear() + "-" + (1000 + new SecureRandom().nextInt(9000));
@@ -170,6 +221,7 @@ public class BookingService {
     /**
      * Hủy đơn đặt phòng
      */
+    @CacheEvict(value = "userBookings", allEntries = true)
     @Transactional
     public boolean cancelBooking(Long bookingId, Long touristId) {
         Optional<Booking> opt = bookingRepository.findById(bookingId);
@@ -187,6 +239,7 @@ public class BookingService {
     /**
      * Gửi khiếu nại thực tế liên kết với booking
      */
+    @CacheEvict(value = "userBookings", allEntries = true)
     @Transactional
     public Report createComplaint(CreateComplaintRequest req) {
         Long homestayId = req.getReportedHomestayId();
@@ -237,6 +290,7 @@ public class BookingService {
     /**
      * Đăng đánh giá thực tế & hoàn thành nhiệm vụ homestay
      */
+    @CacheEvict(value = "userBookings", allEntries = true)
     @Transactional
     public Review submitReviewAndCompleteTask(CreateReviewRequest req) {
         Long homestayId = req.getHomestayId();
@@ -284,15 +338,43 @@ public class BookingService {
         return reviewRepository.save(review);
     }
 
-    private UserBookingDTO mapRowToUserBookingDTO(ResultSet rs, int rowNum) throws SQLException {
-        Long bookingId = rs.getLong("booking_id");
-        Long homestayId = rs.getLong("homestay_id");
-        Long touristId = rs.getLong("tourist_id");
-
+    private RawBooking mapRawBooking(ResultSet rs) throws SQLException {
         java.sql.Date cinDateSql = rs.getDate("check_in_date");
         java.sql.Date coutDateSql = rs.getDate("check_out_date");
-        LocalDate checkInDate = cinDateSql != null ? cinDateSql.toLocalDate() : null;
-        LocalDate checkOutDate = coutDateSql != null ? coutDateSql.toLocalDate() : null;
+        Timestamp createdTs = rs.getTimestamp("created_at");
+
+        return new RawBooking(
+            rs.getLong("booking_id"),
+            rs.getString("booking_code"),
+            rs.getLong("tourist_id"),
+            rs.getString("tourist_name"),
+            rs.getString("tourist_avatar"),
+            rs.getLong("homestay_id"),
+            rs.getString("homestay_name"),
+            rs.getString("homestay_city"),
+            rs.getString("homestay_address"),
+            rs.getObject("room_id") != null ? rs.getLong("room_id") : null,
+            rs.getString("room_name"),
+            rs.getString("room_type"),
+            cinDateSql != null ? cinDateSql.toLocalDate() : null,
+            coutDateSql != null ? coutDateSql.toLocalDate() : null,
+            rs.getInt("guests_count"),
+            rs.getBigDecimal("total_price"),
+            rs.getBigDecimal("discount_amount"),
+            rs.getBigDecimal("deposit_amount"),
+            rs.getBigDecimal("remaining_amount"),
+            rs.getString("payment_type"),
+            rs.getString("deposit_status"),
+            rs.getString("status"),
+            createdTs != null ? createdTs.toLocalDateTime() : null,
+            rs.getString("homestay_image"),
+            rs.getString("room_image")
+        );
+    }
+
+    private UserBookingDTO convertRawToDTO(RawBooking raw, Report report, Review review, GuestTask taskEntity) {
+        LocalDate checkInDate = raw.checkInDate();
+        LocalDate checkOutDate = raw.checkOutDate();
 
         String checkInStr = checkInDate != null ? checkInDate.format(DATE_FMT) : "N/A";
         String checkOutStr = checkOutDate != null ? checkOutDate.format(DATE_FMT) : "N/A";
@@ -302,15 +384,13 @@ public class BookingService {
             nights = (int) Math.max(1, ChronoUnit.DAYS.between(checkInDate, checkOutDate));
         }
 
-        BigDecimal totalPrice = rs.getBigDecimal("total_price");
-        if (totalPrice == null) totalPrice = BigDecimal.ZERO;
+        BigDecimal totalPrice = raw.totalPrice() != null ? raw.totalPrice() : BigDecimal.ZERO;
         String formattedPrice = NumberFormat.getInstance(VI_LOCALE).format(totalPrice) + "đ";
 
-        BigDecimal depositAmount = rs.getBigDecimal("deposit_amount");
-        String depositStatus = rs.getString("deposit_status");
-        String paymentType = rs.getString("payment_type");
-        String rawStatus = rs.getString("status");
-        if (rawStatus == null) rawStatus = "PENDING";
+        BigDecimal depositAmount = raw.depositAmount();
+        String depositStatus = raw.depositStatus();
+        String paymentType = raw.paymentType();
+        String rawStatus = raw.status() != null ? raw.status() : "PENDING";
 
         // Tính toán chuỗi hiển thị thanh toán
         String payStatus = "Chờ thanh toán";
@@ -326,34 +406,25 @@ public class BookingService {
 
         // Lấy báo cáo / khiếu nại thực tế liên kết
         UserBookingDTO.ComplaintDTO complaintDTO = null;
-        Optional<Report> reportOpt = reportRepository.findFirstByBookingId(bookingId);
-        if (reportOpt.isPresent()) {
-            Report r = reportOpt.get();
+        if (report != null) {
             String stText = "Đang xử lý";
-            if ("RESOLVED".equalsIgnoreCase(r.getStatus())) stText = "Đã giải quyết";
-            else if ("REJECTED".equalsIgnoreCase(r.getStatus())) stText = "Đã từ chối";
+            if ("RESOLVED".equalsIgnoreCase(report.getStatus())) stText = "Đã giải quyết";
+            else if ("REJECTED".equalsIgnoreCase(report.getStatus())) stText = "Đã từ chối";
 
             complaintDTO = UserBookingDTO.ComplaintDTO.builder()
-                    .id(r.getId())
-                    .ticketCode("KN-" + bookingId + "-" + r.getId())
-                    .typeText(r.getReportType() != null ? r.getReportType() : "Chất lượng phòng ở")
+                    .id(report.getId())
+                    .ticketCode("KN-" + raw.bookingId() + "-" + report.getId())
+                    .typeText(report.getReportType() != null ? report.getReportType() : "Chất lượng phòng ở")
                     .severity("medium")
-                    .content(r.getContent())
+                    .content(report.getContent())
                     .statusText(stText)
-                    .adminSolution(r.getAdminSolution())
+                    .adminSolution(report.getAdminSolution())
                     .build();
         }
 
-        // Lấy đánh giá thực tế của booking nếu có
-        Optional<Review> reviewOpt = reviewRepository.findFirstByBookingId(bookingId);
-
-        // Lấy danh sách nhiệm vụ của Homestay
-        List<GuestTask> tasks = guestTaskRepository.findByHomestayId(homestayId);
-        GuestTask taskEntity = tasks.isEmpty() ? null : tasks.get(0);
-
         UserBookingDTO.TaskDTO taskDTO = null;
-        if (taskEntity != null || reviewOpt.isPresent()) {
-            boolean hasReviewed = reviewOpt.isPresent();
+        if (taskEntity != null || review != null) {
+            boolean hasReviewed = review != null;
             String rewardText = taskEntity != null && taskEntity.getRewardNote() != null 
                     ? taskEntity.getRewardNote() 
                     : "🎁 Quà tặng trực tiếp từ Homestay";
@@ -378,8 +449,7 @@ public class BookingService {
 
             UserBookingDTO.UserReviewDTO userReviewDTO = null;
             if (hasReviewed) {
-                Review rev = reviewOpt.get();
-                String commentText = rev.getComment() != null ? rev.getComment() : "";
+                String commentText = review.getComment() != null ? review.getComment() : "";
                 String revTitle = "Đánh giá tuyệt vời!";
                 if (commentText.contains("\n")) {
                     String[] parts = commentText.split("\n", 2);
@@ -387,20 +457,20 @@ public class BookingService {
                     commentText = parts[1];
                 }
 
-                String revDate = rev.getCreatedAt() != null ? rev.getCreatedAt().format(DATE_FMT) : "Gần đây";
+                String revDate = review.getCreatedAt() != null ? review.getCreatedAt().format(DATE_FMT) : "Gần đây";
 
                 userReviewDTO = UserBookingDTO.UserReviewDTO.builder()
-                        .id(rev.getId())
-                        .rating(rev.getRating() != null ? rev.getRating() : 5)
+                        .id(review.getId())
+                        .rating(review.getRating() != null ? review.getRating() : 5)
                         .title(revTitle)
                         .content(commentText)
-                        .ownerReply(rev.getOwnerReply())
+                        .ownerReply(review.getOwnerReply())
                         .createdAt(revDate)
                         .build();
             }
 
             taskDTO = UserBookingDTO.TaskDTO.builder()
-                    .id(taskEntity != null ? taskEntity.getId() : (reviewOpt.map(Review::getTaskId).orElse(1L)))
+                    .id(taskEntity != null ? taskEntity.getId() : (review != null ? review.getTaskId() : 1L))
                     .title(taskEntity != null ? taskEntity.getTitle() : "Danh sách việc cần làm tại Homestay")
                     .rewardText(hasReviewed ? "🎁 Đã nhận quà tặng từ Homestay" : rewardText)
                     .status(hasReviewed ? "completed" : "pending")
@@ -426,44 +496,40 @@ public class BookingService {
             normalizedStatus = "completed";
         }
 
-        String homestayImg = rs.getString("homestay_image");
+        String homestayImg = raw.homestayImage();
         if (homestayImg == null || homestayImg.trim().isEmpty()) {
             homestayImg = "https://images.unsplash.com/photo-1587061949409-02df41d5e562?auto=format&fit=crop&w=600&q=80";
         }
 
-        String roomImg = rs.getString("room_image");
+        String roomImg = raw.roomImage();
         if (roomImg == null || roomImg.trim().isEmpty()) {
             roomImg = homestayImg;
         }
 
-        String roomName = rs.getString("room_name");
+        String roomName = raw.roomName();
         if (roomName == null || roomName.trim().isEmpty()) {
             roomName = "Phòng tiêu chuẩn";
         }
 
-        String address = rs.getString("homestay_address");
-        String city = rs.getString("homestay_city");
+        String address = raw.homestayAddress();
+        String city = raw.homestayCity();
         String locationStr = (address != null && !address.isBlank() ? address + ", " : "") + (city != null ? city : "Việt Nam");
 
-        int guestsCount = rs.getInt("guests_count");
-        if (guestsCount <= 0) guestsCount = 2;
-
-        Timestamp createdTs = rs.getTimestamp("created_at");
-        LocalDateTime createdAt = createdTs != null ? createdTs.toLocalDateTime() : null;
+        int guestsCount = raw.guestsCount() > 0 ? raw.guestsCount() : 2;
 
         return UserBookingDTO.builder()
-                .id(bookingId)
-                .bookingCode(rs.getString("booking_code"))
-                .touristId(touristId)
-                .touristName(rs.getString("tourist_name"))
-                .touristAvatar(rs.getString("tourist_avatar"))
-                .homestayId(homestayId)
-                .homestayName(rs.getString("homestay_name"))
+                .id(raw.bookingId())
+                .bookingCode(raw.bookingCode())
+                .touristId(raw.touristId())
+                .touristName(raw.touristName())
+                .touristAvatar(raw.touristAvatar())
+                .homestayId(raw.homestayId())
+                .homestayName(raw.homestayName())
                 .homestayImage(homestayImg)
                 .location(locationStr)
-                .roomId(rs.getObject("room_id") != null ? rs.getLong("room_id") : null)
+                .roomId(raw.roomId())
                 .roomName(roomName)
-                .roomType(rs.getString("room_type") != null ? rs.getString("room_type") : roomName)
+                .roomType(raw.roomType() != null ? raw.roomType() : roomName)
                 .roomImage(roomImg)
                 .checkIn(checkInStr)
                 .checkOut(checkOutStr)
@@ -475,13 +541,13 @@ public class BookingService {
                 .totalPrice(formattedPrice)
                 .totalPriceRaw(totalPrice)
                 .depositAmount(depositAmount)
-                .remainingAmount(rs.getBigDecimal("remaining_amount"))
+                .remainingAmount(raw.remainingAmount())
                 .paymentType(paymentType)
                 .depositStatus(depositStatus)
                 .payStatus(payStatus)
                 .status(normalizedStatus)
                 .statusRaw(rawStatus)
-                .createdAt(createdAt)
+                .createdAt(raw.createdAt())
                 .task(taskDTO)
                 .complaint(complaintDTO)
                 .build();

@@ -18,7 +18,7 @@ public class SpringbootApplication {
 
     @Bean
     public CacheManager cacheManager() {
-        return new ConcurrentMapCacheManager("homePageData", "allRooms", "roomDetail", "homestayRooms", "allHomestays", "homestayDetail", "publicWishlist");
+        return new ConcurrentMapCacheManager("homePageData", "allRooms", "roomDetail", "homestayRooms", "allHomestays", "homestayDetail", "publicWishlist", "userBookings", "publicFestivals");
     }
 
 }
