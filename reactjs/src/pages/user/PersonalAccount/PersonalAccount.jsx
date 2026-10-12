@@ -5,6 +5,7 @@ import { userService } from "../../../services/userService";
 import { authService } from "../../../services/authService";
 import { viewedHistoryService } from "../../../services/viewedHistoryService";
 import { cashbackService } from "../../../services/cashbackService";
+import { voucherService } from "../../../services/voucherService";
 import { formatAmenities } from "../Category/Category";
 
 const PROVINCES_DATA = [
@@ -98,57 +99,6 @@ const INITIAL_VIEWED_LIST = [
   }
 ];
 
-const INITIAL_VOUCHERS = [
-  {
-    id: 1,
-    code: "HANRIVER200",
-    title: "Han River Glass House",
-    location: "Bờ sông Hàn, Đà Nẵng",
-    rating: "4.95",
-    discountText: "Giảm 200K",
-    condText: "Đơn từ 1.5tr · Đặt từ 2 đêm",
-    tag: "🔥 HOT NHẤT",
-    tagClass: "tag-red",
-    img: "https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=600&q=80"
-  },
-  {
-    id: 2,
-    code: "MEMORY180",
-    title: "The Memory Valley Villa",
-    location: "Hồ Tuyền Lâm, Đà Lạt",
-    rating: "4.96",
-    discountText: "Giảm 180K",
-    condText: "Đơn từ 1.2tr · Bể bơi nước ấm",
-    tag: "🔥 HOT NHẤT",
-    tagClass: "tag-orange",
-    img: "https://images.unsplash.com/photo-1518780664697-55e3ad937233?auto=format&fit=crop&w=600&q=80"
-  },
-  {
-    id: 3,
-    code: "TOPASHOT500",
-    title: "Topas Ecolodge Sapa",
-    location: "Mường Hoa, Sapa",
-    rating: "4.98",
-    discountText: "Giảm 500K",
-    condText: "Đơn từ 3.8tr · Bể bơi vô cực",
-    tag: "⚡ SẮP HẾT HẠN",
-    tagClass: "tag-green",
-    img: "https://images.unsplash.com/photo-1571896349842-33c89424de2d?auto=format&fit=crop&w=600&q=80"
-  },
-  {
-    id: 4,
-    code: "SONTRA250",
-    title: "Sơn Trà Sunset Villa",
-    location: "Sơn Trà, Đà Nẵng",
-    rating: "4.94",
-    discountText: "Giảm 250K",
-    condText: "Đơn từ 2.2tr · Hồ bơi view biển",
-    tag: "🎁 ĐẶC QUYỀN VIP",
-    tagClass: "tag-red",
-    img: "https://images.unsplash.com/photo-1580587771525-78b9dba3b914?auto=format&fit=crop&w=600&q=80"
-  }
-];
-
 export default function PersonalAccount() {
   const navigate = useNavigate();
 
@@ -180,8 +130,8 @@ export default function PersonalAccount() {
   const [viewedList, setViewedList] = useState([]);
   const [searchViewed, setSearchViewed] = useState("");
 
-  // Vouchers State
-  const [vouchers, setVouchers] = useState(INITIAL_VOUCHERS);
+  // Vouchers State (kết nối trực tiếp cơ sở dữ liệu qua voucherService)
+  const [vouchers, setVouchers] = useState([]);
   const [redeemCode, setRedeemCode] = useState("");
 
   // Transactions Filter
@@ -335,6 +285,50 @@ export default function PersonalAccount() {
     };
 
     fetchViewedHistory();
+  }, [activeTab]);
+
+  // Load real vouchers from Spring Boot backend (Neon PostgreSQL) & localStorage wallet
+  useEffect(() => {
+    let isMounted = true;
+    const fetchUserVouchers = async () => {
+      try {
+        const allVouchers = await voucherService.getAllVouchers();
+        let savedCodes = [];
+        try {
+          const stored = localStorage.getItem('yen_saved_vouchers');
+          if (stored) savedCodes = JSON.parse(stored);
+        } catch (e) {
+          console.error(e);
+        }
+
+        let displayed = allVouchers;
+        if (savedCodes && savedCodes.length > 0) {
+          const filtered = allVouchers.filter((v) => savedCodes.includes(v.code) || savedCodes.includes(v.id));
+          if (filtered.length > 0) displayed = filtered;
+        }
+
+        if (isMounted && Array.isArray(displayed)) {
+          setVouchers(displayed.map((v) => ({
+            id: v.voucherId || v.id,
+            code: v.code,
+            title: v.homestayName || v.title,
+            location: v.location || v.city || "Việt Nam",
+            rating: v.rating || "5.00",
+            discountText: v.discountVal,
+            condText: v.condition,
+            tag: v.collectionBadge || "🔥 HOT NHẤT",
+            tagClass: v.tagClass || "tag-red",
+            img: v.homestayImg,
+            homestayId: v.homestayId
+          })));
+        }
+      } catch (err) {
+        console.warn("Lỗi khi tải voucher ví cá nhân:", err);
+      }
+    };
+
+    fetchUserVouchers();
+    return () => { isMounted = false; };
   }, [activeTab]);
 
   // Load cashback wallet data from Spring Boot backend (Neon PostgreSQL) - Cực nhanh & mượt mà
@@ -498,7 +492,7 @@ export default function PersonalAccount() {
     triggerToast("Xóa lịch sử", "Đã xóa toàn bộ lịch sử homestay đã xem gần đây.");
   };
 
-  const handleRedeemVoucher = () => {
+  const handleRedeemVoucher = async () => {
     if (!redeemCode.trim()) {
       alert("Vui lòng nhập mã ưu đãi!");
       return;
@@ -508,21 +502,48 @@ export default function PersonalAccount() {
       triggerToast("Mã đã có", "Mã này đã có trong ví voucher của bạn!");
       return;
     }
-    const newVoucher = {
-      id: Date.now(),
-      code: newCode,
-      title: "Ưu Đãi Đặc Biệt " + newCode,
-      location: "Toàn quốc",
-      rating: "5.0",
-      discountText: "Giảm 150K",
-      condText: "Áp dụng cho mọi đơn đặt homestay",
-      tag: "🎁 MỚI THÊM",
-      tagClass: "tag-teal",
-      img: "https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=600&q=80"
-    };
-    setVouchers([newVoucher, ...vouchers]);
-    setRedeemCode("");
-    triggerToast("Thành công", `Đã lưu mã giảm giá ${newCode} vào ví của bạn!`);
+
+    try {
+      const res = await voucherService.checkVoucher(newCode);
+      if (res && res.valid) {
+        let savedCodes = [];
+        try {
+          const stored = localStorage.getItem('yen_saved_vouchers');
+          if (stored) savedCodes = JSON.parse(stored);
+        } catch (e) {}
+        if (!savedCodes.includes(newCode)) {
+          savedCodes.push(newCode);
+          localStorage.setItem('yen_saved_vouchers', JSON.stringify(savedCodes));
+        }
+
+        const allVouchers = await voucherService.getAllVouchers();
+        const matched = allVouchers.find((v) => v.code === newCode);
+        if (matched) {
+          setVouchers((prev) => [
+            {
+              id: matched.voucherId || matched.id,
+              code: matched.code,
+              title: matched.homestayName || matched.title,
+              location: matched.location || matched.city || "Việt Nam",
+              rating: matched.rating || "5.00",
+              discountText: matched.discountVal,
+              condText: matched.condition,
+              tag: matched.collectionBadge || "✨ MỚI KÍCH HOẠT",
+              tagClass: matched.tagClass || "tag-green",
+              img: matched.homestayImg,
+              homestayId: matched.homestayId
+            },
+            ...prev
+          ]);
+        }
+        setRedeemCode("");
+        triggerToast("Thành công", `Đã kích hoạt và lưu mã "${newCode}" vào ví của bạn!`);
+      } else {
+        alert(res?.message || `Mã "${newCode}" không tồn tại hoặc đã hết hạn.`);
+      }
+    } catch {
+      alert(`Không thể xác thực mã "${newCode}". Vui lòng thử lại sau.`);
+    }
   };
 
   const copyVoucherCode = (code) => {
@@ -1287,7 +1308,7 @@ export default function PersonalAccount() {
                             >
                               <i className="bi bi-clipboard me-1"></i> Copy
                             </button>
-                            <Link to="/homestay-detail" className="btn btn-voucher-use fw-bold">
+                            <Link to={v.homestayId ? `/homestay/${v.homestayId}` : '/homestay'} className="btn btn-voucher-use fw-bold">
                               Xem phòng
                             </Link>
                           </div>

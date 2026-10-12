@@ -65,6 +65,14 @@ public class VoucherController {
             }
         }
 
+        // Map homestay entities by ID
+        Map<Long, Homestay> hsMap = new HashMap<>();
+        for (Homestay h : homestays) {
+            if (h.getId() != null) {
+                hsMap.put(h.getId(), h);
+            }
+        }
+
         DateTimeFormatter dtf = DateTimeFormatter.ofPattern("dd/MM/yyyy");
         LocalDate today = LocalDate.now();
 
@@ -72,7 +80,13 @@ public class VoucherController {
 
         for (int i = 0; i < vouchers.size(); i++) {
             Voucher v = vouchers.get(i);
-            Homestay hs = homestays.isEmpty() ? null : homestays.get(i % homestays.size());
+            Homestay hs = null;
+            if (v.getHomestayId() != null) {
+                hs = hsMap.get(v.getHomestayId());
+            }
+            if (hs == null && !homestays.isEmpty()) {
+                hs = homestays.get(i % homestays.size());
+            }
 
             Map<String, Object> map = new HashMap<>();
             map.put("id", "VCH-DB-" + v.getId());
@@ -88,30 +102,47 @@ public class VoucherController {
             map.put("usedCount", v.getUsedCount());
             map.put("status", v.getStatus());
 
-            // Phân loại mục Voucher:
-            // i == 0, 1, 2, 3 -> hot
-            // i == 4, 5 -> new
-            // i == 6, 7 -> most_used
-            // i >= 8 -> vip
+            // Phân loại mục Voucher theo mã code và tính chất ưu đãi
+            String code = v.getCode() != null ? v.getCode().toUpperCase().trim() : "";
             String section;
             String badge;
             String tagClass;
-            if (i < 3) {
+
+            if (code.equals("HANRIVER200") || code.equals("MEMORY180") || code.equals("TRANGAN120") || code.equals("TOPASHOT500") || code.equals("WELCOME10")) {
                 section = "hot";
                 badge = "🔥 HOT NHẤT";
-                tagClass = (i % 2 == 0) ? "tag-red" : "tag-orange";
-            } else if (i < 5) {
+                tagClass = (code.contains("HOT") || code.contains("HAN") || i % 2 == 0) ? "tag-red" : "tag-orange";
+            } else if (code.equals("BLOOMING100") || code.equals("NHARUONG80") || code.equals("NINHBINH70") || code.equals("PINEHILL60") || code.equals("DALAT15")) {
                 section = "new";
                 badge = "✨ MỚI";
-                tagClass = "tag-green";
-            } else if (i < 7) {
+                tagClass = (i % 2 == 0) ? "tag-green" : "tag-teal";
+            } else if (code.equals("HOIAN150") || code.equals("BANA250") || code.equals("TAMCOC90") || code.equals("LANGCO120") || code.equals("WEEKDAY50K") || code.equals("GIAM100K")) {
                 section = "most_used";
                 badge = "⚡ DÙNG NHIỀU";
-                tagClass = "tag-teal";
-            } else {
+                tagClass = (i % 2 == 0) ? "tag-teal" : "tag-orange";
+            } else if (code.equals("VILLA500") || code.equals("ECOSUITE350") || code.equals("PENTHOUSE600") || code.equals("ROYAL800") || code.equals("LONGSTAY20") || code.equals("BLACKFRIDAY30")) {
                 section = "vip";
                 badge = "🎁 ĐẶC QUYỀN VIP";
                 tagClass = "tag-purple";
+            } else {
+                int mod = i % 4;
+                if (mod == 0) {
+                    section = "hot";
+                    badge = "🔥 HOT NHẤT";
+                    tagClass = "tag-red";
+                } else if (mod == 1) {
+                    section = "new";
+                    badge = "✨ MỚI";
+                    tagClass = "tag-green";
+                } else if (mod == 2) {
+                    section = "most_used";
+                    badge = "⚡ DÙNG NHIỀU";
+                    tagClass = "tag-teal";
+                } else {
+                    section = "vip";
+                    badge = "🎁 ĐẶC QUYỀN VIP";
+                    tagClass = "tag-purple";
+                }
             }
             map.put("section", section);
             map.put("collectionBadge", badge);
