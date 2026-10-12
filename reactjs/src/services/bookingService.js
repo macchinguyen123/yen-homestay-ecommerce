@@ -1,21 +1,52 @@
 const API_BASE_URL = 'http://localhost:8081/api/public/bookings';
 
+let memoryCache = {};
+
 export const bookingService = {
+  /**
+   * Lấy ngay tức thì danh sách đặt phòng từ bộ nhớ đệm (0ms)
+   */
+  getCachedUserBookings(userId) {
+    if (!userId) return [];
+    if (memoryCache[userId] && Array.isArray(memoryCache[userId])) {
+      return memoryCache[userId];
+    }
+    try {
+      const stored = localStorage.getItem(`cached_user_bookings_${userId}`);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed)) {
+          memoryCache[userId] = parsed;
+          return parsed;
+        }
+      }
+    } catch (e) {}
+    return [];
+  },
+
   /**
    * Lấy danh sách lịch sử đặt phòng thật của người dùng từ Neon PostgreSQL
    * @param {number|string} userId ID của du khách
    */
   async getUserBookings(userId) {
+    if (!userId) return [];
     try {
       const response = await fetch(`${API_BASE_URL}/user/${userId}`);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       const data = await response.json();
-      return Array.isArray(data) ? data : [];
+      if (Array.isArray(data)) {
+        memoryCache[userId] = data;
+        try {
+          localStorage.setItem(`cached_user_bookings_${userId}`, JSON.stringify(data));
+        } catch (e) {}
+        return data;
+      }
+      return [];
     } catch (error) {
       console.error(`Lỗi khi tải lịch sử đặt phòng của user ${userId}:`, error);
-      return [];
+      return this.getCachedUserBookings(userId);
     }
   },
 

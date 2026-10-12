@@ -1,6 +1,8 @@
 package vn.edu.hcmuaf.fit.springboot.controller;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
@@ -48,6 +50,7 @@ public class AdminFestivalController {
 
     @PostMapping("/admin/local-content/festivals")
     @Transactional
+    @CacheEvict(value = "publicFestivals", allEntries = true)
     public ResponseEntity<?> create(@RequestBody FestivalRequest request) {
         String validation = validate(request);
         if (validation != null) return ResponseEntity.badRequest().body(Map.of("message", validation));
@@ -60,6 +63,7 @@ public class AdminFestivalController {
 
     @PutMapping("/admin/local-content/festivals/{id}")
     @Transactional
+    @CacheEvict(value = "publicFestivals", allEntries = true)
     public ResponseEntity<?> update(@PathVariable Long id, @RequestBody FestivalRequest request) {
         String validation = validate(request);
         if (validation != null) return ResponseEntity.badRequest().body(Map.of("message", validation));
@@ -73,6 +77,7 @@ public class AdminFestivalController {
 
     @DeleteMapping("/admin/local-content/festivals/{id}")
     @Transactional
+    @CacheEvict(value = "publicFestivals", allEntries = true)
     public ResponseEntity<?> delete(@PathVariable Long id) {
         if (!festivalRepository.existsById(id)) return ResponseEntity.notFound().build();
         festivalHomestayRepository.deleteAllForFestival(id);
@@ -81,6 +86,7 @@ public class AdminFestivalController {
     }
 
     @GetMapping("/public/festivals")
+    @Cacheable("publicFestivals")
     public List<Map<String, Object>> getPublicFestivals() {
         return festivalRepository.findAll().stream()
                 .filter(f -> !"ended".equals(status(f)))
@@ -129,7 +135,12 @@ public class AdminFestivalController {
     private Map<String, Object> toResponse(Festival festival, boolean withHomes, boolean publicOnly) {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("id", festival.getId()); result.put("name", festival.getName()); result.put("city", festival.getCity());
-        result.put("location", festival.getLocation()); result.put("imageUrl", festival.getImageUrl());
+        result.put("location", festival.getLocation());
+        String img = festival.getImageUrl();
+        if (img == null || img.isBlank()) {
+            img = "https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?auto=format&fit=crop&w=1200&q=80";
+        }
+        result.put("imageUrl", img);
         result.put("description", festival.getDescription()); result.put("startDate", festival.getStartDate());
         result.put("endDate", festival.getEndDate()); result.put("badgeInfo", festival.getBadgeInfo());
         String status = status(festival);
@@ -137,12 +148,33 @@ public class AdminFestivalController {
         result.put("nearbyHomestays", 0);
         if (withHomes) {
             List<FestivalHomestay> links = festivalHomestayRepository.findByFestivalIdOrderByDisplayOrderAscIdAsc(festival.getId());
-            List<Homestay> homes = homestayRepository.findAllById(links.stream().map(FestivalHomestay::getHomestayId).toList());
+            List<Homestay> homes = links.isEmpty() ? List.of() : homestayRepository.findAllById(links.stream().map(FestivalHomestay::getHomestayId).toList());
             Map<Long, String> images = primaryImages(homes);
             List<Map<String, Object>> recommended = links.stream().map(link -> homes.stream()
                     .filter(h -> h.getId().equals(link.getHomestayId())).findFirst()
                     .map(h -> homestayResponse(h, images.get(h.getId()), link.getDistanceLabel())).orElse(null))
                     .filter(Objects::nonNull).toList();
+
+            if (recommended.isEmpty() && publicOnly) {
+                List<Homestay> cityHomes = (festival.getCity() != null && !festival.getCity().isBlank())
+                        ? homestayRepository.findByCityIgnoreCase(festival.getCity().trim())
+                        : List.of();
+                if (cityHomes.isEmpty()) {
+                    cityHomes = homestayRepository.findAll();
+                }
+                if (!cityHomes.isEmpty()) {
+                    List<Homestay> chosen = cityHomes.stream().limit(4).toList();
+                    Map<Long, String> chosenImgs = primaryImages(chosen);
+                    List<Map<String, Object>> autoHomes = new ArrayList<>();
+                    for (int i = 0; i < chosen.size(); i++) {
+                        Homestay ch = chosen.get(i);
+                        String distLabel = "Cách điểm tổ chức ~" + ((i + 1) * 350) + "m";
+                        autoHomes.add(homestayResponse(ch, chosenImgs.get(ch.getId()), distLabel));
+                    }
+                    recommended = autoHomes;
+                }
+            }
+
             result.put("nearbyHomestays", recommended.size());
             result.put("homestayIds", links.stream().map(FestivalHomestay::getHomestayId).toList());
             result.put("distanceLabels", links.stream().map(FestivalHomestay::getDistanceLabel).toList());

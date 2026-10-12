@@ -3,6 +3,7 @@ import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import SearchSidebar from '../../../components/SearchSidebar/SearchSidebar';
 import { SAMPLE_HOMESTAYS } from '../../../data/sampleHomestays';
 import { homestayService } from '../../../services/homestayService';
+import VisualSearchModal from '../../../components/VisualSearchModal/VisualSearchModal';
 import './SearchResult.css';
 
 // Hàm chuẩn hóa loại bỏ dấu tiếng Việt để tìm kiếm thông minh
@@ -89,6 +90,7 @@ export default function SearchResult() {
   const queryDestParam = searchParams.get('q') || searchParams.get('destination') || searchParams.get('location') || '';
   const [searchInput, setSearchInput] = useState(queryDestParam);
   const [searchQuery, setSearchQuery] = useState(queryDestParam);
+  const [isVisualSearchOpen, setIsVisualSearchOpen] = useState(false);
 
   // Đồng bộ khi URL thay đổi từ bên ngoài (trang chủ hoặc nút back/forward)
   useEffect(() => {
@@ -448,6 +450,15 @@ export default function SearchResult() {
             >
               Tìm kiếm
             </button>
+            <button
+              type="button"
+              className="search-visual-btn"
+              style={{ width: '44px', height: '44px', marginLeft: '6px' }}
+              title="Tìm kiếm bằng hình ảnh (AI CLIP)"
+              onClick={() => setIsVisualSearchOpen(true)}
+            >
+              <i className="bi bi-camera-fill" />
+            </button>
           </form>
 
           {/* 2. Gợi ý điểm đến phổ biến */}
@@ -705,6 +716,12 @@ export default function SearchResult() {
         <i className="bi bi-check-circle-fill me-2 text-warning"></i>
         {toast.msg}
       </div>
+
+      {/* Visual Search Modal */}
+      <VisualSearchModal
+        isOpen={isVisualSearchOpen}
+        onClose={() => setIsVisualSearchOpen(false)}
+      />
     </main>
   );
 }
