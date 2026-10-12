@@ -305,8 +305,40 @@ public class OwnerBookingService {
         List<OwnerBookingDTO> result = new ArrayList<>();
         try {
             List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql.toString(), params.toArray());
+
+            // Tải trước toàn bộ booking_extras trong 1 câu truy vấn duy nhất để loại bỏ N+1 query
+            Map<Long, List<OwnerBookingServiceItemDTO>> extrasMap = new HashMap<>();
+            try {
+                String extrasSql = """
+                    SELECT be.booking_id,
+                           COALESCE(be.service_name, ea.name, 'Dịch vụ homestay') as name,
+                           be.quantity as qty,
+                           be.price,
+                           (be.quantity * be.price) as total
+                    FROM booking_extras be
+                    LEFT JOIN extra_amenities ea ON be.extra_id = ea.extra_id
+                """;
+                List<Map<String, Object>> extrasRows = jdbcTemplate.queryForList(extrasSql);
+                for (Map<String, Object> er : extrasRows) {
+                    Long bId = ((Number) er.get("booking_id")).longValue();
+                    BigDecimal itemPrice = er.get("price") != null ? (BigDecimal) er.get("price") : BigDecimal.ZERO;
+                    BigDecimal itemTotal = er.get("total") != null ? (BigDecimal) er.get("total") : BigDecimal.ZERO;
+                    OwnerBookingServiceItemDTO item = OwnerBookingServiceItemDTO.builder()
+                            .name((String) er.get("name"))
+                            .qty(er.get("qty") != null ? ((Number) er.get("qty")).intValue() : 1)
+                            .price(itemPrice)
+                            .total(itemTotal)
+                            .build();
+                    extrasMap.computeIfAbsent(bId, k -> new ArrayList<>()).add(item);
+                }
+            } catch (Exception ex) {
+                log.warn("Lỗi load booking extras: {}", ex.getMessage());
+            }
+
             for (Map<String, Object> row : rows) {
-                OwnerBookingDTO dto = mapToOwnerBookingDTO(row);
+                Long bId = ((Number) row.get("booking_id")).longValue();
+                List<OwnerBookingServiceItemDTO> sList = extrasMap.getOrDefault(bId, Collections.emptyList());
+                OwnerBookingDTO dto = mapToOwnerBookingDTO(row, sList);
                 // Lọc theo status tab nếu có
                 if (matchesStatusTab(dto, statusTab)) {
                     result.add(dto);
@@ -325,17 +357,23 @@ public class OwnerBookingService {
         }
         String st = dto.getStatus();
         if (st == null) st = "";
+        String sLower = st.toLowerCase();
         return switch (tab.toLowerCase()) {
-            case "pending", "cho-xac-nhan" -> st.contains("xác nhận") || st.equalsIgnoreCase("PENDING");
-            case "deposit", "da-coc", "checkin", "cho-checkin" -> st.contains("Check-in") || st.contains("Đã cọc") || st.equalsIgnoreCase("CONFIRMED");
-            case "staying", "dang-o" -> st.contains("Đang ở") || st.equalsIgnoreCase("CHECKED_IN") || st.equalsIgnoreCase("STAYING");
-            case "completed", "da-hoan-tat" -> st.contains("hoàn tất") || st.equalsIgnoreCase("COMPLETED");
-            case "cancelled", "da-huy" -> st.contains("hủy") || st.equalsIgnoreCase("CANCELLED") || st.equalsIgnoreCase("REJECTED");
+            case "pending", "cho-xac-nhan" -> sLower.contains("xác nhận") || sLower.contains("pending");
+            case "deposit", "da-coc", "checkin", "cho-checkin" -> sLower.contains("check-in") || sLower.contains("cọc") || sLower.contains("confirmed") || sLower.contains("deposit");
+            case "staying", "dang-o" -> sLower.contains("đang ở") || sLower.contains("ở") || sLower.contains("checked_in") || sLower.contains("staying");
+            case "completed", "da-hoan-tat" -> sLower.contains("hoàn tất") || sLower.contains("completed");
+            case "cancelled", "da-huy" -> sLower.contains("hủy") || sLower.contains("cancelled") || sLower.contains("rejected");
             default -> true;
         };
     }
 
     private OwnerBookingDTO mapToOwnerBookingDTO(Map<String, Object> row) {
+        Long bookingId = ((Number) row.get("booking_id")).longValue();
+        return mapToOwnerBookingDTO(row, getBookingServices(bookingId));
+    }
+
+    private OwnerBookingDTO mapToOwnerBookingDTO(Map<String, Object> row, List<OwnerBookingServiceItemDTO> services) {
         Long bookingId = ((Number) row.get("booking_id")).longValue();
         String bookingCode = (String) row.get("booking_code");
         if (bookingCode == null || bookingCode.isEmpty()) {
@@ -434,9 +472,6 @@ public class OwnerBookingService {
 
         java.sql.Timestamp cTs = (java.sql.Timestamp) row.get("created_at");
         LocalDateTime createdAt = cTs != null ? cTs.toLocalDateTime() : LocalDateTime.now();
-
-        // Lấy danh sách dịch vụ kèm theo từ booking_extras
-        List<OwnerBookingServiceItemDTO> services = getBookingServices(bookingId);
 
         // Timeline động
         List<OwnerBookingTimelineItemDTO> timeline = new ArrayList<>();
@@ -677,10 +712,18 @@ public class OwnerBookingService {
         BigDecimal remainAmount = totalPrice.subtract(depositAmount);
         if (remainAmount.compareTo(BigDecimal.ZERO) < 0) remainAmount = BigDecimal.ZERO;
 
+        Long touristId = 21L;
+        try {
+            List<Long> uList = jdbcTemplate.queryForList("SELECT user_id FROM users LIMIT 1", Long.class);
+            if (!uList.isEmpty()) touristId = uList.get(0);
+        } catch (Exception ignored) {}
+
+        String payType = depositAmount.compareTo(totalPrice) >= 0 ? "FULL" : "DEPOSIT";
+
         Booking booking = Booking.builder()
                 .bookingCode(code)
                 .source(req.getSource() != null ? req.getSource() : "Trực tiếp")
-                .touristId(21L) // Mặc định khách vãng lai
+                .touristId(touristId)
                 .homestayId(homestayId)
                 .roomId(roomId)
                 .guestName(req.getGuestName())
@@ -692,10 +735,11 @@ public class OwnerBookingService {
                 .checkInDate(cin)
                 .checkOutDate(cout)
                 .totalPrice(totalPrice)
+                .discountAmount(BigDecimal.ZERO)
                 .depositAmount(depositAmount)
                 .remainingAmount(remainAmount)
-                .depositStatus("Đã nhận cọc trực tiếp")
-                .paymentType(req.getPaymentMethod() != null ? req.getPaymentMethod() : "CASH")
+                .depositStatus("HELD")
+                .paymentType(payType)
                 .status("Chờ Check-in")
                 .specialRequest(req.getSpecialRequest())
                 .createdAt(LocalDateTime.now())
@@ -708,7 +752,7 @@ public class OwnerBookingService {
             Payment p = Payment.builder()
                     .bookingId(saved.getId())
                     .amount(depositAmount)
-                    .paymentMethod(req.getPaymentMethod() != null ? req.getPaymentMethod() : "CASH")
+                    .paymentMethod(normalizePaymentMethod(req.getPaymentMethod()))
                     .transactionCode("TXN-" + System.currentTimeMillis())
                     .status("SUCCESS")
                     .paidAt(LocalDateTime.now())
@@ -742,7 +786,7 @@ public class OwnerBookingService {
                 Payment p = Payment.builder()
                         .bookingId(b.getId())
                         .amount(paid)
-                        .paymentMethod(req.getPaymentMethod() != null ? req.getPaymentMethod() : "VIETQR")
+                        .paymentMethod(normalizePaymentMethod(req.getPaymentMethod()))
                         .transactionCode("CIN-" + System.currentTimeMillis())
                         .status("SUCCESS")
                         .paidAt(LocalDateTime.now())
@@ -773,7 +817,7 @@ public class OwnerBookingService {
             Payment p = Payment.builder()
                     .bookingId(b.getId())
                     .amount(req.getFinalPaidAmount())
-                    .paymentMethod(req.getPaymentType() != null ? req.getPaymentType() : "VIETQR")
+                    .paymentMethod(normalizePaymentMethod(req.getPaymentType()))
                     .transactionCode("COUT-" + System.currentTimeMillis())
                     .status("SUCCESS")
                     .paidAt(LocalDateTime.now())
@@ -841,7 +885,26 @@ public class OwnerBookingService {
                     BigDecimal total = itemPrice.multiply(BigDecimal.valueOf(item.getQty()));
                     extraTotal = extraTotal.add(total);
 
-                    Long extraId = item.getExtraId() != null ? item.getExtraId() : (extraCounter++ % 100000);
+                    Long extraId = item.getExtraId();
+                    if (extraId == null || extraId <= 0) {
+                        try {
+                            List<Long> matched = jdbcTemplate.queryForList(
+                                "SELECT extra_id FROM extra_amenities WHERE name ILIKE ? LIMIT 1",
+                                Long.class, "%" + item.getName() + "%"
+                            );
+                            if (!matched.isEmpty()) {
+                                extraId = matched.get(0);
+                            }
+                        } catch (Exception ignored) {}
+                    }
+                    if (extraId == null || extraId <= 0) {
+                        try {
+                            List<Long> anyId = jdbcTemplate.queryForList("SELECT extra_id FROM extra_amenities ORDER BY extra_id ASC LIMIT 1", Long.class);
+                            extraId = !anyId.isEmpty() ? anyId.get(0) : 1L;
+                        } catch (Exception ex) {
+                            extraId = 1L;
+                        }
+                    }
 
                     // Insert or update booking_extras
                     jdbcTemplate.update("""
@@ -899,6 +962,15 @@ public class OwnerBookingService {
             log.error("Lỗi khi tìm booking {}: {}", idOrCode, e.getMessage());
         }
         return null;
+    }
+
+    private String normalizePaymentMethod(String rawMethod) {
+        if (rawMethod == null) return "BANK_TRANSFER";
+        String upper = rawMethod.toUpperCase();
+        if (upper.contains("MOMO")) return "MOMO";
+        if (upper.contains("VNPAY") || upper.contains("CARD") || upper.contains("POS")) return "VNPAY";
+        if (upper.contains("CASH") || upper.contains("TIEN_MAT") || upper.contains("TIỀN MẶT") || upper.contains("TIEN MAT")) return "CASH";
+        return "BANK_TRANSFER";
     }
 
     private String formatMoney(BigDecimal amount) {

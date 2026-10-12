@@ -153,11 +153,11 @@ export const INITIAL_BOOKINGS_DATA = [
 ];
 
 export const AVAILABLE_SERVICES = [
-  { name: "Cơm lam & Thịt nướng Mai Châu", price: 180000, unit: "suất (kèm muối vừng)", icon: "restaurant", color: "#16a34a" },
-  { name: "Gà đồi nướng than mộc mắc khén", price: 280000, unit: "con (nướng nguyên con)", icon: "local_fire_department", color: "#ea580c" },
-  { name: "Thuê xe máy dạo bản Lác", price: 150000, unit: "ngày (đầy bình xăng)", icon: "two_wheeler", color: "#0284c7" },
-  { name: "Set lửa trại & bắp khoai nướng", price: 250000, unit: "set (củi nứa + 10 bắp khoai)", icon: "camping", color: "#d97706" },
-  { name: "Thuê trang phục dân tộc Thái chụp ảnh", price: 80000, unit: "bộ (kèm khăn piêu & phụ kiện)", icon: "styler", color: "#9333ea" }
+  { id: 1, name: "Cơm lam & Thịt nướng Mai Châu", price: 180000, unit: "suất (kèm muối vừng)", icon: "restaurant", color: "#16a34a" },
+  { id: 2, name: "Gà đồi nướng than mộc mắc khén", price: 280000, unit: "con (nướng nguyên con)", icon: "local_fire_department", color: "#ea580c" },
+  { id: 3, name: "Thuê xe máy dạo bản Lác", price: 150000, unit: "ngày (đầy bình xăng)", icon: "two_wheeler", color: "#0284c7" },
+  { id: 4, name: "Set lửa trại & bắp khoai nướng", price: 250000, unit: "set (củi nứa + 10 bắp khoai)", icon: "camping", color: "#d97706" },
+  { id: 5, name: "Thuê trang phục dân tộc Thái chụp ảnh", price: 80000, unit: "bộ (kèm khăn piêu & phụ kiện)", icon: "styler", color: "#9333ea" }
 ];
 
 export const ROOM_STATUS_TODAY = [

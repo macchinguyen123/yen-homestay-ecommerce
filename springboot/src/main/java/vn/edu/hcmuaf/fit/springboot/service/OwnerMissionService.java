@@ -141,7 +141,7 @@ public class OwnerMissionService {
                             .needPhoto(true)
                             .autoApprove(false)
                             .givenCount(48)
-                            .status("active")
+                            .status("ACTIVE")
                             .build(),
                     GuestTask.builder()
                             .homestayId(defaultHomestayId)
@@ -156,7 +156,7 @@ public class OwnerMissionService {
                             .needPhoto(true)
                             .autoApprove(false)
                             .givenCount(32)
-                            .status("active")
+                            .status("ACTIVE")
                             .build(),
                     GuestTask.builder()
                             .homestayId(defaultHomestayId)
@@ -171,7 +171,7 @@ public class OwnerMissionService {
                             .needPhoto(true)
                             .autoApprove(false)
                             .givenCount(32)
-                            .status("active")
+                            .status("ACTIVE")
                             .build(),
                     GuestTask.builder()
                             .homestayId(defaultHomestayId)
@@ -186,7 +186,7 @@ public class OwnerMissionService {
                             .needPhoto(true)
                             .autoApprove(false)
                             .givenCount(16)
-                            .status("active")
+                            .status("ACTIVE")
                             .build(),
                     GuestTask.builder()
                             .homestayId(defaultHomestayId)
@@ -201,7 +201,7 @@ public class OwnerMissionService {
                             .needPhoto(true)
                             .autoApprove(false)
                             .givenCount(24)
-                            .status("active")
+                            .status("ACTIVE")
                             .build()
             );
             guestTaskRepository.saveAll(sampleTasks);
@@ -297,7 +297,7 @@ public class OwnerMissionService {
                 .needPhoto(req.getNeedPhoto() != null ? req.getNeedPhoto() : true)
                 .autoApprove(req.getAutoApprove() != null ? req.getAutoApprove() : false)
                 .givenCount(0)
-                .status(req.getStatus() != null ? req.getStatus() : "active")
+                .status(req.getStatus() != null ? req.getStatus().toUpperCase() : "ACTIVE")
                 .build();
         GuestTask saved = guestTaskRepository.save(task);
         return mapToMissionDTO(saved);
@@ -318,7 +318,7 @@ public class OwnerMissionService {
         if (req.getTo() != null) task.setToDate(req.getTo());
         if (req.getNeedPhoto() != null) task.setNeedPhoto(req.getNeedPhoto());
         if (req.getAutoApprove() != null) task.setAutoApprove(req.getAutoApprove());
-        if (req.getStatus() != null) task.setStatus(req.getStatus());
+        if (req.getStatus() != null) task.setStatus(req.getStatus().toUpperCase());
 
         GuestTask updated = guestTaskRepository.save(task);
         return mapToMissionDTO(updated);
@@ -333,7 +333,7 @@ public class OwnerMissionService {
     public OwnerMissionDTO toggleMissionStatus(Long id) {
         GuestTask task = guestTaskRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy nhiệm vụ với ID: " + id));
-        String newStatus = "active".equalsIgnoreCase(task.getStatus()) ? "paused" : "active";
+        String newStatus = "ACTIVE".equalsIgnoreCase(task.getStatus()) ? "INACTIVE" : "ACTIVE";
         task.setStatus(newStatus);
         GuestTask updated = guestTaskRepository.save(task);
         return mapToMissionDTO(updated);

@@ -109,6 +109,10 @@ export const ownerBookingService = {
     return await res.json();
   },
 
+  async createBooking(payload) {
+    return this.createDirectBooking(payload);
+  },
+
   /**
    * Xác nhận Check-in nhận phòng
    */
