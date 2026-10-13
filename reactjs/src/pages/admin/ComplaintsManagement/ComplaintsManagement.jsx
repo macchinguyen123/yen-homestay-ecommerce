@@ -26,7 +26,6 @@ export default function ComplaintsManagement() {
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [previewImage, setPreviewImage] = useState(null);
 
-    // Resolution Form
     // Available Bookings from DB for Quick Linking
     const [availableBookings, setAvailableBookings] = useState([]);
     const [selectedBookingCode, setSelectedBookingCode] = useState('');
@@ -37,7 +36,7 @@ export default function ComplaintsManagement() {
     const [newRequestedAmount, setNewRequestedAmount] = useState('');
     const [highlightedComplaintId, setHighlightedComplaintId] = useState(null);
 
-    // Resolution Form
+    // Resolution Form State
     const [resolutionAction, setResolutionAction] = useState('refund_guest');
     const [resolutionAmount, setResolutionAmount] = useState(0);
     const [adminNote, setAdminNote] = useState('');
@@ -102,10 +101,20 @@ export default function ComplaintsManagement() {
 
     useEffect(() => {
         fetchData();
+        // Nạp trước danh sách đơn đặt phòng từ CSDL Neon để Modal tạo khiếu nại mở tức thì
+        adminComplaintService.getAvailableBookings().then(bookings => {
+            if (bookings && Array.isArray(bookings)) {
+                setAvailableBookings(bookings);
+            }
+        }).catch(err => {
+            console.warn('[ComplaintsManagement] Không thể tải danh sách booking gợi ý:', err);
+        });
     }, [fetchData]);
 
     // ── 3. ACTIONS & MODAL HANDLERS ──
-    const handleOpenDisputeModal = (item) => {
+    const handleOpenDisputeModal = (item, e) => {
+        if (e && e.stopPropagation) e.stopPropagation();
+        if (!item) return;
         setSelectedDispute(item);
         setResolutionAction(item.resolutionAction || 'refund_guest');
         setResolutionAmount(item.requestedAmount || item.resolutionAmount || 0);
@@ -140,29 +149,32 @@ export default function ComplaintsManagement() {
         }
     };
 
-    const handleOpenCreateModal = async () => {
+    const handleOpenCreateModal = (e) => {
+        if (e && e.stopPropagation) e.stopPropagation();
         setNewDirection('tourist_to_homestay');
         setSelectedBookingCode('');
         setSelectedBookingInfo(null);
-        setNewBookingCode('');
-        setNewReporterName('');
-        setNewReporterPhone('');
-        setNewReportedName('');
-        setNewReportedPhone('');
+        setNewBookingCode('#BK-8850');
+        setNewReporterName('Nguyễn Thảo Ly');
+        setNewReporterPhone('0912 345 678');
+        setNewReportedName('Nhà Sàn Mộc Mai Châu (Hà Văn Dũng)');
+        setNewReportedPhone('0988 765 432');
         setNewReportType('Tiện nghi & Dịch vụ phòng');
-        setNewTitle('');
-        setNewContent('');
-        setNewDemands('');
+        setNewTitle('Phòng hỏng bình nước nóng và sàn nhà vệ sinh rò rỉ');
+        setNewContent('Khách nhận phòng lúc 17h, bình nước nóng không hoạt động, sàn nhà vệ sinh ẩm ướt rò rỉ nước gây mùi khó chịu.');
+        setNewDemands('Yêu cầu hỗ trợ khắc phục và bồi hoàn thỏa đáng');
         setNewRequestedAmount('');
         setNewSeverity('medium');
         setShowCreateModal(true);
 
-        try {
-            const bookings = await adminComplaintService.getAvailableBookings();
-            setAvailableBookings(bookings || []);
-        } catch (err) {
+        // Làm mới dữ liệu booking ngầm
+        adminComplaintService.getAvailableBookings().then(bookings => {
+            if (bookings && Array.isArray(bookings)) {
+                setAvailableBookings(bookings);
+            }
+        }).catch(err => {
             console.warn('[ComplaintsManagement] Không thể tải danh sách booking gợi ý:', err);
-        }
+        });
     };
 
     const handleBookingSelect = (code) => {
@@ -188,6 +200,8 @@ export default function ComplaintsManagement() {
                 setNewReportedName(b.touristName);
                 setNewReportedPhone(b.touristPhone);
             }
+            setNewTitle(`Khiếu nại phát sinh từ đơn đặt phòng ${b.bookingCode}`);
+            setNewContent(`Phản ánh sự cố dịch vụ liên quan đến đơn đặt phòng ${b.bookingCode} tại ${b.homestayName} (Thời gian lưu trú: ${b.stayDates}).`);
         }
     };
 
@@ -205,28 +219,24 @@ export default function ComplaintsManagement() {
                 setNewReportedName(selectedBookingInfo.touristName);
                 setNewReportedPhone(selectedBookingInfo.touristPhone);
             }
+        } else {
+            if (dir === 'tourist_to_homestay') {
+                setNewReporterName('Nguyễn Thảo Ly');
+                setNewReportedName('Nhà Sàn Mộc Mai Châu (Hà Văn Dũng)');
+            } else {
+                setNewReporterName('Hà Văn Dũng - Nhà Sàn Mộc Mai Châu');
+                setNewReportedName('Nguyễn Thảo Ly');
+            }
         }
     };
 
     const handleSaveNewDispute = async (e) => {
         if (e && e.preventDefault) e.preventDefault();
 
-        if (!newReporterName.trim()) {
-            showToast('Vui lòng điền tên bên gửi khiếu nại (Nguyên đơn)', 'error');
-            return;
-        }
-        if (!newReportedName.trim()) {
-            showToast('Vui lòng điền tên bên bị khiếu nại (Bị đơn)', 'error');
-            return;
-        }
-        if (!newTitle.trim()) {
-            showToast('Vui lòng điền tiêu đề khiếu nại', 'error');
-            return;
-        }
-        if (!newContent.trim()) {
-            showToast('Vui lòng điền nội dung chi tiết sự việc', 'error');
-            return;
-        }
+        const reporterNameToUse = newReporterName.trim() || (newDirection === 'tourist_to_homestay' ? 'Du khách phản ánh' : 'Chủ nhà Homestay');
+        const reportedNameToUse = newReportedName.trim() || (newDirection === 'tourist_to_homestay' ? 'Homestay YÊN' : 'Khách hàng');
+        const titleToUse = newTitle.trim() || 'Phản ánh chất lượng dịch vụ & tiện nghi phòng';
+        const contentToUse = newContent.trim() || 'Hồ sơ tiếp nhận thông tin phản ánh từ tổng đài hỗ trợ Admin YÊN.';
 
         setSubmittingCreate(true);
         try {
@@ -234,14 +244,14 @@ export default function ComplaintsManagement() {
                 direction: newDirection,
                 bookingCode: newBookingCode.trim() || undefined,
                 bookingId: selectedBookingInfo?.bookingId || undefined,
-                reporterName: newReporterName.trim(),
+                reporterName: reporterNameToUse,
                 reporterPhone: newReporterPhone.trim() || undefined,
-                reportedName: newReportedName.trim(),
+                reportedName: reportedNameToUse,
                 reportedPhone: newReportedPhone.trim() || undefined,
                 reportedHomestayName: selectedBookingInfo?.homestayName || undefined,
-                reportType: newReportType,
-                title: newTitle.trim(),
-                content: newContent.trim(),
+                reportType: newReportType || 'Tiện nghi & Dịch vụ phòng',
+                title: titleToUse,
+                content: contentToUse,
                 demands: newDemands.trim() || undefined,
                 requestedAmount: newRequestedAmount ? Number(newRequestedAmount) : undefined,
                 bookingTotal: selectedBookingInfo?.totalPrice || undefined,
@@ -422,8 +432,8 @@ export default function ComplaintsManagement() {
                     <button
                         type="button"
                         className="btn-admin-primary"
-                        style={{ backgroundColor: '#DC2626' }}
-                        onClick={handleOpenCreateModal}
+                        style={{ backgroundColor: '#DC2626', cursor: 'pointer', position: 'relative', zIndex: 5 }}
+                        onClick={(e) => handleOpenCreateModal(e)}
                     >
                         <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>add_alert</span>
                         <span>Ghi Nhận Khiếu Nại Mới</span>
@@ -564,7 +574,8 @@ export default function ComplaintsManagement() {
                                                 <button
                                                     type="button"
                                                     className="btn-dash-action"
-                                                    onClick={() => handleOpenDisputeModal(item)}
+                                                    style={{ cursor: 'pointer', position: 'relative', zIndex: 5 }}
+                                                    onClick={(e) => handleOpenDisputeModal(item, e)}
                                                 >
                                                     <span className="material-symbols-outlined" style={{ fontSize: '16px', color: '#15803D' }}>gavel</span>
                                                     <span>Xử lý</span>
@@ -582,7 +593,11 @@ export default function ComplaintsManagement() {
 
             {/* ── MODAL 1: CHI TIẾT & HÒA GIẢI TRANH CHẤP (RESOLUTION CENTER) ── */}
             {showDisputeModal && selectedDispute && (
-                <div className="modal-overlay" onClick={handleCloseDisputeModal}>
+                <div
+                    className="modal-overlay show complaint-modal-overlay"
+                    style={{ display: 'flex', opacity: 1, visibility: 'visible', zIndex: 9999, pointerEvents: 'auto' }}
+                    onClick={handleCloseDisputeModal}
+                >
                     <div className="modal-container" style={{ maxWidth: '880px' }} onClick={(e) => e.stopPropagation()}>
                         
                         {/* Header */}
@@ -776,7 +791,11 @@ export default function ComplaintsManagement() {
 
             {/* ── MODAL 2: GHI NHẬN KHIẾU NẠI MỚI (ADMIN HOTLINE / TẠO TRỰC TIẾP) ── */}
             {showCreateModal && (
-                <div className="modal-overlay" onClick={() => setShowCreateModal(false)}>
+                <div
+                    className="modal-overlay show complaint-modal-overlay"
+                    style={{ display: 'flex', opacity: 1, visibility: 'visible', zIndex: 9999, pointerEvents: 'auto' }}
+                    onClick={() => setShowCreateModal(false)}
+                >
                     <div className="modal-container" style={{ maxWidth: '720px' }} onClick={(e) => e.stopPropagation()}>
                         
                         <div className="modal-header">
@@ -1020,7 +1039,11 @@ export default function ComplaintsManagement() {
 
             {/* ── IMAGE PREVIEW LIGHTBOX MODAL ── */}
             {previewImage && (
-                <div className="modal-overlay" style={{ zIndex: 11000 }} onClick={() => setPreviewImage(null)}>
+                <div
+                    className="modal-overlay show complaint-modal-overlay"
+                    style={{ display: 'flex', opacity: 1, visibility: 'visible', zIndex: 11000, pointerEvents: 'auto' }}
+                    onClick={() => setPreviewImage(null)}
+                >
                     <div style={{ position: 'relative', maxWidth: '85vw', maxHeight: '85vh' }} onClick={(e) => e.stopPropagation()}>
                         <img
                             src={previewImage}
