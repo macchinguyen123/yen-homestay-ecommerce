@@ -2,6 +2,7 @@ package vn.edu.hcmuaf.fit.springboot.controller;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import vn.edu.hcmuaf.fit.springboot.model.Homestay;
@@ -162,6 +163,7 @@ public class AdminVoucherController {
      * Admin tạo mã giảm giá mới cho hệ thống hoặc gắn vào một homestay cụ thể
      */
     @PostMapping
+    @CacheEvict(value = "publicVouchers", allEntries = true)
     public ResponseEntity<?> createVoucher(@RequestBody Map<String, Object> body) {
         try {
             String code = getString(body, "code");
@@ -219,6 +221,7 @@ public class AdminVoucherController {
      * Admin chỉnh sửa thông tin mã giảm giá
      */
     @PutMapping("/{id}")
+    @CacheEvict(value = "publicVouchers", allEntries = true)
     public ResponseEntity<?> updateVoucher(@PathVariable Long id, @RequestBody Map<String, Object> body) {
         Optional<Voucher> opt = voucherRepository.findById(id);
         if (opt.isEmpty()) {
@@ -287,6 +290,7 @@ public class AdminVoucherController {
      * Toggle trạng thái ACTIVE <-> DISABLED
      */
     @RequestMapping(value = "/{id}/toggle", method = {RequestMethod.PATCH, RequestMethod.PUT, RequestMethod.POST})
+    @CacheEvict(value = "publicVouchers", allEntries = true)
     public ResponseEntity<?> toggleStatus(@PathVariable Long id) {
         Optional<Voucher> opt = voucherRepository.findById(id);
         if (opt.isEmpty()) {
@@ -308,6 +312,7 @@ public class AdminVoucherController {
      * Xóa mã giảm giá khỏi hệ thống (chỉ khi chưa có ai dùng hoặc admin override)
      */
     @DeleteMapping("/{id}")
+    @CacheEvict(value = "publicVouchers", allEntries = true)
     public ResponseEntity<?> deleteVoucher(@PathVariable Long id) {
         if (!voucherRepository.existsById(id)) {
             return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Không tìm thấy mã giảm giá"));

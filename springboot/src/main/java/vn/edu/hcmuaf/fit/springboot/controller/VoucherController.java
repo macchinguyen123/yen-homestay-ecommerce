@@ -40,36 +40,60 @@ public class VoucherController {
     }
 
     /**
-     * Lấy toàn bộ danh sách voucher thật từ PostgreSQL và kết nối với dữ liệu Homestay thật
+     * Lấy toàn bộ danh sách voucher thật từ PostgreSQL và kết nối với dữ liệu Homestay thật.
+     * Caching kết quả trong bộ nhớ để trả lời ngay lập tức (dưới 5ms).
      */
     @GetMapping
+    @Cacheable("publicVouchers")
     public ResponseEntity<List<Map<String, Object>>> getPublicVouchers() {
         List<Voucher> vouchers = voucherRepository.findAll();
-        List<Homestay> homestays = homestayRepository.findAll();
-        List<HomestayImage> allImages = homestayImageRepository.findAll();
-        List<Review> allReviews = reviewRepository.findAll();
+        if (vouchers == null || vouchers.isEmpty()) {
+            return ResponseEntity.ok(Collections.emptyList());
+        }
 
-        // Map homestay primary images
-        Map<Long, String> imgMap = new HashMap<>();
-        for (HomestayImage img : allImages) {
-            if (img.getHomestayId() != null && (!imgMap.containsKey(img.getHomestayId()) || Boolean.TRUE.equals(img.getIsPrimary()))) {
-                imgMap.put(img.getHomestayId(), img.getImageUrl());
+        // Lấy danh sách ID homestay cần thiết thay vì tải toàn bộ bảng
+        Set<Long> targetHsIds = new HashSet<>();
+        for (Voucher v : vouchers) {
+            if (v.getHomestayId() != null) {
+                targetHsIds.add(v.getHomestayId());
             }
         }
 
-        // Map homestay review counts
-        Map<Long, Integer> revMap = new HashMap<>();
-        for (Review r : allReviews) {
-            if (r.getHomestayId() != null) {
-                revMap.put(r.getHomestayId(), revMap.getOrDefault(r.getHomestayId(), 0) + 1);
-            }
+        List<Homestay> homestays;
+        if (!targetHsIds.isEmpty()) {
+            homestays = homestayRepository.findAllById(targetHsIds);
+        } else {
+            homestays = homestayRepository.findAll();
         }
 
-        // Map homestay entities by ID
         Map<Long, Homestay> hsMap = new HashMap<>();
         for (Homestay h : homestays) {
             if (h.getId() != null) {
                 hsMap.put(h.getId(), h);
+            }
+        }
+
+        List<Long> hsIdList = new ArrayList<>(hsMap.keySet());
+
+        // Map homestay primary images (chỉ cho các homestay có liên quan)
+        Map<Long, String> imgMap = new HashMap<>();
+        if (!hsIdList.isEmpty()) {
+            List<HomestayImage> relevantImages = homestayImageRepository.findByHomestayIdIn(hsIdList);
+            for (HomestayImage img : relevantImages) {
+                if (img.getHomestayId() != null && (!imgMap.containsKey(img.getHomestayId()) || Boolean.TRUE.equals(img.getIsPrimary()))) {
+                    imgMap.put(img.getHomestayId(), img.getImageUrl());
+                }
+            }
+        }
+
+        // Map homestay review counts (chỉ đếm cho các homestay có liên quan)
+        Map<Long, Integer> revMap = new HashMap<>();
+        if (!hsIdList.isEmpty()) {
+            List<Review> relevantReviews = reviewRepository.findByHomestayIdIn(hsIdList);
+            for (Review r : relevantReviews) {
+                if (r.getHomestayId() != null) {
+                    revMap.put(r.getHomestayId(), revMap.getOrDefault(r.getHomestayId(), 0) + 1);
+                }
             }
         }
 

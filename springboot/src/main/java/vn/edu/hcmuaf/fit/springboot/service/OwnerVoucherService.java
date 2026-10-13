@@ -2,6 +2,7 @@ package vn.edu.hcmuaf.fit.springboot.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import vn.edu.hcmuaf.fit.springboot.dto.OwnerVoucherDTO;
@@ -174,6 +175,7 @@ public class OwnerVoucherService {
      * Tạo mã giảm giá mới
      */
     @Transactional
+    @CacheEvict(value = "publicVouchers", allEntries = true)
     public OwnerVoucherDTO createVoucher(OwnerVoucherDTO dto) {
         String code = dto.getCode() != null ? dto.getCode().trim().toUpperCase() : "";
         if (code.isEmpty()) {
@@ -227,6 +229,7 @@ public class OwnerVoucherService {
      * Cập nhật thông tin mã giảm giá
      */
     @Transactional
+    @CacheEvict(value = "publicVouchers", allEntries = true)
     public OwnerVoucherDTO updateVoucher(Long id, OwnerVoucherDTO dto) {
         Voucher v = voucherRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy mã giảm giá với ID: " + id));
@@ -279,6 +282,7 @@ public class OwnerVoucherService {
      * Bật / tắt trạng thái mã giảm giá (ACTIVE <-> DISABLED)
      */
     @Transactional
+    @CacheEvict(value = "publicVouchers", allEntries = true)
     public OwnerVoucherDTO toggleStatus(Long id) {
         Voucher v = voucherRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy mã giảm giá với ID: " + id));
@@ -298,6 +302,7 @@ public class OwnerVoucherService {
      * Xoá mã giảm giá
      */
     @Transactional
+    @CacheEvict(value = "publicVouchers", allEntries = true)
     public boolean deleteVoucher(Long id) {
         if (!voucherRepository.existsById(id)) {
             return false;

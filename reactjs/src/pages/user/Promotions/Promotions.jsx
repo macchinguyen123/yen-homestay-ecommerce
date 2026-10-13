@@ -6,8 +6,15 @@ import './Promotions.css';
 export default function Promotions() {
   const navigate = useNavigate();
 
-  const [vouchers, setVouchers] = useState([]);
-  const [loading, setLoading] = useState(true);
+  // Lấy dữ liệu cache có sẵn để hiển thị ngay lập tức (0ms)
+  const [vouchers, setVouchers] = useState(() => {
+    const cached = voucherService.getCachedVouchers();
+    return Array.isArray(cached) && cached.length > 0 ? cached : [];
+  });
+  const [loading, setLoading] = useState(() => {
+    const cached = voucherService.getCachedVouchers();
+    return !(Array.isArray(cached) && cached.length > 0);
+  });
   const [searchQuery, setSearchQuery] = useState('');
   const [redeemInput, setRedeemInput] = useState('');
 
@@ -26,14 +33,16 @@ export default function Promotions() {
   const [toastMsg, setToastMsg] = useState('');
   const [showToast, setShowToast] = useState(false);
 
-  // Tải danh sách voucher thật từ Neon PostgreSQL
+  // Tải danh sách voucher thật từ Neon PostgreSQL (với cache tăng tốc)
   useEffect(() => {
     let isMounted = true;
     const fetchVouchers = async () => {
       try {
-        setLoading(true);
+        if (!vouchers || vouchers.length === 0) {
+          setLoading(true);
+        }
         const data = await voucherService.getAllVouchers();
-        if (isMounted) {
+        if (isMounted && Array.isArray(data) && data.length > 0) {
           setVouchers(data);
         }
       } catch (err) {
@@ -153,14 +162,20 @@ export default function Promotions() {
 
   const renderGrid = (sectionKey) => {
     if (loading) {
-      return (
-        <div className="empty-section-card py-4 text-center">
-          <div className="spinner-border text-success" role="status">
-            <span className="visually-hidden">Đang tải dữ liệu...</span>
+      return Array.from({ length: 4 }).map((_, idx) => (
+        <div key={idx} className="nearby-card compact-card promo-skeleton-card">
+          <div className="nearby-img-box compact-img-box promo-skeleton-img" />
+          <div className="nearby-body compact-body">
+            <div className="promo-skeleton-line" style={{ width: '55%', marginBottom: '10px' }} />
+            <div className="promo-skeleton-line" style={{ width: '85%', height: '22px', marginBottom: '14px' }} />
+            <div className="compact-voucher-strip promo-skeleton-strip" />
+            <div className="d-flex justify-content-between align-items-center mt-3 pt-2">
+              <div className="promo-skeleton-line" style={{ width: '28%', height: '14px' }} />
+              <div className="promo-skeleton-line" style={{ width: '38%', height: '30px', borderRadius: '8px' }} />
+            </div>
           </div>
-          <p className="mt-2 text-muted">Đang tải mã giảm giá từ hệ thống...</p>
         </div>
-      );
+      ));
     }
 
     const items = filterBySection(sectionKey);

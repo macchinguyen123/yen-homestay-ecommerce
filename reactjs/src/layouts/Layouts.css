@@ -70,6 +70,18 @@
   color: #4338CA;
 }
 
+.user-layout {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.user-main {
+  flex: 1 0 auto;
+  min-height: calc(100vh - 64px - 300px);
+  padding-bottom: 48px;
+}
+
 .user-footer {
   background: #0F172A;
   color: #94A3B8;
