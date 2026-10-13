@@ -1,9 +1,78 @@
 /* ==========================================================================
-   YÊN HOMESTAY ADMIN - VOUCHER APPROVAL & DISCOUNT MANAGEMENT STYLESHEET
+   YÊN HOMESTAY ADMIN – VOUCHER MANAGEMENT (Full Rewrite)
    ========================================================================== */
 
-/* --- 1. Voucher Stat Card Accents --- */
-.voucher-stat-icon-wrapper {
+/* ── 1. Toast Notification ─────────────────────────────────────────────── */
+.vm-toast {
+    position: fixed;
+    top: 24px;
+    right: 24px;
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 20px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
+    animation: vm-slide-in 0.3s ease;
+    max-width: 380px;
+}
+
+@keyframes vm-slide-in {
+    from { transform: translateX(120%); opacity: 0; }
+    to   { transform: translateX(0);    opacity: 1; }
+}
+
+.vm-toast--success {
+    background: #F0FDF4;
+    color: #15803D;
+    border: 1px solid #BBF7D0;
+}
+.vm-toast--error {
+    background: #FEF2F2;
+    color: #DC2626;
+    border: 1px solid #FECDD3;
+}
+
+/* ── 2. Stats Grid ──────────────────────────────────────────────────────── */
+.vm-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+@media (max-width: 1200px) { .vm-stats-grid { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 768px)  { .vm-stats-grid { grid-template-columns: repeat(2, 1fr); } }
+
+.vm-stat-card {
+    background: #fff;
+    border-radius: 12px;
+    border: 1px solid #E2E8F0;
+    padding: 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: all 0.2s ease;
+}
+
+.vm-stat-card--clickable {
+    cursor: pointer;
+}
+.vm-stat-card--clickable:hover {
+    border-color: #15803D;
+    box-shadow: 0 4px 12px rgba(21, 128, 61, 0.1);
+    transform: translateY(-2px);
+}
+
+.vm-stat-info { display: flex; flex-direction: column; gap: 4px; }
+.vm-stat-label { font-size: 12px; font-weight: 600; color: #64748B; }
+.vm-stat-value { font-size: 26px; font-weight: 800; color: #0F172A; line-height: 1.1; }
+.vm-stat-value--sm { font-size: 16px; font-weight: 800; color: #0F172A; }
+
+.vm-stat-icon {
     width: 48px;
     height: 48px;
     border-radius: 12px;
@@ -12,465 +81,893 @@
     justify-content: center;
     flex-shrink: 0;
 }
+.vm-stat-icon .material-symbols-outlined { font-size: 26px; }
+.vm-stat-icon--orange  { background: #FFEDD5; color: #EA580C; }
+.vm-stat-icon--green   { background: #DCFCE7; color: #15803D; }
+.vm-stat-icon--slate   { background: #F1F5F9; color: #64748B; }
+.vm-stat-icon--blue    { background: #DBEAFE; color: #2563EB; }
+.vm-stat-icon--purple  { background: #F3E8FF; color: #9333EA; }
+.vm-stat-icon--red     { background: #FEE2E2; color: #DC2626; }
+.vm-stat-icon--amber   { background: #FEF3C7; color: #D97706; }
 
-.voucher-stat-icon-wrapper.orange {
-    background-color: #FFEDD5;
-    color: #EA580C;
-}
-
-.voucher-stat-icon-wrapper.amber {
-    background-color: #FEF3C7;
-    color: #D97706;
-}
-
-.voucher-stat-icon-wrapper.green {
-    background-color: #F0FDF4;
-    color: #15803D;
-}
-
-.voucher-stat-icon-wrapper.red {
-    background-color: #FEE2E2;
-    color: #DC2626;
-}
-
-.voucher-stat-icon-wrapper.blue {
-    background-color: #E0F2FE;
-    color: #0284C7;
-}
-
-.voucher-stat-icon-wrapper.purple {
-    background-color: #F3E8FF;
-    color: #9333EA;
-}
-
-.voucher-stat-icon-wrapper .material-symbols-outlined {
-    font-size: 26px;
-}
-
-/* --- 2. Coupon Code Badge in Table --- */
-.voucher-code-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 4px 10px;
-    background: #F8FAFC;
-    color: #0F172A;
-    border: 1.5px dashed #CBD5E1;
-    border-radius: 8px;
-    font-family: 'Courier New', Courier, monospace;
-    font-weight: 800;
-    font-size: 13.5px;
-    letter-spacing: 0.5px;
-    transition: all 0.2s ease;
-    cursor: pointer;
-}
-
-.voucher-code-badge:hover {
-    background: #FEF3C7;
-    border-color: #D97706;
-    color: #B45309;
-    transform: scale(1.02);
-}
-
-.voucher-code-badge .copy-icon {
-    font-size: 14px;
-    color: #64748B;
-    opacity: 0.8;
-}
-
-/* --- 3. Host Avatar & Info --- */
-.host-mini-avatar {
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-    background: #15803D;
-    color: #FFFFFF;
-    font-weight: 800;
-    font-size: 13px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-}
-
-/* --- 4. Discount Value Highlights --- */
-.discount-val-badge {
-    font-weight: 800;
-    color: #15803D;
-    font-size: 13.5px;
-    display: flex;
-    align-items: center;
-    gap: 4px;
-}
-
-.discount-condition-sub {
-    font-size: 11.5px;
-    color: #64748B;
-    margin-top: 2px;
-}
-
-/* --- 5. Status Chips for Voucher Approval --- */
-.voucher-status-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    padding: 4px 10px;
-    border-radius: 999px;
-    font-size: 11.5px;
-    font-weight: 700;
-    white-space: nowrap;
-}
-
-.voucher-status-chip.pending {
-    background: #FEF3C7;
-    color: #B45309;
-    border: 1px solid #FDE68A;
-}
-
-.voucher-status-chip.approved {
-    background: #DCFCE7;
-    color: #15803D;
-    border: 1px solid #BBF7D0;
-}
-
-.voucher-status-chip.rejected {
-    background: #FEE2E2;
-    color: #DC2626;
-    border: 1px solid #FECDD3;
-}
-
-/* --- 6. Approval Action Buttons in Table --- */
-.action-btn-group {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 6px;
-}
-
-.btn-approve-sm {
-    background: #15803D;
-    color: #FFFFFF;
-    border: none;
-    border-radius: 6px;
-    padding: 5px 10px;
-    font-size: 12px;
-    font-weight: 700;
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    transition: background 0.2s ease;
-}
-
-.btn-approve-sm:hover {
-    background: #166534;
-}
-
-.btn-reject-sm {
-    background: #FFFFFF;
-    color: #DC2626;
-    border: 1px solid #FECDD3;
-    border-radius: 6px;
-    padding: 4px 9px;
-    font-size: 12px;
-    font-weight: 700;
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    transition: all 0.2s ease;
-}
-
-.btn-reject-sm:hover {
-    background: #FEE2E2;
-    border-color: #DC2626;
-}
-
-.btn-rejected-view-sm {
-    background: #F8FAFC;
-    color: #64748B;
-    border: 1px solid #CBD5E1;
-    border-radius: 6px;
-    padding: 4px 10px;
-    font-size: 11.5px;
-    font-weight: 600;
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-}
-
-.btn-rejected-view-sm:hover {
-    background: #F1F5F9;
-    color: #0F172A;
-}
-
-.approved-tag {
-    font-size: 11.5px;
-    color: #15803D;
-    font-weight: 700;
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-}
-
-/* --- 7. Host Request Banner & Visual Ticket Card in Modal --- */
-.host-request-banner {
-    background: #F8FAFC;
-    border: 1px solid #E2E8F0;
-    border-radius: 12px;
-    padding: 14px 16px;
-}
-
-.host-avatar-badge {
-    width: 44px;
-    height: 44px;
-    border-radius: 50%;
-    background: linear-gradient(135deg, #15803D 0%, #064E3B 100%);
-    color: #FFFFFF;
-    font-weight: 800;
-    font-size: 18px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    box-shadow: 0 2px 6px rgba(21, 128, 61, 0.2);
-}
-
-.voucher-ticket-preview {
-    background: linear-gradient(135deg, #F0FDF4 0%, #DCFCE7 100%);
-    border: 2px dashed #86EFAC;
+/* ── 3. Main Card ───────────────────────────────────────────────────────── */
+.vm-card {
+    background: #fff;
     border-radius: 14px;
-    padding: 18px;
-    position: relative;
+    border: 1px solid #E2E8F0;
     overflow: hidden;
-    margin-bottom: 16px;
-    box-shadow: 0 4px 12px rgba(21, 128, 61, 0.08);
 }
 
-.ticket-header {
+.vm-card-header {
+    padding: 20px 24px;
+    border-bottom: 1px solid #E2E8F0;
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
-    margin-bottom: 10px;
+    gap: 16px;
+    flex-wrap: wrap;
 }
 
-.ticket-brand {
+.vm-card-title-group { flex: 1; }
+
+.vm-card-title {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 800;
+    color: #1E293B;
     display: flex;
     align-items: center;
     gap: 8px;
 }
 
-.ticket-brand-logo {
-    width: 28px;
-    height: 28px;
-    background: #15803D;
-    color: #FFFFFF;
+.vm-card-subtitle {
+    margin: 4px 0 0;
+    font-size: 13px;
+    color: #64748B;
+}
+
+/* ── 4. Tabs Bar ────────────────────────────────────────────────────────── */
+.vm-tabs-bar {
+    display: flex;
+    gap: 6px;
+    padding: 14px 20px;
+    background: #F8FAFC;
+    border-bottom: 1px solid #E2E8F0;
+    flex-wrap: wrap;
+}
+
+.vm-tab-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 7px 14px;
     border-radius: 8px;
+    border: none;
+    background: transparent;
+    color: #64748B;
+    font-size: 12.5px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.18s ease;
+    white-space: nowrap;
+}
+.vm-tab-btn:hover { background: #E2E8F0; color: #1E293B; }
+.vm-tab-btn.active {
+    background: #1E293B;
+    color: #FFFFFF;
+}
+
+/* ── 5. Toolbar ─────────────────────────────────────────────────────────── */
+.vm-toolbar {
+    padding: 14px 20px;
+    background: #FAFAFA;
+    border-bottom: 1px solid #F1F5F9;
     display: flex;
     align-items: center;
-    justify-content: center;
-    font-weight: 800;
-    font-size: 14px;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
 }
 
-.ticket-brand-name {
-    font-size: 13px;
-    font-weight: 800;
-    color: #14532D;
-    letter-spacing: 0.5px;
+.vm-toolbar-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
 }
 
-.ticket-discount-amount {
-    font-size: 24px;
-    font-weight: 800;
-    color: #15803D;
-    line-height: 1.1;
-    margin-bottom: 4px;
-}
-
-.ticket-program-name {
-    font-size: 14px;
-    font-weight: 700;
-    color: #0F172A;
-    margin-bottom: 8px;
-}
-
-.ticket-meta-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
+.vm-search-box {
+    display: flex;
+    align-items: center;
     gap: 6px;
-    padding-top: 10px;
-    border-top: 1px dashed #A7F3D0;
-    font-size: 12px;
-    color: #166534;
+    background: #fff;
+    border: 1px solid #CBD5E1;
+    border-radius: 8px;
+    padding: 7px 12px;
+    min-width: 280px;
+    transition: border-color 0.2s;
+}
+.vm-search-box:focus-within { border-color: #15803D; box-shadow: 0 0 0 3px rgba(21, 128, 61, 0.08); }
+.vm-search-box input {
+    border: none;
+    outline: none;
+    font-size: 13px;
+    width: 100%;
+    color: #0F172A;
+    background: transparent;
 }
 
-.ticket-code-pill {
-    background: #FFFFFF;
-    padding: 4px 12px;
-    border-radius: 6px;
-    font-weight: 800;
-    font-family: monospace;
-    font-size: 14px;
-    color: #15803D;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+.vm-select {
+    padding: 8px 12px;
+    border-radius: 8px;
+    border: 1px solid #CBD5E1;
+    outline: none;
+    font-size: 13px;
+    color: #1E293B;
+    background: #fff;
+    cursor: pointer;
+    transition: border-color 0.2s;
+}
+.vm-select:focus { border-color: #15803D; }
+
+/* ── 6. Buttons ─────────────────────────────────────────────────────────── */
+.vm-btn {
     display: inline-flex;
     align-items: center;
     gap: 6px;
+    padding: 9px 18px;
+    border-radius: 8px;
+    border: none;
+    font-size: 13.5px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.18s ease;
+    white-space: nowrap;
+}
+.vm-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+.vm-btn .material-symbols-outlined { font-size: 18px; }
+
+.vm-btn--primary  { background: #15803D; color: #fff; }
+.vm-btn--primary:hover:not(:disabled) { background: #166534; }
+
+.vm-btn--outline  { background: #fff; color: #475569; border: 1px solid #CBD5E1; }
+.vm-btn--outline:hover:not(:disabled) { background: #F1F5F9; color: #1E293B; }
+
+.vm-btn--danger   { background: #DC2626; color: #fff; }
+.vm-btn--danger:hover:not(:disabled) { background: #B91C1C; }
+
+.vm-btn--sm       { padding: 7px 12px; font-size: 12.5px; }
+
+/* ── 7. Table ───────────────────────────────────────────────────────────── */
+.vm-page-container {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    width: 100%;
 }
 
-.host-note-box {
-    background: #FFFBEB;
-    border: 1px solid #FDE68A;
-    border-radius: 10px;
+.vm-table-wrap {
+    overflow-x: auto;
+    width: 100%;
+}
+
+.vm-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    text-align: left;
+}
+.vm-table thead tr {
+    background: #FAFAFA;
+    border-bottom: 2px solid #E2E8F0;
+}
+.vm-table th {
     padding: 12px 14px;
+    color: #64748B;
+    font-size: 11.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    white-space: nowrap;
+    border-bottom: 2px solid #E2E8F0;
+}
+.vm-table-row {
+    border-bottom: 1px solid #F1F5F9;
+    transition: background 0.15s ease;
+}
+.vm-table-row:hover {
+    background: #F8FAFC;
+}
+.vm-table td {
+    padding: 13px 14px;
+    vertical-align: middle;
+    border-bottom: 1px solid #F1F5F9;
 }
 
-.admin-feedback-box {
-    background: #FEF2F2;
-    border: 1px solid #FECDD3;
-    border-radius: 10px;
-    padding: 12px 14px;
-    margin-top: 12px;
+/* Các cột căn chỉnh thoáng đãng */
+.vm-col-code {
+    white-space: nowrap;
+}
+.vm-col-homestay {
+    max-width: 180px;
+}
+.vm-col-discount {
+    min-width: 150px;
+}
+.vm-col-timeusage {
+    min-width: 150px;
+}
+.vm-col-status {
+    white-space: nowrap;
 }
 
-/* Action Button Tooltips & States */
-.action-icon-btn {
+/* Cột Thao Tác liền mạch với bảng, thoải mái không bị mép che */
+.vm-col-actions {
+    text-align: right;
+    white-space: nowrap;
+    padding-right: 18px !important;
+}
+
+.vm-table-empty {
+    text-align: center;
+    padding: 52px 20px;
+    color: #94A3B8;
+    font-size: 14px;
+}
+.vm-table-empty .material-symbols-outlined { display: block; margin: 0 auto 8px; }
+
+.vm-table-sub { font-size: 11px; color: #94A3B8; margin-top: 2px; }
+
+/* ── 8. Code Badge ──────────────────────────────────────────────────────── */
+.vm-code-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px;
+    background: #F8FAFC;
+    color: #0F172A;
+    border: 1.5px dashed #CBD5E1;
+    border-radius: 6px;
+    font-family: 'Courier New', monospace;
+    font-weight: 800;
+    font-size: 12.5px;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+.vm-code-badge:hover {
+    background: #FEF3C7;
+    border-color: #D97706;
+    color: #92400E;
+    transform: scale(1.02);
+}
+
+/* ── 9. Discount Badge ──────────────────────────────────────────────────── */
+.vm-discount-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    font-weight: 700;
+    font-size: 12px;
+    padding: 2px 7px;
+    border-radius: 5px;
+}
+.vm-discount-badge--percent { color: #15803D; background: #F0FDF4; }
+.vm-discount-badge--amount  { color: #B45309; background: #FFFBEB; }
+
+/* ── 10. System Badge ───────────────────────────────────────────────────── */
+.vm-system-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11.5px;
+    color: #1D4ED8;
+    font-weight: 600;
+    background: #DBEAFE;
+    padding: 2px 7px;
+    border-radius: 5px;
+}
+
+/* ── 11. Homestay Name ──────────────────────────────────────────────────── */
+.vm-hs-name {
+    font-weight: 700;
+    font-size: 12.5px;
+    color: #15803D;
+    max-width: 160px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* ── 12. Usage Bar ──────────────────────────────────────────────────────── */
+.vm-usage-wrap { display: flex; flex-direction: column; gap: 3px; min-width: 80px; }
+.vm-usage-text { font-size: 12px; }
+.vm-usage-bar {
+    height: 5px;
+    background: #E2E8F0;
+    border-radius: 999px;
+    overflow: hidden;
+}
+.vm-usage-bar-fill {
+    height: 100%;
+    border-radius: 999px;
+    transition: width 0.5s ease;
+}
+
+/* ── 13. Status Chip ────────────────────────────────────────────────────── */
+.vm-status-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px;
+    border-radius: 999px;
+    font-size: 11.5px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+.vm-status-chip .material-symbols-outlined { font-size: 13px; }
+
+/* ── 14. Action Buttons ─────────────────────────────────────────────────── */
+.vm-actions {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 6px;
+    white-space: nowrap;
+    width: 100%;
+}
+
+.vm-icon-btn {
     width: 32px;
     height: 32px;
-    border-radius: 6px;
-    border: 1px solid #E2E8F0;
-    background: #FFFFFF;
-    color: #64748B;
+    border-radius: 7px;
+    border: 1px solid transparent;
     display: inline-flex;
     align-items: center;
-    gap: 0;
     justify-content: center;
     cursor: pointer;
     transition: all 0.15s ease;
+    flex-shrink: 0;
+}
+.vm-icon-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+.vm-icon-btn .material-symbols-outlined { font-size: 18px; }
+
+.vm-icon-btn--info    { background: #EFF6FF; color: #2563EB; border-color: #BFDBFE; }
+.vm-icon-btn--info:hover:not(:disabled)    { background: #DBEAFE; }
+
+.vm-icon-btn--edit    { background: #F0FDF4; color: #15803D; border-color: #BBF7D0; }
+.vm-icon-btn--edit:hover:not(:disabled)    { background: #DCFCE7; }
+
+.vm-icon-btn--warn    { background: #FFFBEB; color: #D97706; border-color: #FDE68A; }
+.vm-icon-btn--warn:hover:not(:disabled)    { background: #FEF3C7; }
+
+.vm-icon-btn--success { background: #F0FDF4; color: #15803D; border-color: #BBF7D0; }
+.vm-icon-btn--success:hover:not(:disabled) { background: #DCFCE7; }
+
+.vm-icon-btn--danger  { background: #FEF2F2; color: #DC2626; border-color: #FECDD3; }
+.vm-icon-btn--danger:hover:not(:disabled)  { background: #FEE2E2; }
+
+/* ── 15. Table Footer & Pagination ───────────────────────────────────────── */
+.vm-table-footer {
+    padding: 16px 20px;
+    border-top: 1px solid #E2E8F0;
+    font-size: 13px;
+    color: #64748B;
+    background: #FAFAFA;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
 }
 
-.action-icon-btn:hover {
-    color: #15803D;
+.vm-footer-left {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.vm-footer-info {
+    color: #475569;
+    font-size: 13px;
+}
+
+.vm-page-size-selector {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: #64748B;
+}
+
+.vm-page-select {
+    padding: 5px 10px;
+    border: 1px solid #CBD5E1;
+    border-radius: 6px;
+    background: #fff;
+    color: #0F172A;
+    font-size: 12.5px;
+    font-weight: 600;
+    cursor: pointer;
+    outline: none;
+    transition: border-color 0.15s ease;
+}
+.vm-page-select:focus {
     border-color: #15803D;
-    background: #DCFCE7;
 }
 
-/* Modal styles for this component */
-.modal-overlay {
+.vm-pagination {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.vm-page-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 12px;
+    border: 1px solid #CBD5E1;
+    border-radius: 6px;
+    background: #fff;
+    color: #334155;
+    font-size: 12.5px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+.vm-page-btn:hover:not(:disabled) {
+    background: #F1F5F9;
+    border-color: #94A3B8;
+    color: #0F172A;
+}
+.vm-page-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    background: #F8FAFC;
+}
+.vm-page-btn .material-symbols-outlined {
+    font-size: 16px;
+}
+
+.vm-page-numbers {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.vm-page-num {
+    min-width: 32px;
+    height: 32px;
+    padding: 0 6px;
+    border-radius: 6px;
+    border: 1px solid #E2E8F0;
+    background: #fff;
+    color: #475569;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s ease;
+}
+.vm-page-num:hover:not(.active) {
+    background: #F1F5F9;
+    color: #0F172A;
+    border-color: #CBD5E1;
+}
+.vm-page-num.active {
+    background: #15803D;
+    border-color: #15803D;
+    color: #FFFFFF;
+    box-shadow: 0 2px 6px rgba(21, 128, 61, 0.25);
+}
+
+/* ── 16. Loading ────────────────────────────────────────────────────────── */
+.vm-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 60px;
+    color: #94A3B8;
+    font-size: 14px;
+}
+.vm-spinner {
+    width: 36px;
+    height: 36px;
+    border: 3px solid #E2E8F0;
+    border-top-color: #15803D;
+    border-radius: 50%;
+    animation: vm-spin 0.75s linear infinite;
+}
+.vm-spinner-sm {
+    width: 14px;
+    height: 14px;
+    border: 2px solid rgba(255,255,255,0.4);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: vm-spin 0.75s linear infinite;
+    display: inline-block;
+}
+@keyframes vm-spin { to { transform: rotate(360deg); } }
+
+/* ── 17. Modal ──────────────────────────────────────────────────────────── */
+.vm-modal-overlay {
     position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(15, 23, 42, 0.6);
+    inset: 0;
+    background: rgba(15, 23, 42, 0.58);
+    backdrop-filter: blur(3px);
     display: flex;
     align-items: center;
     justify-content: center;
     z-index: 1000;
     opacity: 0;
     pointer-events: none;
-    transition: all 0.3s ease;
+    transition: opacity 0.25s ease;
+    padding: 20px;
 }
-
-.modal-overlay.open {
+.vm-modal-overlay--open {
     opacity: 1;
     pointer-events: auto;
 }
-
-.modal-container {
-    background: #FFFFFF;
-    border-radius: 12px;
-    width: 90%;
-    max-width: 720px;
+.vm-modal-container {
+    background: #fff;
+    border-radius: 14px;
+    width: 100%;
     max-height: 90vh;
     overflow-y: auto;
-    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-    transform: translateY(20px);
-    transition: all 0.3s ease;
+    box-shadow: 0 25px 50px rgba(0, 0, 0, 0.18);
+    transform: translateY(24px) scale(0.97);
+    transition: all 0.25s ease;
+}
+.vm-modal-overlay--open .vm-modal-container {
+    transform: translateY(0) scale(1);
 }
 
-.modal-overlay.open .modal-container {
-    transform: translateY(0);
-}
-
-.modal-header {
+/* Modal Header variants */
+.vm-modal-header {
     display: flex;
-    justify-content: space-between;
     align-items: center;
-    padding: 16px 24px;
+    justify-content: space-between;
+    padding: 18px 24px;
     border-bottom: 1px solid #E2E8F0;
+    gap: 12px;
 }
+.vm-modal-header--green { background: linear-gradient(135deg, #052E16 0%, #15803D 100%); }
+.vm-modal-header--blue  { background: linear-gradient(135deg, #1E3A5F 0%, #2563EB 100%); }
+.vm-modal-header--dark  { background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%); }
+.vm-modal-header--red   { background: linear-gradient(135deg, #7F1D1D 0%, #DC2626 100%); }
 
-.modal-title {
+.vm-modal-title {
     margin: 0;
-    font-size: 18px;
+    font-size: 17px;
     font-weight: 700;
     display: flex;
     align-items: center;
     gap: 8px;
+    color: #fff;
 }
 
-.modal-close-btn {
+.vm-modal-close {
     background: transparent;
     border: none;
     cursor: pointer;
+    padding: 4px;
+    border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 4px;
-    border-radius: 50%;
+    color: rgba(255,255,255,0.8);
     transition: background 0.2s;
 }
+.vm-modal-close:hover { background: rgba(255,255,255,0.15); color: #fff; }
 
-.modal-close-btn:hover {
-    background: rgba(0, 0, 0, 0.1);
-}
+.vm-modal-close--white { color: #fff; }
 
-.modal-body {
-    padding: 24px;
-}
-
-.modal-footer {
+.vm-modal-body { padding: 24px; }
+.vm-modal-footer {
     padding: 16px 24px;
     border-top: 1px solid #E2E8F0;
     display: flex;
     justify-content: flex-end;
-    gap: 12px;
+    gap: 10px;
+    background: #FAFAFA;
 }
 
-.btn-admin-cancel {
-    background: #F1F5F9;
-    color: #475569;
-    border: 1px solid #CBD5E1;
-    padding: 8px 16px;
+/* ── 18. Voucher Ticket Preview ─────────────────────────────────────────── */
+.vm-ticket {
+    background: linear-gradient(135deg, #F0FDF4 0%, #DCFCE7 100%);
+    border: 2px dashed #86EFAC;
+    border-radius: 14px;
+    padding: 20px;
+    margin-bottom: 20px;
+    box-shadow: 0 4px 14px rgba(21, 128, 61, 0.09);
+}
+.vm-ticket-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+.vm-ticket-brand {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.vm-ticket-brand-name {
+    font-size: 13px;
+    font-weight: 800;
+    color: #14532D;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.vm-ticket-amount {
+    font-size: 22px;
+    font-weight: 800;
+    color: #15803D;
+    line-height: 1.2;
+    margin-bottom: 4px;
+}
+.vm-ticket-meta {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px;
+    padding-top: 12px;
+    border-top: 1px dashed #A7F3D0;
+    font-size: 12px;
+    color: #166534;
+}
+
+/* ── 19. Detail Grid ────────────────────────────────────────────────────── */
+.vm-detail-grid { display: flex; flex-direction: column; gap: 8px; }
+.vm-detail-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px 12px;
+    background: #F8FAFC;
     border-radius: 8px;
-    font-size: 14px;
+}
+.vm-detail-row-label {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 12.5px;
     font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s;
+    color: #64748B;
+    min-width: 160px;
+    flex-shrink: 0;
+}
+.vm-detail-row-value {
+    font-size: 13px;
+    font-weight: 600;
+    color: #0F172A;
+    flex: 1;
 }
 
-.btn-admin-cancel:hover {
-    background: #E2E8F0;
-    color: #1E293B;
+/* ── 20. Alert ──────────────────────────────────────────────────────────── */
+.vm-alert {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 12px 16px;
+    border-radius: 10px;
+    font-size: 13.5px;
+}
+.vm-alert .material-symbols-outlined { font-size: 20px; flex-shrink: 0; margin-top: 1px; }
+.vm-alert--danger {
+    background: #FEF2F2;
+    color: #DC2626;
+    border: 1px solid #FECDD3;
 }
 
-.btn-admin-primary {
-    background: #15803D;
-    color: #FFFFFF;
-    border: none;
-    padding: 8px 16px;
+/* ── 21. Form ───────────────────────────────────────────────────────────── */
+.vm-form { display: flex; flex-direction: column; gap: 0; }
+.vm-form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+@media (max-width: 600px) { .vm-form-row { grid-template-columns: 1fr; } }
+
+.vm-form-group { display: flex; flex-direction: column; gap: 5px; }
+.vm-form-label { font-size: 13px; font-weight: 700; color: #0F172A; }
+.vm-form-hint  { font-size: 11.5px; color: #94A3B8; }
+
+.vm-form-input,
+.vm-form-select {
+    padding: 9px 13px;
+    border: 1.5px solid #CBD5E1;
     border-radius: 8px;
-    font-size: 14px;
-    font-weight: 600;
+    font-size: 13.5px;
+    color: #0F172A;
+    outline: none;
+    transition: border-color 0.18s, box-shadow 0.18s;
+    background: #fff;
+    width: 100%;
+    box-sizing: border-box;
+}
+.vm-form-input:focus,
+.vm-form-select:focus {
+    border-color: #15803D;
+    box-shadow: 0 0 0 3px rgba(21, 128, 61, 0.1);
+}
+.vm-form-input--mono { font-family: 'Courier New', monospace; font-weight: 800; letter-spacing: 0.5px; }
+
+/* Legacy classes – kept for backward compat */
+.voucher-stat-icon-wrapper,
+.host-mini-avatar,
+.voucher-code-badge,
+.discount-val-badge,
+.discount-condition-sub,
+.voucher-status-chip,
+.action-btn-group,
+.btn-approve-sm,
+.btn-reject-sm,
+.btn-rejected-view-sm,
+.approved-tag,
+.host-request-banner,
+.host-avatar-badge,
+.voucher-ticket-preview,
+.ticket-header,
+.ticket-brand,
+.ticket-brand-logo,
+.ticket-brand-name,
+.ticket-discount-amount,
+.ticket-program-name,
+.ticket-meta-grid,
+.ticket-code-pill,
+.host-note-box,
+.admin-feedback-box,
+.action-icon-btn,
+.modal-overlay,
+.modal-container,
+.modal-header,
+.modal-title,
+.modal-close-btn,
+.modal-body,
+.modal-footer,
+.btn-admin-cancel,
+.btn-admin-primary { /* all legacy — overridden by new vm-* classes */ }
+
+/* ── HomestayPicker ────────────────────────────────────────────────────────── */
+.vm-hs-picker {
+    position: relative;
+    width: 100%;
+}
+
+.vm-hs-picker-trigger {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 12px;
+    border: 1.5px solid #E2E8F0;
+    border-radius: 8px;
+    background: #fff;
     cursor: pointer;
+    font-size: 13.5px;
+    color: #0F172A;
+    min-height: 40px;
+    transition: border-color 0.18s, box-shadow 0.18s;
+    user-select: none;
+}
+
+.vm-hs-picker-trigger:hover,
+.vm-hs-picker-trigger.open {
+    border-color: #15803D;
+    box-shadow: 0 0 0 3px rgba(21,128,61,0.10);
+}
+
+.vm-hs-picker-selected {
     display: flex;
     align-items: center;
     gap: 6px;
-    transition: all 0.2s;
+    flex: 1;
+    min-width: 0;
 }
 
-.btn-admin-primary:hover {
-    filter: brightness(1.1);
+.vm-hs-picker-name {
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
+
+.vm-hs-picker-id {
+    color: #64748B;
+    font-size: 11px;
+    background: #F1F5F9;
+    padding: 1px 6px;
+    border-radius: 4px;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.vm-hs-picker-placeholder {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: 1;
+    color: #94A3B8;
+}
+
+.vm-hs-picker-dropdown {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    background: #fff;
+    border: 1.5px solid #E2E8F0;
+    border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+    z-index: 1000;
+    overflow: hidden;
+    animation: vm-slide-in-down 0.15s ease;
+}
+
+@keyframes vm-slide-in-down {
+    from { opacity: 0; transform: translateY(-6px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+.vm-hs-picker-search {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border-bottom: 1px solid #F1F5F9;
+    background: #FAFAFA;
+}
+
+.vm-hs-picker-search input {
+    flex: 1;
+    border: none;
+    outline: none;
+    font-size: 13px;
+    background: transparent;
+    color: #0F172A;
+}
+
+.vm-hs-picker-search input::placeholder { color: #CBD5E1; }
+
+.vm-hs-picker-list {
+    max-height: 220px;
+    overflow-y: auto;
+}
+
+.vm-hs-picker-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 14px;
+    cursor: pointer;
+    font-size: 13px;
+    color: #334155;
+    transition: background 0.12s;
+}
+
+.vm-hs-picker-item:hover { background: #F8FAFC; }
+.vm-hs-picker-item.active { background: #F0FDF4; }
+.vm-hs-picker-item--global { border-bottom: 1px solid #F1F5F9; }
+
+.vm-hs-picker-clear {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    font-size: 12px;
+    color: #DC2626;
+    border-top: 1px solid #FEE2E2;
+    cursor: pointer;
+    background: #FFF5F5;
+    transition: background 0.12s;
+}
+
+.vm-hs-picker-clear:hover { background: #FEE2E2; }
