@@ -33,7 +33,7 @@ public class EmailService {
             message.setTo(toEmail);
             message.setSubject("Xác thực tài khoản YÊN Homestay");
             message.setText("Chào bạn,\n\nVui lòng nhấn vào đường dẫn sau để kích hoạt tài khoản của bạn:\n"
-                    + verifyUrl + "\n\nĐường dẫn có hiệu lực trong 24 giờ.\n\nTrân trọng,\nĐội ngũ YÊN Homestay");
+                    + verifyUrl + "\n\nĐường dẫn có hiệu lực trong 15 phút. Nếu quá thời gian này, tài khoản chưa kích hoạt sẽ được xóa khỏi hệ thống và bạn cần đăng ký lại.\n\nTrân trọng,\nĐội ngũ YÊN Homestay");
             mailSender.send(message);
             log.info("Verification email sent successfully to {}", toEmail);
             return true;
