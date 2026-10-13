@@ -6,6 +6,7 @@ import { viewedHistoryService } from '../../../services/viewedHistoryService';
 import { roomService } from '../../../services/roomService';
 import { homestayService } from '../../../services/homestayService';
 import { reviewService } from '../../../services/reviewService';
+import { ownerService } from '../../../services/ownerService';
 import { SAMPLE_HOMESTAYS } from '../../../data/sampleHomestays';
 import {
   roomsData, galleryImages, amenitiesData, AMENITY_GROUPS,
@@ -25,11 +26,13 @@ function reviewAvatarStyle(name) {
   return { background: avatarColors[hash % avatarColors.length] };
 }
 function experiencePriceLabel(x) {
-  return x.price > 0 ? `${fmtVND(x.price)} ${x.unit}` : 'Miễn phí';
+  const p = Number(x?.price || 0);
+  return p > 0 ? `${fmtVND(p)} ${x?.unit || ''}` : 'Miễn phí';
 }
 function matchExperience(x, category, cost) {
+  const p = Number(x?.price || 0);
   return (category === 'all' || x.category === category) &&
-    (cost === 'all' || (cost === 'free' ? x.price === 0 : x.price > 0));
+    (cost === 'all' || (cost === 'free' ? p === 0 : p > 0));
 }
 
 // ─── Sub-components ────────────────────────────────────────────
@@ -529,7 +532,9 @@ function ReviewsDrawer({ open, onClose, reviews = [], homestayRating = '5.0', on
 }
 
 /** Experiences Drawer */
-function ExperiencesDrawer({ open, onClose, onScrollToRooms }) {
+function ExperiencesDrawer({ open, onClose, onScrollToRooms, experiences, loadingExperiences }) {
+  // Dùng experiences từ DB (nếu có), fallback về experiencesData static
+  const activeExperiences = (experiences && experiences.length > 0) ? experiences : experiencesData;
   const [category, setCategory] = useState('all');
   const [cost, setCost] = useState('all');
   const focusItemRef = useRef(null);
@@ -544,7 +549,7 @@ function ExperiencesDrawer({ open, onClose, onScrollToRooms }) {
     return () => window.removeEventListener('keydown', handler);
   }, [open, onClose]);
 
-  const result = experiencesData.filter((x) => matchExperience(x, category, cost));
+  const result = activeExperiences.filter((x) => matchExperience(x, category, cost));
   const cat = EXPERIENCE_CATEGORIES.find((c) => c.id === category);
   const costItem = EXPERIENCE_COSTS.find((c) => c.id === cost);
 
@@ -561,7 +566,7 @@ function ExperiencesDrawer({ open, onClose, onScrollToRooms }) {
         <div className="rv-summary">
           <div className="xp-summary-icon"><i className="bi bi-stars" /></div>
           <div className="rv-summary-text">
-            <strong>{result.length} trải nghiệm</strong>
+            <strong>{loadingExperiences ? 'Đang tải...' : `${result.length} trải nghiệm`}</strong>
             <span>{(cat ? cat.label : 'Tất cả nhóm trải nghiệm') + (cost === 'all' ? '' : ` · ${costItem.label}`)}</span>
           </div>
         </div>
@@ -570,7 +575,7 @@ function ExperiencesDrawer({ open, onClose, onScrollToRooms }) {
             <span className="rv-filter-label">Nhóm trải nghiệm</span>
             <div className="rv-chip-row">
               {[{ id: 'all', label: 'Tất cả' }, ...EXPERIENCE_CATEGORIES].map((c) => {
-                const count = experiencesData.filter((x) => matchExperience(x, c.id, cost)).length;
+                const count = activeExperiences.filter((x) => matchExperience(x, c.id, cost)).length;
                 return (
                   <button key={c.id} type="button" className={`yn-chip ${category === c.id ? 'active' : ''}`}
                     onClick={() => setCategory(c.id)}>
@@ -584,7 +589,7 @@ function ExperiencesDrawer({ open, onClose, onScrollToRooms }) {
             <span className="rv-filter-label">Chi phí</span>
             <div className="rv-chip-row">
               {EXPERIENCE_COSTS.map((c) => {
-                const count = experiencesData.filter((x) => matchExperience(x, category, c.id)).length;
+                const count = activeExperiences.filter((x) => matchExperience(x, category, c.id)).length;
                 return (
                   <button key={c.id} type="button" className={`yn-chip ${cost === c.id ? 'active' : ''}`}
                     onClick={() => setCost(c.id)}>
@@ -597,8 +602,10 @@ function ExperiencesDrawer({ open, onClose, onScrollToRooms }) {
         </div>
         <div className="rv-result-bar">
           <span>
-            {result.length
-              ? `Hiển thị ${result.length} / ${experiencesData.length} trải nghiệm`
+            {loadingExperiences
+              ? 'Đang tải dữ liệu trải nghiệm từ CSDL...'
+              : result.length
+              ? `Hiển thị ${result.length} / ${activeExperiences.length} trải nghiệm`
               : 'Không có trải nghiệm phù hợp'}
           </span>
         </div>
@@ -610,7 +617,7 @@ function ExperiencesDrawer({ open, onClose, onScrollToRooms }) {
                 <article key={x.id} className="xp-item" ref={focusItemRef} data-xp-id={x.id}>
                   <div className="xp-item-media">
                     <img
-                      src={unsplashUrl(x.img, 1000)} alt={x.title} loading="lazy"
+                      src={x.img && (x.img.startsWith('http') || x.img.startsWith('/')) ? x.img : unsplashUrl(x.img || EXPERIENCE_FALLBACK_IMG, 1000)} alt={x.title} loading="lazy"
                       onError={(e) => { e.target.onerror = null; e.target.src = unsplashUrl(EXPERIENCE_FALLBACK_IMG, 1000); }}
                     />
                     <span className="xp-badge"><i className={`bi ${xcat?.icon}`} /> {xcat?.label}</span>
@@ -624,7 +631,7 @@ function ExperiencesDrawer({ open, onClose, onScrollToRooms }) {
                       <span><i className="bi bi-people" />{x.people}</span>
                     </div>
                     <ul className="xp-item-includes">
-                      {x.includes.map((t, i) => (
+                      {(x.includes || []).map((t, i) => (
                         <li key={i}><i className="bi bi-check2" /><span>{t}</span></li>
                       ))}
                     </ul>
@@ -792,6 +799,10 @@ export default function HomestayDetail() {
   const [reviewStats, setReviewStats] = useState(null);
   const [loadingReviews, setLoadingReviews] = useState(true);
 
+  // Trải nghiệm (dịch vụ) của homestay từ CSDL
+  const [dbExperiences, setDbExperiences] = useState([]);
+  const [loadingExperiences, setLoadingExperiences] = useState(false);
+
   // Bộ lọc và phân trang đánh giá trực tiếp trên trang Homestay
   const [pageReviewStars, setPageReviewStars] = useState('all');
   const [pageReviewPhotoOnly, setPageReviewPhotoOnly] = useState(false);
@@ -844,19 +855,52 @@ export default function HomestayDetail() {
           setLoading(false);
         }
 
-        // Nạp song song Reviews và Stats trong nền
-        if (homestayIdNum) {
+        // Nạp song song Reviews, Stats và Experiences trong nền
+        const targetHsId = homestayIdNum || (activeH?.id && !isNaN(activeH.id) ? Number(activeH.id) : 1);
+        if (targetHsId) {
+          setLoadingExperiences(true);
           Promise.all([
-            reviewService.getReviewsByHomestayId(homestayIdNum),
-            reviewService.getReviewStats(homestayIdNum)
-          ]).then(([revs, stats]) => {
+            reviewService.getReviewsByHomestayId(targetHsId),
+            reviewService.getReviewStats(targetHsId),
+            ownerService.getServices(targetHsId).catch(() => null),
+          ]).then(([revs, stats, services]) => {
             if (isMounted) {
               if (revs && revs.length > 0) setDbReviews(revs);
               if (stats) setReviewStats(stats);
+              if (Array.isArray(services) && services.length > 0) {
+                // Chuyển dịch vụ sang định dạng trải nghiệm hiển thị
+                const expMapped = services.map((svc) => {
+                  const cat = (svc.category || '').toLowerCase();
+                  const expCategory = cat.includes('activity') || cat.includes('outdoor') ? 'thiennhien' :
+                    cat.includes('food') || cat.includes('am') ? 'amthuc' :
+                    cat.includes('farm') || cat.includes('nong') ? 'nongtrai' : 'thugian';
+                  return {
+                    id: String(svc.id || svc.name),
+                    category: expCategory,
+                    title: svc.name || 'Dịch vụ trải nghiệm',
+                    summary: svc.description || '',
+                    img: svc.image || EXPERIENCE_FALLBACK_IMG,
+                    duration: '',
+                    time: 'Liên hệ chủ nhà',
+                    people: 'Mọi lứa tuổi',
+                    price: Number(svc.price || 0),
+                    unit: svc.unit || (Number(svc.price) > 0 ? '/ khách' : ''),
+                    includes: [],
+                    note: '',
+                    booking: 'Liên hệ chủ nhà',
+                  };
+                });
+                setDbExperiences(expMapped);
+              }
+              setLoadingExperiences(false);
               setLoadingReviews(false);
             }
           }).catch(err => {
-            console.warn('Lỗi tải đánh giá phụ:', err);
+            console.warn('Lỗi tải đánh giá phụ hoặc trải nghiệm:', err);
+            if (isMounted) {
+              setLoadingExperiences(false);
+              setLoadingReviews(false);
+            }
           });
         }
       } catch (err) {
@@ -992,7 +1036,10 @@ export default function HomestayDetail() {
   const minPrice = rooms.length > 0 ? Math.min(...rooms.map((r) => Number(r.price || r.pricePerNight || 0))) : 890000;
 
   const amenitiesPreview = amenitiesData.filter((a) => a.preview).sort((a, b) => a.preview - b.preview);
-  const expPreview = EXPERIENCE_PREVIEW_IDS.map((id) => experiencesData.find((x) => x.id === id)).filter(Boolean);
+  // Preview trải nghiệm: ưu tiên từ CSDL, fallback về static data
+  const expPreview = dbExperiences.length > 0
+    ? dbExperiences.slice(0, 4)
+    : EXPERIENCE_PREVIEW_IDS.map((eid) => experiencesData.find((x) => x.id === eid)).filter(Boolean);
 
   const relatedHomestays = useMemo(() => {
     const others = SAMPLE_HOMESTAYS.filter(
@@ -1213,6 +1260,59 @@ export default function HomestayDetail() {
               </div>
               <button type="button" className="yn-btn yn-btn--outline" onClick={() => setAmDrawer(true)}>
                 Hiển thị tất cả {amenitiesData.length} tiện nghi
+              </button>
+            </div>
+            <div className="detail-divider" />
+
+            {/* 4.4b TRẢI NGHIỆM HOMESTAY MANG LẠI */}
+            <div className="detail-block experience-section" id="experiencesSection">
+              <div className="experience-head">
+                <div>
+                  <h3 className="experience-title">
+                    <i className="bi bi-stars" /> Trải nghiệm tại homestay
+                  </h3>
+                  <p className="experience-sub">
+                    Những hoạt động, đặc sản và trải nghiệm văn hóa bản địa do chủ nhà tổ chức hoặc hướng dẫn.
+                  </p>
+                </div>
+                <span className="experience-count-note">
+                  {loadingExperiences ? 'Đang tải...' : `${(dbExperiences.length > 0 ? dbExperiences : experiencesData).length} trải nghiệm`}
+                </span>
+              </div>
+
+              <div className="experience-grid">
+                {expPreview.map((x) => {
+                  const xcat = EXPERIENCE_CATEGORIES.find((c) => c.id === x.category);
+                  const isDb = x.img && (x.img.startsWith('http') || x.img.startsWith('/'));
+                  const imgSrc = isDb ? x.img : unsplashUrl(x.img || EXPERIENCE_FALLBACK_IMG, 700);
+                  return (
+                    <article key={x.id} className="xp-card" onClick={() => setExpDrawer(true)}>
+                      <div className="xp-card-media">
+                        <img
+                          src={imgSrc}
+                          alt={x.title}
+                          loading="lazy"
+                          onError={(e) => { e.target.onerror = null; e.target.src = unsplashUrl(EXPERIENCE_FALLBACK_IMG, 700); }}
+                        />
+                        <span className={`xp-badge ${Number(x.price) === 0 ? 'xp-badge--free' : ''}`}>
+                          <i className={`bi ${xcat?.icon || 'bi-stars'}`} /> {xcat?.label || 'Trải nghiệm'}
+                        </span>
+                      </div>
+                      <div className="xp-card-body">
+                        <span className="xp-cat"><i className="bi bi-tag-fill" /> {xcat?.label || 'Bản địa'}</span>
+                        <h4 className="xp-card-name">{x.title}</h4>
+                        <div className="xp-card-meta">
+                          <i className="bi bi-cash-coin" />
+                          <span>{experiencePriceLabel(x)}</span>
+                        </div>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+
+              <button type="button" className="yn-btn yn-btn--outline" onClick={() => setExpDrawer(true)}>
+                Hiển thị tất cả {(dbExperiences.length > 0 ? dbExperiences : experiencesData).length} trải nghiệm
               </button>
             </div>
             <div className="detail-divider" />
@@ -1554,6 +1654,14 @@ export default function HomestayDetail() {
       <AmenitiesDrawer
         open={amDrawer}
         onClose={() => setAmDrawer(false)}
+      />
+
+      <ExperiencesDrawer
+        open={expDrawer}
+        experiences={dbExperiences}
+        loadingExperiences={loadingExperiences}
+        onClose={() => setExpDrawer(false)}
+        onScrollToRooms={scrollToRooms}
       />
 
       <Toast message={toast.msg} show={toast.show} />

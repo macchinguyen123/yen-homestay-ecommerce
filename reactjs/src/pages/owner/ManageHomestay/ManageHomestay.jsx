@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import './ManageHomestay.css';
+import { authService } from '../../../services/authService';
 import {
   NEW_34_PROVINCES,
   SAMPLE_WARDS,
@@ -15,7 +16,7 @@ import {
 
 export default function ManageHomestay() {
   // ── States ───────────────────────────────────────────────────────────
-  const [homestays, setHomestays] = useState(INITIAL_HOMESTAYS);
+  const [homestays, setHomestays] = useState([]);
   const [staffAssignments, setStaffAssignments] = useState(INITIAL_STAFF_ASSIGNMENTS);
   const [highlightedRowId, setHighlightedRowId] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -37,16 +38,18 @@ export default function ManageHomestay() {
   const fetchRealHomestays = async () => {
     setLoading(true);
     try {
+      const user = authService.getCurrentUser();
+      const ownerId = user?.id || 1;
       const token = localStorage.getItem('token');
-      let response = await fetch('http://localhost:8081/api/admin/homestays', {
+      let response = await fetch(`http://localhost:8081/api/admin/homestays?ownerId=${ownerId}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (!response.ok) {
-        response = await fetch('http://localhost:8081/api/public/admin/homestays');
+        response = await fetch(`http://localhost:8081/api/public/admin/homestays?ownerId=${ownerId}`);
       }
       if (response.ok) {
         const data = await response.json();
-        if (data && data.length > 0) {
+        if (Array.isArray(data)) {
           const activeId = localStorage.getItem('ownerActiveHomestayId');
           const mapped = data.map((item, idx) => ({
             id: item.id,
@@ -307,6 +310,8 @@ export default function ManageHomestay() {
 
     // Async DB save
     try {
+      const user = authService.getCurrentUser();
+      const ownerId = user?.id || 1;
       const token = localStorage.getItem('token');
       const payload = {
         name: newHomestay.name.trim(),
@@ -315,7 +320,8 @@ export default function ManageHomestay() {
         rooms: Number(newHomestay.rooms) || 6,
         price: 890000,
         status: 'ACTIVE',
-        img: newImg
+        img: newImg,
+        ownerId: ownerId
       };
 
       let res = await fetch('http://localhost:8081/api/admin/homestays', {

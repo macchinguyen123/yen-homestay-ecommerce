@@ -41,27 +41,34 @@ export default function OwnerLayout() {
 
   const fetchHomestays = async () => {
     try {
+      const user = authService.getCurrentUser();
+      const ownerId = user?.id || 1;
       const token = localStorage.getItem('token');
-      let res = await fetch('http://localhost:8081/api/admin/homestays', {
+      let res = await fetch(`http://localhost:8081/api/admin/homestays?ownerId=${ownerId}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (!res.ok) {
-        res = await fetch('http://localhost:8081/api/public/admin/homestays');
+        res = await fetch(`http://localhost:8081/api/public/admin/homestays?ownerId=${ownerId}`);
       }
       if (res.ok) {
         const data = await res.json();
-        if (data && data.length > 0) {
+        if (Array.isArray(data)) {
           setHomestaysList(data);
           try {
             localStorage.setItem('owner_homestays', JSON.stringify(data.map(h => ({ id: h.id, name: h.name, city: h.region || h.city || h.address || '' }))));
           } catch (e) {}
-          const storedId = localStorage.getItem('ownerActiveHomestayId');
-          const found = data.find(h => String(h.id) === String(storedId));
-          if (found) {
-            setActiveHomestayId(found.id);
+          if (data.length > 0) {
+            const storedId = localStorage.getItem('ownerActiveHomestayId');
+            const found = data.find(h => String(h.id) === String(storedId));
+            if (found) {
+              setActiveHomestayId(found.id);
+            } else {
+              setActiveHomestayId(data[0].id);
+              localStorage.setItem('ownerActiveHomestayId', String(data[0].id));
+            }
           } else {
-            setActiveHomestayId(data[0].id);
-            localStorage.setItem('ownerActiveHomestayId', String(data[0].id));
+            setActiveHomestayId(null);
+            localStorage.removeItem('ownerActiveHomestayId');
           }
         }
       }

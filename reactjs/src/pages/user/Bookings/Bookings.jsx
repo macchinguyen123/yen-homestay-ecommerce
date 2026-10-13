@@ -6,8 +6,11 @@ import './Bookings.css';
 
 const mapBooking = (b) => ({
   ...b,
-  code: b.bookingCode,
-  homestayImg: b.homestayImage,
+  status: (b.status || '').toLowerCase(),
+  code: b.bookingCode || b.code || '',
+  homestayImg: b.homestayImage || b.homestayImg || '',
+  homestayName: b.homestayName || 'Homestay YÊN',
+  location: b.location || 'Việt Nam',
   complaint: b.complaint ? { ...b.complaint } : null,
 });
 
@@ -77,9 +80,9 @@ export default function Bookings() {
       if (currentFilter !== 'all' && b.status !== currentFilter) return false;
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
-        const matchName = b.homestayName.toLowerCase().includes(q);
-        const matchCode = b.code.toLowerCase().includes(q);
-        const matchLoc = b.location.toLowerCase().includes(q);
+        const matchName = (b.homestayName || '').toLowerCase().includes(q);
+        const matchCode = (b.code || '').toLowerCase().includes(q);
+        const matchLoc = (b.location || '').toLowerCase().includes(q);
         return matchName || matchCode || matchLoc;
       }
       return true;
@@ -261,8 +264,9 @@ export default function Bookings() {
               ) : (
                 filteredBookings.map((bk) => {
                   const isTaskDone = bk.task && bk.task.status === 'completed';
-                  const doneCount = bk.task ? bk.task.checklist.filter((i) => i.done).length : 0;
-                  const totalCount = bk.task ? bk.task.checklist.length : 0;
+                  const checklist = Array.isArray(bk.task?.checklist) ? bk.task.checklist : [];
+                  const doneCount = checklist.filter((i) => i.done).length;
+                  const totalCount = checklist.length;
 
                   return (
                     <div key={bk.id} className={`bk-card-item ${bk.status === 'active' ? 'is-active-stay' : ''}`}>
@@ -323,7 +327,7 @@ export default function Bookings() {
                           </div>
 
                           <div className="task-checklist-items">
-                            {bk.task.checklist.map((item) => (
+                            {checklist.map((item) => (
                               <div key={item.id} className={`task-item-row ${item.done ? 'done' : ''}`}
                                 onClick={() => openTaskModal(bk.id)}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -392,7 +396,7 @@ export default function Bookings() {
               <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 12, padding: 20 }}>
                 <span className="status-badge status-completed" style={{ marginBottom: 12 }}>ĐÃ HOÀN THÀNH</span>
                 <div style={{ fontSize: '1.2rem', color: '#F59E0B', marginBottom: 8 }}>
-                  {'★'.repeat(activeTaskBk.task.userReview.rating)}
+                  {'★'.repeat(Math.max(1, Math.min(5, Math.round(Number(activeTaskBk.task.userReview.rating || 5)))))}
                 </div>
                 <h4 style={{ fontSize: '1rem', fontWeight: 800, color: '#0F172A', margin: '0 0 6px' }}>
                   {activeTaskBk.task.userReview.title}

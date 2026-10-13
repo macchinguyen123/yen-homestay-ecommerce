@@ -74,8 +74,13 @@ public class AdminHomestayController {
     }
 
     @GetMapping
-    public ResponseEntity<?> getAllHomestays() {
-        List<Homestay> homestays = homestayRepository.findAll();
+    public ResponseEntity<?> getAllHomestays(@RequestParam(value = "ownerId", required = false) Long ownerId) {
+        List<Homestay> homestays;
+        if (ownerId != null && ownerId > 0) {
+            homestays = homestayRepository.findByOwnerId(ownerId);
+        } else {
+            homestays = homestayRepository.findAll();
+        }
         List<User> allUsers = userRepository.findAll();
         List<HomestayImage> allImages = homestayImageRepository.findAll();
 
@@ -100,6 +105,7 @@ public class AdminHomestayController {
         List<Map<String, Object>> result = homestays.stream().map(h -> {
             Map<String, Object> map = new HashMap<>();
             map.put("id", h.getId());
+            map.put("ownerId", h.getOwnerId());
             map.put("code", "#HS-" + String.format("%04d", h.getId()));
             map.put("name", h.getName());
             

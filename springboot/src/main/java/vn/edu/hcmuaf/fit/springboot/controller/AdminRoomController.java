@@ -19,6 +19,7 @@ import java.util.Map;
 public class AdminRoomController {
 
     private final RoomRepository roomRepository;
+    private final vn.edu.hcmuaf.fit.springboot.repository.HomestayRepository homestayRepository;
     private final CacheManager cacheManager;
 
     private void clearAllCaches() {
@@ -35,8 +36,25 @@ public class AdminRoomController {
     }
 
     @GetMapping({"/api/admin/rooms", "/api/public/admin/rooms"})
-    public ResponseEntity<List<Room>> getAllRooms() {
-        List<Room> rooms = roomRepository.findAll();
+    public ResponseEntity<List<Room>> getAllRooms(
+            @RequestParam(value = "homestayId", required = false) Long homestayId,
+            @RequestParam(value = "ownerId", required = false) Long ownerId) {
+        List<Room> rooms;
+        if (homestayId != null && homestayId > 0) {
+            rooms = roomRepository.findByHomestayId(homestayId);
+        } else if (ownerId != null && ownerId > 0) {
+            List<vn.edu.hcmuaf.fit.springboot.model.Homestay> ownerHomestays = homestayRepository.findByOwnerId(ownerId);
+            List<Long> hsIds = ownerHomestays.stream().map(vn.edu.hcmuaf.fit.springboot.model.Homestay::getId).collect(java.util.stream.Collectors.toList());
+            if (hsIds.isEmpty()) {
+                rooms = java.util.Collections.emptyList();
+            } else {
+                rooms = roomRepository.findAll().stream()
+                        .filter(r -> r.getHomestayId() != null && hsIds.contains(r.getHomestayId()))
+                        .collect(java.util.stream.Collectors.toList());
+            }
+        } else {
+            rooms = roomRepository.findAll();
+        }
         rooms.forEach(r -> {
             if (r.getRoomCode() == null || r.getRoomCode().trim().isEmpty()) {
                 r.setRoomCode("P." + r.getId());
