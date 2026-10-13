@@ -718,7 +718,7 @@ export default function Register() {
 
               <div className="otp-section">
                 <p className="otp-info">
-                  Mở email <strong>{role === 'guest' ? guestForm.email : hostForm.email}</strong> và nhấn liên kết kích hoạt. Kiểm tra cả thư mục Spam nếu chưa thấy email.
+                  Mở email <strong>{role === 'guest' ? guestForm.email : hostForm.email}</strong> và nhấn liên kết kích hoạt trong 15 phút. Nếu quá hạn, tài khoản chưa kích hoạt sẽ được xóa và bạn cần đăng ký lại. Kiểm tra cả thư mục Spam nếu chưa thấy email.
                 </p>
                 <p className="otp-resend-row">
                   Không nhận được email?{' '}
@@ -740,11 +740,11 @@ export default function Register() {
               <h1 className="step-title mb-2">Đăng ký thành công!</h1>
               <p className="step-subtitle mb-3" style={{ fontSize: '1.1rem', lineHeight: '1.5' }}>
                 Chúng tôi đã gửi một email xác thực đến địa chỉ <strong className="text-success">{role === 'guest' ? guestForm.email : hostForm.email}</strong>. 
-                <br/>Vui lòng kiểm tra hộp thư đến (và thư mục Spam) để kích hoạt tài khoản của bạn.
+                <br/>Vui lòng kích hoạt tài khoản trong 15 phút.
               </p>
               
               <div className="success-reward mb-4">
-                <i className="bi bi-info-circle-fill me-2 text-primary"></i>Bạn cần kích hoạt tài khoản trước khi đăng nhập!
+                <i className="bi bi-info-circle-fill me-2 text-primary"></i>Bạn cần kích hoạt tài khoản trước khi đăng nhập. Hãy kiểm tra cả thư mục Spam nếu chưa thấy email.
               </div>
 
               <div className="d-flex flex-column gap-2">

@@ -98,11 +98,23 @@ public class AuthService {
                     .build();
         }
 
-        if (userRepository.existsByEmail(email)) {
-            return LoginResponse.builder()
-                    .success(false)
-                    .message("Email này đã được sử dụng!")
-                    .build();
+        Optional<User> existingUser = userRepository.findByEmail(email);
+        if (existingUser.isPresent()) {
+            User user = existingUser.get();
+            Optional<VerificationToken> existingToken = tokenRepository.findByUser(user);
+            boolean inactiveWithExpiredToken = !Boolean.TRUE.equals(user.getActive())
+                    && existingToken.isPresent()
+                    && existingToken.get().getExpiryDate().isBefore(LocalDateTime.now());
+
+            if (inactiveWithExpiredToken) {
+                tokenRepository.delete(existingToken.get());
+                userRepository.delete(user);
+            } else {
+                return LoginResponse.builder()
+                        .success(false)
+                        .message("Email này đã được sử dụng!")
+                        .build();
+            }
         }
 
         String phoneNumber = request.getPhoneNumber() == null ? null : request.getPhoneNumber().trim();
@@ -162,7 +174,7 @@ public class AuthService {
 
         return LoginResponse.builder()
                 .success(true)
-                .message("Đăng ký thành công! Vui lòng kiểm tra email để kích hoạt tài khoản.")
+                .message("Đăng ký thành công! Vui lòng kiểm tra email và kích hoạt tài khoản trong 15 phút.")
                 .id(newUser.getId())
                 .email(newUser.getEmail())
                 .fullName(newUser.getFullName())
@@ -182,9 +194,14 @@ public class AuthService {
         
         VerificationToken verificationToken = tokenOpt.get();
         if (verificationToken.getExpiryDate().isBefore(LocalDateTime.now())) {
+            User expiredUser = verificationToken.getUser();
+            tokenRepository.delete(verificationToken);
+            if (expiredUser != null && !Boolean.TRUE.equals(expiredUser.getActive())) {
+                userRepository.delete(expiredUser);
+            }
             return LoginResponse.builder()
                     .success(false)
-                    .message("Mã xác nhận đã hết hạn! Vui lòng đăng ký lại hoặc yêu cầu gửi lại email.")
+                    .message("Link xác thực đã hết hạn sau 15 phút. Tài khoản chưa kích hoạt đã được xóa, vui lòng đăng ký lại.")
                     .build();
         }
         

@@ -31,6 +31,6 @@ public class VerificationToken {
     public VerificationToken(User user) {
         this.user = user;
         this.token = UUID.randomUUID().toString();
-        this.expiryDate = LocalDateTime.now().plusHours(24);
+        this.expiryDate = LocalDateTime.now().plusMinutes(15);
     }
 }
