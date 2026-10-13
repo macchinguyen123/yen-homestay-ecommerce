@@ -200,8 +200,6 @@ public class RoomService {
         List<RoomImage> roomImages = roomIds.isEmpty() ? Collections.emptyList() : roomImageRepository.findByRoomIdIn(roomIds);
         Map<Long, List<RoomImage>> imagesByRoom = roomImages.stream()
                 .collect(Collectors.groupingBy(RoomImage::getRoomId));
-        Map<Long, ReviewSummary> roomReviewStats = getRoomReviewStatsForHomestay(homestayId);
-
         List<GuestTaskDTO> tasks = guestTaskRepository.findByHomestayId(homestayId).stream()
                 .map(this::toGuestTaskDTO)
                 .collect(Collectors.toList());
@@ -209,9 +207,10 @@ public class RoomService {
             tasks = getDefaultTasks(homestayId);
         }
         final List<GuestTaskDTO> finalTasks = tasks;
+        ReviewSummary hsStat = getHomestayReviewStat(homestayId);
 
         return rooms.stream()
-                .map(r -> toRoomDTOWithImages(r, homestayName, imagesByRoom.getOrDefault(r.getId(), Collections.emptyList()), roomReviewStats.get(r.getId()), finalTasks))
+                .map(r -> toRoomDTOWithImages(r, homestayName, imagesByRoom.getOrDefault(r.getId(), Collections.emptyList()), hsStat, finalTasks))
                 .collect(Collectors.toList());
     }
 
@@ -248,12 +247,13 @@ public class RoomService {
                     final List<GuestTaskDTO> finalTasks = hTasks;
 
                     List<Room> rooms = roomsByHomestay.getOrDefault(h.getId(), Collections.emptyList());
+                    ReviewSummary hStat = hsReviewStats.get(h.getId());
                     List<RoomDTO> roomDTOs = rooms.stream()
-                            .map(r -> toRoomDTOWithImages(r, h.getName(), imagesByRoom.getOrDefault(r.getId(), Collections.emptyList()), roomReviewStats.get(r.getId()), finalTasks))
+                            .map(r -> toRoomDTOWithImages(r, h.getName(), imagesByRoom.getOrDefault(r.getId(), Collections.emptyList()), hStat, finalTasks))
                             .collect(Collectors.toList());
 
                     List<HomestayImage> hImages = imagesByHomestay.getOrDefault(h.getId(), Collections.emptyList());
-                    return toHomestayDTO(h, roomDTOs, hImages, hsReviewStats.get(h.getId()), hTasks);
+                    return toHomestayDTO(h, roomDTOs, hImages, hStat, hTasks);
                 })
                 .collect(Collectors.toList());
     }

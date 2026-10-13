@@ -523,6 +523,48 @@ body {
 .rating-bar { height: 6px; background: var(--border-color); border-radius: var(--radius-full); overflow: hidden; }
 .rating-bar span { display: block; height: 100%; background: var(--primary-color); border-radius: var(--radius-full); }
 
+.page-review-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-bottom: 22px;
+    padding: 14px 18px;
+    background: var(--light-bg);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-color);
+}
+
+.page-review-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+}
+
+.page-review-sort {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+}
+
+.page-review-sort-label {
+    font-size: 0.84rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+
+.page-reviews-actions {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-top: 20px;
+}
+
 .reviews-grid { display: flex; flex-direction: column; gap: 14px; margin-bottom: 24px; }
 
 .review-card {
