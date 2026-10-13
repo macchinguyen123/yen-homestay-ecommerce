@@ -5,6 +5,7 @@ import './GlobalAdminContent.css';
 
 export default function AdminLayout() {
     const [dropdownOpen, setDropdownOpen] = useState(false);
+    const [unreadCount, setUnreadCount] = useState(0);
     const dropdownRef = useRef(null);
     const navigate = useNavigate();
 
@@ -17,6 +18,24 @@ export default function AdminLayout() {
         }
         document.addEventListener("mousedown", handleClickOutside);
         return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
+
+    useEffect(() => {
+        const user = JSON.parse(localStorage.getItem('user') || 'null');
+        if (!user?.id || !user?.token) return;
+        const apiBase = import.meta.env.VITE_API_BASE_URL?.replace(/\/auth\/?$/, '') || 'http://localhost:8081/api';
+        const load = () => fetch(`${apiBase}/notifications/unread-count`, { headers: { Authorization: `Bearer ${user.token}` } })
+            .then((response) => response.ok ? response.json() : { count: 0 })
+            .then((data) => setUnreadCount(Number(data.count || 0)))
+            .catch(() => setUnreadCount(0));
+        load();
+        const socketBase = import.meta.env.VITE_WS_BASE_URL || apiBase.replace(/^http/, 'ws').replace(/\/api$/, '');
+        const socket = new WebSocket(`${socketBase}/ws/notifications?token=${encodeURIComponent(user.token)}`);
+        socket.onmessage = (event) => {
+            try { const payload = JSON.parse(event.data); if (typeof payload.unreadCount === 'number') setUnreadCount(payload.unreadCount); else load(); }
+            catch { load(); }
+        };
+        return () => socket.close();
     }, []);
 
     return (
@@ -124,7 +143,7 @@ export default function AdminLayout() {
                         <div className="header-action-btns">
                             <button className="header-icon-btn" title="Thông báo hệ thống">
                                 <span className="material-symbols-outlined">notifications</span>
-                                <span className="badge-dot">5</span>
+                                {unreadCount > 0 && <span className="badge-dot">{unreadCount}</span>}
                             </button>
                             <button className="header-icon-btn" title="Hộp thư & Hỗ trợ">
                                 <span className="material-symbols-outlined">chat</span>

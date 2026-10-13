@@ -28,6 +28,7 @@ public class AuthService {
     private final VerificationTokenRepository tokenRepository;
     private final PasswordResetTokenRepository passwordResetTokenRepository;
     private final EmailService emailService;
+    private final SessionTokenService sessionTokenService;
 
     @Value("${app.frontend-url:http://localhost:5173}")
     private String frontendUrl;
@@ -83,7 +84,7 @@ public class AuthService {
                 .fullName(user.getFullName())
                 .role(user.getRole())
                 .avatar(user.getAvatar())
-                .token("DEMO_JWT_TOKEN_" + user.getId() + "_" + System.currentTimeMillis())
+                .token(sessionTokenService.issue(user.getId()))
                 .build();
     }
 

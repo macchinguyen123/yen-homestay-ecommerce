@@ -35,6 +35,9 @@ public class AdminHomestayController {
     @Autowired
     private vn.edu.hcmuaf.fit.springboot.repository.RoomImageRepository roomImageRepository;
 
+    @Autowired
+    private vn.edu.hcmuaf.fit.springboot.service.NotificationService notificationService;
+
     private String resolveHomestayImage(Long homestayId, String city) {
         List<HomestayImage> images = homestayImageRepository.findByHomestayId(homestayId);
         if (images != null && !images.isEmpty()) {
@@ -208,6 +211,13 @@ public class AdminHomestayController {
                 h.setStatus(st.toUpperCase());
             }
             homestayRepository.save(h);
+            if ("ACTIVE".equalsIgnoreCase(h.getStatus()) || "APPROVED".equalsIgnoreCase(h.getStatus()) || "REJECTED".equalsIgnoreCase(h.getStatus())) {
+                boolean rejected = "REJECTED".equalsIgnoreCase(h.getStatus());
+                notificationService.create(h.getOwnerId(), rejected ? "Homestay bị từ chối" : "Homestay đã được duyệt",
+                        rejected ? "Homestay " + h.getName() + " chưa được duyệt. Vui lòng kiểm tra trạng thái hoặc phản hồi từ quản trị viên."
+                                : "Homestay " + h.getName() + " đã được duyệt và có thể hoạt động.",
+                        "HOMESTAY", h.getId(), "/owner/homestays");
+            }
             return ResponseEntity.ok(Map.of("success", true, "message", "Cập nhật trạng thái thành công"));
         } else {
             return ResponseEntity.status(404).body(Map.of("success", false, "message", "Không tìm thấy Homestay"));

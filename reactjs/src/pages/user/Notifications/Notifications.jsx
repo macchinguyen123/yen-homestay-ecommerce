@@ -1,8 +1,9 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import './Notifications.css';
 
-const INITIAL_NOTIFICATIONS = [
+/* Legacy sample data removed: notifications are loaded from the database. */
+/* const INITIAL_NOTIFICATIONS = [
   {
     id: 'noti-101',
     category: 'trip',
@@ -119,10 +120,10 @@ const INITIAL_NOTIFICATIONS = [
     mainActionText: 'Viết đánh giá ngay',
     mainActionUrl: '/bookings'
   }
-];
+]; */
 
 export default function Notifications() {
-  const [notifications, setNotifications] = useState(INITIAL_NOTIFICATIONS);
+  const [notifications, setNotifications] = useState([]);
   const [activeCategory, setActiveCategory] = useState('all');
 
   // Modal Detail State
@@ -130,6 +131,35 @@ export default function Notifications() {
 
   // Toast State
   const [toast, setToast] = useState({ show: false, msg: '' });
+
+  const currentUser = JSON.parse(localStorage.getItem('user') || 'null');
+  const apiBase = import.meta.env.VITE_API_BASE_URL?.replace(/\/auth\/?$/, '') || 'http://localhost:8081/api';
+  const headers = { Authorization: `Bearer ${currentUser?.token || ''}`, 'Content-Type': 'application/json' };
+
+  const mapNotification = (n) => ({
+    ...n,
+    id: n.id,
+    category: ['BOOKING', 'TRIP'].includes((n.type || '').toUpperCase()) ? 'trip' : (n.type || 'system').toLowerCase(),
+    desc: n.message,
+    unread: !n.read,
+    timestamp: n.createdAt ? new Date(n.createdAt).toLocaleString('vi-VN') : '',
+    iconClass: (n.type || 'system').toLowerCase(),
+    icon: 'bi-bell-fill',
+    meta: [], details: [], mainActionUrl: n.link || '/notifications'
+  });
+
+  useEffect(() => {
+    if (!currentUser?.id) return;
+    const loadNotifications = () => fetch(`${apiBase}/notifications`, { headers })
+      .then((r) => r.ok ? r.json() : [])
+      .then((data) => setNotifications(Array.isArray(data) ? data.map(mapNotification) : []))
+      .catch(() => setNotifications([]));
+    loadNotifications();
+    const socketBase = (import.meta.env.VITE_WS_BASE_URL || apiBase.replace(/^http/, 'ws').replace(/\/api$/, ''));
+    const socket = new WebSocket(`${socketBase}/ws/notifications?token=${encodeURIComponent(currentUser.token || '')}`);
+    socket.onmessage = () => loadNotifications();
+    return () => socket.close();
+  }, [currentUser?.id]);
 
   const triggerToast = (msg) => {
     setToast({ show: true, msg });
@@ -163,18 +193,21 @@ export default function Notifications() {
       triggerToast('Tất cả thông báo đã được đọc!');
       return;
     }
+    fetch(`${apiBase}/notifications/read-all`, { method: 'PATCH', headers }).catch(() => {});
     setNotifications((prev) => prev.map((n) => ({ ...n, unread: false })));
     triggerToast('Đã đánh dấu tất cả thông báo là đã đọc!');
   };
 
   const handleDeleteNoti = (id, e) => {
     e.stopPropagation();
+    fetch(`${apiBase}/notifications/${id}`, { method: 'DELETE', headers }).catch(() => {});
     setNotifications((prev) => prev.filter((n) => n.id !== id));
     triggerToast('Đã xóa thông báo.');
   };
 
   const handleOpenDetail = (item) => {
     if (item.unread) {
+      fetch(`${apiBase}/notifications/${item.id}/read`, { method: 'PATCH', headers }).catch(() => {});
       setNotifications((prev) =>
         prev.map((n) => (n.id === item.id ? { ...n, unread: false } : n))
       );

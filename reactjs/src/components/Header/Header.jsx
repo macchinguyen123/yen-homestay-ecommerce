@@ -8,9 +8,26 @@ export default function Header() {
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [user, setUser] = useState(null);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
-    setUser(authService.getCurrentUser());
+    const current = authService.getCurrentUser();
+    setUser(current);
+    if (current?.id) {
+      const apiBase = import.meta.env.VITE_API_BASE_URL?.replace(/\/auth\/?$/, '') || 'http://localhost:8081/api';
+      const loadUnread = () => fetch(`${apiBase}/notifications/unread-count`, { headers: { Authorization: `Bearer ${current.token || ''}` } })
+        .then((r) => r.ok ? r.json() : { count: 0 })
+        .then((data) => setUnreadCount(Number(data.count || 0)))
+        .catch(() => setUnreadCount(0));
+      loadUnread();
+      const socketBase = import.meta.env.VITE_WS_BASE_URL || apiBase.replace(/^http/, 'ws').replace(/\/api$/, '');
+      const socket = new WebSocket(`${socketBase}/ws/notifications?token=${encodeURIComponent(current.token || '')}`);
+      socket.onmessage = (event) => {
+        try { const payload = JSON.parse(event.data); if (typeof payload.unreadCount === 'number') setUnreadCount(payload.unreadCount); else loadUnread(); }
+        catch { loadUnread(); }
+      };
+      return () => socket.close();
+    }
   }, []);
 
   const handleLogout = () => {
@@ -106,7 +123,7 @@ export default function Header() {
               >
                 <i className="bi bi-bell nav-icon" />
                 <span>Thông báo</span>
-                <span className="yen-noti-badge">3</span>
+                {unreadCount > 0 && <span className="yen-noti-badge">{unreadCount}</span>}
               </NavLink>
             </li>
 
