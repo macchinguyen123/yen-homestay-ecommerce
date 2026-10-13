@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import "./PersonalAccount.css";
 import { userService } from "../../../services/userService";
@@ -212,6 +212,8 @@ export default function PersonalAccount() {
   const [showWithdrawModal, setShowWithdrawModal] = useState(false);
   const [withdrawForm, setWithdrawForm] = useState({ bank: "Vietcombank", accNum: "991203004005", amount: "100000" });
   const [termsModalVoucher, setTermsModalVoucher] = useState(null);
+  const [voucherFilter, setVoucherFilter] = useState("all");
+  const [voucherSearch, setVoucherSearch] = useState("");
 
   // Toast Notice State
   const [toast, setToast] = useState({ show: false, title: "", body: "" });
@@ -319,7 +321,11 @@ export default function PersonalAccount() {
             tag: v.collectionBadge || "🔥 HOT NHẤT",
             tagClass: v.tagClass || "tag-red",
             img: v.homestayImg,
-            homestayId: v.homestayId
+            homestayId: v.homestayId,
+            expiryText: v.expiryText || "Áp dụng năm 2026",
+            isUrgent: Boolean(v.isUrgent),
+            section: v.section || "hot",
+            terms: Array.isArray(v.terms) ? v.terms : []
           })));
         }
       } catch (err) {
@@ -531,7 +537,11 @@ export default function PersonalAccount() {
               tag: matched.collectionBadge || "✨ MỚI KÍCH HOẠT",
               tagClass: matched.tagClass || "tag-green",
               img: matched.homestayImg,
-              homestayId: matched.homestayId
+              homestayId: matched.homestayId,
+              expiryText: matched.expiryText || "Áp dụng năm 2026",
+              isUrgent: Boolean(matched.isUrgent),
+              section: matched.section || "new",
+              terms: Array.isArray(matched.terms) ? matched.terms : []
             },
             ...prev
           ]);
@@ -546,10 +556,41 @@ export default function PersonalAccount() {
     }
   };
 
+  const handleRemoveVoucher = (code) => {
+    try {
+      const stored = localStorage.getItem('yen_saved_vouchers');
+      if (stored) {
+        const list = JSON.parse(stored).filter((c) => c !== code);
+        localStorage.setItem('yen_saved_vouchers', JSON.stringify(list));
+      }
+    } catch (e) {
+      console.error(e);
+    }
+    setVouchers((prev) => prev.filter((v) => v.code !== code));
+    triggerToast("Đã gỡ voucher", `Đã xóa mã "${code}" khỏi ví voucher của bạn.`);
+  };
+
   const copyVoucherCode = (code) => {
     navigator.clipboard.writeText(code);
     triggerToast("Đã copy", `Đã sao chép mã ${code} vào bộ nhớ tạm!`);
   };
+
+  // Danh sách voucher ví đã lọc & tìm kiếm
+  const filteredVouchers = useMemo(() => {
+    return vouchers.filter((v) => {
+      const q = voucherSearch.trim().toLowerCase();
+      const matchSearch =
+        !q ||
+        (v.code && v.code.toLowerCase().includes(q)) ||
+        (v.title && v.title.toLowerCase().includes(q)) ||
+        (v.location && v.location.toLowerCase().includes(q));
+
+      if (!matchSearch) return false;
+      if (voucherFilter === "urgent") return v.isUrgent;
+      if (voucherFilter === "hot") return v.tagClass === "tag-red" || v.section === "hot";
+      return true;
+    });
+  }, [vouchers, voucherFilter, voucherSearch]);
 
   const handleWithdrawSubmit = async (e) => {
     e.preventDefault();
@@ -657,7 +698,7 @@ export default function PersonalAccount() {
   );
 
   return (
-    <main className="container py-4 py-md-5 personal-account-page">
+    <div className="container py-4 py-md-5 personal-account-page mb-5">
       {/* Header at top */}
       <div className="account-header-box mb-4 mb-md-5">
         <h1 className="h3 fw-bold text-dark tracking-tight mb-2">Tài khoản cá nhân</h1>
@@ -1232,84 +1273,163 @@ export default function PersonalAccount() {
 
           {/* TAB 3: MÃ GIẢM GIÁ */}
           {activeTab === "tab-vouchers" && (
-            <div className="animate-fade-in">
-              <div className="voucher-hero-banner mb-4">
-                <div className="d-flex align-items-center justify-content-between flex-wrap gap-3">
-                  <div>
-                    <span className="voucher-hero-badge mb-2 d-inline-block"><i className="bi bi-wallet2 me-1"></i> Ví voucher cá nhân</span>
-                    <h2 className="h4 fw-bold text-white mb-1">Mã Giảm Giá Đã Lưu Trong Ví</h2>
-                    <p className="text-xs text-light mb-0">Bạn có {vouchers.length} voucher khả dụng</p>
+            <div className="animate-fade-in pa-vouchers-container">
+              {/* 1. Header Banner & Kích hoạt mã đồng bộ */}
+              <div className="pa-voucher-hero-card mb-4">
+                <div className="pa-voucher-hero-head">
+                  <div className="pa-voucher-hero-info">
+                    <span className="pa-voucher-badge">
+                      <i className="bi bi-wallet2 me-1.5"></i> Ví voucher cá nhân
+                    </span>
+                    <h2 className="pa-voucher-title">Mã Giảm Giá Của Bạn</h2>
+                    <p className="pa-voucher-subtitle">
+                      Bạn đang có {vouchers.length} mã ưu đãi khả dụng. Kích hoạt thêm mã mới hoặc lưu thêm từ kho khuyến mãi!
+                    </p>
                   </div>
-                  <Link to="/promotions" className="btn-discover">
-                    <i className="bi bi-grid-fill me-1"></i> Khám phá thêm kho mã
+                  <Link to="/promotions" className="pa-btn-explore-vouchers">
+                    <i className="bi bi-grid-fill me-1.5"></i> Săn thêm voucher
                   </Link>
                 </div>
+
+                {/* Redeem Form bên trong Hero Card */}
+                <div className="pa-voucher-redeem-row mt-3">
+                  <div className="pa-redeem-input-wrap">
+                    <i className="bi bi-ticket-perforated-fill pa-redeem-icon"></i>
+                    <input
+                      type="text"
+                      className="pa-redeem-input"
+                      placeholder="Nhập mã ưu đãi (Ví dụ: HANRIVER200, TOPASHOT500)..."
+                      value={redeemCode}
+                      onChange={(e) => setRedeemCode(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleRedeemVoucher(); } }}
+                    />
+                  </div>
+                  <button type="button" className="pa-btn-redeem" onClick={handleRedeemVoucher}>
+                    <i className="bi bi-lightning-charge-fill me-1"></i> Kích hoạt ngay
+                  </button>
+                </div>
               </div>
 
-              {/* Gold Redeem Input */}
-              <div className="eco-card mb-4">
-                <h6 className="fw-bold text-dark mb-2"><i className="bi bi-ticket-perforated-fill text-warning me-2"></i>Kích hoạt mã khuyến mãi mới</h6>
-                <div className="promo-redeem-gold-box">
-                  <i className="bi bi-ticket-perforated-fill text-success"></i>
+              {/* 2. Filter Bar & Search Toolbar */}
+              <div className="pa-voucher-toolbar mb-3">
+                <div className="pa-voucher-chips">
+                  <button
+                    type="button"
+                    className={`pa-chip ${voucherFilter === "all" ? "active" : ""}`}
+                    onClick={() => setVoucherFilter("all")}
+                  >
+                    Tất cả <span className="pa-chip-count">{vouchers.length}</span>
+                  </button>
+                  <button
+                    type="button"
+                    className={`pa-chip ${voucherFilter === "hot" ? "active" : ""}`}
+                    onClick={() => setVoucherFilter("hot")}
+                  >
+                    <i className="bi bi-fire text-danger me-1"></i> Ưu đãi Hot
+                  </button>
+                  <button
+                    type="button"
+                    className={`pa-chip ${voucherFilter === "urgent" ? "active" : ""}`}
+                    onClick={() => setVoucherFilter("urgent")}
+                  >
+                    <i className="bi bi-hourglass-split text-warning me-1"></i> Sắp hết hạn
+                  </button>
+                </div>
+
+                <div className="pa-voucher-search-wrap">
+                  <i className="bi bi-search"></i>
                   <input
                     type="text"
-                    placeholder="Nhập mã ưu đãi (Ví dụ: HANRIVER200, TOPASHOT500)..."
-                    value={redeemCode}
-                    onChange={(e) => setRedeemCode(e.target.value)}
+                    placeholder="Tìm theo mã, homestay, địa điểm..."
+                    value={voucherSearch}
+                    onChange={(e) => setVoucherSearch(e.target.value)}
                   />
-                  <button className="btn-redeem-gold" onClick={handleRedeemVoucher}>Kích hoạt ngay</button>
+                  {voucherSearch && (
+                    <button type="button" className="pa-btn-clear-search" onClick={() => setVoucherSearch("")} title="Xóa tìm kiếm">
+                      <i className="bi bi-x-circle-fill"></i>
+                    </button>
+                  )}
                 </div>
               </div>
 
-              {/* Vouchers Grid */}
-              <div className="eco-card">
-                <div className="eco-card-title">
-                  <span><i className="bi bi-bookmark-star-fill text-success me-2"></i>Danh sách mã trong ví của bạn</span>
-                  <span className="badge bg-success text-white">{vouchers.length} Mã khả dụng</span>
-                </div>
+              {/* 3. Voucher Ticket Cards Grid (2-cột cân đối, chuẩn thiết kế vé sang trọng) */}
+              {filteredVouchers.length > 0 ? (
+                <div className="pa-voucher-grid">
+                  {filteredVouchers.map((v) => (
+                    <div key={v.id} className="pa-ticket-card">
+                      {/* Vùng bên trái: Thumbnail homestay + Discount Tag + Cắt vé notch */}
+                      <div className="pa-ticket-left">
+                        <img src={v.img} alt={v.title} className="pa-ticket-thumb" />
+                        <span className={`pa-ticket-pill-tag ${v.tagClass || 'tag-green'}`}>
+                          {v.tag}
+                        </span>
+                        <div className="pa-ticket-val-badge">
+                          <span className="pa-ticket-val-num">{v.discountText}</span>
+                        </div>
+                      </div>
 
-                <div className="row g-3">
-                  {vouchers.map((v) => (
-                    <div key={v.id} className="col-md-6 col-lg-4">
-                      <div className="voucher-card-item h-100">
-                        <div className="voucher-card-img-wrapper">
-                          <span className={`voucher-tag ${v.tagClass}`}>{v.tag}</span>
-                          <button type="button" className="voucher-wishlist-btn" title="Lưu voucher">
-                            <i className="bi bi-heart-fill text-danger"></i>
+                      {/* Notches đường cắt vé */}
+                      <div className="pa-ticket-notch pa-ticket-notch-top"></div>
+                      <div className="pa-ticket-notch pa-ticket-notch-bottom"></div>
+
+                      {/* Vùng bên phải: Thông tin & Thao tác */}
+                      <div className="pa-ticket-right">
+                        <div className="pa-ticket-meta-row">
+                          <span className="pa-ticket-location">
+                            <i className="bi bi-geo-alt-fill text-danger me-1"></i>
+                            {v.location}
+                          </span>
+                          <button
+                            type="button"
+                            className="pa-ticket-remove-btn"
+                            onClick={() => handleRemoveVoucher(v.code)}
+                            title="Xóa mã này khỏi ví"
+                          >
+                            <i className="bi bi-x-lg"></i>
                           </button>
-                          <img src={v.img} alt={v.title} />
                         </div>
 
-                        <div className="voucher-card-body">
-                          <div className="voucher-meta-row">
-                            <span className="voucher-location">
-                              <i className="bi bi-geo-alt-fill text-danger me-1"></i> {v.location}
-                            </span>
-                            <span className="voucher-rating">
-                              <i className="bi bi-star-fill text-warning me-1"></i> {v.rating}
-                            </span>
-                          </div>
+                        <h3 className="pa-ticket-name" title={v.title}>
+                          {v.title}
+                        </h3>
 
-                          <h3 className="voucher-title" title={v.title}>{v.title}</h3>
+                        <div className="pa-ticket-condition-row">
+                          <i className="bi bi-info-circle me-1"></i>
+                          <span>{v.condText}</span>
+                        </div>
 
-                          <div className="voucher-strip-box">
-                            <div className="voucher-strip-left">{v.discountText}</div>
-                            <div className="voucher-strip-right">
-                              <span className="voucher-code-label">MÃ: {v.code}</span>
-                              <span className="voucher-cond-text">{v.condText}</span>
-                            </div>
-                          </div>
+                        <div className="pa-ticket-expiry-row">
+                          <i className={`bi ${v.isUrgent ? 'bi-fire text-danger' : 'bi-clock text-muted'} me-1`}></i>
+                          <span className={v.isUrgent ? 'text-danger fw-bold' : 'text-muted'}>
+                            {v.expiryText || 'Áp dụng trong năm'}
+                          </span>
+                        </div>
 
-                          <div className="voucher-card-footer">
+                        <div className="pa-ticket-foot">
+                          <button
+                            type="button"
+                            className="pa-ticket-code-pill"
+                            onClick={() => copyVoucherCode(v.code)}
+                            title="Nhấp để copy mã giảm giá"
+                          >
+                            <span className="pa-code-lbl">MÃ:</span>
+                            <span className="pa-code-val">{v.code}</span>
+                            <i className="bi bi-copy pa-copy-ic"></i>
+                          </button>
+
+                          <div className="pa-ticket-actions">
                             <button
                               type="button"
-                              className="btn btn-voucher-copy fw-bold"
-                              onClick={() => copyVoucherCode(v.code)}
+                              className="pa-btn-terms"
+                              onClick={() => setTermsModalVoucher(v)}
                             >
-                              <i className="bi bi-clipboard me-1"></i> Copy
+                              Điều kiện
                             </button>
-                            <Link to={v.homestayId ? `/homestay/${v.homestayId}` : '/homestay'} className="btn btn-voucher-use fw-bold">
-                              Xem phòng
+                            <Link
+                              to={v.homestayId ? `/homestay/${v.homestayId}` : '/homestay'}
+                              className="pa-btn-use"
+                            >
+                              Đặt ngay
                             </Link>
                           </div>
                         </div>
@@ -1317,7 +1437,36 @@ export default function PersonalAccount() {
                     </div>
                   ))}
                 </div>
-              </div>
+              ) : (
+                <div className="pa-voucher-empty-box">
+                  <div className="pa-empty-icon-wrap">
+                    <i className="bi bi-ticket-perforated"></i>
+                  </div>
+                  <h4 className="pa-empty-title">
+                    {voucherSearch || voucherFilter !== "all"
+                      ? "Không tìm thấy mã giảm giá phù hợp"
+                      : "Ví voucher của bạn đang trống"}
+                  </h4>
+                  <p className="pa-empty-desc">
+                    {voucherSearch || voucherFilter !== "all"
+                      ? "Vui lòng kiểm tra lại từ khóa tìm kiếm hoặc chọn bộ lọc khác."
+                      : "Hãy ghé thăm Kho khuyến mãi để lưu các mã giảm giá homestay hấp dẫn nhất vào ví nhé!"}
+                  </p>
+                  {voucherSearch || voucherFilter !== "all" ? (
+                    <button
+                      type="button"
+                      className="btn btn-outline-success btn-sm rounded-pill px-3"
+                      onClick={() => { setVoucherFilter("all"); setVoucherSearch(""); }}
+                    >
+                      Xóa bộ lọc tìm kiếm
+                    </button>
+                  ) : (
+                    <Link to="/promotions" className="btn btn-success rounded-pill px-4 py-2 fw-bold text-sm">
+                      <i className="bi bi-gift-fill me-1.5"></i> Khám phá kho ưu đãi ngay
+                    </Link>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
@@ -2079,25 +2228,58 @@ export default function PersonalAccount() {
 
       {/* 9. Modal Voucher Terms */}
       {termsModalVoucher && (
-        <div className="modal show d-block" style={{ backgroundColor: "rgba(0,0,0,0.5)" }} tabindex="-1">
-          <div className="modal-dialog modal-dialog-centered">
-            <div className="modal-content rounded-4 border-0 shadow">
-              <div className="modal-header border-0 pb-0">
-                <h5 className="modal-title fw-bold text-dark"><i className="bi bi-info-circle-fill text-success me-2"></i>Điều kiện sử dụng Voucher</h5>
+        <div className="modal show d-block" style={{ backgroundColor: "rgba(15,23,42,0.6)", backdropFilter: "blur(4px)", zIndex: 1060 }} tabIndex="-1">
+          <div className="modal-dialog modal-dialog-centered" style={{ maxWidth: '480px' }}>
+            <div className="modal-content rounded-4 border-0 shadow-lg overflow-hidden">
+              <div className="modal-header bg-light border-bottom py-3 px-4">
+                <h5 className="modal-title fw-bold text-dark fs-6 mb-0">
+                  <i className="bi bi-shield-check text-success me-2"></i>
+                  Điều Kiện &amp; Quy Định Sử Dụng
+                </h5>
                 <button type="button" className="btn-close" onClick={() => setTermsModalVoucher(null)}></button>
               </div>
-              <div className="modal-body py-3">
-                <h6 className="fw-bold text-success">{termsModalVoucher.code} - {termsModalVoucher.discountText}</h6>
-                <p className="text-sm text-secondary mb-2">{termsModalVoucher.title}</p>
-                <ul className="text-xs text-muted mb-0 ps-3">
-                  <li>{termsModalVoucher.condText}</li>
-                  <li>Áp dụng khi thanh toán trực tuyến qua Ví YÊN Pay hoặc Chuyển khoản QR.</li>
-                  <li>Mỗi tài khoản chỉ áp dụng mã 1 lần cho mỗi chuyến đi.</li>
-                  <li>Không áp dụng đồng thời với các chương trình khuyến mãi đặc biệt khác.</li>
+              <div className="modal-body p-4">
+                <div className="p-3 rounded-3 mb-3" style={{ background: '#F0FDF4', border: '1px solid #BBF7D0' }}>
+                  <div className="d-flex align-items-center justify-content-between mb-1.5">
+                    <span className="badge bg-success text-white fw-bold px-2 py-1">{termsModalVoucher.code}</span>
+                    <strong className="text-success fs-6">{termsModalVoucher.discountText}</strong>
+                  </div>
+                  <h6 className="fw-bold text-dark mb-1">{termsModalVoucher.title}</h6>
+                  <p className="text-xs text-muted mb-0">
+                    <i className="bi bi-geo-alt-fill text-danger me-1"></i>
+                    {termsModalVoucher.location}
+                  </p>
+                </div>
+
+                <h6 className="fw-bold text-dark mb-2 text-sm">Chi tiết chính sách ưu đãi:</h6>
+                <ul className="text-xs text-secondary mb-3 ps-3 d-flex flex-column gap-2" style={{ lineHeight: 1.6 }}>
+                  <li><strong>Điều kiện đơn hàng:</strong> {termsModalVoucher.condText}</li>
+                  {Array.isArray(termsModalVoucher.terms) && termsModalVoucher.terms.length > 0 ? (
+                    termsModalVoucher.terms.map((t, idx) => <li key={idx}>{t}</li>)
+                  ) : (
+                    <>
+                      <li>Áp dụng cho mọi đơn đặt phòng trực tuyến tại homestay này trên YÊN.</li>
+                      <li>Thời hạn: {termsModalVoucher.expiryText || 'Có hiệu lực trong năm'}.</li>
+                      <li>Mỗi khách hàng được áp dụng 01 mã cho mỗi đơn đặt phòng.</li>
+                    </>
+                  )}
                 </ul>
               </div>
-              <div className="modal-footer border-0 pt-0">
-                <button type="button" className="btn btn-eco-save" onClick={() => setTermsModalVoucher(null)}>Đã hiểu</button>
+              <div className="modal-footer bg-light border-top py-2.5 px-4 d-flex justify-content-between">
+                <button
+                  type="button"
+                  className="btn btn-outline-success btn-sm rounded-pill px-3 fw-bold"
+                  onClick={() => { copyVoucherCode(termsModalVoucher.code); }}
+                >
+                  <i className="bi bi-copy me-1"></i> Copy mã
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-success btn-sm rounded-pill px-4 fw-bold"
+                  onClick={() => setTermsModalVoucher(null)}
+                >
+                  Đã hiểu
+                </button>
               </div>
             </div>
           </div>
@@ -2119,6 +2301,6 @@ export default function PersonalAccount() {
           </div>
         </div>
       )}
-    </main>
+    </div>
   );
 }
