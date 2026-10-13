@@ -44,13 +44,12 @@ function Toast({ message, show }) {
   );
 }
 
-/** Review card hiển thị người dùng và đánh giá thật từ Database */
-function ReviewCard({ review, showRoom = true, clamp = false, onPhotoClick }) {
+/** Review card hiển thị người dùng và đánh giá thật từ Database cho Homestay */
+function ReviewCard({ review, showRoom = false, clamp = false, onPhotoClick }) {
   const name = review.touristName || review.name || 'Khách du lịch';
   const initial = name.trim().split(' ').pop().charAt(0).toUpperCase();
   const dateStr = review.formattedDate || review.date || 'Gần đây';
   const ratingVal = review.rating || review.stars || 5;
-  const roomName = review.roomName || review.room;
   const photos = review.images || review.photos || [];
 
   return (
@@ -62,11 +61,6 @@ function ReviewCard({ review, showRoom = true, clamp = false, onPhotoClick }) {
           <span>{dateStr}</span>
         </div>
       </div>
-      {showRoom && roomName && (
-        <span className="review-room-badge">
-          <i className="bi bi-door-open" /> {roomName}
-        </span>
-      )}
       <div className="review-stars">
         {Array.from({ length: 5 }, (_, i) => (
           <i key={i} className={`bi bi-star-fill ${i >= ratingVal ? 'off' : ''}`} />
@@ -143,7 +137,7 @@ function Lightbox({ images, index, onClose, onNav }) {
 }
 
 /** Room Modal */
-function RoomModal({ room, homestay, allHomestayReviews = [], onClose, onOpenReviews, showToast }) {
+function RoomModal({ room, homestay, homestayRating = '5.0', homestayReviewCount = 0, onClose, onScrollToReviews, showToast }) {
   const [galleryIdx, setGalleryIdx] = useState(0);
   const scrollRef = useRef(null);
 
@@ -238,15 +232,6 @@ function RoomModal({ room, homestay, allHomestayReviews = [], onClose, onOpenRev
       }
     ];
   }, [room?.tasks, homestay?.tasks]);
-
-  const roomReviews = useMemo(() => {
-    return (allHomestayReviews || []).filter((r) => String(r.roomId) === String(room.id));
-  }, [allHomestayReviews, room.id]);
-
-  const modalReviewCount = roomReviews.length;
-  const modalRating = modalReviewCount > 0
-    ? (roomReviews.reduce((sum, r) => sum + r.rating, 0) / modalReviewCount).toFixed(1)
-    : (room.rating ? (room.rating > 5 ? (room.rating / 2).toFixed(1) : Number(room.rating).toFixed(1)) : '5.0');
 
   return (
     <div className="room-modal-overlay active" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
@@ -383,26 +368,17 @@ function RoomModal({ room, homestay, allHomestayReviews = [], onClose, onOpenRev
             </div>
 
             <div className="room-modal-subhead">
-              <h4 className="room-modal-subtitle">Khách nói gì về phòng này</h4>
+              <h4 className="room-modal-subtitle">Đánh giá chung về Homestay</h4>
               <span className="room-modal-rating">
-                <i className="bi bi-star-fill" /> {modalRating} · {modalReviewCount} đánh giá
+                <i className="bi bi-star-fill star-gold" /> {homestayRating} · {homestayReviewCount} đánh giá
               </span>
             </div>
-            {modalReviewCount > 0 ? (
-              <div className="room-modal-reviews">
-                {roomReviews.slice(0, 2).map((r) => (
-                  <ReviewCard key={r.id} review={r} showRoom={false} clamp={true} />
-                ))}
-              </div>
-            ) : (
-              <div className="rv-empty-state" style={{ padding: '24px 16px', marginBottom: '16px' }}>
-                <i className="bi bi-chat-square-dots" style={{ fontSize: '1.6rem' }} />
-                <p>Phòng này hiện chưa có đánh giá riêng nào từ khách hàng.</p>
-              </div>
-            )}
+            <p style={{ fontSize: '0.86rem', color: 'var(--text-muted)', margin: '4px 0 14px', lineHeight: 1.5 }}>
+              Đánh giá được ghi nhận từ những du khách đã từng lưu trú và trải nghiệm thực tế tại homestay này.
+            </p>
             <button type="button" className="yn-btn yn-btn--outline yn-btn--block"
-              onClick={() => onOpenReviews(modalReviewCount > 0 ? String(room.id) : 'all')}>
-              <i className="bi bi-chat-square-text" /> {modalReviewCount > 0 ? `Xem tất cả ${modalReviewCount} đánh giá về phòng này` : 'Xem đánh giá về homestay'}
+              onClick={() => { onClose(); if (onScrollToReviews) onScrollToReviews(); }}>
+              <i className="bi bi-chat-square-text" /> Xem tất cả {homestayReviewCount} đánh giá của homestay này
             </button>
           </div>
         </div>
@@ -422,17 +398,16 @@ function RoomModal({ room, homestay, allHomestayReviews = [], onClose, onOpenRev
 }
 
 /** Reviews Drawer */
-function ReviewsDrawer({ open, onClose, initialGroup, reviews = [], rooms = [], homestayRating = '5.0', onPhotoClick }) {
+function ReviewsDrawer({ open, onClose, reviews = [], homestayRating = '5.0', onPhotoClick }) {
   const REVIEW_PAGE_SIZE = 6;
-  const [group, setGroup] = useState(initialGroup || 'all');
   const [stars, setStars] = useState('all');
   const [sort, setSort] = useState('newest');
   const [photo, setPhoto] = useState(false);
   const [shown, setShown] = useState(REVIEW_PAGE_SIZE);
 
   useEffect(() => {
-    if (open) { setGroup(initialGroup || 'all'); setStars('all'); setSort('newest'); setPhoto(false); setShown(REVIEW_PAGE_SIZE); }
-  }, [open, initialGroup]);
+    if (open) { setStars('all'); setSort('newest'); setPhoto(false); setShown(REVIEW_PAGE_SIZE); }
+  }, [open]);
 
   useEffect(() => {
     const handler = (e) => { if (e.key === 'Escape' && open) onClose(); };
@@ -440,21 +415,9 @@ function ReviewsDrawer({ open, onClose, initialGroup, reviews = [], rooms = [], 
     return () => window.removeEventListener('keydown', handler);
   }, [open, onClose]);
 
-  // Nhóm phòng thực tế kèm số lượng đánh giá thực tế từ Database
-  const roomFilterList = useMemo(() => {
-    return (rooms || []).map((r) => ({
-      id: String(r.id),
-      label: r.name || r.roomName || 'Phòng',
-      total: reviews.filter((rev) => String(rev.roomId) === String(r.id)).length
-    }));
-  }, [rooms, reviews]);
-
-  const selectedRoomObj = roomFilterList.find((g) => g.id === group);
-
-  // Lọc đánh giá thực tế
+  // Lọc đánh giá thực tế của Homestay
   const filtered = useMemo(() => {
     let res = (reviews || []).filter((r) => {
-      if (group !== 'all' && String(r.roomId) !== String(group)) return false;
       if (stars !== 'all' && Number(r.rating) !== Number(stars)) return false;
       if (photo && (!r.images || r.images.length === 0)) return false;
       return true;
@@ -468,10 +431,10 @@ function ReviewsDrawer({ open, onClose, initialGroup, reviews = [], rooms = [], 
       res.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
     }
     return res;
-  }, [reviews, group, stars, photo, sort]);
+  }, [reviews, stars, photo, sort]);
 
   const visible = filtered.slice(0, shown);
-  const photoCount = reviews.filter((r) => (group === 'all' || String(r.roomId) === String(group)) && r.images && r.images.length > 0).length;
+  const photoCount = reviews.filter((r) => (r.images && r.images.length > 0) || (r.photos && r.photos.length > 0)).length;
 
   return (
     <>
@@ -479,7 +442,7 @@ function ReviewsDrawer({ open, onClose, initialGroup, reviews = [], rooms = [], 
       <aside className={`rv-drawer ${open ? 'active' : ''}`} role="dialog" aria-modal="true"
         aria-hidden={!open} id="rvDrawer">
         <div className="rv-head">
-          <h3>Đánh giá từ khách hàng ({reviews.length})</h3>
+          <h3>Đánh giá về homestay ({reviews.length})</h3>
           <button type="button" className="yn-btn yn-btn--ghost yn-btn--icon" onClick={onClose} title="Đóng">
             <i className="bi bi-x-lg" />
           </button>
@@ -489,34 +452,19 @@ function ReviewsDrawer({ open, onClose, initialGroup, reviews = [], rooms = [], 
             <i className="bi bi-star-fill" /> <b>{homestayRating}</b>
           </div>
           <div className="rv-summary-text">
-            <strong>{group === 'all' ? reviews.length : (selectedRoomObj?.total || 0)} đánh giá</strong>
-            <span>{group === 'all' ? 'Tất cả loại phòng' : (selectedRoomObj?.label || 'Phòng đã chọn')}</span>
+            <strong>{reviews.length} đánh giá</strong>
+            <span>Đánh giá thực tế từ khách du lịch</span>
           </div>
         </div>
 
         <div className="rv-filters">
           <div>
-            <span className="rv-filter-label">Loại phòng</span>
-            <div className="rv-chip-row">
-              <button type="button" className={`yn-chip ${group === 'all' ? 'active' : ''}`}
-                onClick={() => { setGroup('all'); setShown(REVIEW_PAGE_SIZE); }}>
-                Tất cả loại phòng <span className="chip-count">{reviews.length}</span>
-              </button>
-              {roomFilterList.map((g) => (
-                <button key={g.id} type="button" className={`yn-chip ${String(group) === String(g.id) ? 'active' : ''}`}
-                  onClick={() => { setGroup(String(g.id)); setShown(REVIEW_PAGE_SIZE); }}>
-                  {g.label} <span className="chip-count">{g.total}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-          <div>
             <span className="rv-filter-label">Lọc theo sao</span>
             <div className="rv-chip-row">
               {['all', '5', '4', '3', '2', '1'].map((s) => {
                 const count = s === 'all'
-                  ? reviews.filter((r) => group === 'all' || String(r.roomId) === String(group)).length
-                  : reviews.filter((r) => (group === 'all' || String(r.roomId) === String(group)) && Number(r.rating) === Number(s)).length;
+                  ? reviews.length
+                  : reviews.filter((r) => Number(r.rating) === Number(s)).length;
                 return (
                   <button key={s} type="button"
                     className={`yn-chip ${!photo && stars === s ? 'active' : ''}`}
@@ -561,7 +509,7 @@ function ReviewsDrawer({ open, onClose, initialGroup, reviews = [], rooms = [], 
               <i className="bi bi-chat-square-dots" />
               Chưa có đánh giá nào khớp với bộ lọc này.<br />
               <button type="button" className="yn-btn yn-btn--outline yn-btn--sm"
-                onClick={() => { setGroup('all'); setStars('all'); setPhoto(false); setShown(REVIEW_PAGE_SIZE); }}>
+                onClick={() => { setStars('all'); setPhoto(false); setShown(REVIEW_PAGE_SIZE); }}>
                 Xóa bộ lọc
               </button>
             </div>
@@ -844,6 +792,12 @@ export default function HomestayDetail() {
   const [reviewStats, setReviewStats] = useState(null);
   const [loadingReviews, setLoadingReviews] = useState(true);
 
+  // Bộ lọc và phân trang đánh giá trực tiếp trên trang Homestay
+  const [pageReviewStars, setPageReviewStars] = useState('all');
+  const [pageReviewPhotoOnly, setPageReviewPhotoOnly] = useState(false);
+  const [pageReviewSort, setPageReviewSort] = useState('newest');
+  const [pageReviewsShown, setPageReviewsShown] = useState(6);
+
   const roomsSectionRef = useRef(null);
   const reviewsSectionRef = useRef(null);
   const toastTimer = useRef(null);
@@ -1004,6 +958,25 @@ export default function HomestayDetail() {
       return { label: `${s} sao`, pct, count: c };
     });
   }, [homestayReviewCount, reviewStats, dbReviews]);
+
+  // Danh sách đánh giá lọc và sắp xếp trực tiếp trên trang Homestay
+  const filteredPageReviews = useMemo(() => {
+    let list = [...(dbReviews || [])];
+    if (pageReviewStars !== 'all') {
+      list = list.filter((r) => Number(r.rating) === Number(pageReviewStars));
+    }
+    if (pageReviewPhotoOnly) {
+      list = list.filter((r) => (r.images && r.images.length > 0) || (r.photos && r.photos.length > 0));
+    }
+    if (pageReviewSort === 'highest') {
+      list.sort((a, b) => b.rating - a.rating || new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+    } else if (pageReviewSort === 'lowest') {
+      list.sort((a, b) => a.rating - b.rating || new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+    } else {
+      list.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+    }
+    return list;
+  }, [dbReviews, pageReviewStars, pageReviewPhotoOnly, pageReviewSort]);
 
   const handlePhotoClick = (reviewId, photoIdx) => {
     const review = dbReviews.find((r) => r.id === reviewId);
@@ -1269,22 +1242,12 @@ export default function HomestayDetail() {
                         {(room.amenities || []).slice(0, 3).map((a, j) => <li key={j}>{a}</li>)}
                       </ul>
                       <button type="button" className="room-rating-link"
-                        onClick={(e) => { e.stopPropagation(); setReviewsDrawer({ open: true, group: String(room.id) }); }}>
-                        {(() => {
-                          const rRevs = dbReviews.filter((rev) => String(rev.roomId) === String(room.id));
-                          const rCount = rRevs.length;
-                          const rScore = rCount > 0
-                            ? (rRevs.reduce((s, x) => s + x.rating, 0) / rCount).toFixed(1)
-                            : (room.rating ? (room.rating > 5 ? (room.rating / 2).toFixed(1) : Number(room.rating).toFixed(1)) : '5.0');
-                          return (
-                            <>
-                              <i className="bi bi-star-fill" /> {rScore}
-                              <i className="rating-sep" />
-                              <span>{rCount} đánh giá</span>
-                              <i className="bi bi-chevron-right rating-arrow" />
-                            </>
-                          );
-                        })()}
+                        onClick={(e) => { e.stopPropagation(); scrollToReviews(); }}
+                        title="Xem các đánh giá của homestay này">
+                        <i className="bi bi-star-fill star-gold" /> {homestayRating}
+                        <i className="rating-sep" />
+                        <span>{homestayReviewCount} đánh giá homestay</span>
+                        <i className="bi bi-chevron-down rating-arrow" />
                       </button>
                     </div>
                     <div className="room-list-action">
@@ -1307,6 +1270,8 @@ export default function HomestayDetail() {
               <h3 className="detail-block-title">
                 <i className="bi bi-star-fill star-gold" /> {homestayRating} · {homestayReviewCount} đánh giá về homestay
               </h3>
+              
+              {/* Tổng quan điểm số và phân bố sao của Homestay */}
               <div className="rating-overview">
                 <div className="rating-score">
                   <b>{homestayRating}</b>
@@ -1327,23 +1292,105 @@ export default function HomestayDetail() {
                   ))}
                 </div>
               </div>
-              {dbReviews.length > 0 ? (
+
+              {/* Bộ lọc và sắp xếp đánh giá trực tiếp ngay tại trang homestay */}
+              {dbReviews.length > 0 && (
+                <div className="page-review-controls">
+                  <div className="page-review-chips">
+                    <button
+                      type="button"
+                      className={`yn-chip ${pageReviewStars === 'all' && !pageReviewPhotoOnly ? 'active' : ''}`}
+                      onClick={() => { setPageReviewStars('all'); setPageReviewPhotoOnly(false); setPageReviewsShown(6); }}
+                    >
+                      Tất cả <span className="chip-count">{dbReviews.length}</span>
+                    </button>
+                    {['5', '4', '3', '2', '1'].map((s) => {
+                      const count = dbReviews.filter((r) => Number(r.rating) === Number(s)).length;
+                      return (
+                        <button
+                          key={s}
+                          type="button"
+                          className={`yn-chip ${!pageReviewPhotoOnly && pageReviewStars === s ? 'active' : ''}`}
+                          onClick={() => { setPageReviewStars(s); setPageReviewPhotoOnly(false); setPageReviewsShown(6); }}
+                        >
+                          <i className="bi bi-star-fill" /> {s} sao <span className="chip-count">{count}</span>
+                        </button>
+                      );
+                    })}
+                    <button
+                      type="button"
+                      className={`yn-chip ${pageReviewPhotoOnly ? 'active' : ''}`}
+                      onClick={() => { setPageReviewPhotoOnly(!pageReviewPhotoOnly); setPageReviewStars('all'); setPageReviewsShown(6); }}
+                    >
+                      <i className="bi bi-camera-fill" /> Có hình ảnh <span className="chip-count">{dbReviews.filter((r) => (r.images && r.images.length > 0) || (r.photos && r.photos.length > 0)).length}</span>
+                    </button>
+                  </div>
+
+                  <div className="page-review-sort">
+                    <span className="page-review-sort-label">Sắp xếp:</span>
+                    <select
+                      className="rv-select"
+                      value={pageReviewSort}
+                      onChange={(e) => { setPageReviewSort(e.target.value); setPageReviewsShown(6); }}
+                    >
+                      <option value="newest">Mới nhất</option>
+                      <option value="highest">Điểm cao nhất</option>
+                      <option value="lowest">Điểm thấp nhất</option>
+                    </select>
+                  </div>
+                </div>
+              )}
+
+              {/* Danh sách các đánh giá hiển thị trực tiếp ngay tại trang Homestay */}
+              {filteredPageReviews.length > 0 ? (
                 <div className="reviews-grid">
-                  {dbReviews.slice(0, 4).map((r) => (
-                    <ReviewCard key={r.id} review={r} showRoom clamp onPhotoClick={handlePhotoClick} />
+                  {filteredPageReviews.slice(0, pageReviewsShown).map((r) => (
+                    <ReviewCard key={r.id} review={r} showRoom={false} clamp={false} onPhotoClick={handlePhotoClick} />
                   ))}
                 </div>
               ) : (
                 <div className="rv-empty-state">
                   <i className="bi bi-chat-square-dots" />
-                  <p>Homestay này hiện chưa có đánh giá nào từ khách hàng.</p>
+                  <p>
+                    {dbReviews.length === 0 
+                      ? 'Homestay này hiện chưa có đánh giá nào từ khách hàng.' 
+                      : 'Không có đánh giá nào phù hợp với bộ lọc hiện tại.'}
+                  </p>
+                  {dbReviews.length > 0 && (
+                    <button
+                      type="button"
+                      className="yn-btn yn-btn--outline yn-btn--sm"
+                      style={{ marginTop: '10px' }}
+                      onClick={() => { setPageReviewStars('all'); setPageReviewPhotoOnly(false); setPageReviewsShown(6); }}
+                    >
+                      Xóa bộ lọc
+                    </button>
+                  )}
                 </div>
               )}
-              {dbReviews.length > 0 && (
-                <button type="button" className="yn-btn yn-btn--outline"
-                  onClick={() => setReviewsDrawer({ open: true, group: 'all' })}>
-                  <i className="bi bi-chat-square-text" /> Xem tất cả {homestayReviewCount} đánh giá
-                </button>
+
+              {/* Nút Xem thêm / Thu gọn ngay tại trang homestay */}
+              {filteredPageReviews.length > 0 && (
+                <div className="page-reviews-actions" style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap', marginTop: '16px' }}>
+                  {filteredPageReviews.length > pageReviewsShown && (
+                    <button
+                      type="button"
+                      className="yn-btn yn-btn--outline"
+                      onClick={() => setPageReviewsShown((s) => s + 6)}
+                    >
+                      <i className="bi bi-arrow-down-circle" /> Xem thêm {Math.min(6, filteredPageReviews.length - pageReviewsShown)} đánh giá khác (Đã xem {pageReviewsShown}/{filteredPageReviews.length})
+                    </button>
+                  )}
+                  {pageReviewsShown > 6 && (
+                    <button
+                      type="button"
+                      className="yn-btn yn-btn--ghost"
+                      onClick={() => { setPageReviewsShown(6); reviewsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }}
+                    >
+                      <i className="bi bi-arrow-up-circle" /> Thu gọn bớt
+                    </button>
+                  )}
+                </div>
               )}
             </div>
             <div className="detail-divider" />
@@ -1488,18 +1535,17 @@ export default function HomestayDetail() {
         <RoomModal
           room={rooms[activeRoomIdx]}
           homestay={homestay}
-          allHomestayReviews={dbReviews}
+          homestayRating={homestayRating}
+          homestayReviewCount={homestayReviewCount}
           onClose={() => setActiveRoomIdx(null)}
-          onOpenReviews={(group) => { setActiveRoomIdx(null); setReviewsDrawer({ open: true, group }); }}
+          onScrollToReviews={scrollToReviews}
           showToast={showToast}
         />
       )}
 
       <ReviewsDrawer
         open={reviewsDrawer.open}
-        initialGroup={reviewsDrawer.group}
         reviews={dbReviews}
-        rooms={rooms}
         homestayRating={homestayRating}
         onClose={() => setReviewsDrawer((s) => ({ ...s, open: false }))}
         onPhotoClick={handlePhotoClick}
