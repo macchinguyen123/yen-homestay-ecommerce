@@ -28,4 +28,6 @@ public class CreateBookingRequest {
     private String customerPhone;
     private String customerEmail;
     private String paymentMethod;
+    private java.util.List<Long> extraIds;
+    private java.util.List<java.util.Map<String, Object>> selectedExperiences;
 }

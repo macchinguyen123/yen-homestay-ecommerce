@@ -205,20 +205,40 @@ export default function ManageHomestay() {
         });
     }, [list, filterStatus, filterRegion, searchTerm]);
 
-    // Phân trang 6 homestay mỗi trang
-    const ITEMS_PER_PAGE = 6;
+    // Cấu hình phân trang chuyên nghiệp cho Admin
+    const [pageSize, setPageSize] = useState(10);
     const [currentPage, setCurrentPage] = useState(1);
 
+    // Reset về trang 1 khi thay đổi điều kiện lọc, tìm kiếm hoặc kích thước trang
     useEffect(() => {
         setCurrentPage(1);
-    }, [searchTerm, filterStatus, filterRegion]);
+    }, [searchTerm, filterStatus, filterRegion, pageSize]);
 
-    const totalPages = Math.ceil(filteredData.length / ITEMS_PER_PAGE) || 1;
+    const totalItems = filteredData.length;
+    const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+    const safeCurrentPage = Math.min(Math.max(1, currentPage), totalPages);
 
     const paginatedData = useMemo(() => {
-        const start = (currentPage - 1) * ITEMS_PER_PAGE;
-        return filteredData.slice(start, start + ITEMS_PER_PAGE);
-    }, [filteredData, currentPage]);
+        const start = (safeCurrentPage - 1) * pageSize;
+        return filteredData.slice(start, start + pageSize);
+    }, [filteredData, safeCurrentPage, pageSize]);
+
+    const pageStart = totalItems === 0 ? 0 : (safeCurrentPage - 1) * pageSize + 1;
+    const pageEnd = Math.min(safeCurrentPage * pageSize, totalItems);
+
+    // Thuật toán hiển thị danh sách số trang thông minh (có dấu ...)
+    const pageNumbers = useMemo(() => {
+        if (totalPages <= 7) {
+            return Array.from({ length: totalPages }, (_, i) => i + 1);
+        }
+        if (safeCurrentPage <= 4) {
+            return [1, 2, 3, 4, 5, '...', totalPages];
+        }
+        if (safeCurrentPage >= totalPages - 3) {
+            return [1, '...', totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
+        }
+        return [1, '...', safeCurrentPage - 1, safeCurrentPage, safeCurrentPage + 1, '...', totalPages];
+    }, [totalPages, safeCurrentPage]);
 
     const uniqueRegions = Array.from(new Set(list.map(item => item.region).filter(r => r && r !== 'N/A')));
 
@@ -389,77 +409,98 @@ export default function ManageHomestay() {
                 </div>
 
                 {/* THANH PHÂN TRANG */}
-                {totalPages > 1 && (
-                    <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        marginTop: '16px',
-                        padding: '12px 18px',
-                        background: '#ffffff',
-                        border: '1px solid #e2e8f0',
-                        borderRadius: '8px'
-                    }}>
-                        <div style={{ fontSize: '13px', color: '#64748b' }}>
-                            Hiển thị {Math.min((currentPage - 1) * ITEMS_PER_PAGE + 1, filteredData.length)} - {Math.min(currentPage * ITEMS_PER_PAGE, filteredData.length)} trong tổng số {filteredData.length} homestay
-                        </div>
-                        <div style={{ display: 'flex', gap: '6px' }}>
-                            <button
-                                type="button"
-                                disabled={currentPage === 1}
-                                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                                style={{
-                                    padding: '6px 12px',
-                                    borderRadius: '6px',
-                                    border: '1px solid #cbd5e1',
-                                    background: '#ffffff',
-                                    cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
-                                    opacity: currentPage === 1 ? 0.5 : 1,
-                                    fontSize: '13px',
-                                    fontWeight: 600
+                <div className="homestay-pagination-bar">
+                    <div className="homestay-pagination-info">
+                        {totalItems > 0 ? (
+                            <span>
+                                Hiển thị <b>{pageStart} - {pageEnd}</b> trong tổng số <b>{totalItems}</b> homestay
+                            </span>
+                        ) : (
+                            <span>Không có homestay nào</span>
+                        )}
+
+                        <div className="homestay-page-size-selector">
+                            <label htmlFor="pageSizeSelect">Hiển thị:</label>
+                            <select
+                                id="pageSizeSelect"
+                                value={pageSize}
+                                onChange={(e) => {
+                                    setPageSize(Number(e.target.value));
+                                    setCurrentPage(1);
                                 }}
                             >
-                                ‹ Trước
-                            </button>
-                            {Array.from({ length: totalPages }, (_, idx) => idx + 1).map(p => (
-                                <button
-                                    key={p}
-                                    type="button"
-                                    onClick={() => setCurrentPage(p)}
-                                    style={{
-                                        padding: '6px 12px',
-                                        borderRadius: '6px',
-                                        border: p === currentPage ? '1px solid #15803D' : '1px solid #cbd5e1',
-                                        background: p === currentPage ? '#15803D' : '#ffffff',
-                                        color: p === currentPage ? '#ffffff' : '#334155',
-                                        cursor: 'pointer',
-                                        fontSize: '13px',
-                                        fontWeight: 600
-                                    }}
-                                >
-                                    {p}
-                                </button>
-                            ))}
-                            <button
-                                type="button"
-                                disabled={currentPage === totalPages}
-                                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                                style={{
-                                    padding: '6px 12px',
-                                    borderRadius: '6px',
-                                    border: '1px solid #cbd5e1',
-                                    background: '#ffffff',
-                                    cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
-                                    opacity: currentPage === totalPages ? 0.5 : 1,
-                                    fontSize: '13px',
-                                    fontWeight: 600
-                                }}
-                            >
-                                Sau ›
-                            </button>
+                                <option value={10}>10 / trang</option>
+                                <option value={20}>20 / trang</option>
+                                <option value={50}>50 / trang</option>
+                            </select>
                         </div>
                     </div>
-                )}
+
+                    {totalPages > 1 && (
+                        <div className="homestay-pagination-controls">
+                            <button
+                                type="button"
+                                className="pagination-btn pagination-btn--nav"
+                                disabled={safeCurrentPage === 1}
+                                onClick={() => setCurrentPage(1)}
+                                title="Về trang đầu"
+                            >
+                                <span className="material-symbols-outlined">first_page</span>
+                            </button>
+
+                            <button
+                                type="button"
+                                className="pagination-btn pagination-btn--nav"
+                                disabled={safeCurrentPage === 1}
+                                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                                title="Trang trước"
+                            >
+                                <span className="material-symbols-outlined">chevron_left</span>
+                                <span>Trước</span>
+                            </button>
+
+                            <div className="pagination-pages-list">
+                                {pageNumbers.map((p, idx) => {
+                                    if (p === '...') {
+                                        return <span key={`ellipsis-${idx}`} className="pagination-ellipsis">…</span>;
+                                    }
+                                    const isActive = p === safeCurrentPage;
+                                    return (
+                                        <button
+                                            key={p}
+                                            type="button"
+                                            className={`pagination-btn pagination-btn--num ${isActive ? 'active' : ''}`}
+                                            onClick={() => setCurrentPage(p)}
+                                        >
+                                            {p}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+
+                            <button
+                                type="button"
+                                className="pagination-btn pagination-btn--nav"
+                                disabled={safeCurrentPage === totalPages}
+                                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                                title="Trang tiếp theo"
+                            >
+                                <span>Sau</span>
+                                <span className="material-symbols-outlined">chevron_right</span>
+                            </button>
+
+                            <button
+                                type="button"
+                                className="pagination-btn pagination-btn--nav"
+                                disabled={safeCurrentPage === totalPages}
+                                onClick={() => setCurrentPage(totalPages)}
+                                title="Đến trang cuối"
+                            >
+                                <span className="material-symbols-outlined">last_page</span>
+                            </button>
+                        </div>
+                    )}
+                </div>
             </div>
 
             {/* MODAL THÊM MỚI HOMESTAY / PHÒNG */}

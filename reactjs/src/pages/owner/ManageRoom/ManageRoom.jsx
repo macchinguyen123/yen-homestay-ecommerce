@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import './ManageRoom.css';
 import { initialRoomsData } from './manageRoomData';
+import { authService } from '../../../services/authService';
 
 // Hàm chuẩn hóa loại bỏ dấu tiếng Việt để tìm kiếm phòng thông minh
 function removeVietnameseTones(str) {
@@ -41,8 +42,17 @@ export default function ManageRoom() {
   const fetchRealRooms = async () => {
     setLoading(true);
     try {
+      const user = authService.getCurrentUser();
+      const ownerId = user?.id || 1;
+      const token = localStorage.getItem('token');
       let homestayMap = {};
-      const hsRes = await fetch('http://localhost:8081/api/public/homestays');
+
+      let hsRes = await fetch(`http://localhost:8081/api/admin/homestays?ownerId=${ownerId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (!hsRes.ok) {
+        hsRes = await fetch(`http://localhost:8081/api/public/admin/homestays?ownerId=${ownerId}`);
+      }
       if (hsRes.ok) {
         const hsData = await hsRes.json();
         if (Array.isArray(hsData)) {
@@ -53,10 +63,15 @@ export default function ManageRoom() {
         }
       }
 
-      const roomRes = await fetch('http://localhost:8081/api/public/admin/rooms');
+      let roomRes = await fetch(`http://localhost:8081/api/admin/rooms?ownerId=${ownerId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (!roomRes.ok) {
+        roomRes = await fetch(`http://localhost:8081/api/public/admin/rooms?ownerId=${ownerId}`);
+      }
       if (roomRes.ok) {
         const roomsData = await roomRes.json();
-        if (Array.isArray(roomsData) && roomsData.length > 0) {
+        if (Array.isArray(roomsData)) {
           const mappedRooms = roomsData.map(r => {
             const hsName = homestayMap[r.homestayId] || 'Homestay';
             const rName = r.roomName || r.name || `Phòng ${r.id}`;
@@ -81,19 +96,14 @@ export default function ManageRoom() {
               stay: 'Phòng sạch sẽ sẵn sàng đón khách'
             };
           });
-          setRoomsList(prev => {
-            if (!prev || prev.length === 0) return mappedRooms;
-            const idsInMapped = new Set(mappedRooms.map(r => String(r.id)));
-            const localOnly = prev.filter(r => r && r.id && !idsInMapped.has(String(r.id)));
-            return [...localOnly, ...mappedRooms];
-          });
+          setRoomsList(mappedRooms);
           return;
         }
       }
-      setRoomsList(prev => (prev && prev.length > 0 ? prev : initialRoomsData.rooms));
+      setRoomsList([]);
     } catch (err) {
       console.error('Lỗi nạp phòng từ CSDL:', err);
-      setRoomsList(prev => (prev && prev.length > 0 ? prev : initialRoomsData.rooms));
+      setRoomsList([]);
     } finally {
       setLoading(false);
     }
@@ -155,7 +165,18 @@ export default function ManageRoom() {
   // Lọc & Sắp xếp phòng theo Active Homestay, Tab, Tìm kiếm và Thứ tự sắp xếp
   const filteredRooms = useMemo(() => {
     let result = roomsList.filter((r) => {
-      // 1. Khi đang gõ từ khóa tìm kiếm: Ưu tiên tìm kiếm trên TẤT CẢ các phòng & TẤT CẢ cơ sở homestay
+      // 1. Lọc theo Cơ sở Homestay đang được chọn
+      if (activeHomestayId && activeHomestayId !== 'all' && r.homestayId && String(r.homestayId) !== String(activeHomestayId)) {
+        return false;
+      }
+
+      // 2. Tab filter trạng thái phòng
+      if (activeTab === 'occupied' && r.status !== 'occupied') return false;
+      if (activeTab === 'booked' && r.status !== 'booked') return false;
+      if (activeTab === 'available' && r.status !== 'available') return false;
+      if (activeTab === 'maintenance' && r.status !== 'maintenance') return false;
+
+      // 3. Khi đang gõ từ khóa tìm kiếm: lọc theo từ khóa
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase().trim();
         const qNoTone = removeVietnameseTones(q);
@@ -182,17 +203,6 @@ export default function ManageRoom() {
 
         return matchCode || matchName || matchFullName || matchType || matchGuest || matchHomestayName || matchDescription || matchId || matchPrice;
       }
-
-      // 2. Khi KHÔNG gõ tìm kiếm: Lọc theo Cơ sở Homestay đang được chọn
-      if (activeHomestayId && activeHomestayId !== 'all' && r.homestayId && String(r.homestayId) !== String(activeHomestayId)) {
-        return false;
-      }
-
-      // 3. Tab filter trạng thái phòng
-      if (activeTab === 'occupied' && r.status !== 'occupied') return false;
-      if (activeTab === 'booked' && r.status !== 'booked') return false;
-      if (activeTab === 'available' && r.status !== 'available') return false;
-      if (activeTab === 'maintenance' && r.status !== 'maintenance') return false;
 
       return true;
     });
@@ -342,7 +352,9 @@ export default function ManageRoom() {
 
   // Hành động mở modal Thêm mới phòng
   const handleOpenAddRoom = () => {
-    const currentHsId = activeHomestayId || localStorage.getItem('ownerActiveHomestayId') || (homestaysList[0]?.id || 1);
+    const currentHsId = (activeHomestayId && activeHomestayId !== 'all')
+      ? activeHomestayId
+      : (homestaysList[0]?.id || 1);
     setRoomFormData({
       code: `P.${100 + roomsList.length + 1}`,
       name: '',

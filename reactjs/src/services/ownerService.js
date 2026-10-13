@@ -40,7 +40,10 @@ export const ownerService = {
   async getServices(homestayId) {
     try {
       const query = homestayId ? `?homestayId=${homestayId}` : '';
-      const res = await safeFetch(`${API_BASE_URL}${query}`);
+      let res = await fetch(`${PUBLIC_API_BASE_URL}${query}`);
+      if (!res.ok) {
+        res = await safeFetch(`${API_BASE_URL}${query}`);
+      }
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data)) {

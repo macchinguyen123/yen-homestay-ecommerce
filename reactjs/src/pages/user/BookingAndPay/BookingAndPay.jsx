@@ -3,6 +3,7 @@ import { Link, useNavigate, useLocation, useSearchParams } from 'react-router-do
 import { authService } from '../../../services/authService';
 import { bookingService } from '../../../services/bookingService';
 import { voucherService } from '../../../services/voucherService';
+import { ownerService } from '../../../services/ownerService';
 import './BookingAndPay.css';
 
 const SERVICE_FEE_RATE = 0.05;
@@ -14,6 +15,7 @@ const pad = (n) => String(n).padStart(2, '0');
 const toInputDate = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 
 const DEFAULT_HOMESTAY = {
+  id: 1,
   name: 'The Pine Hill Retreat',
   location: 'Phường 3, TP. Đà Lạt, Lâm Đồng',
   rating: 4.90,
@@ -35,7 +37,8 @@ const ROOM_CATALOG = {
   }
 };
 
-const EXPERIENCES = [
+// Dữ liệu trải nghiệm mặc định (fallback) khi chưa tải được từ CSDL
+const FALLBACK_EXPERIENCES = [
   { id: 'sanmay', title: 'Săn mây bình minh trên đồi thông', price: 0, unit: '', note: 'Không cần đặt trước' },
   { id: 'trekking', title: 'Đi bộ xuyên rừng thông', price: 100000, unit: '/ nhóm', note: '2 giờ · đặt trước 1 ngày' },
   { id: 'hairau', title: 'Hái rau, dâu tại vườn nhà', price: 60000, unit: '/ khách', note: '60 phút · đặt trước 1 ngày' },
@@ -45,6 +48,19 @@ const EXPERIENCES = [
   { id: 'luatrai', title: 'Lửa trại & nướng BBQ đêm đồi thông', price: 250000, unit: '/ nhóm', note: '2 giờ · đặt trước 1 ngày' },
   { id: 'bontam', title: 'Ngâm bồn tắm gỗ ngắm mây, ngắm sao', price: 0, unit: '', note: 'Hẹn giờ với chủ nhà' }
 ];
+
+// Chuyển đổi dịch vụ từ DB sang định dạng trải nghiệm để hiển thị
+function mapServiceToExperience(svc) {
+  const priceNum = Number(svc.price || 0);
+  const unit = svc.unit || (priceNum > 0 ? '/ khách' : '');
+  return {
+    id: String(svc.id || svc.name),
+    title: svc.name || 'Dịch vụ trải nghiệm',
+    price: priceNum,
+    unit: unit,
+    note: svc.description || '',
+  };
+}
 
 const COUPONS = {
   YEN10: {
@@ -114,6 +130,10 @@ export default function BookingAndPay() {
   const [checkin, setCheckin] = useState(toInputDate(defaultCheckinDate));
   const [checkout, setCheckout] = useState(toInputDate(defaultCheckoutDate));
   const [guests, setGuests] = useState(2);
+
+  // Dữ liệu trải nghiệm lấy từ CSDL
+  const [dbExperiences, setDbExperiences] = useState(FALLBACK_EXPERIENCES);
+  const [loadingExperiences, setLoadingExperiences] = useState(false);
 
   // Form Contact
   const [fullName, setFullName] = useState('');
@@ -220,6 +240,35 @@ export default function BookingAndPay() {
     if (passedGuests) setGuests(Number(passedGuests));
   }, [searchParams, location.state]);
 
+  // Load dữ liệu trải nghiệm từ CSDL khi homestayId thay đổi
+  useEffect(() => {
+    const hsId = searchParams.get('homestayId') || location.state?.homestayId || homestay?.id || 1;
+    let isMounted = true;
+    setLoadingExperiences(true);
+    ownerService.getServices(hsId)
+      .then((data) => {
+        if (!isMounted) return;
+        if (Array.isArray(data) && data.length > 0) {
+          // Lọc các dịch vụ đang hoạt động
+          const mapped = data
+            .filter((s) => {
+              const status = (s.status || '').toUpperCase();
+              if (status === 'INACTIVE' || status === 'SUSPENDED') return false;
+              return true;
+            })
+            .map(mapServiceToExperience);
+          if (mapped.length > 0) {
+            setDbExperiences(mapped);
+          }
+        }
+        setLoadingExperiences(false);
+      })
+      .catch(() => {
+        if (isMounted) setLoadingExperiences(false);
+      });
+    return () => { isMounted = false; };
+  }, [searchParams, location.state, homestay?.id]);
+
   // Addons & Discounts
   const [selectedExperiences, setSelectedExperiences] = useState(new Set());
   const [couponInput, setCouponInput] = useState('');
@@ -274,11 +323,12 @@ export default function BookingAndPay() {
   const payNow = payPlan === 'deposit' ? Math.round((grandTotal * DEPOSIT_RATE) / 1000) * 1000 : grandTotal;
   const payLater = grandTotal - payNow;
 
-  // Experiences cost total
-  const selectedExpList = EXPERIENCES.filter((x) => selectedExperiences.has(x.id));
+  // Experiences cost total - dùng dbExperiences (từ CSDL hoặc fallback)
+  const selectedExpList = dbExperiences.filter((x) => selectedExperiences.has(x.id));
   const expTotal = selectedExpList.reduce((sum, x) => {
     if (x.price <= 0) return sum;
-    return sum + (x.unit === '/ khách' ? x.price * guests : x.price);
+    const isPerPerson = x.unit && (x.unit.includes('khách') || x.unit.includes('người'));
+    return sum + (isPerPerson ? x.price * guests : x.price);
   }, 0);
 
   // Apply coupon handler (ưu tiên kiểm tra trực tiếp cơ sở dữ liệu PostgreSQL)
@@ -465,7 +515,7 @@ export default function BookingAndPay() {
         },
         arrivalTime: arrivalTime,
         experiences: Array.from(selectedExperiences).map((id) => {
-          const exp = EXPERIENCES.find((x) => x.id === id);
+          const exp = dbExperiences.find((x) => x.id === id);
           return exp ? exp.title : id;
         }),
         note: guestNote,
@@ -658,20 +708,36 @@ export default function BookingAndPay() {
                     <p>Chọn trước để chủ nhà chuẩn bị. Khoản này tính riêng và trả trực tiếp tại homestay.</p>
                   </div>
                 </div>
+                {loadingExperiences ? (
+                  <div style={{ padding: '12px 0', color: '#64748B', fontSize: '0.88rem', display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span className="bk-spinner" style={{ width: 16, height: 16, borderWidth: 2 }} />
+                    Đang tải danh sách trải nghiệm...
+                  </div>
+                ) : (
                 <div className="bk-xp-list">
-                  {EXPERIENCES.map((x) => {
+                  {dbExperiences.map((x) => {
                     const isChecked = selectedExperiences.has(x.id);
                     return (
-                      <label key={x.id} className={`bk-xp ${isChecked ? 'checked' : ''}`} onClick={() => toggleExperience(x.id)}>
+                      <div
+                        key={x.id}
+                        className={`bk-xp ${isChecked ? 'checked' : ''}`}
+                        onClick={() => toggleExperience(x.id)}
+                        role="checkbox"
+                        aria-checked={isChecked}
+                        tabIndex={0}
+                        onKeyDown={(e) => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); toggleExperience(x.id); } }}
+                        style={{ cursor: 'pointer' }}
+                      >
                         <span className="bk-xp-box"><i className="bi bi-check-lg" /></span>
                         <span className="bk-xp-body"><b>{x.title}</b><small>{x.note}</small></span>
                         <span className={`bk-xp-price ${x.price === 0 ? 'is-free' : ''}`}>
                           {x.price > 0 ? `${fmtVND(x.price)} ${x.unit}` : 'Miễn phí'}
                         </span>
-                      </label>
+                      </div>
                     );
                   })}
                 </div>
+                )}
                 {selectedExpList.length > 0 && expTotal > 0 && (
                   <div className="bk-xp-total">
                     <span>Dự kiến trả thêm tại homestay</span>
