@@ -258,27 +258,107 @@ public class BookingService {
         }
         if (reporterId == null) reporterId = 21L;
 
+        String touristName = "Du khách";
+        String touristPhone = "0912 345 678";
+        String homestayName = "Homestay YÊN";
+        String hostName = "Chủ nhà Homestay";
+        String hostPhone = "0988 765 432";
+        String region = "Việt Nam";
+        String bookingCodeStr = "#BK-" + (req.getBookingId() != null ? req.getBookingId() : "1");
+        String bookingTotalStr = "1.500.000đ";
+        String stayDatesStr = "Theo lịch lưu trú";
+
+        try {
+            if (req.getBookingId() != null) {
+                Booking bk = bookingRepository.findById(req.getBookingId()).orElse(null);
+                if (bk != null) {
+                    if (bk.getBookingCode() != null) {
+                        bookingCodeStr = bk.getBookingCode().startsWith("#") ? bk.getBookingCode() : "#" + bk.getBookingCode();
+                    }
+                    if (bk.getTotalPrice() != null) {
+                        bookingTotalStr = String.format("%,dđ", bk.getTotalPrice().longValue());
+                    }
+                    if (bk.getCheckInDate() != null && bk.getCheckOutDate() != null) {
+                        stayDatesStr = bk.getCheckInDate().format(DATE_FMT) + " - " + bk.getCheckOutDate().format(DATE_FMT);
+                    }
+                }
+            }
+            if (reporterId != null) {
+                List<Map<String, Object>> uList = jdbcTemplate.queryForList("SELECT full_name, phone FROM users WHERE user_id = ?", reporterId);
+                if (!uList.isEmpty()) {
+                    Map<String, Object> u = uList.get(0);
+                    if (u.get("full_name") != null && !u.get("full_name").toString().isBlank()) touristName = u.get("full_name").toString();
+                    if (u.get("phone") != null && !u.get("phone").toString().isBlank()) touristPhone = u.get("phone").toString();
+                }
+            }
+            if (homestayId != null) {
+                List<Map<String, Object>> hList = jdbcTemplate.queryForList("SELECT h.name, h.city, h.address, u.full_name as host_name, u.phone as host_phone FROM homestays h LEFT JOIN users u ON h.owner_id = u.user_id WHERE h.homestay_id = ?", homestayId);
+                if (!hList.isEmpty()) {
+                    Map<String, Object> h = hList.get(0);
+                    if (h.get("name") != null && !h.get("name").toString().isBlank()) homestayName = h.get("name").toString();
+                    if (h.get("city") != null && !h.get("city").toString().isBlank()) region = h.get("city").toString();
+                    else if (h.get("address") != null && !h.get("address").toString().isBlank()) region = h.get("address").toString();
+                    if (h.get("host_name") != null && !h.get("host_name").toString().isBlank()) hostName = h.get("host_name").toString();
+                    if (h.get("host_phone") != null && !h.get("host_phone").toString().isBlank()) hostPhone = h.get("host_phone").toString();
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Lỗi enrich thông tin khiếu nại: {}", e.getMessage());
+        }
+
+        String nextCode = String.format("#KN-%04d", 1048 + reportRepository.count() + 1);
+        String initialTimeline = "[{\"time\":\"Vừa xong\",\"desc\":\"Du khách " + touristName + " gửi đơn khiếu nại qua ứng dụng\"}]";
+
         Report report;
         Optional<Report> existingOpt = req.getBookingId() != null ? reportRepository.findFirstByBookingId(req.getBookingId()) : Optional.empty();
         if (existingOpt.isPresent()) {
             report = existingOpt.get();
             report.setReportType(req.getReportType() != null ? req.getReportType() : "Chất lượng phòng ở");
-            report.setTitle(req.getTitle() != null ? req.getTitle() : "Khiếu nại về đơn đặt phòng #" + req.getBookingId());
+            report.setTitle(req.getTitle() != null ? req.getTitle() : "Khiếu nại về đơn đặt phòng " + bookingCodeStr);
             report.setContent(req.getContent());
             if (req.getProofImages() != null && !req.getProofImages().isBlank()) {
                 report.setProofImages(req.getProofImages());
             }
             report.setStatus("PENDING");
+            if (report.getComplaintCode() == null) report.setComplaintCode(nextCode);
+            if (report.getDirection() == null) report.setDirection("tourist_to_homestay");
+            report.setBookingCode(bookingCodeStr);
+            report.setBookingTotal(bookingTotalStr);
+            report.setStayDates(stayDatesStr);
+            report.setReporterName(touristName);
+            report.setReporterPhone(touristPhone);
+            report.setReporterRole("Du khách (Tourist)");
+            report.setReportedHomestayName(homestayName);
+            report.setReportedName(hostName);
+            report.setReporterReportedPhone(hostPhone);
+            report.setReportedRegion(region);
         } else {
             report = Report.builder()
+                    .complaintCode(nextCode)
+                    .direction("tourist_to_homestay")
                     .bookingId(req.getBookingId() != null ? req.getBookingId() : 1L)
+                    .bookingCode(bookingCodeStr)
                     .reporterId(reporterId)
                     .reportedHomestayId(homestayId)
+                    .reporterName(touristName)
+                    .reporterRole("Du khách (Tourist)")
+                    .reporterPhone(touristPhone)
+                    .reportedHomestayName(homestayName)
+                    .reportedName(hostName)
+                    .reporterReportedPhone(hostPhone)
+                    .reportedRegion(region)
                     .reportType(req.getReportType() != null ? req.getReportType() : "Chất lượng phòng ở")
-                    .title(req.getTitle() != null ? req.getTitle() : "Khiếu nại về đơn đặt phòng #" + req.getBookingId())
-                    .content(req.getContent() != null ? req.getContent() : "Không có nội dung")
+                    .title(req.getTitle() != null ? req.getTitle() : "Khiếu nại về đơn đặt phòng " + bookingCodeStr)
+                    .content(req.getContent() != null ? req.getContent() : "Không có nội dung chi tiết")
+                    .demands("Đề nghị Admin và chủ nhà hỗ trợ xử lý.")
+                    .reportedResponse("Đang chờ phản hồi giải trình từ chủ nhà Homestay.")
+                    .requestedAmount(BigDecimal.ZERO)
+                    .bookingTotal(bookingTotalStr)
+                    .stayDates(stayDatesStr)
+                    .severity(req.getSeverity() != null ? req.getSeverity() : "medium")
                     .proofImages(req.getProofImages())
                     .status("PENDING")
+                    .timeline(initialTimeline)
                     .createdAt(LocalDateTime.now())
                     .build();
         }
