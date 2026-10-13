@@ -19,20 +19,14 @@ const OWNER_NAV = [
   { to: '/owner/settings',   icon: 'bi-gear',            label: 'Cài đặt' },
 ];
 
-// ─── Thông báo mẫu (notification dropdown) ────────────────────────────────────
-const SAMPLE_NOTIFS = [
-  { id: 1, icon: 'bi-bell-fill',           color: 'green',  title: 'Đơn đặt phòng mới',      desc: 'Nguyễn Thị Mai vừa đặt phòng Garden View.',       time: '5 phút trước' },
-  { id: 2, icon: 'bi-alarm-fill',          color: 'yellow', title: 'Nhắc nhở nhận phòng',     desc: 'Lê Văn Hiếu check-in lúc 14:00 hôm nay.',          time: '1 giờ trước' },
-  { id: 3, icon: 'bi-star-fill',           color: 'orange', title: 'Đánh giá 5 sao mới',      desc: 'Hoàng Minh Anh để lại đánh giá 5 sao.',            time: '3 giờ trước' },
-];
-
 export default function OwnerLayout() {
   const navigate = useNavigate();
   const [ownerProfile, setOwnerProfile] = useState(() => authService.getCurrentUser() || {});
 
   // Notification dropdown
   const [notifOpen, setNotifOpen] = useState(false);
-  const [notifCount, setNotifCount]   = useState(SAMPLE_NOTIFS.length);
+  const [notifCount, setNotifCount]   = useState(0);
+  const [notifications, setNotifications] = useState([]);
   const notifRef = useRef(null);
 
   // Profile dropdown
@@ -96,6 +90,31 @@ export default function OwnerLayout() {
     return () => window.removeEventListener('ownerActiveHomestayChanged', handleSync);
   }, []);
 
+  useEffect(() => {
+    const user = authService.getCurrentUser();
+    if (!user?.id || !user?.token) return;
+    const apiBase = import.meta.env.VITE_API_BASE_URL?.replace(/\/auth\/?$/, '') || 'http://localhost:8081/api';
+    const headers = { Authorization: `Bearer ${user.token}` };
+    const load = () => fetch(`${apiBase}/notifications`, { headers })
+      .then((response) => response.ok ? response.json() : [])
+      .then((items) => {
+        const list = Array.isArray(items) ? items : [];
+        setNotifications(list);
+        setNotifCount(list.filter((item) => !item.read).length);
+      }).catch(() => { setNotifications([]); setNotifCount(0); });
+    load();
+    const socketBase = import.meta.env.VITE_WS_BASE_URL || apiBase.replace(/^http/, 'ws').replace(/\/api$/, '');
+    const socket = new WebSocket(`${socketBase}/ws/notifications?token=${encodeURIComponent(user.token)}`);
+    socket.onmessage = (event) => {
+      try {
+        const payload = JSON.parse(event.data);
+        if (typeof payload.unreadCount === 'number') setNotifCount(payload.unreadCount);
+        load();
+      } catch { load(); }
+    };
+    return () => socket.close();
+  }, []);
+
   // Đóng dropdown khi click bên ngoài
   useEffect(() => {
     function handleClickOutside(e) {
@@ -115,6 +134,10 @@ export default function OwnerLayout() {
   };
 
   const handleReadAllNotifs = () => {
+    const user = authService.getCurrentUser();
+    const apiBase = import.meta.env.VITE_API_BASE_URL?.replace(/\/auth\/?$/, '') || 'http://localhost:8081/api';
+    fetch(`${apiBase}/notifications/read-all`, { method: 'PATCH', headers: { Authorization: `Bearer ${user?.token || ''}` } }).catch(() => {});
+    setNotifications((items) => items.map((item) => ({ ...item, read: true })));
     setNotifCount(0);
     setNotifOpen(false);
   };
@@ -249,7 +272,7 @@ export default function OwnerLayout() {
             <div className="owner-notif-wrap" ref={notifRef}>
               <button
                 className="owner-icon-btn"
-                onClick={() => { setNotifOpen(o => !o); setNotifCount(0); }}
+                onClick={() => setNotifOpen(o => !o)}
                 aria-label="Thông báo"
               >
                 <i className="bi bi-bell-fill" />
@@ -269,18 +292,18 @@ export default function OwnerLayout() {
                   </div>
 
                   <div className="owner-notif-list">
-                    {SAMPLE_NOTIFS.map(n => (
+                    {notifications.length ? notifications.slice(0, 8).map(n => (
                       <div key={n.id} className="owner-notif-item">
-                        <div className={`owner-notif-icon ${n.color}`}>
-                          <i className={`bi ${n.icon}`} />
+                        <div className="owner-notif-icon green">
+                          <i className="bi bi-bell-fill" />
                         </div>
                         <div className="owner-notif-content">
                           <strong>{n.title}</strong>
-                          <span>{n.desc}</span>
+                          <span>{n.message}</span>
                         </div>
-                        <small>{n.time}</small>
+                        <small>{n.createdAt ? new Date(n.createdAt).toLocaleString('vi-VN') : ''}</small>
                       </div>
-                    ))}
+                    )) : <div className="owner-notif-item"><div className="owner-notif-content"><span>Chưa có thông báo.</span></div></div>}
                   </div>
                 </div>
               )}

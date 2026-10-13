@@ -35,6 +35,7 @@ public class OwnerBookingService {
     private final HomestayRepository homestayRepository;
     private final UserRepository userRepository;
     private final PaymentRepository paymentRepository;
+    private final NotificationService notificationService;
 
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
     private static final DateTimeFormatter DATETIME_FMT = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
@@ -844,6 +845,8 @@ public class OwnerBookingService {
         }
 
         bookingRepository.save(b);
+        notificationService.create(b.getTouristId(), "Chủ homestay đã xác nhận đặt phòng",
+                "Yêu cầu đặt phòng " + b.getBookingCode() + " đã được xác nhận.", "BOOKING", b.getId(), "/bookings");
         return getBookingByIdOrCode(bookingId.toString());
     }
 
@@ -864,6 +867,9 @@ public class OwnerBookingService {
         }
 
         bookingRepository.save(b);
+        notificationService.create(b.getTouristId(), "Yêu cầu đặt phòng bị từ chối",
+                "Đơn đặt phòng " + b.getBookingCode() + " đã bị từ chối hoặc hủy. Vui lòng xem thông tin hoàn tiền.",
+                "BOOKING", b.getId(), "/bookings");
         return getBookingByIdOrCode(bookingId.toString());
     }
 

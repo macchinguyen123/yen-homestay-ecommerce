@@ -75,6 +75,7 @@ export const bookingService = {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          Authorization: `Bearer ${JSON.parse(localStorage.getItem('user') || 'null')?.token || ''}`,
         },
         body: JSON.stringify(bookingData),
       });
@@ -92,8 +93,10 @@ export const bookingService = {
    */
   async cancelBooking(bookingId, touristId) {
     try {
-      const response = await fetch(`${API_BASE_URL}/${bookingId}/cancel?touristId=${touristId}`, {
+      const currentUser = JSON.parse(localStorage.getItem('user') || 'null');
+      const response = await fetch(`${API_BASE_URL}/${bookingId}/cancel`, {
         method: 'PUT',
+        headers: { Authorization: `Bearer ${currentUser?.token || ''}` },
       });
       return await response.json();
     } catch (error) {

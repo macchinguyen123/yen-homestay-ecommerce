@@ -34,6 +34,9 @@ public class BookingService {
     private final ReviewRepository reviewRepository;
     private final GuestTaskRepository guestTaskRepository;
     private final PaymentRepository paymentRepository;
+    private final HomestayRepository homestayRepository;
+    private final NotificationService notificationService;
+    private final UserRepository userRepository;
 
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
     private static final Locale VI_LOCALE = new Locale("vi", "VN");
@@ -153,6 +156,11 @@ public class BookingService {
     @CacheEvict(value = "userBookings", allEntries = true)
     @Transactional
     public Booking createBooking(CreateBookingRequest req) {
+        if (req.getTouristId() == null || req.getHomestayId() == null || req.getCheckInDate() == null || req.getCheckOutDate() == null) {
+            throw new IllegalArgumentException("Thiếu người đặt, homestay hoặc ngày nhận/trả phòng.");
+        }
+        Homestay targetHomestay = homestayRepository.findById(req.getHomestayId())
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy homestay được đặt."));
         String code = "YEN-" + LocalDate.now().getYear() + "-" + (1000 + new SecureRandom().nextInt(9000));
 
         // Chuẩn hóa theo ràng buộc Check Constraint của Neon PostgreSQL:
@@ -168,12 +176,12 @@ public class BookingService {
 
         Booking booking = Booking.builder()
                 .bookingCode(code)
-                .touristId(req.getTouristId() != null ? req.getTouristId() : 21L) // Mặc định du khách
-                .homestayId(req.getHomestayId() != null ? req.getHomestayId() : 1L)
+                .touristId(req.getTouristId())
+                .homestayId(req.getHomestayId())
                 .roomId(req.getRoomId())
                 .voucherId(req.getVoucherId())
-                .checkInDate(req.getCheckInDate() != null ? req.getCheckInDate() : LocalDate.now().plusDays(2))
-                .checkOutDate(req.getCheckOutDate() != null ? req.getCheckOutDate() : LocalDate.now().plusDays(5))
+                .checkInDate(req.getCheckInDate())
+                .checkOutDate(req.getCheckOutDate())
                 .guestsCount(req.getGuestsCount() != null ? req.getGuestsCount() : 2)
                 .totalPrice(req.getTotalPrice() != null ? req.getTotalPrice() : BigDecimal.ZERO)
                 .discountAmount(req.getDiscountAmount() != null ? req.getDiscountAmount() : BigDecimal.ZERO)
@@ -186,6 +194,13 @@ public class BookingService {
                 .build();
 
         Booking savedBooking = bookingRepository.save(booking);
+
+        notificationService.create(savedBooking.getTouristId(), "Đã gửi yêu cầu đặt phòng",
+                "Yêu cầu đặt phòng tại " + targetHomestay.getName() + " đã được gửi thành công.",
+                "BOOKING", savedBooking.getId(), "/bookings");
+        notificationService.create(targetHomestay.getOwnerId(), "Bạn có yêu cầu đặt phòng mới",
+                "Có yêu cầu đặt phòng mới tại " + targetHomestay.getName() + ".", "BOOKING",
+                savedBooking.getId(), "/owner/bookings");
 
         // Tạo bản ghi giao dịch payment nếu đã thanh toán
         // payments.payment_method: 'BANK_TRANSFER', 'CASH', 'VNPAY', 'MOMO'
@@ -227,9 +242,12 @@ public class BookingService {
         Optional<Booking> opt = bookingRepository.findById(bookingId);
         if (opt.isPresent()) {
             Booking b = opt.get();
-            if (touristId == null || b.getTouristId().equals(touristId)) {
+            if (touristId != null && b.getTouristId().equals(touristId)) {
                 b.setStatus("CANCELLED");
                 bookingRepository.save(b);
+                homestayRepository.findById(b.getHomestayId()).ifPresent(h -> notificationService.create(h.getOwnerId(),
+                        "Khách yêu cầu hủy đặt phòng", "Khách đã gửi yêu cầu hủy đơn " + b.getBookingCode() + ".",
+                        "BOOKING", b.getId(), "/owner/bookings"));
                 return true;
             }
         }
@@ -284,6 +302,13 @@ public class BookingService {
         }
 
         Report savedReport = reportRepository.save(report);
+        for (User admin : userRepository.findByRoleIgnoreCase("ADMIN")) {
+            if ("ACTIVE".equalsIgnoreCase(admin.getStatus())) {
+                notificationService.create(admin.getId(), "Có báo cáo hoặc khiếu nại mới",
+                        "Có khiếu nại mới cần kiểm tra: " + savedReport.getTitle(), "REPORT",
+                        savedReport.getId(), "/admin/complaints");
+            }
+        }
         return savedReport;
     }
 
@@ -335,7 +360,11 @@ public class BookingService {
                     .build();
         }
 
-        return reviewRepository.save(review);
+        Review savedReview = reviewRepository.save(review);
+        homestayRepository.findById(homestayId).ifPresent(h -> notificationService.create(h.getOwnerId(),
+                "Khách vừa gửi đánh giá mới", "Homestay " + h.getName() + " vừa nhận được đánh giá mới.",
+                "REVIEW", savedReview.getId(), "/owner/reviews"));
+        return savedReview;
     }
 
     private RawBooking mapRawBooking(ResultSet rs) throws SQLException {

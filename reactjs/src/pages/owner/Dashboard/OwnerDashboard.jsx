@@ -4,7 +4,6 @@ import {
   INITIAL_DASHBOARD_STATS,
   INITIAL_BOOKINGS,
   REVENUE_PERIODS,
-  NOTIFICATIONS_DATA,
   OCCUPANCY_DATA,
   formatCurrency,
   formatDateRange,
@@ -119,6 +118,22 @@ export default function OwnerDashboard() {
   const [period, setPeriod] = useState('7days');
   const [dateFilter, setDateFilter] = useState('');
   const [page, setPage] = useState(1);
+  const [notifications, setNotifications] = useState([]);
+
+  useEffect(() => {
+    const user = JSON.parse(localStorage.getItem('user') || 'null');
+    if (!user?.id || !user?.token) return;
+    const apiBase = import.meta.env.VITE_API_BASE_URL?.replace(/\/auth\/?$/, '') || 'http://localhost:8081/api';
+    const load = () => fetch(`${apiBase}/notifications`, { headers: { Authorization: `Bearer ${user.token}` } })
+      .then((response) => response.ok ? response.json() : [])
+      .then((items) => setNotifications(Array.isArray(items) ? items.slice(0, 5) : []))
+      .catch(() => setNotifications([]));
+    load();
+    const socketBase = import.meta.env.VITE_WS_BASE_URL || apiBase.replace(/^http/, 'ws').replace(/\/api$/, '');
+    const socket = new WebSocket(`${socketBase}/ws/notifications?token=${encodeURIComponent(user.token)}`);
+    socket.onmessage = load;
+    return () => socket.close();
+  }, []);
 
   // Lọc booking theo ngày
   const filteredBookings = dateFilter
@@ -336,18 +351,19 @@ export default function OwnerDashboard() {
                 <button className="view-all-button">Xem tất cả</button>
               </div>
               <div className="notification-list">
-                {NOTIFICATIONS_DATA.map(n => (
+                {notifications.map(n => (
                   <div key={n.id} className="notification-item">
-                    <div className={`notification-icon ${n.type}`}>
-                      <i className={`bi ${n.icon}`} />
+                    <div className="notification-icon green">
+                      <i className="bi bi-bell-fill" />
                     </div>
                     <div className="notification-content">
                       <strong>{n.title}</strong>
-                      <span>{n.desc}</span>
+                      <span>{n.message}</span>
                     </div>
-                    <small>{n.time}</small>
+                    <small>{n.createdAt ? new Date(n.createdAt).toLocaleString('vi-VN') : ''}</small>
                   </div>
                 ))}
+                {!notifications.length && <p>Chưa có thông báo.</p>}
               </div>
             </section>
           </div>

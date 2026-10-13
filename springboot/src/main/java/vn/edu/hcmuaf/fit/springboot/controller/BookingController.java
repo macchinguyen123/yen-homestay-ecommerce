@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.security.core.Authentication;
 import vn.edu.hcmuaf.fit.springboot.dto.*;
 import vn.edu.hcmuaf.fit.springboot.model.Booking;
 import vn.edu.hcmuaf.fit.springboot.model.Report;
@@ -52,8 +53,12 @@ public class BookingController {
      * Tạo mới đơn đặt phòng vào cơ sở dữ liệu thật Neon PostgreSQL
      */
     @PostMapping
-    public ResponseEntity<?> createBooking(@RequestBody CreateBookingRequest request) {
+    public ResponseEntity<?> createBooking(@RequestBody CreateBookingRequest request, Authentication authentication) {
         try {
+            if (authentication == null || !authentication.isAuthenticated()) {
+                return ResponseEntity.status(401).body(Map.of("success", false, "message", "Vui lòng đăng nhập để đặt phòng."));
+            }
+            request.setTouristId(Long.valueOf(authentication.getName()));
             Booking created = bookingService.createBooking(request);
             Map<String, Object> resp = new HashMap<>();
             resp.put("success", true);
@@ -75,7 +80,11 @@ public class BookingController {
      * Hủy đơn đặt phòng
      */
     @PutMapping("/{bookingId}/cancel")
-    public ResponseEntity<?> cancelBooking(@PathVariable Long bookingId, @RequestParam(required = false) Long touristId) {
+    public ResponseEntity<?> cancelBooking(@PathVariable Long bookingId, Authentication authentication) {
+        Long touristId = null;
+        try { if (authentication != null && authentication.isAuthenticated()) touristId = Long.valueOf(authentication.getName()); }
+        catch (Exception ignored) { }
+        if (touristId == null) return ResponseEntity.status(401).body(Map.of("success", false, "message", "Vui lòng đăng nhập để hủy đơn."));
         boolean ok = bookingService.cancelBooking(bookingId, touristId);
         Map<String, Object> resp = new HashMap<>();
         resp.put("success", ok);
