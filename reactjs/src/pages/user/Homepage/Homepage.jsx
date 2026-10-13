@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import './Homepage.css';
 import { homestayService } from '../../../services/homestayService';
@@ -6,6 +6,33 @@ import { wishlistService } from '../../../services/wishlistService';
 import { authService } from '../../../services/authService';
 import { formatAmenities } from '../Category/Category';
 import VisualSearchModal from '../../../components/VisualSearchModal/VisualSearchModal';
+
+// Hàm chuẩn hóa loại bỏ dấu tiếng Việt để tìm kiếm gợi ý thông minh
+function removeVietnameseTones(str) {
+  if (!str) return '';
+  let s = str.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  s = s.replace(/đ/g, 'd').replace(/Đ/g, 'd');
+  return s.toLowerCase().trim();
+}
+
+// Danh mục điểm đến thịnh hành & gợi ý phong cách du lịch
+const POPULAR_DESTINATIONS = [
+  { name: 'Đà Lạt', desc: 'Thành phố mộng mơ & săn mây', icon: 'bi-cloud-sun', homestaysCount: '120+ homestay', badge: 'Hot' },
+  { name: 'Hội An', desc: 'Phố cổ đèn lồng & di sản', icon: 'bi-bank', homestaysCount: '85+ homestay', badge: 'Văn hóa' },
+  { name: 'Sapa', desc: 'Săn mây bản làng Tây Bắc', icon: 'bi-image', homestaysCount: '90+ homestay', badge: 'Săn mây' },
+  { name: 'Đà Nẵng', desc: 'Thành phố biển & lễ hội pháo hoa', icon: 'bi-water', homestaysCount: '140+ homestay', badge: 'Biển' },
+  { name: 'Ninh Bình', desc: 'Tràng An non nước hữu tình', icon: 'bi-compass', homestaysCount: '65+ homestay', badge: 'Thiên nhiên' },
+  { name: 'Phú Quốc', desc: 'Đảo ngọc biển xanh & hoàng hôn', icon: 'bi-sunset', homestaysCount: '110+ homestay', badge: 'Nghỉ dưỡng' },
+];
+
+const POPULAR_THEMES = [
+  { label: 'Miệt vườn sông nước', icon: 'bi-water', query: 'miệt vườn' },
+  { label: 'Nhà gỗ săn mây', icon: 'bi-cloud-haze2', query: 'săn mây' },
+  { label: 'Villa có hồ bơi riêng', icon: 'bi-water', query: 'hồ bơi' },
+  { label: 'Nông trại sinh thái', icon: 'bi-tree', query: 'nông trại' },
+  { label: 'Gần phố cổ đi bộ', icon: 'bi-signpost-2', query: 'phố cổ' },
+  { label: 'Có sân vườn BBQ', icon: 'bi-fire', query: 'bbq' },
+];
 
 const HERO_SLIDES = [
   { id: 1, img: 'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=1920&q=80', title: 'Homestay giữa núi rừng bản địa chân thực' },
@@ -106,6 +133,9 @@ const DEFAULT_FESTIVALS = [
       { id: 'f1', name: 'Han River Glass House', location: 'Bờ sông Hàn, Đà Nẵng', distance: 'Cách điểm bắn pháo hoa 450m', rating: '4.95', reviews: '184', price: '1.150.000đ', tag: 'Gần khán đài pháo hoa', img: 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=600&q=80' },
       { id: 'f2', name: 'Danang Riverside Cozy Villa', location: 'Đường Trần Hưng Đạo, Đà Nẵng', distance: 'Cách điểm tổ chức 700m', rating: '4.92', reviews: '142', price: '1.450.000đ', tag: 'Đi bộ ra lễ hội', img: 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=600&q=80' },
       { id: 'f3', name: 'Sơn Trà Sunset Infinity Villa', location: 'Quận Sơn Trà, Đà Nẵng', distance: 'Cách điểm tổ chức 1.2km', rating: '4.94', reviews: '215', price: '2.750.000đ', tag: 'View biển vô cực', img: 'https://images.unsplash.com/photo-1580587771525-78b9dba3b914?auto=format&fit=crop&w=600&q=80' },
+      { id: 'f4', name: 'Dragon Bridge Boutique Stay', location: 'Cầu Rồng, Đà Nẵng', distance: 'Cách điểm tổ chức 550m', rating: '4.91', reviews: '168', price: '1.250.000đ', tag: 'View Cầu Rồng phun lửa', img: 'https://images.unsplash.com/photo-1571896349842-33c89424de2d?auto=format&fit=crop&w=600&q=80' },
+      { id: 'f5', name: 'Bạch Đằng Riverside Luxury', location: 'Đường Bạch Đằng, Đà Nẵng', distance: 'Cách điểm tổ chức 300m', rating: '4.96', reviews: '290', price: '1.850.000đ', tag: 'Ngắm pháo hoa trực tiếp', img: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=600&q=80' },
+      { id: 'f6', name: 'Mỹ Khê Beachside Green Villa', location: 'Bãi biển Mỹ Khê, Đà Nẵng', distance: 'Cách điểm tổ chức 1.5km', rating: '4.89', reviews: '115', price: '1.050.000đ', tag: 'Gần biển thoáng mát', img: 'https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?auto=format&fit=crop&w=600&q=80' },
     ],
   },
   {
@@ -117,8 +147,12 @@ const DEFAULT_FESTIVALS = [
     date: '18/12 - 31/12/2026',
     imageUrl: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=1200&q=80',
     homestays: [
-      { id: 'f4', name: 'Dalat Blooming Garden Homestay', location: 'Hồ Xuân Hương, Đà Lạt', distance: 'Cách Quảng trường 400m', rating: '4.97', reviews: '230', price: '950.000đ', tag: 'Đi bộ ra Festival', img: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=600&q=80' },
-      { id: 'f5', name: 'The Memory Valley Villa', location: 'Hồ Tuyền Lâm, Đà Lạt', distance: 'Cách điểm tổ chức 1.5km', rating: '4.96', reviews: '340', price: '1.450.000đ', tag: 'Săn mây thung lũng', img: 'https://images.unsplash.com/photo-1518780664697-55e3ad937233?auto=format&fit=crop&w=600&q=80' },
+      { id: 'f7', name: 'Dalat Blooming Garden Homestay', location: 'Hồ Xuân Hương, Đà Lạt', distance: 'Cách Quảng trường 400m', rating: '4.97', reviews: '230', price: '950.000đ', tag: 'Đi bộ ra Festival', img: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=600&q=80' },
+      { id: 'f8', name: 'The Memory Valley Villa', location: 'Hồ Tuyền Lâm, Đà Lạt', distance: 'Cách điểm tổ chức 1.5km', rating: '4.96', reviews: '340', price: '1.450.000đ', tag: 'Săn mây thung lũng', img: 'https://images.unsplash.com/photo-1518780664697-55e3ad937233?auto=format&fit=crop&w=600&q=80' },
+      { id: 'f9', name: 'Mimosa Forest Wooden Cottage', location: 'Đèo Mimosa, Đà Lạt', distance: 'Cách điểm tổ chức 2km', rating: '4.93', reviews: '175', price: '1.150.000đ', tag: 'Rừng hoa Mimosa', img: 'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=600&q=80' },
+      { id: 'f10', name: 'Cẩm Tú Cầu Hillside Villa', location: 'Trại Mát, Đà Lạt', distance: 'Cách điểm tổ chức 2.5km', rating: '4.90', reviews: '142', price: '1.200.000đ', tag: 'Cánh đồng cẩm tú cầu', img: 'https://images.unsplash.com/photo-1510798831971-661eb04b3739?auto=format&fit=crop&w=600&q=80' },
+      { id: 'f11', name: 'Thung Lũng Mây Warm Cabin', location: 'Hồ Than Thở, Đà Lạt', distance: 'Cách điểm tổ chức 1.8km', rating: '4.92', reviews: '160', price: '1.050.000đ', tag: 'Lò sưởi củi ấm cúng', img: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=600&q=80' },
+      { id: 'f12', name: 'Pine Hill Retreat Dalat', location: 'Phường 4, Đà Lạt', distance: 'Cách Quảng trường 1km', rating: '4.95', reviews: '210', price: '1.350.000đ', tag: 'Đồi thông thơ mộng', img: 'https://images.unsplash.com/photo-1513519245088-0e12902e5a38?auto=format&fit=crop&w=600&q=80' },
     ],
   },
 ];
@@ -128,6 +162,14 @@ const HOT_HOMESTAYS = [
   { id: 2, name: 'An Bàng Seaside Haven', city: 'hoian', location: 'Hội An', rating: 4.93, reviews: 285, specs: '2 phòng ngủ · 4 khách', amenities: 'Sát biển 50m · Xe đạp miễn phí · Bữa sáng miền Trung', price: '1.550.000đ', tag: 'Đã đặt 31 lần', img: 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=600&q=80' },
   { id: 3, name: 'Mây Lang Thang Eco Lodge', city: 'sapa', location: 'Sapa', rating: 4.90, reviews: 198, specs: '1 phòng ngủ · 2 khách', amenities: 'View thung lũng Mường Hoa · Lẩu cá hồi · Tắm bồn gỗ', price: '1.100.000đ', tag: 'Đã đặt 29 lần', img: 'https://images.unsplash.com/photo-1510798831971-661eb04b3739?auto=format&fit=crop&w=600&q=80' },
   { id: 4, name: 'Sơn Trà Sunset Infinity Villa', city: 'danang', location: 'Đà Nẵng', rating: 4.94, reviews: 215, specs: '4 phòng ngủ · 8 khách', amenities: 'Hồ bơi vô cực view biển · Bếp nướng BBQ · Karaoke', price: '2.750.000đ', tag: 'Đã đặt 26 lần', img: 'https://images.unsplash.com/photo-1571896349842-33c89424de2d?auto=format&fit=crop&w=600&q=80' },
+  { id: 5, name: 'Rừng Sương Glamping & Cabin', city: 'dalat', location: 'Đà Lạt', rating: 4.92, reviews: 182, specs: '2 phòng ngủ · 4 khách', amenities: 'Chèo thuyền SUP · Tiệc nướng BBQ · Lửa trại đêm', price: '1.100.000đ', tag: 'Săn mây cực chill', img: 'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=600&q=80' },
+  { id: 6, name: 'Làng Nắng Vintage Homestay', city: 'hoian', location: 'Hội An', rating: 4.88, reviews: 145, specs: '1 phòng ngủ · 2 khách', amenities: 'Vườn cây nhiệt đới · Trà chiều miễn phí · Xe đạp dạo phố', price: '890.000đ', tag: 'Phố cổ 500m', img: 'https://images.unsplash.com/photo-1559592413-7cec4d0cae2b?auto=format&fit=crop&w=600&q=80' },
+  { id: 7, name: 'Fansipan Panorama Eco House', city: 'sapa', location: 'Sapa', rating: 4.95, reviews: 260, specs: '2 phòng ngủ · 4 khách', amenities: 'Ban công săn mây toàn cảnh · Tắm lá thuốc Dao Đỏ · Bếp củi', price: '1.350.000đ', tag: 'View Fansipan', img: 'https://images.unsplash.com/photo-1528127269322-539801943592?auto=format&fit=crop&w=600&q=80' },
+  { id: 8, name: 'Mỹ Khê Horizon Coastal Villa', city: 'danang', location: 'Đà Nẵng', rating: 4.91, reviews: 195, specs: '3 phòng ngủ · 6 khách', amenities: 'Sát biển 100m · Sân thượng ngắm bình minh · Bếp nướng hải sản', price: '1.650.000đ', tag: 'Biển Mỹ Khê', img: 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=600&q=80' },
+  { id: 9, name: 'Hồ Tuyền Lâm Forest Lodge', city: 'dalat', location: 'Hồ Tuyền Lâm, Đà Lạt', rating: 4.94, reviews: 230, specs: '2 phòng ngủ · 4 khách', amenities: 'Bến thuyền riêng · Đốt lửa trại ngắm sao · Trà chiều miễn phí', price: '1.380.000đ', tag: 'Ven hồ bình yên', img: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=600&q=80' },
+  { id: 10, name: 'Cẩm Thanh Riverside Cottage', city: 'hoian', location: 'Rừng dừa Bảy Mẫu, Hội An', rating: 4.90, reviews: 172, specs: '2 phòng ngủ · 4 khách', amenities: 'Thuyền thúng miễn phí · Bếp nướng sân vườn · Bữa sáng miền quê', price: '920.000đ', tag: 'Rừng dừa Bảy Mẫu', img: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=600&q=80' },
+  { id: 11, name: 'Cát Cát Wooden Chalet', city: 'sapa', location: 'Bản Cát Cát, Sapa', rating: 4.93, reviews: 210, specs: '1 phòng ngủ · 2 khách', amenities: 'Bồn tắm nước suối khoáng · Ngắm thác Tiên Sa · Trang phục dân tộc', price: '1.050.000đ', tag: 'Gần suối Cát Cát', img: 'https://images.unsplash.com/photo-1513519245088-0e12902e5a38?auto=format&fit=crop&w=600&q=80' },
+  { id: 12, name: 'Non Nước Sunlit Garden Villa', city: 'danang', location: 'Ngũ Hành Sơn, Đà Nẵng', rating: 4.92, reviews: 165, specs: '3 phòng ngủ · 6 khách', amenities: 'Hồ bơi riêng biệt lập · Sân bóng chuyền bãi biển · Bếp BBQ hải sản', price: '2.250.000đ', tag: 'Sát bãi tắm Non Nước', img: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=600&q=80' },
 ];
 
 const FAVORITES_HOMESTAYS = [
@@ -135,6 +177,14 @@ const FAVORITES_HOMESTAYS = [
   { id: 102, name: 'Lạc Vào Phố Cổ Heritage', city: 'hoian', location: 'Hội An', rating: 4.95, reviews: 215, specs: '3 phòng ngủ · 6 khách', amenities: 'Bể bơi riêng · Xe đạp miễn phí · Trà chiều bản địa', price: '1.650.000đ', tag: 'Điểm kiến trúc', img: 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=600&q=80' },
   { id: 103, name: 'Sapa Cloud Forest Lodge', city: 'sapa', location: 'Tả Van, Sapa', rating: 4.91, reviews: 154, specs: '1 phòng ngủ · 2 khách', amenities: 'Ban công săn mây · Tắm thuốc Dao Đỏ · Ăn tối gia đình', price: '980.000đ', tag: 'Trải nghiệm Dao Đỏ', img: 'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=600&q=80' },
   { id: 104, name: 'Danang Ocean Horizon', city: 'danang', location: 'Bán đảo Sơn Trà, Đà Nẵng', rating: 4.94, reviews: 178, specs: '2 phòng ngủ · 4 khách', amenities: 'Bể bơi vô cực ngắm vịnh · Bếp BBQ · Đón tiễn sân bay', price: '1.450.000đ', tag: 'View biển triệu đô', img: 'https://images.unsplash.com/photo-1571896349842-33c89424de2d?auto=format&fit=crop&w=600&q=80' },
+  { id: 105, name: 'Mộc Trà Hillside Villa', city: 'dalat', location: 'Cầu Đất, Đà Lạt', rating: 4.93, reviews: 168, specs: '3 phòng ngủ · 6 khách', amenities: 'Đồi chè Cầu Đất · Thưởng trà ngắm hoàng hôn · Sân vườn rộng', price: '1.350.000đ', tag: 'Đồi chè xanh mướt', img: 'https://images.unsplash.com/photo-1518780664697-55e3ad937233?auto=format&fit=crop&w=600&q=80' },
+  { id: 106, name: 'Cổ Trấn Lồng Đèn House', city: 'hoian', location: 'Cẩm Châu, Hội An', rating: 4.89, reviews: 130, specs: '2 phòng ngủ · 4 khách', amenities: 'Phong cách Đông Dương · Hồ cá koi sân vườn · Gần chợ quê', price: '1.050.000đ', tag: 'Phong cách Indochine', img: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=600&q=80' },
+  { id: 107, name: 'Tả Van Bamboo Eco Homestay', city: 'sapa', location: 'Tả Van, Sapa', rating: 4.92, reviews: 175, specs: '1 phòng ngủ · 2 khách', amenities: 'Bungalow tre tự nhiên · Suối Mường Hoa chảy qua · Bữa sáng bản địa', price: '850.000đ', tag: 'Bên bờ suối Mường Hoa', img: 'https://images.unsplash.com/photo-1500595046743-cd271d694d30?auto=format&fit=crop&w=600&q=80' },
+  { id: 108, name: 'Bán Đảo Xanh Luxury Suite', city: 'danang', location: 'Sơn Trà, Đà Nẵng', rating: 4.96, reviews: 210, specs: '3 phòng ngủ · 6 khách', amenities: 'Hồ bơi nước mặn · Bếp BBQ gia đình · Trọn vẹn view biển Mỹ Khê', price: '2.100.000đ', tag: 'Nghỉ dưỡng thượng lưu', img: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=600&q=80' },
+  { id: 109, name: 'Đồi Thông Hoàng Hôn Cabin', city: 'dalat', location: 'Trại Mát, Đà Lạt', rating: 4.95, reviews: 195, specs: '2 phòng ngủ · 4 khách', amenities: 'Kính ngắm thung lũng đèn đêm · Bếp sưởi gỗ · Ban công thưởng trà', price: '1.250.000đ', tag: 'Ngắm thung lũng đèn', img: 'https://images.unsplash.com/photo-1510798831971-661eb04b3739?auto=format&fit=crop&w=600&q=80' },
+  { id: 110, name: 'An Bàng Secret Garden', city: 'hoian', location: 'Biển An Bàng, Hội An', rating: 4.91, reviews: 140, specs: '2 phòng ngủ · 4 khách', amenities: 'Lối đi bộ ra biển 30m · Sân vườn chuối nhiệt đới · Đạp xe dạo biển', price: '1.300.000đ', tag: 'Gần biển An Bàng', img: 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=600&q=80' },
+  { id: 111, name: 'Thung Lũng Mường Hoa Chalet', city: 'sapa', location: 'Hầu Thào, Sapa', rating: 4.94, reviews: 188, specs: '2 phòng ngủ · 4 khách', amenities: 'Săn mây ban công toàn cảnh · Bữa tối lẩu gà đen bản địa · Lò sưởi ấm', price: '1.150.000đ', tag: 'Săn mây Hầu Thào', img: 'https://images.unsplash.com/photo-1528127269322-539801943592?auto=format&fit=crop&w=600&q=80' },
+  { id: 112, name: 'Sơn Trà Green Bay Villa', city: 'danang', location: 'Bãi Bụt, Đà Nẵng', rating: 4.97, reviews: 225, specs: '3 phòng ngủ · 6 khách', amenities: 'Hồ bơi nhìn thẳng vịnh Đà Nẵng · Dịch vụ đầu bếp tại gia · Trà chiều', price: '2.450.000đ', tag: 'Vịnh Sơn Trà ngắm biển', img: 'https://images.unsplash.com/photo-1580587771525-78b9dba3b914?auto=format&fit=crop&w=600&q=80' },
 ];
 
 export default function Homepage() {
@@ -152,6 +202,42 @@ export default function Homepage() {
   const [popoverOpen, setPopoverOpen] = useState(false);
   const [isVisualSearchOpen, setIsVisualSearchOpen] = useState(false);
 
+  // Search History & Suggestion Popover State
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [searchHistory, setSearchHistory] = useState(() => {
+    try {
+      const saved = localStorage.getItem('yen_search_history');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {}
+    return ['Đà Lạt', 'Hội An', 'Sapa săn mây', 'Đà Nẵng'];
+  });
+  const searchBoxRef = useRef(null);
+  const searchInputRef = useRef(null);
+
+  // Xử lý đóng popover khi click ra ngoài hoặc bấm Escape
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (searchBoxRef.current && !searchBoxRef.current.contains(e.target)) {
+        setIsSearchOpen(false);
+      }
+    };
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        setIsSearchOpen(false);
+        setPopoverOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
+
   // Featured Combo Slider
   const [comboIndex, setComboIndex] = useState(0);
 
@@ -159,12 +245,27 @@ export default function Homepage() {
   const [activeFestivalKey, setActiveFestivalKey] = useState('diff');
   const [databaseFestivals, setDatabaseFestivals] = useState(DEFAULT_FESTIVALS);
   const [festivalLoading, setFestivalLoading] = useState(false);
-  const [visibleFestivalCount, setVisibleFestivalCount] = useState(4);
 
   // Favorites Filter City State
   const [favCityFilter, setFavCityFilter] = useState('all');
-  const [visibleFavoritesCount, setVisibleFavoritesCount] = useState(4);
-  const [visibleHotCount, setVisibleHotCount] = useState(4);
+
+  // Homestay Sliders: Refs & Smooth Scroll Controls
+  const hotSliderRef = useRef(null);
+  const favSliderRef = useRef(null);
+  const festSliderRef = useRef(null);
+
+  const scrollSlider = (ref, direction) => {
+    if (ref && ref.current) {
+      const containerWidth = ref.current.clientWidth;
+      const scrollStep = containerWidth > 768 ? Math.floor(containerWidth * 0.75) : 300;
+      ref.current.scrollBy({
+        left: direction * scrollStep,
+        behavior: 'smooth'
+      });
+    }
+  };
+
+
 
   // Wishlist State (Đồng bộ trực tiếp với CSDL)
   const [currentUser, setCurrentUser] = useState(authService.getCurrentUser());
@@ -404,13 +505,100 @@ export default function Homepage() {
     }
   };
 
-  const handleSearchSubmit = (e) => {
-    e.preventDefault();
-    triggerToast(`Đang tìm kiếm homestay tại: ${destination || 'Tất cả điểm đến'}...`);
-    setTimeout(() => {
-      navigate(`/search?q=${encodeURIComponent(destination)}`);
-    }, 800);
+  const saveToHistory = (term) => {
+    if (!term || !term.trim()) return;
+    const clean = term.trim();
+    setSearchHistory((prev) => {
+      const next = [clean, ...prev.filter((i) => i.toLowerCase() !== clean.toLowerCase())].slice(0, 8);
+      try {
+        localStorage.setItem('yen_search_history', JSON.stringify(next));
+      } catch (e) {}
+      return next;
+    });
   };
+
+  const removeFromHistory = (termToRemove, e) => {
+    if (e) {
+      e.stopPropagation();
+      e.preventDefault();
+    }
+    setSearchHistory((prev) => {
+      const next = prev.filter((i) => i !== termToRemove);
+      try {
+        localStorage.setItem('yen_search_history', JSON.stringify(next));
+      } catch (e) {}
+      return next;
+    });
+  };
+
+  const clearAllHistory = (e) => {
+    if (e) {
+      e.stopPropagation();
+      e.preventDefault();
+    }
+    setSearchHistory([]);
+    try {
+      localStorage.removeItem('yen_search_history');
+    } catch (e) {}
+    triggerToast('Đã xóa tất cả lịch sử tìm kiếm');
+  };
+
+  const handleSelectQuery = (term, autoSubmit = false) => {
+    setDestination(term);
+    setIsSearchOpen(false);
+    saveToHistory(term);
+    if (autoSubmit) {
+      triggerToast(`Đang tìm kiếm homestay tại: ${term}...`);
+      setTimeout(() => {
+        navigate(`/search?q=${encodeURIComponent(term)}`);
+      }, 350);
+    }
+  };
+
+  const handleSearchSubmit = (e) => {
+    if (e) e.preventDefault();
+    setIsSearchOpen(false);
+    const term = destination.trim();
+    if (term) {
+      saveToHistory(term);
+    }
+    triggerToast(`Đang tìm kiếm homestay tại: ${term || 'Tất cả điểm đến'}...`);
+    setTimeout(() => {
+      navigate(`/search?q=${encodeURIComponent(term)}`);
+    }, 450);
+  };
+
+  // Danh sách homestay tổng hợp để gợi ý trực tiếp
+  const allAvailableHomestays = useMemo(() => {
+    const map = new Map();
+    [...(homeData.hotHomestays || []), ...(homeData.favoritesHomestays || [])].forEach((h) => {
+      if (h && (h.id || h.name) && !map.has(h.id || h.name)) {
+        map.set(h.id || h.name, h);
+      }
+    });
+    return Array.from(map.values());
+  }, [homeData.hotHomestays, homeData.favoritesHomestays]);
+
+  // Gợi ý homestay theo từ khóa đang gõ
+  const matchingHomestays = useMemo(() => {
+    if (!destination || !destination.trim()) return [];
+    const q = removeVietnameseTones(destination);
+    return allAvailableHomestays
+      .filter((h) => {
+        const target = removeVietnameseTones(`${h.name || ''} ${h.location || ''} ${h.city || ''}`);
+        return target.includes(q);
+      })
+      .slice(0, 4);
+  }, [destination, allAvailableHomestays]);
+
+  // Gợi ý địa điểm theo từ khóa đang gõ
+  const matchingDestinations = useMemo(() => {
+    if (!destination || !destination.trim()) return POPULAR_DESTINATIONS;
+    const q = removeVietnameseTones(destination);
+    return POPULAR_DESTINATIONS.filter((d) =>
+      removeVietnameseTones(`${d.name} ${d.desc}`).includes(q)
+    );
+  }, [destination]);
 
   const scrollExperience = (direction) => {
     if (expGridRef.current) {
@@ -418,13 +606,92 @@ export default function Homepage() {
     }
   };
 
-  const filteredFavorites = homeData.favoritesHomestays.filter((h) => {
+  const filteredFavorites = (homeData.favoritesHomestays || []).filter((h) => {
     if (favCityFilter === 'all') return true;
     return h.city === favCityFilter;
   });
 
-  const festivalTabs = databaseFestivals.length > 0 ? databaseFestivals : DEFAULT_FESTIVALS;
+  const festivalTabs = (databaseFestivals && databaseFestivals.length > 0) ? databaseFestivals : DEFAULT_FESTIVALS;
   const activeFestData = festivalTabs.find(festival => festival.key === activeFestivalKey) || festivalTabs[0];
+
+  // Drag-to-scroll (kéo kéo qua) trên máy tính
+  useEffect(() => {
+    const attachSliderDrag = (slider) => {
+      if (!slider) return () => {};
+      let isDown = false;
+      let startX = 0;
+      let scrollLeft = 0;
+      let hasDragged = false;
+
+      const handleMouseDown = (e) => {
+        isDown = true;
+        hasDragged = false;
+        slider.style.cursor = 'grabbing';
+        slider.style.userSelect = 'none';
+        slider.style.scrollSnapType = 'none';
+        startX = e.pageX - slider.offsetLeft;
+        scrollLeft = slider.scrollLeft;
+      };
+
+      const handleMouseLeave = () => {
+        if (!isDown) return;
+        isDown = false;
+        slider.style.cursor = '';
+        slider.style.userSelect = '';
+        slider.style.scrollSnapType = 'x mandatory';
+      };
+
+      const handleMouseUp = () => {
+        if (!isDown) return;
+        isDown = false;
+        slider.style.cursor = '';
+        slider.style.userSelect = '';
+        slider.style.scrollSnapType = 'x mandatory';
+      };
+
+      const handleMouseMove = (e) => {
+        if (!isDown) return;
+        const x = e.pageX - slider.offsetLeft;
+        const walk = (x - startX) * 1.3;
+        if (Math.abs(walk) > 6) {
+          hasDragged = true;
+        }
+        slider.scrollLeft = scrollLeft - walk;
+      };
+
+      const handleClickCapture = (e) => {
+        if (hasDragged) {
+          e.preventDefault();
+          e.stopPropagation();
+          hasDragged = false;
+        }
+      };
+
+      slider.addEventListener('mousedown', handleMouseDown);
+      slider.addEventListener('mouseleave', handleMouseLeave);
+      slider.addEventListener('mouseup', handleMouseUp);
+      slider.addEventListener('mousemove', handleMouseMove);
+      slider.addEventListener('click', handleClickCapture, true);
+
+      return () => {
+        slider.removeEventListener('mousedown', handleMouseDown);
+        slider.removeEventListener('mouseleave', handleMouseLeave);
+        slider.removeEventListener('mouseup', handleMouseUp);
+        slider.removeEventListener('mousemove', handleMouseMove);
+        slider.removeEventListener('click', handleClickCapture, true);
+      };
+    };
+
+    const cleanupHot = attachSliderDrag(hotSliderRef.current);
+    const cleanupFav = attachSliderDrag(favSliderRef.current);
+    const cleanupFest = attachSliderDrag(festSliderRef.current);
+
+    return () => {
+      cleanupHot();
+      cleanupFav();
+      cleanupFest();
+    };
+  }, [favCityFilter, activeFestivalKey, homeData]);
 
   return (
     <div className="homepage-wrapper">
@@ -448,22 +715,54 @@ export default function Homepage() {
 
             {/* THANH TÌM KIẾM HERO */}
             <div className="hero-search-wrapper">
-              <div className="search-box modern-gold-box">
+              <div className={`search-box modern-gold-box ${isSearchOpen ? 'is-focused' : ''}`} ref={searchBoxRef}>
                 <form className="search-form" onSubmit={handleSearchSubmit}>
                   {/* Điểm đến */}
-                  <div className="search-field field-with-border field-destination">
+                  <div
+                    className={`search-field field-with-border field-destination ${isSearchOpen ? 'field-active' : ''}`}
+                    onClick={() => {
+                      setIsSearchOpen(true);
+                      setPopoverOpen(false);
+                      if (searchInputRef.current) searchInputRef.current.focus();
+                    }}
+                  >
                     <i className="bi bi-geo-alt search-field-icon" />
                     <div className="field-content">
-                      <label className="field-label" htmlFor="searchDest">Điểm đến hoặc tên homestay</label>
+                      <label className="field-label" htmlFor="searchDest">Điểm đến hoặc homestay</label>
                       <input
                         type="text"
                         id="searchDest"
+                        ref={searchInputRef}
                         className="field-input"
-                        placeholder="Bạn muốn đến đâu?"
+                        placeholder="Bạn muốn đi đâu? (Đà Lạt, Hội An...)"
                         value={destination}
-                        onChange={(e) => setDestination(e.target.value)}
+                        autoComplete="off"
+                        onChange={(e) => {
+                          setDestination(e.target.value);
+                          if (!isSearchOpen) setIsSearchOpen(true);
+                        }}
+                        onFocus={() => {
+                          setIsSearchOpen(true);
+                          setPopoverOpen(false);
+                        }}
                       />
                     </div>
+
+                    {/* Nút Xóa nhanh từ khóa */}
+                    {destination && (
+                      <button
+                        type="button"
+                        className="clear-search-btn"
+                        title="Xóa tìm kiếm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDestination('');
+                          if (searchInputRef.current) searchInputRef.current.focus();
+                        }}
+                      >
+                        <i className="bi bi-x-circle-fill" />
+                      </button>
+                    )}
                   </div>
 
                   {/* Nhận phòng */}
@@ -501,7 +800,10 @@ export default function Homepage() {
                     <button
                       type="button"
                       className="guests-toggle-btn"
-                      onClick={() => setPopoverOpen(!popoverOpen)}
+                      onClick={() => {
+                        setPopoverOpen(!popoverOpen);
+                        setIsSearchOpen(false);
+                      }}
                     >
                       <i className="bi bi-people-fill search-field-icon" />
                       <div className="field-content">
@@ -567,9 +869,13 @@ export default function Homepage() {
                     type="button"
                     className="search-visual-btn"
                     title="Tìm kiếm bằng hình ảnh (AI CLIP)"
-                    onClick={() => setIsVisualSearchOpen(true)}
+                    onClick={() => {
+                      setIsVisualSearchOpen(true);
+                      setIsSearchOpen(false);
+                    }}
                   >
                     <i className="bi bi-camera-fill" />
+                    <span className="visual-badge">AI</span>
                   </button>
 
                   {/* Submit */}
@@ -577,16 +883,214 @@ export default function Homepage() {
                     <i className="bi bi-search" /><span>Tìm kiếm</span>
                   </button>
                 </form>
+
+                {/* DROPDOWN GỢI Ý & LỊCH SỬ TÌM KIẾM - ĐẶT TẠI CẤP SEARCH-BOX ĐỂ RỘNG RÃI & KHÔNG BỊ BÓ HẸP BỞI CỘT ĐIỂM ĐẾN */}
+                {isSearchOpen && (
+                  <div className="search-suggestion-dropdown" onClick={(e) => e.stopPropagation()}>
+                    {!destination.trim() ? (
+                      <>
+                        {/* 1. LỊCH SỬ TÌM KIẾM */}
+                        {searchHistory.length > 0 && (
+                          <div className="dropdown-section history-section">
+                            <div className="dropdown-section-header">
+                              <span className="sug-section-title">
+                                <i className="bi bi-clock-history text-emerald" /> Lịch sử tìm kiếm gần đây
+                              </span>
+                              <button
+                                type="button"
+                                className="btn-clear-all-history"
+                                onClick={clearAllHistory}
+                              >
+                                Xóa tất cả
+                              </button>
+                            </div>
+                            <div className="search-history-tags">
+                              {searchHistory.map((term, idx) => (
+                                <div
+                                  key={idx}
+                                  className="search-history-tag"
+                                  onClick={() => handleSelectQuery(term, true)}
+                                >
+                                  <i className="bi bi-clock history-icon" />
+                                  <span className="history-text">{term}</span>
+                                  <button
+                                    type="button"
+                                    className="history-remove-btn"
+                                    title="Xóa mục này"
+                                    onClick={(e) => removeFromHistory(term, e)}
+                                  >
+                                    <i className="bi bi-x" />
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* 2. ĐIỂM ĐẾN THỊNH HÀNH */}
+                        <div className="dropdown-section destinations-section">
+                          <div className="dropdown-section-header">
+                            <span className="sug-section-title">
+                              <i className="bi bi-fire text-amber" /> Điểm đến thịnh hành nhất
+                            </span>
+                            <span className="section-hint">Chọn để khám phá</span>
+                          </div>
+                          <div className="popular-destinations-grid">
+                            {POPULAR_DESTINATIONS.map((dest) => (
+                              <div
+                                key={dest.name}
+                                className="popular-dest-card"
+                                onClick={() => handleSelectQuery(dest.name, true)}
+                              >
+                                <div className="dest-icon-wrap">
+                                  <i className={`bi ${dest.icon}`} />
+                                </div>
+                                <div className="dest-info">
+                                  <div className="dest-name-row">
+                                    <span className="dest-name">{dest.name}</span>
+                                    <span className="dest-badge">{dest.badge}</span>
+                                  </div>
+                                  <div className="dest-desc">{dest.desc}</div>
+                                </div>
+                                <span className="dest-count">{dest.homestaysCount}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* 3. PHONG CÁCH DU LỊCH */}
+                        <div className="dropdown-section themes-section">
+                          <div className="dropdown-section-header">
+                            <span className="sug-section-title">
+                              <i className="bi bi-compass-fill text-emerald" /> Khám phá theo trải nghiệm
+                            </span>
+                          </div>
+                          <div className="theme-chips-list">
+                            {POPULAR_THEMES.map((theme) => (
+                              <button
+                                key={theme.label}
+                                type="button"
+                                className="theme-chip-btn"
+                                onClick={() => handleSelectQuery(theme.query, true)}
+                              >
+                                <i className={`bi ${theme.icon}`} />
+                                <span>{theme.label}</span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      /* KHI ĐANG GÕ TỪ KHÓA */
+                      <div className="dropdown-live-results">
+                        {/* Khớp trực tiếp */}
+                        <div
+                          className="search-direct-action"
+                          onClick={() => handleSelectQuery(destination, true)}
+                        >
+                          <div className="action-icon">
+                            <i className="bi bi-search" />
+                          </div>
+                          <div className="action-text">
+                            Tìm kiếm homestay tại <strong>"{destination}"</strong>
+                          </div>
+                          <i className="bi bi-arrow-right action-arrow" />
+                        </div>
+
+                        {/* Địa điểm gợi ý khớp */}
+                        {matchingDestinations.length > 0 && (
+                          <div className="dropdown-section">
+                            <div className="dropdown-section-header">
+                              <span className="sug-section-title">
+                                <i className="bi bi-geo-alt-fill text-emerald" /> Địa điểm phù hợp ({matchingDestinations.length})
+                              </span>
+                            </div>
+                            <div className="matching-destinations-list">
+                              {matchingDestinations.map((dest) => (
+                                <div
+                                  key={dest.name}
+                                  className="matching-dest-row"
+                                  onClick={() => handleSelectQuery(dest.name, true)}
+                                >
+                                  <i className="bi bi-geo-alt text-emerald" />
+                                  <span className="matching-dest-name">{dest.name}</span>
+                                  <span className="matching-dest-desc">— {dest.desc}</span>
+                                  <span className="matching-dest-count">{dest.homestaysCount}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Homestay gợi ý khớp */}
+                        {matchingHomestays.length > 0 && (
+                          <div className="dropdown-section">
+                            <div className="dropdown-section-header">
+                              <span className="sug-section-title">
+                                <i className="bi bi-house-heart-fill text-emerald" /> Homestay nổi bật ({matchingHomestays.length})
+                              </span>
+                              <span className="section-hint">Bấm xem chi tiết</span>
+                            </div>
+                            <div className="suggested-homestays-list">
+                              {matchingHomestays.map((h) => (
+                                <div
+                                  key={h.id}
+                                  className="suggested-homestay-card"
+                                  onClick={() => {
+                                    setIsSearchOpen(false);
+                                    saveToHistory(h.name);
+                                    navigate(`/homestay/${h.id}`);
+                                  }}
+                                >
+                                  <img
+                                    src={h.img || 'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=120&q=80'}
+                                    alt={h.name}
+                                    className="suggested-hs-img"
+                                  />
+                                  <div className="suggested-hs-info">
+                                    <div className="suggested-hs-name">{h.name}</div>
+                                    <div className="suggested-hs-loc">
+                                      <i className="bi bi-geo-alt" /> {h.location || h.city}
+                                    </div>
+                                  </div>
+                                  <div className="suggested-hs-price-meta">
+                                    <div className="suggested-hs-rating">
+                                      <i className="bi bi-star-fill text-warning" /> {h.rating || 5.0}
+                                    </div>
+                                    <div className="suggested-hs-price">{h.price}</div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Không tìm thấy gợi ý cụ thể */}
+                        {matchingHomestays.length === 0 && matchingDestinations.length === 0 && (
+                          <div className="dropdown-empty-state">
+                            <div className="empty-icon-circle">
+                              <i className="bi bi-search-heart" />
+                            </div>
+                            <div className="empty-title">Tìm kiếm mở rộng</div>
+                            <p className="empty-desc">
+                              Nhấn <strong>Enter</strong> hoặc bấm nút <strong>Tìm kiếm</strong> để duyệt tất cả homestay phù hợp với từ khóa "<strong>{destination}</strong>".
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Quick tags */}
               <div className="modern-hero-tags">
-                <span className="tags-label"><i className="bi bi-fire" /> Gợi ý:</span>
+                <span className="tags-label"><i className="bi bi-fire" /> Gợi ý nhanh:</span>
                 {['Đà Lạt', 'Đà Nẵng', 'Hội An', 'Sapa', 'Ninh Bình', 'Phú Quốc'].map((tag) => (
                   <span
                     key={tag}
                     className="quick-tag"
-                    onClick={() => { setDestination(tag); triggerToast(`Đã chọn điểm đến: ${tag}`); }}
+                    onClick={() => handleSelectQuery(tag, true)}
                   >
                     {tag}
                   </span>
@@ -769,7 +1273,15 @@ export default function Homepage() {
 
           <div className="festival-tabs">
             {festivalTabs.map(festival => (
-              <button key={festival.key} type="button" className={`festival-tab-btn ${activeFestivalKey === festival.key ? 'active' : ''}`} onClick={() => { setActiveFestivalKey(festival.key); setVisibleFestivalCount(4); }}>
+              <button
+                key={festival.key}
+                type="button"
+                className={`festival-tab-btn ${activeFestivalKey === festival.key ? 'active' : ''}`}
+                onClick={() => {
+                  setActiveFestivalKey(festival.key);
+                  if (festSliderRef.current) festSliderRef.current.scrollLeft = 0;
+                }}
+              >
                 <i className="bi bi-calendar-event" /> {festival.name}
               </button>
             ))}
@@ -788,59 +1300,114 @@ export default function Homepage() {
                   </div>
                 </div>
                 <Link to="/search" className="btn-view-room" style={{ background: '#D97706', whiteSpace: 'nowrap' }}>
-                  Xem homestay gần nhất
+                  Xem tất cả homestay gần nhất
                 </Link>
               </div>
 
-              <div className="festival-homestays-grid">
-                {(activeFestData.homestays || []).slice(0, visibleFestivalCount).map((h) => (
-                  <div key={h.id} className="homestay-card">
-                    <div className="card-img-wrapper">
-                      <span className="card-top-tag">{h.tag || 'Gần điểm lễ hội'}</span>
-                      <button
-                        type="button"
-                        className={`card-wishlist-btn ${isWishlisted(h.id, h.name) ? 'active' : ''}`}
-                        onClick={(e) => toggleWishlist(h, e)}
-                        title={isWishlisted(h.id, h.name) ? 'Bỏ yêu thích' : 'Lưu vào yêu thích'}
-                      >
-                        <i className={`bi ${isWishlisted(h.id, h.name) ? 'bi-heart-fill' : 'bi-heart'}`} />
-                      </button>
-                      <Link to={`/homestay/${h.id || 'doi'}`} state={{ homestay: h }} style={{ display: 'block', height: '100%' }}>
-                        <img src={h.img || h.imageUrl || 'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=600&q=80'} alt={h.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                      </Link>
-                    </div>
-                    <div className="card-body">
-                      <div className="card-location-rating">
-                        <span className="card-location"><i className="bi bi-geo-alt-fill text-success" /> {h.location}</span>
-                        <span className="card-rating"><i className="bi bi-star-fill" /> {h.rating || '5.0'} ({h.reviews || 0})</span>
-                      </div>
-                      <h3 className="card-title"><Link to={`/homestay/${h.id}`} state={{ homestay: h }}>{h.name}</Link></h3>
-                      <div className="card-specs">{h.distance || h.distanceLabel || 'Cách điểm tổ chức 500m'}</div>
-                      <div className="card-footer-row">
-                        <div>
-                          <span className="price-label">Giá từ:</span>
-                          <span className="card-price">{typeof h.price === 'number' ? h.price.toLocaleString('vi-VN') + 'đ' : (h.price ? (h.price.toString().includes('đ') ? h.price : Number(h.price).toLocaleString('vi-VN') + 'đ') : '1.200.000đ')}</span>
+              <div className="homestay-slider-wrap" style={{ position: 'relative', width: '100%' }}>
+                <button
+                  type="button"
+                  className="homestay-slider-arrow arrow-prev"
+                  style={{
+                    position: 'absolute',
+                    top: '50%',
+                    left: '-20px',
+                    transform: 'translateY(-50%)',
+                    zIndex: 35,
+                    width: '44px',
+                    height: '52px',
+                    borderRadius: '12px',
+                    background: 'rgba(255, 255, 255, 0.75)',
+                    backdropFilter: 'blur(12px)',
+                    WebkitBackdropFilter: 'blur(12px)',
+                    border: '1.5px solid rgba(255, 255, 255, 0.85)',
+                    boxShadow: '0 6px 20px rgba(15, 23, 42, 0.14)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '1.25rem',
+                    color: '#1E293B',
+                    cursor: 'pointer',
+                    outline: 'none',
+                    transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+                  }}
+                  onClick={() => scrollSlider(festSliderRef, -1)}
+                  aria-label="Xem homestay trước"
+                >
+                  <i className="bi bi-chevron-left" />
+                </button>
+
+                <div className="homestay-slider-track" ref={festSliderRef}>
+                  {(activeFestData.homestays || []).map((h) => (
+                    <div key={h.id} className="homestay-slider-item">
+                      <div className="homestay-card">
+                        <div className="card-img-wrapper">
+                          <span className="card-top-tag">{h.tag || 'Gần điểm lễ hội'}</span>
+                          <button
+                            type="button"
+                            className={`card-wishlist-btn ${isWishlisted(h.id, h.name) ? 'active' : ''}`}
+                            onClick={(e) => toggleWishlist(h, e)}
+                            title={isWishlisted(h.id, h.name) ? 'Bỏ yêu thích' : 'Lưu vào yêu thích'}
+                          >
+                            <i className={`bi ${isWishlisted(h.id, h.name) ? 'bi-heart-fill' : 'bi-heart'}`} />
+                          </button>
+                          <Link to={`/homestay/${h.id || 'doi'}`} state={{ homestay: h }} style={{ display: 'block', height: '100%' }}>
+                            <img src={h.img || h.imageUrl || 'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=600&q=80'} alt={h.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          </Link>
                         </div>
-                        <Link to={`/homestay/${h.id}`} state={{ homestay: h }} className="btn-view-room">Xem homestay</Link>
+                        <div className="card-body">
+                          <div className="card-location-rating">
+                            <span className="card-location"><i className="bi bi-geo-alt-fill text-success" /> {h.location}</span>
+                            <span className="card-rating"><i className="bi bi-star-fill" /> {h.rating || '5.0'} ({h.reviews || 0})</span>
+                          </div>
+                          <h3 className="card-title"><Link to={`/homestay/${h.id}`} state={{ homestay: h }}>{h.name}</Link></h3>
+                          <div className="card-specs">{h.distance || h.distanceLabel || 'Cách điểm tổ chức 500m'}</div>
+                          <div className="card-footer-row">
+                            <div>
+                              <span className="price-label">Giá từ:</span>
+                              <span className="card-price">{typeof h.price === 'number' ? h.price.toLocaleString('vi-VN') + 'đ' : (h.price ? (h.price.toString().includes('đ') ? h.price : Number(h.price).toLocaleString('vi-VN') + 'đ') : '1.200.000đ')}</span>
+                            </div>
+                            <Link to={`/homestay/${h.id}`} state={{ homestay: h }} className="btn-view-room">Xem homestay</Link>
+                          </div>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
+
+                <button
+                  type="button"
+                  className="homestay-slider-arrow arrow-next"
+                  style={{
+                    position: 'absolute',
+                    top: '50%',
+                    right: '-20px',
+                    transform: 'translateY(-50%)',
+                    zIndex: 35,
+                    width: '44px',
+                    height: '52px',
+                    borderRadius: '12px',
+                    background: 'rgba(255, 255, 255, 0.75)',
+                    backdropFilter: 'blur(12px)',
+                    WebkitBackdropFilter: 'blur(12px)',
+                    border: '1.5px solid rgba(255, 255, 255, 0.85)',
+                    boxShadow: '0 6px 20px rgba(15, 23, 42, 0.14)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '1.25rem',
+                    color: '#1E293B',
+                    cursor: 'pointer',
+                    outline: 'none',
+                    transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+                  }}
+                  onClick={() => scrollSlider(festSliderRef, 1)}
+                  aria-label="Xem homestay tiếp theo"
+                >
+                  <i className="bi bi-chevron-right" />
+                </button>
               </div>
             </>
-          )}
-
-          {activeFestData && visibleFestivalCount < (activeFestData.homestays || []).length && (
-            <div style={{ textAlign: 'center', marginTop: '32px' }}>
-              <button 
-                onClick={() => setVisibleFestivalCount(prev => prev + 4)}
-                style={{ padding: '12px 32px', borderRadius: '12px', fontWeight: 'bold', background: '#FFF', border: '1.5px solid #15803D', color: '#15803D', cursor: 'pointer', transition: 'all 0.2s' }}
-                onMouseOver={(e) => { e.currentTarget.style.background = '#15803D'; e.currentTarget.style.color = '#FFF'; }}
-                onMouseOut={(e) => { e.currentTarget.style.background = '#FFF'; e.currentTarget.style.color = '#15803D'; }}
-              >
-                Xem thêm homestay theo lễ hội
-              </button>
-            </div>
           )}
         </div>
       </section>
@@ -850,60 +1417,115 @@ export default function Homepage() {
         <div className="hp-container">
           <span className="section-badge-top" style={{ color: '#E11D48' }}><i className="bi bi-graph-up-arrow" /> Xu hướng đặt phòng</span>
           <h2 className="section-title">Homestay hot được đặt nhiều nhất hôm nay</h2>
-          <p className="section-subtitle">Top 4 căn homestay được khách hàng chốt phòng liên tục trong 24 giờ qua</p>
+          <p className="section-subtitle">Danh sách các căn homestay được khách hàng chốt phòng liên tục trong 24 giờ qua</p>
 
-          <div className="hot-grid">
-            {homeData.hotHomestays.slice(0, visibleHotCount).map((h) => (
-              <div key={h.id} className="homestay-card">
-                <div className="card-img-wrapper">
-                  <span className="card-top-tag tag-hot"><i className="bi bi-fire" /> {h.tag}</span>
-                  <button
-                    type="button"
-                    className={`card-wishlist-btn ${isWishlisted(h.id, h.name) ? 'active' : ''}`}
-                    onClick={(e) => toggleWishlist(h, e)}
-                    title={isWishlisted(h.id, h.name) ? 'Bỏ yêu thích' : 'Lưu vào yêu thích'}
-                  >
-                    <i className={`bi ${isWishlisted(h.id, h.name) ? 'bi-heart-fill' : 'bi-heart'}`} />
-                  </button>
-                  <Link to={`/homestay/${h.id || 'doi'}`} state={{ homestay: h }} style={{ display: 'block', height: '100%' }}>
-                    <img src={h.img || 'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=600&q=80'} alt={h.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  </Link>
-                </div>
-                <div className="card-body">
-                  <div className="card-location-rating">
-                    <span className="card-location"><i className="bi bi-geo-alt-fill text-success" /> {h.location}</span>
-                    <span className="card-rating"><i className="bi bi-star-fill" /> {h.rating} ({h.reviews})</span>
-                  </div>
-                  <h3 className="card-title"><Link to={`/homestay/${h.id}`} state={{ homestay: h }}>{h.name}</Link></h3>
-                  <div className="card-specs"><span>{h.specs}</span></div>
-                  <div className="card-amenities-box">
-                    <span className="amenities-label">Tiện nghi nổi bật:</span>
-                    <p className="amenities-items">{formatAmenities(h.amenities)}</p>
-                  </div>
-                  <div className="card-footer-row">
-                    <div>
-                      <span className="price-label">Giá từ:</span>
-                      <span className="card-price">{h.price}</span>
+          <div className="homestay-slider-wrap" style={{ position: 'relative', width: '100%' }}>
+            <button
+              type="button"
+              className="homestay-slider-arrow arrow-prev"
+              style={{
+                position: 'absolute',
+                top: '50%',
+                left: '-20px',
+                transform: 'translateY(-50%)',
+                zIndex: 35,
+                width: '44px',
+                height: '52px',
+                borderRadius: '12px',
+                background: 'rgba(255, 255, 255, 0.75)',
+                backdropFilter: 'blur(12px)',
+                WebkitBackdropFilter: 'blur(12px)',
+                border: '1.5px solid rgba(255, 255, 255, 0.85)',
+                boxShadow: '0 6px 20px rgba(15, 23, 42, 0.14)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '1.25rem',
+                color: '#1E293B',
+                cursor: 'pointer',
+                outline: 'none',
+                transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+              }}
+              onClick={() => scrollSlider(hotSliderRef, -1)}
+              aria-label="Xem homestay trước"
+            >
+              <i className="bi bi-chevron-left" />
+            </button>
+
+            <div className="homestay-slider-track" ref={hotSliderRef}>
+              {(homeData.hotHomestays || []).map((h) => (
+                <div key={h.id} className="homestay-slider-item">
+                  <div className="homestay-card">
+                    <div className="card-img-wrapper">
+                      <span className="card-top-tag tag-hot"><i className="bi bi-fire" /> {h.tag}</span>
+                      <button
+                        type="button"
+                        className={`card-wishlist-btn ${isWishlisted(h.id, h.name) ? 'active' : ''}`}
+                        onClick={(e) => toggleWishlist(h, e)}
+                        title={isWishlisted(h.id, h.name) ? 'Bỏ yêu thích' : 'Lưu vào yêu thích'}
+                      >
+                        <i className={`bi ${isWishlisted(h.id, h.name) ? 'bi-heart-fill' : 'bi-heart'}`} />
+                      </button>
+                      <Link to={`/homestay/${h.id || 'doi'}`} state={{ homestay: h }} style={{ display: 'block', height: '100%' }}>
+                        <img src={h.img || 'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=600&q=80'} alt={h.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      </Link>
                     </div>
-                    <Link to={`/homestay/${h.id}`} state={{ homestay: h }} className="btn-view-room">Xem homestay</Link>
+                    <div className="card-body">
+                      <div className="card-location-rating">
+                        <span className="card-location"><i className="bi bi-geo-alt-fill text-success" /> {h.location}</span>
+                        <span className="card-rating"><i className="bi bi-star-fill" /> {h.rating} ({h.reviews})</span>
+                      </div>
+                      <h3 className="card-title"><Link to={`/homestay/${h.id}`} state={{ homestay: h }}>{h.name}</Link></h3>
+                      <div className="card-specs"><span>{h.specs}</span></div>
+                      <div className="card-amenities-box">
+                        <span className="amenities-label">Tiện nghi nổi bật:</span>
+                        <p className="amenities-items">{formatAmenities(h.amenities)}</p>
+                      </div>
+                      <div className="card-footer-row">
+                        <div>
+                          <span className="price-label">Giá từ:</span>
+                          <span className="card-price">{h.price}</span>
+                        </div>
+                        <Link to={`/homestay/${h.id}`} state={{ homestay: h }} className="btn-view-room">Xem homestay</Link>
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
-
-          {visibleHotCount < homeData.hotHomestays.length && (
-            <div style={{ textAlign: 'center', marginTop: '32px' }}>
-              <button 
-                onClick={() => setVisibleHotCount(prev => prev + 4)}
-                style={{ padding: '12px 32px', borderRadius: '12px', fontWeight: 'bold', background: '#FFF', border: '1.5px solid #15803D', color: '#15803D', cursor: 'pointer', transition: 'all 0.2s' }}
-                onMouseOver={(e) => { e.currentTarget.style.background = '#15803D'; e.currentTarget.style.color = '#FFF'; }}
-                onMouseOut={(e) => { e.currentTarget.style.background = '#FFF'; e.currentTarget.style.color = '#15803D'; }}
-              >
-                Xem thêm homestay hot
-              </button>
+              ))}
             </div>
-          )}
+
+            <button
+              type="button"
+              className="homestay-slider-arrow arrow-next"
+              style={{
+                position: 'absolute',
+                top: '50%',
+                right: '-20px',
+                transform: 'translateY(-50%)',
+                zIndex: 35,
+                width: '44px',
+                height: '52px',
+                borderRadius: '12px',
+                background: 'rgba(255, 255, 255, 0.75)',
+                backdropFilter: 'blur(12px)',
+                WebkitBackdropFilter: 'blur(12px)',
+                border: '1.5px solid rgba(255, 255, 255, 0.85)',
+                boxShadow: '0 6px 20px rgba(15, 23, 42, 0.14)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '1.25rem',
+                color: '#1E293B',
+                cursor: 'pointer',
+                outline: 'none',
+                transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+              }}
+              onClick={() => scrollSlider(hotSliderRef, 1)}
+              aria-label="Xem homestay tiếp theo"
+            >
+              <i className="bi bi-chevron-right" />
+            </button>
+          </div>
         </div>
       </section>
 
@@ -927,7 +1549,10 @@ export default function Homepage() {
                   key={tab.key}
                   type="button"
                   className={`city-tab ${favCityFilter === tab.key ? 'active' : ''}`}
-                  onClick={() => { setFavCityFilter(tab.key); setVisibleFavoritesCount(4); }}
+                  onClick={() => {
+                    setFavCityFilter(tab.key);
+                    if (favSliderRef.current) favSliderRef.current.scrollLeft = 0;
+                  }}
                 >
                   {tab.label}
                 </button>
@@ -935,58 +1560,113 @@ export default function Homepage() {
             </div>
           </div>
 
-          <div className="favorites-grid">
-            {filteredFavorites.slice(0, visibleFavoritesCount).map((h) => (
-              <div key={h.id} className="homestay-card">
-                <div className="card-img-wrapper">
-                  <span className="card-top-tag">{h.tag}</span>
-                  <button
-                    type="button"
-                    className={`card-wishlist-btn ${isWishlisted(h.id, h.name) ? 'active' : ''}`}
-                    onClick={(e) => toggleWishlist(h, e)}
-                    title={isWishlisted(h.id, h.name) ? 'Bỏ yêu thích' : 'Lưu vào yêu thích'}
-                  >
-                    <i className={`bi ${isWishlisted(h.id, h.name) ? 'bi-heart-fill' : 'bi-heart'}`} />
-                  </button>
-                  <Link to={`/homestay/${h.id || 'doi'}`} state={{ homestay: h }} style={{ display: 'block', height: '100%' }}>
-                    <img src={h.img || 'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=600&q=80'} alt={h.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  </Link>
-                </div>
-                <div className="card-body">
-                  <div className="card-location-rating">
-                    <span className="card-location"><i className="bi bi-geo-alt-fill text-success" /> {h.location}</span>
-                    <span className="card-rating"><i className="bi bi-star-fill" /> {h.rating} ({h.reviews})</span>
-                  </div>
-                  <h3 className="card-title"><Link to={`/homestay/${h.id}`} state={{ homestay: h }}>{h.name}</Link></h3>
-                  <div className="card-specs"><span>{h.specs}</span></div>
-                  <div className="card-amenities-box">
-                    <span className="amenities-label">Tiện nghi nổi bật:</span>
-                    <p className="amenities-items">{formatAmenities(h.amenities)}</p>
-                  </div>
-                  <div className="card-footer-row">
-                    <div>
-                      <span className="price-label">Giá từ:</span>
-                      <span className="card-price">{h.price}</span>
-                    </div>
-                    <Link to={`/homestay/${h.id}`} state={{ homestay: h }} className="btn-view-room">Xem homestay</Link>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
+          <div className="homestay-slider-wrap" style={{ position: 'relative', width: '100%' }}>
+            <button
+              type="button"
+              className="homestay-slider-arrow arrow-prev"
+              style={{
+                position: 'absolute',
+                top: '50%',
+                left: '-20px',
+                transform: 'translateY(-50%)',
+                zIndex: 35,
+                width: '44px',
+                height: '52px',
+                borderRadius: '12px',
+                background: 'rgba(255, 255, 255, 0.75)',
+                backdropFilter: 'blur(12px)',
+                WebkitBackdropFilter: 'blur(12px)',
+                border: '1.5px solid rgba(255, 255, 255, 0.85)',
+                boxShadow: '0 6px 20px rgba(15, 23, 42, 0.14)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '1.25rem',
+                color: '#1E293B',
+                cursor: 'pointer',
+                outline: 'none',
+                transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+              }}
+              onClick={() => scrollSlider(favSliderRef, -1)}
+              aria-label="Xem homestay trước"
+            >
+              <i className="bi bi-chevron-left" />
+            </button>
 
-          {visibleFavoritesCount < filteredFavorites.length && (
-            <div style={{ textAlign: 'center', marginTop: '32px' }}>
-              <button 
-                onClick={() => setVisibleFavoritesCount(prev => prev + 4)}
-                style={{ padding: '12px 32px', borderRadius: '12px', fontWeight: 'bold', background: '#FFF', border: '1.5px solid #15803D', color: '#15803D', cursor: 'pointer', transition: 'all 0.2s' }}
-                onMouseOver={(e) => { e.currentTarget.style.background = '#15803D'; e.currentTarget.style.color = '#FFF'; }}
-                onMouseOut={(e) => { e.currentTarget.style.background = '#FFF'; e.currentTarget.style.color = '#15803D'; }}
-              >
-                Xem thêm homestay
-              </button>
+            <div className="homestay-slider-track" ref={favSliderRef}>
+              {(filteredFavorites || []).map((h) => (
+                <div key={h.id} className="homestay-slider-item">
+                  <div className="homestay-card">
+                    <div className="card-img-wrapper">
+                      <span className="card-top-tag">{h.tag}</span>
+                      <button
+                        type="button"
+                        className={`card-wishlist-btn ${isWishlisted(h.id, h.name) ? 'active' : ''}`}
+                        onClick={(e) => toggleWishlist(h, e)}
+                        title={isWishlisted(h.id, h.name) ? 'Bỏ yêu thích' : 'Lưu vào yêu thích'}
+                      >
+                        <i className={`bi ${isWishlisted(h.id, h.name) ? 'bi-heart-fill' : 'bi-heart'}`} />
+                      </button>
+                      <Link to={`/homestay/${h.id || 'doi'}`} state={{ homestay: h }} style={{ display: 'block', height: '100%' }}>
+                        <img src={h.img || 'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=600&q=80'} alt={h.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      </Link>
+                    </div>
+                    <div className="card-body">
+                      <div className="card-location-rating">
+                        <span className="card-location"><i className="bi bi-geo-alt-fill text-success" /> {h.location}</span>
+                        <span className="card-rating"><i className="bi bi-star-fill" /> {h.rating} ({h.reviews})</span>
+                      </div>
+                      <h3 className="card-title"><Link to={`/homestay/${h.id}`} state={{ homestay: h }}>{h.name}</Link></h3>
+                      <div className="card-specs"><span>{h.specs}</span></div>
+                      <div className="card-amenities-box">
+                        <span className="amenities-label">Tiện nghi nổi bật:</span>
+                        <p className="amenities-items">{formatAmenities(h.amenities)}</p>
+                      </div>
+                      <div className="card-footer-row">
+                        <div>
+                          <span className="price-label">Giá từ:</span>
+                          <span className="card-price">{h.price}</span>
+                        </div>
+                        <Link to={`/homestay/${h.id}`} state={{ homestay: h }} className="btn-view-room">Xem homestay</Link>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
-          )}
+
+            <button
+              type="button"
+              className="homestay-slider-arrow arrow-next"
+              style={{
+                position: 'absolute',
+                top: '50%',
+                right: '-20px',
+                transform: 'translateY(-50%)',
+                zIndex: 35,
+                width: '44px',
+                height: '52px',
+                borderRadius: '12px',
+                background: 'rgba(255, 255, 255, 0.75)',
+                backdropFilter: 'blur(12px)',
+                WebkitBackdropFilter: 'blur(12px)',
+                border: '1.5px solid rgba(255, 255, 255, 0.85)',
+                boxShadow: '0 6px 20px rgba(15, 23, 42, 0.14)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '1.25rem',
+                color: '#1E293B',
+                cursor: 'pointer',
+                outline: 'none',
+                transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+              }}
+              onClick={() => scrollSlider(favSliderRef, 1)}
+              aria-label="Xem homestay tiếp theo"
+            >
+              <i className="bi bi-chevron-right" />
+            </button>
+          </div>
         </div>
       </section>
 
