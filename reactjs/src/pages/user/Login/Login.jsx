@@ -7,10 +7,7 @@ export default function Login() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
-  // Role: 'tourist' | 'owner'
-  const [activeRole, setActiveRole] = useState('tourist');
-
-  // Input states - Không dùng tài khoản mẫu, bắt buộc nhập từ CSDL
+  // Input states - Bắt buộc nhập tài khoản từ CSDL
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -25,19 +22,6 @@ export default function Login() {
   const [resetLoading, setResetLoading] = useState(false);
   const [resetError, setResetError] = useState('');
   const [resetSuccess, setResetSuccess] = useState('');
-
-  const switchRole = (role) => {
-    setActiveRole(role);
-  };
-
-  useEffect(() => {
-    const roleParam = searchParams.get('role');
-    if (roleParam === 'host' || roleParam === 'owner') {
-      setActiveRole('owner');
-    } else {
-      setActiveRole('tourist');
-    }
-  }, [searchParams]);
 
   const togglePasswordVisibility = () => {
     setShowPassword((prev) => !prev);
@@ -143,28 +127,49 @@ export default function Login() {
       const result = await authService.login({
         username: username.trim(),
         password: password,
-        role: activeRole,
       });
 
       if (result && result.success && result.user) {
-        // Lưu thông tin người dùng thực tế lấy từ CSDL (fullName, role, email, ...)
         const dbUser = result.user;
-        const userRole = (dbUser.role || (activeRole === 'admin' ? 'ADMIN' : activeRole === 'owner' ? 'OWNER' : 'USER')).toUpperCase();
+        const rawRole = (dbUser.role || 'USER').toUpperCase();
 
         sessionStorage.setItem('isLoggedIn', 'true');
         sessionStorage.setItem('userName', dbUser.fullName || dbUser.email);
-        sessionStorage.setItem('userRole', userRole === 'OWNER' ? 'host' : userRole === 'ADMIN' ? 'admin' : 'guest');
+        sessionStorage.setItem('userId', String(dbUser.id));
 
-        localStorage.setItem('user_role', userRole);
+        let normalizedRole = 'USER';
+        let sessionRole = 'guest';
+
+        if (rawRole === 'ADMIN') {
+          normalizedRole = 'ADMIN';
+          sessionRole = 'admin';
+        } else if (rawRole === 'OWNER' || rawRole === 'HOST') {
+          normalizedRole = 'OWNER';
+          sessionRole = 'host';
+        } else {
+          normalizedRole = 'TOURIST';
+          sessionRole = 'guest';
+        }
+
+        sessionStorage.setItem('userRole', sessionRole);
+        localStorage.setItem('user_role', normalizedRole);
         localStorage.setItem('user', JSON.stringify(dbUser));
 
-        // Chuyển hướng chính xác theo vai trò trong CSDL
-        if (userRole === 'ADMIN') {
+        // Kích hoạt cập nhật trạng thái người dùng trên Header & toàn hệ thống
+        window.dispatchEvent(new Event('storage'));
+
+        // Phân quyền điều hướng tự động chính xác theo vai trò trong CSDL
+        if (normalizedRole === 'ADMIN') {
           navigate('/admin/dashboard');
-        } else if (userRole === 'OWNER') {
+        } else if (normalizedRole === 'OWNER') {
           navigate('/owner/dashboard');
         } else {
-          navigate('/');
+          const redirectUrl = searchParams.get('redirect');
+          if (redirectUrl) {
+            navigate(redirectUrl);
+          } else {
+            navigate('/');
+          }
         }
       } else {
         // Thông báo lỗi chuẩn từ CSDL nếu tài khoản hoặc mật khẩu sai
@@ -229,37 +234,6 @@ export default function Login() {
             <p className="login-card-subtitle">Chào mừng bạn quay trở lại với Homestay Việt Nam</p>
           </div>
 
-          {/* Role Switcher Tabs (Khách thuê / Chủ Homestay / Admin) */}
-          <div className="login-role-tabs">
-            <button
-              className={`login-role-tab ${activeRole === 'tourist' ? 'active' : ''}`}
-              id="tab-tourist"
-              onClick={() => switchRole('tourist')}
-              type="button"
-            >
-              <i className="bi bi-person-luggage" />
-              <span>Khách thuê</span>
-            </button>
-            <button
-              className={`login-role-tab ${activeRole === 'owner' ? 'active' : ''}`}
-              id="tab-owner"
-              onClick={() => switchRole('owner')}
-              type="button"
-            >
-              <i className="bi bi-house-heart-fill" />
-              <span>Chủ Homestay</span>
-            </button>
-            <button
-              className={`login-role-tab ${activeRole === 'admin' ? 'active' : ''}`}
-              id="tab-admin"
-              onClick={() => switchRole('admin')}
-              type="button"
-            >
-              <i className="bi bi-shield-lock-fill" />
-              <span>Admin</span>
-            </button>
-          </div>
-
           {/* Form Inputs */}
           <form id="login-form" className="login-form" onSubmit={handleLogin}>
             {/* Email / Phone */}
@@ -274,13 +248,7 @@ export default function Login() {
                 <input
                   className="login-input"
                   id="username-input"
-                  placeholder={
-                    activeRole === 'admin'
-                      ? 'admin@yenhomestay.com'
-                      : activeRole === 'owner'
-                      ? 'chuhoang.homestay@gmail.com hoặc 0987...'
-                      : 'maichi.lehoang@gmail.com hoặc 0912...'
-                  }
+                  placeholder="Nhập email hoặc số điện thoại của bạn"
                   type="text"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
@@ -386,14 +354,14 @@ export default function Login() {
             </button>
           </div>
 
-          {/* Bottom Registration Links (Nối sang register với role) */}
+          {/* Bottom Registration Links (Nối sang register với role tương ứng) */}
           <div className="login-register-footer">
             <div className="login-register-note">
               <span>Bạn chưa có tài khoản?</span>
             </div>
             <div className="login-register-links">
               <Link
-                className={`login-reg-btn ${activeRole === 'tourist' ? 'active' : ''}`}
+                className="login-reg-btn"
                 to="/register?role=guest"
                 id="link-reg-guest"
               >
@@ -401,7 +369,7 @@ export default function Login() {
                 <span>Đăng ký Khách thuê</span>
               </Link>
               <Link
-                className={`login-reg-btn ${activeRole === 'owner' ? 'active' : ''}`}
+                className="login-reg-btn"
                 to="/register?role=host"
                 id="link-reg-host"
               >

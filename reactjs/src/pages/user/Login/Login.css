@@ -571,17 +571,23 @@
 }
 
 .login-register-links {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
   margin-top: 8px;
+}
+
+@media (max-width: 480px) {
+  .login-register-links {
+    grid-template-columns: 1fr;
+  }
 }
 
 .login-reg-btn {
   padding: 10px 12px;
   border-radius: 12px;
-  font-size: 12px;
-  font-weight: 700;
+  font-size: 13px;
+  font-weight: 600;
   text-align: center;
   transition: all 0.2s ease;
   display: flex;
@@ -590,47 +596,16 @@
   gap: 8px;
   box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
   text-decoration: none;
-}
-
-.login-reg-btn#link-reg-guest.active {
-  border: 1px solid #6EE7B7;
-  background-color: #FFFFFF;
-  color: #15803D;
-}
-
-.login-reg-btn#link-reg-guest.active:hover {
-  background-color: #ECFDF5;
-}
-
-.login-reg-btn#link-reg-guest:not(.active) {
   border: 1px solid #E2E8F0;
   background-color: #FFFFFF;
   color: #334155;
 }
 
-.login-reg-btn#link-reg-guest:not(.active):hover {
-  background-color: #F1F5F9;
-}
-
-.login-reg-btn#link-reg-host.active {
-  border: 1px solid #34D399;
-  background-color: #ECFDF5;
+.login-reg-btn:hover {
+  border-color: #15803D;
+  background-color: #F0FDF4;
   color: #15803D;
-}
-
-.login-reg-btn#link-reg-host.active:hover {
-  background-color: #D1FAE5;
-}
-
-.login-reg-btn#link-reg-host:not(.active) {
-  border: 1px solid #E2E8F0;
-  background-color: #FFFFFF;
-  color: #334155;
-}
-
-.login-reg-btn#link-reg-host:not(.active):hover {
-  background-color: #F1F5F9;
-  color: #166534;
+  box-shadow: 0 4px 6px -1px rgba(21, 128, 61, 0.1);
 }
 
 /* 10. MODAL QUÊN MẬT KHẨU */

@@ -7,17 +7,11 @@ export default function AccountManagement() {
     const navigate = useNavigate();
 
     // Stats state
-    const [stats, setStats] = useState({
-        totalUsers: 0,
-        totalGuests: 0,
-        totalHosts: 0,
-        activeUsers: 0,
-        blockedUsers: 0,
-    });
+    const [stats, setStats] = useState(() => adminUserService.getImmediateStats());
 
     // Users list & filter states
-    const [users, setUsers] = useState([]);
-    const [loading, setLoading] = useState(true);
+    const [users, setUsers] = useState(() => adminUserService.getImmediateUsers());
+    const [loading, setLoading] = useState(() => adminUserService.getImmediateUsers().length === 0);
     const [activeTab, setActiveTab] = useState('all'); // 'all' | 'guest' | 'host' | 'admin'
     const [searchKeyword, setSearchKeyword] = useState('');
     const [statusFilter, setStatusFilter] = useState('all'); // 'all' | 'active' | 'blocked'
@@ -35,15 +29,15 @@ export default function AccountManagement() {
     const [lockDuration, setLockDuration] = useState('Vĩnh viễn');
 
     // Load Data from Real Backend (Spring Boot + Neon PostgreSQL)
-    const loadData = async () => {
-        setLoading(true);
+    const loadData = async (showSpin = false) => {
+        if (showSpin) setLoading(true);
         try {
             const [statsData, usersData] = await Promise.all([
                 adminUserService.getUserStats(),
                 adminUserService.getUsers('all', 'all', ''),
             ]);
             if (statsData) setStats(statsData);
-            if (Array.isArray(usersData)) setUsers(usersData);
+            if (Array.isArray(usersData) && usersData.length > 0) setUsers(usersData);
         } catch (error) {
             console.error('Lỗi khi tải dữ liệu tài khoản:', error);
         } finally {
