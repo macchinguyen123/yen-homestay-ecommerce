@@ -38,11 +38,16 @@ export const authService = {
           token: data.token,
         };
 
+        const rawRole = (data.role || 'USER').toUpperCase();
+        const normalizedRole = rawRole === 'ADMIN' ? 'ADMIN' : (rawRole === 'OWNER' || rawRole === 'HOST') ? 'OWNER' : 'TOURIST';
+        const sessionRole = rawRole === 'ADMIN' ? 'admin' : (rawRole === 'OWNER' || rawRole === 'HOST') ? 'host' : 'guest';
+
         localStorage.setItem('user', JSON.stringify(userData));
-        localStorage.setItem('user_role', data.role);
+        localStorage.setItem('user_role', normalizedRole);
         sessionStorage.setItem('isLoggedIn', 'true');
         sessionStorage.setItem('userName', data.fullName || data.email);
-        sessionStorage.setItem('userRole', data.role);
+        sessionStorage.setItem('userRole', sessionRole);
+        sessionStorage.setItem('userId', String(data.id));
 
         return { success: true, message: data.message || 'Đăng nhập thành công!', user: userData };
       } else {

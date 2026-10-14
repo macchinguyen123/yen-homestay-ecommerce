@@ -34,4 +34,10 @@ public class AdminDashboardController {
             @RequestParam(name = "period", defaultValue = "month") String period) {
         return ResponseEntity.ok(adminDashboardService.getMetricDetail(key, period));
     }
+
+    @PostMapping("/refresh")
+    public ResponseEntity<Void> refreshCache() {
+        adminDashboardService.evictDashboardCache();
+        return ResponseEntity.ok().build();
+    }
 }

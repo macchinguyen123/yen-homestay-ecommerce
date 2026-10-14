@@ -155,23 +155,30 @@ export default function AdminDashboard() {
     const [dateFilter, setDateFilter] = useState('month');
     const [activityTab, setActivityTab] = useState('all');
 
-    // Dynamic State ("Code mềm")
-    const [loading, setLoading] = useState(true);
+    // Dynamic State ("Code mềm" - Khởi tạo tức thì để không bao giờ bị trắng màn hình)
+    const [loading, setLoading] = useState(false);
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [isLiveDb, setIsLiveDb] = useState(false);
-    const [dashboardData, setDashboardData] = useState(null);
-    const [activities, setActivities] = useState([]);
+    const [dashboardData, setDashboardData] = useState(() => adminDashboardService.getImmediateFallbackOverview('month'));
+    const [activities, setActivities] = useState(() => adminDashboardService.getImmediateFallbackActivities());
     const [lastUpdated, setLastUpdated] = useState('');
 
     const [modalData, setModalData] = useState(null);
     const [modalType, setModalType] = useState(''); // 'metric' or 'activity'
 
-    // Fetch dynamic data
+    // Fetch dynamic data in PARALLEL
     const fetchDashboard = useCallback(async (period, showSpin = false) => {
-        if (showSpin) setIsRefreshing(true);
+        if (showSpin) {
+            setIsRefreshing(true);
+            try {
+                await adminDashboardService.refreshServerCache();
+            } catch (ignored) {}
+        }
         try {
-            const overviewRes = await adminDashboardService.getOverview(period);
-            const activitiesRes = await adminDashboardService.getRecentActivities('all');
+            const [overviewRes, activitiesRes] = await Promise.all([
+                adminDashboardService.getOverview(period),
+                adminDashboardService.getRecentActivities('all')
+            ]);
 
             if (overviewRes && overviewRes.data) {
                 setDashboardData(overviewRes.data);
@@ -187,9 +194,8 @@ export default function AdminDashboard() {
         } catch (err) {
             console.error('Lỗi khi tải dữ liệu dashboard:', err);
         } finally {
-            setLoading(false);
             if (showSpin) {
-                setTimeout(() => setIsRefreshing(false), 400);
+                setTimeout(() => setIsRefreshing(false), 300);
             }
         }
     }, []);

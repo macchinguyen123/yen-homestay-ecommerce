@@ -6,24 +6,63 @@
 
 const API_BASE_URL = 'http://localhost:8081/api/admin/users';
 
+let memoryUsers = null;
+let memoryStats = null;
+
+const DEFAULT_STATS = {
+    totalUsers: 22,
+    totalGuests: 14,
+    totalHosts: 7,
+    activeUsers: 21,
+    blockedUsers: 1,
+};
+
 export const adminUserService = {
+    // 0. Lấy dữ liệu khởi tạo tức thì để giao diện không bị giật hoặc chờ spinner lâu
+    getImmediateStats() {
+        if (memoryStats) return memoryStats;
+        try {
+            const raw = sessionStorage.getItem('yen_cached_admin_user_stats');
+            if (raw) {
+                memoryStats = JSON.parse(raw);
+                return memoryStats;
+            }
+        } catch (ignored) {}
+        return DEFAULT_STATS;
+    },
+
+    getImmediateUsers() {
+        if (memoryUsers && memoryUsers.length > 0) return memoryUsers;
+        try {
+            const raw = sessionStorage.getItem('yen_cached_admin_users');
+            if (raw) {
+                const parsed = JSON.parse(raw);
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                    memoryUsers = parsed;
+                    return memoryUsers;
+                }
+            }
+        } catch (ignored) {}
+        return [];
+    },
+
     // 1. Thống kê số lượng tài khoản theo vai trò & trạng thái
     async getUserStats() {
         try {
-            const res = await fetch(`${API_BASE_URL}/stats`);
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 4000);
+            const res = await fetch(`${API_BASE_URL}/stats`, { signal: controller.signal });
+            clearTimeout(timeoutId);
             if (res.ok) {
-                return await res.json();
+                const data = await res.json();
+                memoryStats = data;
+                try { sessionStorage.setItem('yen_cached_admin_user_stats', JSON.stringify(data)); } catch (ignored) {}
+                return data;
             }
         } catch (err) {
             console.warn('Lỗi kết nối API getUserStats, sử dụng fallback:', err);
         }
-        return {
-            totalUsers: 22,
-            totalGuests: 14,
-            totalHosts: 7,
-            activeUsers: 21,
-            blockedUsers: 1,
-        };
+        return this.getImmediateStats();
     },
 
     // 2. Lấy danh sách tài khoản kèm bộ lọc role, status, keyword
@@ -35,14 +74,22 @@ export const adminUserService = {
             if (keyword && keyword.trim()) params.append('keyword', keyword.trim());
 
             const url = `${API_BASE_URL}?${params.toString()}`;
-            const res = await fetch(url);
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 4000);
+            const res = await fetch(url, { signal: controller.signal });
+            clearTimeout(timeoutId);
             if (res.ok) {
-                return await res.json();
+                const data = await res.json();
+                if (Array.isArray(data) && (!role || role === 'all') && (!status || status === 'all') && !keyword) {
+                    memoryUsers = data;
+                    try { sessionStorage.setItem('yen_cached_admin_users', JSON.stringify(data)); } catch (ignored) {}
+                }
+                return data;
             }
         } catch (err) {
             console.warn('Lỗi kết nối API getUsers:', err);
         }
-        return [];
+        return this.getImmediateUsers();
     },
 
     // 3. Lấy thông tin chi tiết một tài khoản theo ID
