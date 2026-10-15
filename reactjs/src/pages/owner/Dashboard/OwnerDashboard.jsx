@@ -1,10 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import './OwnerDashboard.css';
 import {
-  INITIAL_DASHBOARD_STATS,
-  INITIAL_BOOKINGS,
-  REVENUE_PERIODS,
-  OCCUPANCY_DATA,
   formatCurrency,
   formatDateRange,
 } from './ownerDashboardData';
@@ -16,16 +13,8 @@ const PERIOD_OPTS = [
   { value: 'month',  label: 'Tháng này' },
 ];
 
-const ROOM_IMAGES = [
-  'https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=150&q=80',
-  'https://images.unsplash.com/photo-1564501049412-61c2a3083791?auto=format&fit=crop&w=150&q=80',
-  'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=150&q=80',
-  'https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?auto=format&fit=crop&w=150&q=80',
-];
-
 // ─── SVG Revenue Chart ─────────────────────────────────────────────────────────
-function RevenueChart({ period }) {
-  const { labels, values } = REVENUE_PERIODS[period];
+function RevenueChart({ data = [] }) {
   const [tooltip, setTooltip] = useState(null);
   const svgRef = useRef(null);
 
@@ -34,18 +23,20 @@ function RevenueChart({ period }) {
   const chartW = W - PL - PR;
   const chartH = H - PT - PB;
 
+  const labels = data.map(point => point.label);
+  const values = data.map(point => Number(point.amount) || 0);
   const maxVal = Math.max(...values, 1);
   const ySteps = 4;
 
   const points = labels.map((_, i) => ({
-    x: PL + (i / (labels.length - 1)) * chartW,
+    x: PL + (i / Math.max(labels.length - 1, 1)) * chartW,
     y: PT + chartH - (values[i] / maxVal) * chartH,
     value: values[i],
     label: labels[i],
   }));
 
   const pathD = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
-  const areaD = `${pathD} L${points[points.length - 1].x.toFixed(1)},${(PT + chartH).toFixed(1)} L${PL},${(PT + chartH).toFixed(1)} Z`;
+  const areaD = points.length ? `${pathD} L${points[points.length - 1].x.toFixed(1)},${(PT + chartH).toFixed(1)} L${PL},${(PT + chartH).toFixed(1)} Z` : '';
 
   return (
     <div className="chart-container" style={{ position: 'relative' }}>
@@ -72,13 +63,13 @@ function RevenueChart({ period }) {
         })}
 
         {/* Area fill */}
-        <path d={areaD} fill="url(#revGrad)" />
+        {points.length > 1 && <path d={areaD} fill="url(#revGrad)" />}
 
         {/* Line */}
-        <path d={pathD} fill="none" stroke="#059669" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+        {points.length > 1 && <path d={pathD} fill="none" stroke="#059669" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />}
 
         {/* Points */}
-        {points.map((p, i) => (
+        {points.map((p, i) => (labels.length <= 10 || i % Math.ceil(labels.length / 7) === 0 || i === labels.length - 1) && (
           <circle
             key={i}
             cx={p.x} cy={p.y} r={4}
@@ -90,7 +81,7 @@ function RevenueChart({ period }) {
         ))}
 
         {/* X-axis labels */}
-        {points.map((p, i) => (
+        {points.map((p, i) => (labels.length <= 10 || i % Math.ceil(labels.length / 7) === 0 || i === labels.length - 1) && (
           <text key={i} x={p.x} y={H - 6} textAnchor="middle" className="chart-axis-label">
             {p.label}
           </text>
@@ -119,6 +110,46 @@ export default function OwnerDashboard() {
   const [dateFilter, setDateFilter] = useState('');
   const [page, setPage] = useState(1);
   const [notifications, setNotifications] = useState([]);
+  const [dashboard, setDashboard] = useState(null);
+  const [dashboardLoading, setDashboardLoading] = useState(true);
+  const [dashboardError, setDashboardError] = useState('');
+  const [activeHomestayId, setActiveHomestayId] = useState(() => localStorage.getItem('ownerActiveHomestayId'));
+  const owner = JSON.parse(localStorage.getItem('user') || 'null') || {};
+
+  useEffect(() => {
+    const syncHomestay = () => setActiveHomestayId(localStorage.getItem('ownerActiveHomestayId'));
+    window.addEventListener('ownerActiveHomestayChanged', syncHomestay);
+    window.addEventListener('storage', syncHomestay);
+    return () => {
+      window.removeEventListener('ownerActiveHomestayChanged', syncHomestay);
+      window.removeEventListener('storage', syncHomestay);
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    const user = JSON.parse(localStorage.getItem('user') || 'null');
+    if (!activeHomestayId || !user?.token) {
+      setDashboard(null);
+      setDashboardLoading(false);
+      setDashboardError(activeHomestayId ? 'Vui lòng đăng nhập lại để tải số liệu.' : 'Chọn hoặc tạo homestay để xem thống kê.');
+      return () => { cancelled = true; };
+    }
+    const apiBase = import.meta.env.VITE_API_BASE_URL?.replace(/\/auth\/?$/, '') || 'http://localhost:8081/api';
+    setDashboardLoading(true);
+    setDashboardError('');
+    fetch(`${apiBase}/owner/dashboard?homestayId=${encodeURIComponent(activeHomestayId)}&period=${period}`, {
+      headers: { Authorization: `Bearer ${user.token}` },
+    })
+      .then(async response => {
+        if (!response.ok) throw new Error((await response.json().catch(() => ({}))).message || 'Không tải được dữ liệu dashboard.');
+        return response.json();
+      })
+      .then(data => { if (!cancelled) setDashboard(data); })
+      .catch(error => { if (!cancelled) { setDashboard(null); setDashboardError(error.message); } })
+      .finally(() => { if (!cancelled) setDashboardLoading(false); });
+    return () => { cancelled = true; };
+  }, [activeHomestayId, period]);
 
   useEffect(() => {
     const user = JSON.parse(localStorage.getItem('user') || 'null');
@@ -135,24 +166,35 @@ export default function OwnerDashboard() {
     return () => socket.close();
   }, []);
 
-  // Lọc booking theo ngày
+  // Lọc các booking thật theo ngày
+  const bookings = dashboard?.recentBookings || [];
   const filteredBookings = dateFilter
-    ? INITIAL_BOOKINGS.filter(b => {
+    ? bookings.filter(b => {
         const cin  = new Date(b.checkIn);
         const cout = new Date(b.checkOut);
         const sel  = new Date(dateFilter);
         cin.setHours(0,0,0,0); cout.setHours(0,0,0,0); sel.setHours(0,0,0,0);
         return sel >= cin && sel <= cout;
       })
-    : INITIAL_BOOKINGS;
+    : bookings;
 
   const totalPages = Math.ceil(filteredBookings.length / ITEMS_PER_PAGE);
   const pagedBookings = filteredBookings.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
 
-  const upcomingBookings = INITIAL_BOOKINGS.filter(b => b.status === 'Đã đặt' || b.status === 'Đang ở').slice(0, 4);
+  const upcomingBookings = dashboard?.upcomingBookings || [];
 
-  const { percentage, booked, available, total } = OCCUPANCY_DATA;
+  const stats = dashboard?.summary || {};
+  const percentage = Number(stats.occupancyRate) || 0;
+  const booked = Number(stats.bookedRooms) || 0;
+  const available = Number(stats.availableRooms) || 0;
+  const total = Number(stats.totalRooms) || 0;
   const occupancyDeg = Math.round((percentage / 100) * 360);
+  const statCards = [
+    { id: 'total-bookings', label: 'Tổng booking', value: Number(stats.totalBookings) || 0, desc: 'Tổng đơn của cơ sở', icon: 'bi-calendar2-check', color: '#11885f', bg: '#ddf5e9' },
+    { id: 'pending-bookings', label: 'Booking chờ xác nhận', value: Number(stats.pendingBookings) || 0, desc: 'Cần xử lý', icon: 'bi-clock-history', color: '#25a8c7', bg: '#ddf4fa' },
+    { id: 'today-checkin', label: 'Check-in hôm nay', value: Number(stats.checkInsToday) || 0, desc: 'Theo ngày nhận phòng', icon: 'bi-door-open', color: '#7355d9', bg: '#ece6ff' },
+    { id: 'monthly-revenue', label: 'Doanh thu tháng này', value: formatCurrency(stats.monthRevenue), desc: 'Thanh toán thành công', icon: 'bi-cash-stack', color: '#11885f', bg: '#ddf5e9' },
+  ];
 
   return (
     <div className="owner-dashboard-page">
@@ -162,7 +204,7 @@ export default function OwnerDashboard() {
         <div className="dashboard-hero-overlay" />
         <div className="dashboard-hero-content">
           <div className="hero-greeting">
-            <i className="bi bi-hand-wave-fill" /> Xin chào, Nguyễn Văn An!
+            <i className="bi bi-hand-wave-fill" /> Xin chào, {owner.fullName || owner.name || owner.email || 'Chủ homestay'}!
           </div>
           <h1>
             Chào mừng bạn đến với hệ thống<br />
@@ -176,17 +218,13 @@ export default function OwnerDashboard() {
 
         {/* Homestay card (floating right) */}
         <div className="hero-homestay-card">
-          <img
-            src="https://images.unsplash.com/photo-1601918774946-25832a4be0d6?auto=format&fit=crop&w=500&q=80"
-            alt="Nhà Sàn Mộc"
-            className="hero-homestay-image"
-          />
+          {dashboard?.homestay?.img ? <img src={dashboard.homestay.img} alt={dashboard.homestay.name} className="hero-homestay-image" /> : <div className="hero-homestay-image hero-homestay-placeholder"><i className="bi bi-houses-fill" /></div>}
           <div className="hero-homestay-info">
             <span className="hero-homestay-sub">Homestay của bạn</span>
-            <h3 className="hero-homestay-name">Nhà Sàn Mộc</h3>
+            <h3 className="hero-homestay-name">{dashboard?.homestay?.name || 'Chưa chọn cơ sở'}</h3>
             <span className="hero-homestay-loc">
               <i className="bi bi-geo-alt-fill" />
-              Làng Cò, Mai Châu, Hòa Bình
+              {[dashboard?.homestay?.address, dashboard?.homestay?.city].filter(Boolean).join(', ') || 'Chưa cập nhật địa chỉ'}
             </span>
           </div>
         </div>
@@ -197,7 +235,7 @@ export default function OwnerDashboard() {
 
         {/* ── 4 STAT CARDS ──────────────────────────────── */}
         <section className="dashboard-stat-grid">
-          {INITIAL_DASHBOARD_STATS.map(s => (
+          {statCards.map(s => (
             <div key={s.id} className="dashboard-stat-card">
               <div className="stat-icon" style={{ background: s.bg, color: s.color }}>
                 <i className={`bi ${s.icon}`} />
@@ -205,7 +243,7 @@ export default function OwnerDashboard() {
               <div>
                 <span className="stat-label">{s.label}</span>
                 <div className="stat-number">{typeof s.value === 'number' ? s.value.toLocaleString('vi-VN') : s.value}</div>
-                <span className="stat-growth">{s.growth}</span>
+                {s.id === 'monthly-revenue' && <span className="stat-growth">Tháng trước: {formatCurrency(stats.previousMonthRevenue)}</span>}
                 <span className="stat-description">{s.desc}</span>
               </div>
             </div>
@@ -232,7 +270,7 @@ export default function OwnerDashboard() {
                   ))}
                 </select>
               </div>
-              <RevenueChart period={period} />
+              {dashboardLoading ? <p className="dashboard-empty-state">Đang tải doanh thu...</p> : <RevenueChart data={dashboard?.revenue || []} />}
             </section>
 
             {/* Recent Bookings */}
@@ -268,11 +306,11 @@ export default function OwnerDashboard() {
                     </tr>
                   </thead>
                   <tbody>
-                    {pagedBookings.length > 0 ? pagedBookings.map(b => (
+                    {!dashboardLoading && pagedBookings.length > 0 ? pagedBookings.map(b => (
                       <tr key={b.id}>
                         <td>
                           <div className="customer">
-                            <img src={b.avatar} alt={b.customerName} />
+                            {b.avatar ? <img src={b.avatar} alt={b.customerName} /> : <span className="customer-avatar-placeholder"><i className="bi bi-person-fill" /></span>}
                             {b.customerName}
                           </div>
                         </td>
@@ -286,7 +324,7 @@ export default function OwnerDashboard() {
                     )) : (
                       <tr>
                         <td colSpan={5} style={{ textAlign: 'center', padding: '20px', color: '#94A3B8' }}>
-                          Không có đơn nào trong khoảng thời gian này.
+                          {dashboardLoading ? 'Đang tải đơn đặt phòng...' : (dashboardError || 'Chưa có đơn đặt phòng trong khoảng thời gian này.')}
                         </td>
                       </tr>
                     )}
@@ -324,12 +362,12 @@ export default function OwnerDashboard() {
             <section className="dashboard-card">
               <div className="dashboard-card-header">
                 <h2>Lịch đặt phòng sắp tới</h2>
-                <button className="view-all-button">Xem tất cả</button>
+                <Link to="/owner/bookings" className="view-all-button">Xem tất cả</Link>
               </div>
               <div className="upcoming-list">
-                {upcomingBookings.map((b, i) => (
+                {upcomingBookings.map((b) => (
                   <div key={b.id} className="upcoming-item">
-                    <img src={ROOM_IMAGES[i % ROOM_IMAGES.length]} alt={b.room} />
+                    {b.avatar ? <img src={b.avatar} alt={b.room} /> : <span className="customer-avatar-placeholder"><i className="bi bi-door-open" /></span>}
                     <div className="upcoming-info">
                       <strong>{b.customerName}</strong>
                       <span>Phòng {b.room}</span>
@@ -341,6 +379,7 @@ export default function OwnerDashboard() {
                     </div>
                   </div>
                 ))}
+                {!dashboardLoading && upcomingBookings.length === 0 && <p className="dashboard-empty-state">Chưa có lịch nhận phòng sắp tới.</p>}
               </div>
             </section>
 
@@ -348,7 +387,7 @@ export default function OwnerDashboard() {
             <section className="dashboard-card">
               <div className="dashboard-card-header">
                 <h2>Thông báo mới</h2>
-                <button className="view-all-button">Xem tất cả</button>
+              <Link to="/owner/notifications" className="view-all-button">Xem tất cả</Link>
               </div>
               <div className="notification-list">
                 {notifications.map(n => (
@@ -375,22 +414,22 @@ export default function OwnerDashboard() {
             <section className="dashboard-card">
               <h2 className="dashboard-section-title">Thao tác nhanh</h2>
               <div className="quick-actions">
-                <button>
+                <Link to="/owner/rooms">
                   <i className="bi bi-door-open green" />
                   Thêm phòng
-                </button>
-                <button>
+                </Link>
+                <Link to="/owner/services">
                   <i className="bi bi-basket2 blue" />
                   Thêm dịch vụ
-                </button>
-                <button>
+                </Link>
+                <Link to="/owner/discounts">
                   <i className="bi bi-ticket-perforated orange" />
                   Tạo mã giảm giá
-                </button>
-                <button>
+                </Link>
+                <Link to="/owner/missions">
                   <i className="bi bi-calendar-plus blue" />
                   Thêm nhiệm vụ
-                </button>
+                </Link>
               </div>
             </section>
 
@@ -427,15 +466,7 @@ export default function OwnerDashboard() {
             </section>
 
             {/* Bottom image card */}
-            <div className="bottom-image-card">
-              <img
-                src="https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=600&q=80"
-                alt="Homestay"
-              />
-              <div>
-                Cùng phát triển<br />homestay Việt!
-              </div>
-            </div>
+            {dashboardError && <p className="dashboard-empty-state">{dashboardError}</p>}
 
           </aside>
         </div>

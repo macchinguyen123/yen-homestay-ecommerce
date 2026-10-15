@@ -36,20 +36,21 @@ export default function OwnerLayout() {
   // Dynamic Homestays & Switcher State
   const [homestaysList, setHomestaysList] = useState([]);
   const [activeHomestayId, setActiveHomestayId] = useState(null);
+  const [homestaysLoading, setHomestaysLoading] = useState(true);
   const [hsDropdownOpen, setHsDropdownOpen] = useState(false);
   const hsRef = useRef(null);
 
   const fetchHomestays = async () => {
     try {
       const user = authService.getCurrentUser();
-      const ownerId = user?.id || 1;
-      const token = localStorage.getItem('token');
-      let res = await fetch(`http://localhost:8081/api/admin/homestays?ownerId=${ownerId}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (!res.ok) {
-        res = await fetch(`http://localhost:8081/api/public/admin/homestays?ownerId=${ownerId}`);
+      const token = user?.token || JSON.parse(localStorage.getItem('user') || 'null')?.token;
+      if (!token) {
+        setHomestaysList([]);
+        setActiveHomestayId(null);
+        return;
       }
+      const apiBase = import.meta.env.VITE_API_BASE_URL?.replace(/\/auth\/?$/, '') || 'http://localhost:8081/api';
+      const res = await fetch(`${apiBase}/owner/homestays`, { headers: { Authorization: `Bearer ${token}` } });
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data)) {
@@ -71,9 +72,16 @@ export default function OwnerLayout() {
             localStorage.removeItem('ownerActiveHomestayId');
           }
         }
+      } else {
+        setHomestaysList([]);
+        setActiveHomestayId(null);
       }
     } catch (err) {
       console.error('Lỗi nạp danh sách homestay cho sidebar:', err);
+      setHomestaysList([]);
+      setActiveHomestayId(null);
+    } finally {
+      setHomestaysLoading(false);
     }
   };
 
@@ -170,7 +178,7 @@ export default function OwnerLayout() {
           <div className="owner-sidebar-brand-text">
             <span className="owner-sidebar-brand-name">YÊN <span>Host</span></span>
             <span className="owner-sidebar-brand-sub">
-              {currentHomestayObj ? currentHomestayObj.name : 'Nhà Sàn Mộc'}
+              {currentHomestayObj ? currentHomestayObj.name : (homestaysLoading ? 'Đang tải cơ sở...' : 'Chưa có cơ sở')}
             </span>
           </div>
         </div>
@@ -223,6 +231,7 @@ export default function OwnerLayout() {
                   </Link>
                 </div>
                 <div className="owner-hs-switcher-list">
+                  {!homestaysLoading && homestaysList.length === 0 && <div className="owner-hs-item-sub">Tài khoản chưa có homestay.</div>}
                   {homestaysList.map((hs) => {
                     const isSelected = String(hs.id) === String(activeHomestayId);
                     return (
@@ -231,11 +240,7 @@ export default function OwnerLayout() {
                         className={`owner-hs-item ${isSelected ? 'selected' : ''}`}
                         onClick={() => handleSelectHomestay(hs.id)}
                       >
-                        <img
-                          src={hs.img || 'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=800&q=80'}
-                          alt={hs.name}
-                          className="owner-hs-item-img"
-                        />
+                        {hs.img ? <img src={hs.img} alt={hs.name} className="owner-hs-item-img" /> : <div className="owner-hs-item-img owner-hs-item-placeholder"><i className="bi bi-houses-fill" /></div>}
                         <div className="owner-hs-item-info">
                           <div className="owner-hs-item-name">{hs.name}</div>
                           <div className="owner-hs-item-sub">{hs.region || hs.address || 'Việt Nam'}</div>
@@ -337,7 +342,7 @@ export default function OwnerLayout() {
                     <span className="owner-profile-role-badge">Chủ homestay</span>
                   </div>
                   <span className="owner-profile-sub">
-                    {currentHomestayObj ? currentHomestayObj.name : 'Nhà Sàn Mộc'}
+                    {currentHomestayObj ? currentHomestayObj.name : (homestaysLoading ? 'Đang tải cơ sở...' : 'Chưa có cơ sở')}
                   </span>
                 </div>
                 <i className="bi bi-chevron-down owner-profile-chevron" />
