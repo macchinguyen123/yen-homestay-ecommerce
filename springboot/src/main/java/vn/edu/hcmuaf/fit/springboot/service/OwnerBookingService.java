@@ -81,8 +81,7 @@ public class OwnerBookingService {
                 jdbcTemplate.execute("SELECT setval('bookings_booking_id_seq', " + Math.max(maxBId, 1L) + ")");
             } catch (Exception ignored) {}
 
-            // 5. Seed dữ liệu mẫu thực tế nếu CSDL chưa có hoặc số lượng đơn ít
-            seedInitialBookingsIfEmpty();
+            // Không tự tạo booking mẫu trong CSDL khi khởi động ứng dụng.
 
         } catch (Exception e) {
             log.error("Lỗi khi khởi tạo bảng bookings: {}", e.getMessage(), e);
