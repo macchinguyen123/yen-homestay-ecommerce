@@ -37,6 +37,7 @@ export default function OwnerLayout() {
   const [homestaysList, setHomestaysList] = useState([]);
   const [activeHomestayId, setActiveHomestayId] = useState(null);
   const [homestaysLoading, setHomestaysLoading] = useState(true);
+  const [homestaysError, setHomestaysError] = useState('');
   const [hsDropdownOpen, setHsDropdownOpen] = useState(false);
   const hsRef = useRef(null);
 
@@ -47,6 +48,7 @@ export default function OwnerLayout() {
       if (!token) {
         setHomestaysList([]);
         setActiveHomestayId(null);
+        setHomestaysError('Phiên đăng nhập không có token. Vui lòng đăng xuất và đăng nhập lại.');
         return;
       }
       const apiBase = import.meta.env.VITE_API_BASE_URL?.replace(/\/auth\/?$/, '') || 'http://localhost:8081/api';
@@ -54,6 +56,7 @@ export default function OwnerLayout() {
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data)) {
+          setHomestaysError('');
           setHomestaysList(data);
           try {
             localStorage.setItem('owner_homestays', JSON.stringify(data.map(h => ({ id: h.id, name: h.name, city: h.region || h.city || h.address || '' }))));
@@ -67,17 +70,21 @@ export default function OwnerLayout() {
               setActiveHomestayId(data[0].id);
               localStorage.setItem('ownerActiveHomestayId', String(data[0].id));
             }
+            window.dispatchEvent(new Event('ownerHomestaysLoaded'));
           } else {
             setActiveHomestayId(null);
             localStorage.removeItem('ownerActiveHomestayId');
           }
         }
       } else {
+        const body = await res.json().catch(() => ({}));
+        setHomestaysError(body.message || `Không tải được cơ sở (HTTP ${res.status}).`);
         setHomestaysList([]);
         setActiveHomestayId(null);
       }
     } catch (err) {
       console.error('Lỗi nạp danh sách homestay cho sidebar:', err);
+      setHomestaysError('Không thể kết nối máy chủ để tải cơ sở.');
       setHomestaysList([]);
       setActiveHomestayId(null);
     } finally {
@@ -232,6 +239,7 @@ export default function OwnerLayout() {
                 </div>
                 <div className="owner-hs-switcher-list">
                   {!homestaysLoading && homestaysList.length === 0 && <div className="owner-hs-item-sub">Tài khoản chưa có homestay.</div>}
+                  {!homestaysLoading && homestaysError && <div className="owner-hs-item-sub owner-hs-error">{homestaysError}</div>}
                   {homestaysList.map((hs) => {
                     const isSelected = String(hs.id) === String(activeHomestayId);
                     return (

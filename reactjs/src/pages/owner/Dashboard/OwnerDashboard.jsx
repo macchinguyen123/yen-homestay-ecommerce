@@ -119,9 +119,11 @@ export default function OwnerDashboard() {
   useEffect(() => {
     const syncHomestay = () => setActiveHomestayId(localStorage.getItem('ownerActiveHomestayId'));
     window.addEventListener('ownerActiveHomestayChanged', syncHomestay);
+    window.addEventListener('ownerHomestaysLoaded', syncHomestay);
     window.addEventListener('storage', syncHomestay);
     return () => {
       window.removeEventListener('ownerActiveHomestayChanged', syncHomestay);
+      window.removeEventListener('ownerHomestaysLoaded', syncHomestay);
       window.removeEventListener('storage', syncHomestay);
     };
   }, []);

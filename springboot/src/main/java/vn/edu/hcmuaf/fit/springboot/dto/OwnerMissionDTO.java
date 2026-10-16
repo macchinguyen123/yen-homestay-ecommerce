@@ -18,6 +18,7 @@ public class OwnerMissionDTO {
     private String rewardType;
     private String rewardValue;
     private String rewardExtra;
+    private String reward;
     private String from;
     private String to;
     private Boolean needPhoto;

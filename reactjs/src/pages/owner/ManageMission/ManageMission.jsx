@@ -13,13 +13,14 @@ export default function ManageMission() {
     return localStorage.getItem('ownerActiveHomestayId') || '';
   });
   const [stats, setStats] = useState({
-    activeMissions: 4,
+    activeMissions: 0,
     pendingToday: 0,
-    participantGuests: 142,
-    rewardedVouchers: 96,
-    interactionRate: 68
+    participantGuests: 0,
+    rewardedVouchers: 0,
+    interactionRate: 0
   });
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
 
   // Filter state for submissions
   const [filterType, setFilterType] = useState('all');
@@ -73,8 +74,8 @@ export default function ManageMission() {
 
   const [giftForm, setGiftForm] = useState({
     selectedGuests: [],
-    giftItem: 'Voucher giảm 20% lần lưu trú sau',
-    message: 'Cảm ơn bạn đã đồng hành cùng Nhà Sàn Mộc trong tháng 09. Mong sớm được đón bạn quay lại!'
+    giftItem: '',
+    message: ''
   });
 
   // Toast notification
@@ -95,58 +96,48 @@ export default function ManageMission() {
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
-      const hid = selectedHomestayId ? Number(selectedHomestayId) : null;
-
-      // 1. Fetch Homestays
-      try {
-        const hsRes = await fetch('http://localhost:8081/api/public/homestays');
-        if (hsRes.ok) {
-          const hsList = await hsRes.json();
-          if (Array.isArray(hsList) && hsList.length > 0) {
-            setOwnerHomestays(hsList);
-            if (!selectedHomestayId) {
-              const saved = localStorage.getItem('ownerActiveHomestayId');
-              if (saved) {
-                setSelectedHomestayId(saved);
-              } else {
-                setSelectedHomestayId(String(hsList[0].id));
-                localStorage.setItem('ownerActiveHomestayId', String(hsList[0].id));
-              }
-            }
-          }
-        }
-      } catch (err) {
-        console.warn('Lỗi fetch homestays:', err);
+      setLoadError('');
+      const user = JSON.parse(localStorage.getItem('user') || 'null');
+      if (!user?.token) throw new Error('Phiên đăng nhập không hợp lệ. Vui lòng đăng nhập lại.');
+      const apiBase = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8081/api/auth').replace(/\/auth\/?$/, '');
+      const hsRes = await fetch(`${apiBase}/owner/homestays`, { headers: { Authorization: `Bearer ${user.token}` } });
+      if (!hsRes.ok) throw new Error('Không tải được danh sách cơ sở của chủ homestay.');
+      const hsList = await hsRes.json();
+      const ownedHomestays = Array.isArray(hsList) ? hsList : [];
+      setOwnerHomestays(ownedHomestays);
+      let currentId = selectedHomestayId;
+      if (!ownedHomestays.some((hs) => String(hs.id) === String(currentId))) {
+        currentId = ownedHomestays[0] ? String(ownedHomestays[0].id) : '';
+        if (currentId) localStorage.setItem('ownerActiveHomestayId', currentId);
+        else localStorage.removeItem('ownerActiveHomestayId');
+        setSelectedHomestayId(currentId);
+        window.dispatchEvent(new Event('ownerHomestaysLoaded'));
       }
+      if (!currentId) {
+        setMissions([]); setSubmissions([]); setStats({ activeMissions: 0, pendingToday: 0, participantGuests: 0, rewardedVouchers: 0, interactionRate: 0 }); setTopGuests([]); setRewardStock([]);
+        return;
+      }
+      const hid = Number(currentId);
 
       // 2. Fetch Missions, Submissions, Stats
-      const [missionsData, submissionsData, statsData, topGuestsData, stockData] =
+      const [missionsData, submissionsData, statsData, stockData] =
         await Promise.all([
           ownerMissionService.getMissions(hid),
           ownerMissionService.getSubmissions(hid),
           ownerMissionService.getStats(hid),
-          ownerMissionService.getTopGuests(hid),
           ownerMissionService.getRewardStock(hid)
         ]);
 
-      if (missionsData && missionsData.length > 0) {
-        setMissions(missionsData);
-      }
-      if (submissionsData && submissionsData.length > 0) {
-        setSubmissions(submissionsData);
-      }
-      if (statsData) {
-        setStats(statsData);
-      }
-      if (topGuestsData && topGuestsData.length > 0) {
-        setTopGuests(topGuestsData);
-      }
-      if (stockData && stockData.length > 0) {
-        setRewardStock(stockData);
-      }
+      setMissions(Array.isArray(missionsData) ? missionsData : []);
+      setSubmissions(Array.isArray(submissionsData) ? submissionsData : []);
+      setStats(statsData || { activeMissions: 0, pendingToday: 0, participantGuests: 0, rewardedVouchers: 0, interactionRate: 0 });
+      setTopGuests(Array.isArray(statsData?.topGuests) ? statsData.topGuests : []);
+      setRewardStock(Array.isArray(stockData) ? stockData : []);
     } catch (err) {
       console.error('Lỗi nạp dữ liệu nhiệm vụ:', err);
-      showToast('Không thể kết nối đến máy chủ CSDL', 'error');
+      setLoadError(err.message || 'Không thể tải dữ liệu nhiệm vụ từ máy chủ.');
+      setOwnerHomestays([]); setMissions([]); setSubmissions([]); setTopGuests([]); setRewardStock([]);
+      setStats({ activeMissions: 0, pendingToday: 0, participantGuests: 0, rewardedVouchers: 0, interactionRate: 0 });
     } finally {
       setLoading(false);
     }
@@ -156,10 +147,21 @@ export default function ManageMission() {
     loadData();
   }, [loadData]);
 
+  useEffect(() => {
+    const syncHomestay = () => setSelectedHomestayId(localStorage.getItem('ownerActiveHomestayId') || '');
+    window.addEventListener('ownerActiveHomestayChanged', syncHomestay);
+    window.addEventListener('ownerHomestaysLoaded', syncHomestay);
+    return () => {
+      window.removeEventListener('ownerActiveHomestayChanged', syncHomestay);
+      window.removeEventListener('ownerHomestaysLoaded', syncHomestay);
+    };
+  }, []);
+
   const handleHomestayChange = (e) => {
     const newId = e.target.value;
     setSelectedHomestayId(newId);
     localStorage.setItem('ownerActiveHomestayId', newId);
+    window.dispatchEvent(new Event('ownerActiveHomestayChanged'));
     showToast(`Đã chuyển sang homestay #${newId}`, 'success');
   };
 
@@ -191,6 +193,16 @@ export default function ManageMission() {
   // Pending submissions count
   const pendingSubmissionsCount = useMemo(() => {
     return submissions.filter((s) => s.status === 'pending' || !s.status).length;
+  }, [submissions]);
+
+  const missionBreakdown = useMemo(() => {
+    const counts = submissions.reduce((acc, submission) => {
+      const title = submission.task || 'Chưa gắn nhiệm vụ';
+      acc.set(title, (acc.get(title) || 0) + 1);
+      return acc;
+    }, new Map());
+    const total = submissions.length;
+    return [...counts.entries()].map(([title, count]) => ({ title, count, percentage: total ? Math.round(count * 100 / total) : 0 }));
   }, [submissions]);
 
   // ── Action Handlers ─────────────────────────────────────────────────
@@ -240,39 +252,33 @@ export default function ManageMission() {
     try {
       const payload = {
         ...missionForm,
-        homestayId: selectedHomestayId ? Number(selectedHomestayId) : null,
-        reward:
-          missionForm.rewardType === 'voucher-percent'
-            ? `Voucher ${missionForm.rewardValue}%`
-            : missionForm.rewardType === 'voucher-amount'
-            ? `Voucher ${Number(missionForm.rewardValue).toLocaleString('vi-VN')}₫`
-            : missionForm.rewardValue
+        homestayId: selectedHomestayId ? Number(selectedHomestayId) : null
       };
 
       if (editingMission) {
-        await ownerMissionService.updateMission(editingMission.id, payload);
+        const updated = await ownerMissionService.updateMission(editingMission.id, payload);
         setMissions((prev) =>
-          prev.map((m) => (m.id === editingMission.id ? { ...m, ...payload } : m))
+          prev.map((m) => (m.id === editingMission.id ? updated : m))
         );
         showToast('Đã cập nhật nhiệm vụ thành công!', 'success');
       } else {
         const created = await ownerMissionService.createMission(payload);
-        setMissions((prev) => [created || { ...payload, id: Date.now() }, ...prev]);
+        setMissions((prev) => [created, ...prev]);
         showToast('Đã tạo nhiệm vụ mới thành công!', 'success');
       }
       closeModal();
     } catch (err) {
       console.error(err);
-      showToast('Có lỗi xảy ra khi lưu nhiệm vụ', 'error');
+      showToast(err.message || 'Có lỗi xảy ra khi lưu nhiệm vụ', 'error');
     }
   };
 
   const handleToggleMissionStatus = async (mission) => {
     const nextStatus = mission.status === 'active' ? 'paused' : 'active';
     try {
-      await ownerMissionService.toggleMissionStatus(mission.id, nextStatus);
+      const updated = await ownerMissionService.toggleMissionStatus(mission.id);
       setMissions((prev) =>
-        prev.map((m) => (m.id === mission.id ? { ...m, status: nextStatus } : m))
+        prev.map((m) => (m.id === mission.id ? updated : m))
       );
       showToast(
         `Đã ${nextStatus === 'active' ? 'kích hoạt' : 'tạm dừng'} nhiệm vụ "${mission.title}"`,
@@ -280,9 +286,7 @@ export default function ManageMission() {
       );
     } catch (err) {
       console.error(err);
-      setMissions((prev) =>
-        prev.map((m) => (m.id === mission.id ? { ...m, status: nextStatus } : m))
-      );
+      showToast(err.message || 'Không thể cập nhật trạng thái nhiệm vụ.', 'error');
     }
   };
 
@@ -294,8 +298,7 @@ export default function ManageMission() {
       showToast('Đã xóa nhiệm vụ thành công!', 'success');
     } catch (err) {
       console.error(err);
-      setMissions((prev) => prev.filter((m) => m.id !== missionId));
-      showToast('Đã xóa nhiệm vụ!', 'success');
+      showToast(err.message || 'Không thể xóa nhiệm vụ.', 'error');
     }
   };
 
@@ -308,7 +311,7 @@ export default function ManageMission() {
   const handleOpenApprove = (sub) => {
     setSelectedSubmission(sub);
     setApproveForm({
-      reward: sub.reward || 'Voucher 15% + 1 túi trà gạo lứt',
+      reward: sub.reward || '',
       note: 'Cảm ơn bạn đã trải nghiệm và chia sẻ khoảnh khắc tuyệt vời tại homestay!',
       notify: true,
       featurePhoto: false
@@ -347,11 +350,7 @@ export default function ManageMission() {
       closeModal();
     } catch (err) {
       console.error(err);
-      setSubmissions((prev) =>
-        prev.map((s) => (s.id === selectedSubmission.id ? { ...s, status: 'approved' } : s))
-      );
-      showToast(`Đã phê duyệt bài nộp của ${selectedSubmission.guest}!`, 'success');
-      closeModal();
+      showToast(err.message || 'Không thể duyệt bài nộp.', 'error');
     }
   };
 
@@ -360,9 +359,7 @@ export default function ManageMission() {
     if (!selectedSubmission) return;
     try {
       await ownerMissionService.rejectSubmission(selectedSubmission.id, rejectForm);
-      setSubmissions((prev) =>
-        prev.map((s) => (s.id === selectedSubmission.id ? { ...s, status: 'rejected' } : s))
-      );
+      showToast(err.message || 'Không thể từ chối bài nộp.', 'error');
       showToast(`Đã từ chối bài nộp của ${selectedSubmission.guest}`, 'info');
       closeModal();
     } catch (err) {
@@ -379,9 +376,7 @@ export default function ManageMission() {
     if (!selectedSubmission) return;
     try {
       await ownerMissionService.requestRetakeSubmission(selectedSubmission.id, retakeForm);
-      setSubmissions((prev) =>
-        prev.map((s) => (s.id === selectedSubmission.id ? { ...s, status: 'retake' } : s))
-      );
+      showToast(err.message || 'Không thể gửi yêu cầu chụp lại.', 'error');
       showToast(`Đã gửi yêu cầu chụp lại tới ${selectedSubmission.guest}`, 'info');
       closeModal();
     } catch (err) {
@@ -397,7 +392,7 @@ export default function ManageMission() {
   const handleAddStock = () => {
     if (!newStockItem.name.trim()) return;
     const newItem = {
-      id: Date.now(),
+      id: -Date.now(),
       name: newStockItem.name,
       type: newStockItem.type,
       qty: Number(newStockItem.qty) || 1
@@ -412,29 +407,30 @@ export default function ManageMission() {
 
   const handleSaveStock = async () => {
     try {
-      await ownerMissionService.saveRewardStock(
+      const saved = await ownerMissionService.saveRewardStock(
         selectedHomestayId ? Number(selectedHomestayId) : null,
         rewardStock
       );
+      setRewardStock(Array.isArray(saved) ? saved : []);
       showToast('Đã lưu kho phần thưởng thành công!', 'success');
       closeModal();
     } catch (err) {
       console.error(err);
-      showToast('Đã lưu kho phần thưởng!', 'success');
-      closeModal();
+      showToast(err.message || 'Không thể lưu kho phần thưởng.', 'error');
     }
   };
 
   // Gift actions
   const handleSendGift = () => {
-    showToast(`Đã gửi quà tri ân đến ${giftForm.selectedGuests.length || topGuests.length} du khách!`, 'success');
-    closeModal();
+    ownerMissionService.sendGift({ ...giftForm, homestayId: Number(selectedHomestayId) })
+      .then((result) => { showToast(result.message || 'Đã gửi thông báo quà tặng.', 'success'); closeModal(); })
+      .catch((err) => showToast(err.message || 'Không thể gửi quà tri ân.', 'error'));
   };
 
   // Active homestay title
   const activeHomestayName = useMemo(() => {
     const found = ownerHomestays.find((h) => String(h.id) === String(selectedHomestayId));
-    return found ? found.name : 'Nhà Sàn Mộc • Mai Châu';
+    return found ? found.name : 'Chưa chọn cơ sở';
   }, [ownerHomestays, selectedHomestayId]);
 
   return (
@@ -488,6 +484,8 @@ export default function ManageMission() {
           </div>
         </div>
 
+        {loadError && <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{loadError}</div>}
+
         {/* ── 4 KPI CARDS (METRIC HIGHLIGHTS) ────────────────────────── */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-space-md">
           {/* KPI 1 */}
@@ -501,7 +499,7 @@ export default function ManageMission() {
               </span>
               <div className="flex items-baseline gap-space-xs mt-0.5">
                 <span className="font-display-lg text-display-lg text-primary font-bold">
-                  {String(activeMissionsCount || stats.activeMissions || 4).padStart(2, '0')}
+                  {String(activeMissionsCount).padStart(2, '0')}
                 </span>
               </div>
             </div>
@@ -518,7 +516,7 @@ export default function ManageMission() {
               </span>
               <div className="flex items-baseline gap-space-xs mt-0.5">
                 <span className="font-display-lg text-display-lg text-on-surface font-bold">
-                  {String(pendingSubmissionsCount || stats.pendingToday || 8).padStart(2, '0')}
+                  {String(stats.pendingToday ?? pendingSubmissionsCount).padStart(2, '0')}
                 </span>
               </div>
             </div>
@@ -535,7 +533,7 @@ export default function ManageMission() {
               </span>
               <div className="flex items-baseline gap-space-xs mt-0.5">
                 <span className="font-display-lg text-display-lg text-primary font-bold">
-                  {stats.participantGuests || 142}
+                  {stats.participantGuests ?? 0}
                 </span>
               </div>
             </div>
@@ -552,7 +550,7 @@ export default function ManageMission() {
               </span>
               <div className="flex items-baseline gap-space-xs mt-0.5">
                 <span className="font-display-lg text-display-lg text-primary font-bold">
-                  {stats.rewardedVouchers || 96}
+                  {stats.rewardedVouchers ?? 0}
                 </span>
               </div>
             </div>
@@ -616,25 +614,18 @@ export default function ManageMission() {
                       {/* Guest Header */}
                       <div className="flex items-start justify-between gap-space-sm">
                         <div className="flex items-center gap-space-sm">
-                          <img
-                            className="w-11 h-11 rounded-full object-cover shadow-sm"
-                            alt={sub.guest}
-                            src={
-                              sub.avatar ||
-                              'https://lh3.googleusercontent.com/aida-public/AB6AXuDtBD2J0dMb6ui-jzFd-s3WAOrIcULKNiD9XtfnGxQMKSTx355Pf1EjERQXBHDwHrcQ0Rorvh9B6EK8HB6KmTt_y_Vmq08HXH1mv79H5Vu9HA98ZemUl4gMQKLX8UE6D4XyoH4aj98giLTIomA-cZpFPmBtgmFxgoZt0ZKA5x-4LkgkGP-hJ2DyiPrZOmmqIdCcd6okDRUACpFaDNJU99_AMzc9ReyPXk77zeU4Z5vnxIG6w4_nVg8'
-                            }
-                          />
+                          {sub.avatar ? <img className="w-11 h-11 rounded-full object-cover shadow-sm" alt={sub.guest} src={sub.avatar} /> : <div className="w-11 h-11 rounded-full bg-surface-container-high flex items-center justify-center"><span className="material-symbols-outlined">person</span></div>}
                           <div className="flex flex-col">
                             <div className="flex items-center gap-space-xs">
                               <span className="font-label-lg text-label-lg text-on-surface font-bold">
                                 {sub.guest}
                               </span>
                               <span className="px-2 py-0.5 rounded-full bg-secondary-container text-on-secondary-container font-label-sm text-[10px] font-bold">
-                                {sub.room || 'Phòng Garden View'}
+                                {sub.room || 'Chưa chỉ định phòng'}
                               </span>
                             </div>
                             <span className="font-body-sm text-body-sm text-on-surface-variant">
-                              Nộp lúc {sub.time || '09:12 • 17/09/2024'}
+                              Nộp lúc {sub.time || 'Chưa cập nhật'}
                             </span>
                           </div>
                         </div>
@@ -673,16 +664,9 @@ export default function ManageMission() {
                       {/* Media Grid */}
                       <div className="grid grid-cols-1 sm:grid-cols-12 gap-space-md bg-surface-container-low/40 p-space-sm rounded-lg border border-surface-container/60">
                         <div className="sm:col-span-5 overflow-hidden rounded-lg relative aspect-[4/3] sm:aspect-auto sm:h-44 shadow-sm bg-surface-container-highest">
-                          <img
-                            className="w-full h-full object-cover"
-                            alt="Ảnh nộp"
-                            src={
-                              sub.photo ||
-                              'https://lh3.googleusercontent.com/aida-public/AB6AXuAwxRCSb8O0TEvP8qWKkyBWYmOPRU7CAe-lU0L0LMkQVLCWwT-WPYALrACR8Db8vw3_4jArbeXHHO_9d76yf7xm93aRwrudcovcbdkH-3EQrrGzyVg0iJ-Mvu69r8SV1GpbtRs1onXyn8r2zhoo3AUha2-9zCn4Myw7IYvyDRyt2uYN6sGiBB77aieKV_8H49oOFbrdmjYwsetb-x5cKFX4PCfWM-yOuk8sjzC85RU_W3_1EPQSU6E'
-                            }
-                          />
+                          {sub.image ? <img className="w-full h-full object-cover" alt="Ảnh nộp" src={sub.image} /> : <div className="w-full h-full min-h-40 flex flex-col items-center justify-center text-on-surface-variant"><span className="material-symbols-outlined">image_not_supported</span><span>Chưa có ảnh bài nộp</span></div>}
                           <div className="absolute bottom-2 left-2 px-2 py-0.5 rounded bg-primary/80 text-on-primary font-label-sm text-[10px] flex items-center gap-1 font-semibold">
-                            <span className="material-symbols-outlined text-[12px]">photo_camera</span> 1 ảnh đính kèm
+                            <span className="material-symbols-outlined text-[12px]">photo_camera</span> {sub.photos || 0} ảnh đính kèm
                           </div>
                         </div>
 
@@ -692,7 +676,7 @@ export default function ManageMission() {
                               Cảm nhận từ khách hàng
                             </span>
                             <p className="font-body-md text-body-md text-on-surface italic bg-surface-container-lowest p-3 rounded-lg shadow-sm border border-surface-container">
-                              “{sub.review || 'Không gian nhà sàn Mai Châu quá tuyệt vời, cô chủ chỉ cách dệt vải rất tận tình! Mùa lúa chín này chắc chắn nhóm mình sẽ rủ bạn bè quay lại.'}”
+                              {sub.review ? `“${sub.review}”` : 'Khách chưa để lại nhận xét.'}
                             </p>
                           </div>
 
@@ -704,7 +688,7 @@ export default function ManageMission() {
                                   Phần thưởng dự kiến
                                 </span>
                                 <span className="font-label-lg text-label-lg font-bold text-primary">
-                                  {sub.reward || 'Voucher 15% + 1 túi trà gạo lứt Mộc Châu'}
+                                  {sub.reward || 'Chưa cấu hình phần thưởng'}
                                 </span>
                               </div>
                             </div>
@@ -779,6 +763,7 @@ export default function ManageMission() {
 
               {/* Danh sách nhiệm vụ bên phải */}
               <div className="flex flex-col gap-space-xs">
+                {!missions.length && <p className="py-3 text-center text-sm text-on-surface-variant">{loading ? 'Đang tải nhiệm vụ...' : 'Cơ sở này chưa có nhiệm vụ nào.'}</p>}
                 {missions.map((m) => {
                   const isActive = m.status === 'active';
                   return (
@@ -801,7 +786,7 @@ export default function ManageMission() {
                             {m.title}
                           </span>
                           <span className="font-body-sm text-body-sm text-secondary font-medium">
-                            {m.reward || 'Voucher 10%'}
+                            {m.reward || 'Chưa cấu hình phần thưởng'}
                           </span>
                         </div>
                       </div>
@@ -859,16 +844,16 @@ export default function ManageMission() {
                       d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
                       fill="none"
                       stroke="currentColor"
-                      strokeDasharray="82, 100"
+                      strokeDasharray={`${Number(stats.interactionRate || 0)}, 100`}
                       strokeWidth="3.5"
                     />
                   </svg>
                   <div className="flex flex-col">
                     <span className="font-label-lg text-label-lg text-primary font-bold">
-                      82% Mục tiêu tương tác tháng
+                      {Number(stats.interactionRate || 0)}% khách đặt phòng đã tham gia
                     </span>
                     <span className="font-body-sm text-body-sm text-on-surface-variant">
-                      96/120 du khách đã nhận phần thưởng
+                      {stats.participantGuests ?? 0} du khách đã gửi bài nộp
                     </span>
                   </div>
                 </div>
@@ -892,7 +877,7 @@ export default function ManageMission() {
                   </h3>
                 </div>
                 <span className="font-label-sm text-label-sm text-on-surface-variant font-semibold">
-                  Tháng 09/2024
+                  Dựa trên bài nộp đã duyệt
                 </span>
               </div>
 
@@ -914,20 +899,13 @@ export default function ManageMission() {
                       >
                         {idx + 1}
                       </div>
-                      <img
-                        className="w-9 h-9 rounded-full object-cover shadow-sm"
-                        alt={guest.name}
-                        src={
-                          guest.avatar ||
-                          'https://lh3.googleusercontent.com/aida-public/AB6AXuBM2p3xVWdv84AVmzpSgASDhrTJWBslvj9gqrIocFGTSa80ihcG4lcehUXD1yur0QqYvgSIR0sfQCQbHDpnxmX1B0NbaARMi116qNnbisQ0_sqa7JgXnyQMhoHPY3Iaa6L9k-FDayYklK7Ks29G59GDVm9uzDeX5qG0840EGEfjLUks1387sY1oCLzpTjUC20f3HXCH8CWYiCNJN_ZJn-tL-9zKgl6nGoxmg9otBPZcuWuo7KO-gIs'
-                        }
-                      />
+                      {guest.avatar ? <img className="w-9 h-9 rounded-full object-cover shadow-sm" alt={guest.name} src={guest.avatar} /> : <div className="w-9 h-9 rounded-full bg-surface-container-high flex items-center justify-center"><span className="material-symbols-outlined">person</span></div>}
                       <div className="flex flex-col">
                         <span className="font-label-md text-label-md text-on-surface font-bold">
                           {guest.name}
                         </span>
                         <span className="font-body-sm text-body-sm text-on-surface-variant">
-                          {guest.missionsCount || 5 - idx} nhiệm vụ đã hoàn thành
+                          {guest.completed || 0} nhiệm vụ đã hoàn thành
                         </span>
                       </div>
                     </div>
@@ -936,11 +914,11 @@ export default function ManageMission() {
               </div>
 
               <button
-                onClick={() => setActiveModal('gift')}
+                onClick={() => { setGiftForm((prev) => ({ ...prev, selectedGuests: topGuests.map((guest) => String(guest.id)) })); setActiveModal('gift'); }}
                 type="button"
                 className="w-full mt-2 py-2 rounded-lg bg-surface-container text-primary hover:bg-surface-container-high font-label-md text-label-md transition-colors text-center font-bold"
               >
-                Gửi quà tri ân tháng 09
+                Gửi quà tri ân
               </button>
             </div>
           </div>
@@ -1272,7 +1250,7 @@ export default function ManageMission() {
                 </div>
                 <div className="mission-detail-item">
                   <span className="mission-detail-label">Phòng</span>
-                  <span className="mission-detail-value">{selectedSubmission.room || 'Phòng Garden View'}</span>
+                  <span className="mission-detail-value">{selectedSubmission.room || 'Chưa chỉ định phòng'}</span>
                 </div>
                 <div className="mission-detail-item">
                   <span className="mission-detail-label">Thời gian nộp</span>
@@ -1643,7 +1621,7 @@ export default function ManageMission() {
             <div className="mission-modal-header">
               <div>
                 <h2 className="font-headline-md text-headline-md text-on-surface font-bold">
-                  Mục tiêu tương tác tháng 09
+                  Thống kê bài nộp nhiệm vụ
                 </h2>
                 <p className="font-body-sm text-body-sm text-on-surface-variant mt-1">
                   Thống kê tỷ lệ du khách tham gia và hoàn thành thử thách.
@@ -1656,45 +1634,16 @@ export default function ManageMission() {
 
             <div className="mission-form">
               <div className="mission-stats-list">
-                <div className="mission-stats-row">
-                  <div className="mission-stats-head">
-                    <span>Mặc trang phục dân tộc Thái</span>
-                    <span>42 bài nộp (100%)</span>
+                {missionBreakdown.map((item) => (
+                  <div className="mission-stats-row" key={item.title}>
+                    <div className="mission-stats-head">
+                      <span>{item.title}</span>
+                      <span>{item.count} bài nộp ({item.percentage}%)</span>
+                    </div>
+                    <div className="mission-stats-bar"><i style={{ width: `${item.percentage}%` }} /></div>
                   </div>
-                  <div className="mission-stats-bar">
-                    <i style={{ width: '100%' }}></i>
-                  </div>
-                </div>
-
-                <div className="mission-stats-row">
-                  <div className="mission-stats-head">
-                    <span>Check-in bình minh Mai Châu</span>
-                    <span>28 bài nộp (70%)</span>
-                  </div>
-                  <div className="mission-stats-bar">
-                    <i style={{ width: '70%' }}></i>
-                  </div>
-                </div>
-
-                <div className="mission-stats-row">
-                  <div className="mission-stats-head">
-                    <span>Thưởng thức cơm lam nướng</span>
-                    <span>16 bài nộp (45%)</span>
-                  </div>
-                  <div className="mission-stats-bar">
-                    <i style={{ width: '45%' }}></i>
-                  </div>
-                </div>
-
-                <div className="mission-stats-row">
-                  <div className="mission-stats-head">
-                    <span>Đánh giá 5 sao trên bản đồ</span>
-                    <span>10 bài nộp (25%)</span>
-                  </div>
-                  <div className="mission-stats-bar">
-                    <i style={{ width: '25%' }}></i>
-                  </div>
-                </div>
+                ))}
+                {!missionBreakdown.length && <p>Chưa có bài nộp trong cơ sở này.</p>}
               </div>
             </div>
 
@@ -1714,7 +1663,7 @@ export default function ManageMission() {
             <div className="mission-modal-header">
               <div>
                 <h2 className="font-headline-md text-headline-md text-on-surface font-bold">
-                  Gửi quà tri ân tháng 09
+                  Gửi quà tri ân
                 </h2>
                 <p className="font-body-sm text-body-sm text-on-surface-variant mt-1">
                   Chọn du khách tích cực để trao tặng voucher hoặc phần quà đặc biệt.
@@ -1733,23 +1682,23 @@ export default function ManageMission() {
                     <label key={g.id} className="mission-gift-item">
                       <input
                         type="checkbox"
-                        defaultChecked
+                        checked={giftForm.selectedGuests.includes(String(g.id))}
                         onChange={(e) => {
                           if (e.target.checked) {
                             setGiftForm((prev) => ({
                               ...prev,
-                              selectedGuests: [...prev.selectedGuests, g.id]
+                              selectedGuests: [...prev.selectedGuests, String(g.id)]
                             }));
                           } else {
                             setGiftForm((prev) => ({
                               ...prev,
-                              selectedGuests: prev.selectedGuests.filter((id) => id !== g.id)
+                              selectedGuests: prev.selectedGuests.filter((id) => id !== String(g.id))
                             }));
                           }
                         }}
                       />
                       <span>{g.name}</span>
-                      <small>{g.missionsCount || 5} nhiệm vụ</small>
+                      <small>{g.completed || 0} nhiệm vụ</small>
                     </label>
                   ))}
                 </div>

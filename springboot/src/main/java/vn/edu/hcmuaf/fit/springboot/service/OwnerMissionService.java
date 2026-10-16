@@ -14,11 +14,9 @@ import vn.edu.hcmuaf.fit.springboot.dto.OwnerMissionStatsDTO.TopGuestDTO;
 import vn.edu.hcmuaf.fit.springboot.dto.OwnerSubmissionDTO;
 import vn.edu.hcmuaf.fit.springboot.model.GuestTask;
 import vn.edu.hcmuaf.fit.springboot.model.GuestTaskSubmission;
-import vn.edu.hcmuaf.fit.springboot.model.Homestay;
 import vn.edu.hcmuaf.fit.springboot.model.RewardStock;
 import vn.edu.hcmuaf.fit.springboot.repository.GuestTaskRepository;
 import vn.edu.hcmuaf.fit.springboot.repository.GuestTaskSubmissionRepository;
-import vn.edu.hcmuaf.fit.springboot.repository.HomestayRepository;
 import vn.edu.hcmuaf.fit.springboot.repository.RewardStockRepository;
 
 import java.time.LocalDateTime;
@@ -35,7 +33,7 @@ public class OwnerMissionService {
     private final GuestTaskRepository guestTaskRepository;
     private final GuestTaskSubmissionRepository submissionRepository;
     private final RewardStockRepository rewardStockRepository;
-    private final HomestayRepository homestayRepository;
+    private final NotificationService notificationService;
 
     private static final DateTimeFormatter DATETIME_FMT = DateTimeFormatter.ofPattern("HH:mm • dd/MM/yyyy");
 
@@ -90,8 +88,7 @@ public class OwnerMissionService {
                     "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP" +
                     ")");
 
-            // 4. Seed dữ liệu mẫu nếu rỗng
-            seedInitialDataIfEmpty();
+            // Không tự chèn dữ liệu mẫu khi khởi động.
 
             log.info("Khởi tạo cấu trúc bảng Missions & Submissions thành công!");
         } catch (Exception e) {
@@ -103,159 +100,7 @@ public class OwnerMissionService {
         if (homestayId != null && homestayId > 0) {
             return homestayId;
         }
-        // Tìm homestay đầu tiên có task hoặc homestay đầu tiên trong hệ thống
-        Long hsWithTasks = guestTaskRepository.findAll().stream()
-                .map(GuestTask::getHomestayId)
-                .filter(id -> id != null && id > 0)
-                .findFirst()
-                .orElse(null);
-        if (hsWithTasks != null) {
-            return hsWithTasks;
-        }
-        return homestayRepository.findAll().stream()
-                .findFirst()
-                .map(Homestay::getId)
-                .orElse(1L);
-    }
-
-    private void seedInitialDataIfEmpty() {
-        Long defaultHomestayId = resolveHomestayId(null);
-
-        // Kiểm tra xem homestay mặc định hoặc hệ thống đã có task chuẩn chưa
-        boolean hasRichTasks = guestTaskRepository.findAll().stream()
-                .anyMatch(t -> t.getIcon() != null && !t.getIcon().isBlank() && !"award_star".equals(t.getIcon()));
-
-        if (!hasRichTasks) {
-            log.info("Chưa có nhiệm vụ chuẩn đầy đủ thuộc tính, tiến hành seed 4 nhiệm vụ chuẩn cho homestay {}...", defaultHomestayId);
-            List<GuestTask> sampleTasks = List.of(
-                    GuestTask.builder()
-                            .homestayId(defaultHomestayId)
-                            .title("Check-in bình minh thung lũng Mai Châu")
-                            .description("Chụp ảnh góc ban công hoặc sân vườn lúc sương sớm, gắn thẻ định vị Nhà Sàn Mộc kèm hashtag #NhaSanMoc.")
-                            .icon("wb_sunny")
-                            .rewardType("voucher-percent")
-                            .rewardValue("10")
-                            .rewardExtra("")
-                            .fromDate("2026-09-01")
-                            .toDate("2026-10-31")
-                            .needPhoto(true)
-                            .autoApprove(false)
-                            .givenCount(48)
-                            .status("ACTIVE")
-                            .build(),
-                    GuestTask.builder()
-                            .homestayId(defaultHomestayId)
-                            .title("Làm cơm lam cùng nghệ nhân Làng Cố")
-                            .description("Trải nghiệm tự tay cho gạo nếp nương vào ống tre và nướng bên bếp lửa hồng cùng đồng bào dân tộc Thái.")
-                            .icon("outdoor_grill")
-                            .rewardType("points")
-                            .rewardValue("50")
-                            .rewardExtra("Quà nông sản lưu niệm")
-                            .fromDate("2026-09-01")
-                            .toDate("2026-12-31")
-                            .needPhoto(true)
-                            .autoApprove(false)
-                            .givenCount(32)
-                            .status("ACTIVE")
-                            .build(),
-                    GuestTask.builder()
-                            .homestayId(defaultHomestayId)
-                            .title("Đánh giá 5 sao kèm 3 ảnh thực tế")
-                            .description("Để lại nhận xét chân thực trên Google Maps hoặc nền tảng Booking về trải nghiệm bình yên tại Nhà Sàn Mộc.")
-                            .icon("star")
-                            .rewardType("voucher-amount")
-                            .rewardValue("100000")
-                            .rewardExtra("")
-                            .fromDate("2026-09-01")
-                            .toDate("2026-12-31")
-                            .needPhoto(true)
-                            .autoApprove(false)
-                            .givenCount(32)
-                            .status("ACTIVE")
-                            .build(),
-                    GuestTask.builder()
-                            .homestayId(defaultHomestayId)
-                            .title("Đánh giá 5 sao kèm 3 ảnh thực tế")
-                            .description("Để lại nhận xét chân thực trên Google Maps hoặc nền tảng Booking về trải nghiệm bình yên tại Nhà Sàn Mộc.")
-                            .icon("star")
-                            .rewardType("voucher-amount")
-                            .rewardValue("100000")
-                            .rewardExtra("")
-                            .fromDate("2026-09-01")
-                            .toDate("2026-12-31")
-                            .needPhoto(true)
-                            .autoApprove(false)
-                            .givenCount(16)
-                            .status("ACTIVE")
-                            .build(),
-                    GuestTask.builder()
-                            .homestayId(defaultHomestayId)
-                            .title("Trekking khám phá bản Lác 2 mùa lúa chín")
-                            .description("Ghi lại 3 khoảnh khắc đẹp trên cung đường ruộng bậc thang và chia sẻ vị trí bản Lác 2.")
-                            .icon("hiking")
-                            .rewardType("gift")
-                            .rewardValue("Khăn thổ cẩm thủ công")
-                            .rewardExtra("")
-                            .fromDate("2026-09-01")
-                            .toDate("2026-11-30")
-                            .needPhoto(true)
-                            .autoApprove(false)
-                            .givenCount(24)
-                            .status("ACTIVE")
-                            .build()
-            );
-            guestTaskRepository.saveAll(sampleTasks);
-        }
-
-        // Seed submissions nếu trống
-        if (submissionRepository.count() == 0) {
-            log.info("Bảng guest_task_submissions đang rỗng, tiến hành seed 2 bài nộp chờ duyệt...");
-            List<GuestTaskSubmission> sampleSubmissions = List.of(
-                    GuestTaskSubmission.builder()
-                            .submissionCode("S001")
-                            .homestayId(defaultHomestayId)
-                            .guestName("Trần Thị Hương")
-                            .roomName("Phòng Garden View")
-                            .taskTitle("Mặc trang phục dân tộc Thái chụp ảnh bên khung dệt thổ cẩm Nhà Sàn Mộc")
-                            .taskType("costume")
-                            .reviewText("Không gian nhà sàn Mai Châu quá tuyệt vời, cô chủ chỉ cách dệt vải rất tận tình! Mùa lúa chín này chắc chắn nhóm mình sẽ rủ bạn bè quay lại.")
-                            .rewardText("Voucher 15% + 1 túi trà gạo lứt Mộc Châu")
-                            .photosCount(1)
-                            .guestAvatar("https://lh3.googleusercontent.com/aida-public/AB6AXuDtBD2J0dMb6ui-jzFd-s3WAOrIcULKNiD9XtfnGxQMKSTx355Pf1EjERQXBHDwHrcQ0Rorvh9B6EK8HB6KmTt_y_Vmq08HXH1mv79H5Vu9HA98ZemUl4gMQKLX8UE6D4XyoH4aj98giLTIomA-cZpFPmBtgmFxgoZt0ZKA5x-4LkgkGP-hJ2DyiPrZOmmqIdCcd6okDRUACpFaDNJU99_AMzc9ReyPXk77zeU4Z5vnxIG6w4_nVg8")
-                            .submissionImage("https://lh3.googleusercontent.com/aida-public/AB6AXuAwxRCSb8O0TEvP8qWKkyBWYmOPRU7CAe-lU0L0LMkQVLCWwT-WPYALrACR8Db8vw3_4jArbeXHHO_9d76yf7xm93aRwrudcovcbdkH-3EQrrGzyVg0iJ-Mvu69r8SV1GpbtRs1onXyn8r2zhoo3AUha2-9zCn4Myw7IYvyDRyt2uYN6sGiBB77aieKV_8H49oOFbrdmjYwsetb-x5cKFX4PCfWM-yOuk8sjzC85RU_W3_1EPQSU6E")
-                            .status("pending")
-                            .submittedAt(LocalDateTime.now().minusHours(3))
-                            .build(),
-                    GuestTaskSubmission.builder()
-                            .submissionCode("S002")
-                            .homestayId(defaultHomestayId)
-                            .guestName("Lê Văn Hiếu")
-                            .roomName("Phòng Lake View")
-                            .taskTitle("Thưởng thức và đánh giá mâm cơm lam cá suối nướng")
-                            .taskType("food")
-                            .reviewText("Cá suối ướp mắc khén nướng than giòn bì thơm nức mũi, ăn cùng cơm lam dẻo quánh đúng điệu bản Mường - Thái. Điểm 10 chất lượng!")
-                            .rewardText("Voucher giảm 50.000đ dịch vụ ăn uống lần sau")
-                            .photosCount(2)
-                            .guestAvatar("https://lh3.googleusercontent.com/aida-public/AB6AXuCf_GZrWvs5PbldzGsECiknjV3jiAuHqF3qQ0vTTpwxRImEmzWcmrBQnpJQPLCNdqaSQyoDm9EP7lyCzAelYHSu6XVwxZuLvuR4SmH4_n1_jLQqsked0ttQNeszq6kP3dH8Eg7Q0znPXhxfzPh9u3nJRtVOB9jjoxAwXHammtyBVEsTPjxOl7oC4sF5gCPWoEmUCpzteXKyDXMyoeC4SLHip0BteQKWK18gnncNJ8HpdsRhQh3I9Kk")
-                            .submissionImage("https://lh3.googleusercontent.com/aida-public/AB6AXuDdBW9ILAd7dvQBEAbmNPGGhivvXfCDDDvtJC4zDg-IGR1XGnQHtA4M57KLjUy_o5-9yqHoF2Uw6AzbXIbXr5JqBg7pqGmVdmi9S8BlHDTQdO6pnk9LM39hh_l_uGgmUtz0c2c8-reOCnTG3SQFP-16zq1RahEvEE-quDqEvGgOYS040aA0FBxBWtVpWrgycH8PZGR5baQ2OB7L6FqQiMNaMef1HWMQ97YLH41-3qmRgcbG08VxzIo")
-                            .status("pending")
-                            .submittedAt(LocalDateTime.now().minusHours(4))
-                            .build()
-            );
-            submissionRepository.saveAll(sampleSubmissions);
-        }
-
-        // Seed reward_stocks nếu trống
-        if (rewardStockRepository.count() == 0) {
-            log.info("Bảng reward_stocks đang rỗng, tiến hành seed 4 vật phẩm kho...");
-            List<RewardStock> sampleStocks = List.of(
-                    RewardStock.builder().homestayId(defaultHomestayId).name("Voucher giảm 10%").type("Voucher").qty(60).build(),
-                    RewardStock.builder().homestayId(defaultHomestayId).name("Voucher 100.000₫ trừ thẳng").type("Voucher").qty(40).build(),
-                    RewardStock.builder().homestayId(defaultHomestayId).name("Túi trà gạo lứt Mộc Châu").type("Quà tặng").qty(25).build(),
-                    RewardStock.builder().homestayId(defaultHomestayId).name("Quà nông sản lưu niệm").type("Quà tặng").qty(30).build()
-            );
-            rewardStockRepository.saveAll(sampleStocks);
-        }
+        return null;
     }
 
     // ==========================================
@@ -264,26 +109,15 @@ public class OwnerMissionService {
 
     @Transactional(readOnly = true)
     public List<OwnerMissionDTO> getMissions(Long homestayId) {
-        List<GuestTask> list;
-        if (homestayId != null && homestayId > 0) {
-            list = guestTaskRepository.findByHomestayId(homestayId);
-            if (list.isEmpty()) {
-                Long hid = resolveHomestayId(null);
-                list = guestTaskRepository.findByHomestayId(hid);
-            }
-        } else {
-            list = guestTaskRepository.findAll();
-            if (list.isEmpty()) {
-                Long hid = resolveHomestayId(null);
-                list = guestTaskRepository.findByHomestayId(hid);
-            }
-        }
+        if (homestayId == null || homestayId <= 0) return List.of();
+        List<GuestTask> list = guestTaskRepository.findByHomestayId(homestayId);
         return list.stream().map(this::mapToMissionDTO).collect(Collectors.toList());
     }
 
     @Transactional
     public OwnerMissionDTO createMission(CreateMissionRequest req) {
         Long hid = resolveHomestayId(req.getHomestayId());
+        if (hid == null) throw new IllegalArgumentException("Vui lòng chọn cơ sở trước khi tạo nhiệm vụ.");
         GuestTask task = GuestTask.builder()
                 .homestayId(hid)
                 .title(req.getTitle())
@@ -350,6 +184,9 @@ public class OwnerMissionService {
                 .rewardType(t.getRewardType())
                 .rewardValue(t.getRewardValue())
                 .rewardExtra(t.getRewardExtra())
+                .reward("voucher-percent".equalsIgnoreCase(t.getRewardType()) ? "Voucher " + t.getRewardValue() + "%" :
+                        "voucher-amount".equalsIgnoreCase(t.getRewardType()) ? "Voucher " + t.getRewardValue() + "₫" :
+                                (t.getRewardValue() != null ? t.getRewardValue() : t.getRewardExtra()))
                 .from(t.getFromDate())
                 .to(t.getToDate())
                 .needPhoto(t.getNeedPhoto())
@@ -365,15 +202,8 @@ public class OwnerMissionService {
 
     @Transactional(readOnly = true)
     public List<OwnerSubmissionDTO> getSubmissions(Long homestayId, String status, String taskType, String search) {
-        List<GuestTaskSubmission> list;
-        if (homestayId != null && homestayId > 0) {
-            list = submissionRepository.findByHomestayIdOrderBySubmittedAtDesc(homestayId);
-            if (list.isEmpty()) {
-                list = submissionRepository.findAll();
-            }
-        } else {
-            list = submissionRepository.findAll();
-        }
+        if (homestayId == null || homestayId <= 0) return List.of();
+        List<GuestTaskSubmission> list = submissionRepository.findByHomestayIdOrderBySubmittedAtDesc(homestayId);
 
         return list.stream()
                 .filter(s -> {
@@ -479,10 +309,10 @@ public class OwnerMissionService {
                 .taskType(s.getTaskType() != null ? s.getTaskType() : "general")
                 .task(s.getTaskTitle() != null ? s.getTaskTitle() : "Nhiệm vụ homestay")
                 .review(s.getReviewText() != null ? s.getReviewText() : "")
-                .reward(s.getRewardText() != null ? s.getRewardText() : "Voucher homestay")
-                .photos(s.getPhotosCount() != null ? s.getPhotosCount() : 1)
-                .avatar(s.getGuestAvatar() != null ? s.getGuestAvatar() : "https://lh3.googleusercontent.com/aida-public/AB6AXuDtBD2J0dMb6ui-jzFd-s3WAOrIcULKNiD9XtfnGxQMKSTx355Pf1EjERQXBHDwHrcQ0Rorvh9B6EK8HB6KmTt_y_Vmq08HXH1mv79H5Vu9HA98ZemUl4gMQKLX8UE6D4XyoH4aj98giLTIomA-cZpFPmBtgmFxgoZt0ZKA5x-4LkgkGP-hJ2DyiPrZOmmqIdCcd6okDRUACpFaDNJU99_AMzc9ReyPXk77zeU4Z5vnxIG6w4_nVg8")
-                .image(s.getSubmissionImage() != null ? s.getSubmissionImage() : "https://lh3.googleusercontent.com/aida-public/AB6AXuAwxRCSb8O0TEvP8qWKkyBWYmOPRU7CAe-lU0L0LMkQVLCWwT-WPYALrACR8Db8vw3_4jArbeXHHO_9d76yf7xm93aRwrudcovcbdkH-3EQrrGzyVg0iJ-Mvu69r8SV1GpbtRs1onXyn8r2zhoo3AUha2-9zCn4Myw7IYvyDRyt2uYN6sGiBB77aieKV_8H49oOFbrdmjYwsetb-x5cKFX4PCfWM-yOuk8sjzC85RU_W3_1EPQSU6E")
+                .reward(s.getRewardText())
+                .photos(s.getPhotosCount() != null ? s.getPhotosCount() : 0)
+                .avatar(s.getGuestAvatar())
+                .image(s.getSubmissionImage())
                 .status(s.getStatus() != null ? s.getStatus().toLowerCase() : "pending")
                 .rejectReason(s.getRejectReason())
                 .retakeReason(s.getRetakeReason())
@@ -498,6 +328,7 @@ public class OwnerMissionService {
     @Transactional(readOnly = true)
     public List<RewardStockDTO> getRewardStocks(Long homestayId) {
         Long hid = resolveHomestayId(homestayId);
+        if (hid == null) return List.of();
         List<RewardStock> stocks = rewardStockRepository.findByHomestayIdOrderByIdAsc(hid);
         return stocks.stream()
                 .map(st -> RewardStockDTO.builder()
@@ -512,10 +343,16 @@ public class OwnerMissionService {
     @Transactional
     public List<RewardStockDTO> saveRewardStocks(SaveStockRequest req) {
         Long hid = resolveHomestayId(req.getHomestayId());
+        if (hid == null) throw new IllegalArgumentException("Vui lòng chọn cơ sở trước khi lưu kho phần thưởng.");
         if (req.getItems() != null) {
+            Set<Long> retainedIds = req.getItems().stream().map(SaveStockRequest.StockItem::getId).filter(Objects::nonNull).collect(Collectors.toSet());
+            rewardStockRepository.findByHomestayIdOrderByIdAsc(hid).stream()
+                    .filter(stock -> !retainedIds.contains(stock.getId()))
+                    .forEach(rewardStockRepository::delete);
             for (SaveStockRequest.StockItem item : req.getItems()) {
                 if (item.getId() != null && item.getId() > 0) {
                     rewardStockRepository.findById(item.getId()).ifPresent(stock -> {
+                        if (!hid.equals(stock.getHomestayId())) throw new IllegalArgumentException("Phần thưởng không thuộc cơ sở đang chọn.");
                         if (item.getName() != null) stock.setName(item.getName());
                         if (item.getType() != null) stock.setType(item.getType());
                         if (item.getQty() != null) stock.setQty(item.getQty());
@@ -538,13 +375,28 @@ public class OwnerMissionService {
     @Transactional
     public Map<String, Object> sendAppreciationGift(SendGiftRequest req) {
         Long hid = resolveHomestayId(req.getHomestayId());
-        int count = req.getSelectedGuests() != null ? req.getSelectedGuests().size() : 0;
-        log.info("Đã gửi quà tri ân [{}] tới {} khách hàng xuất sắc của homestay {}", req.getGiftItem(), count, hid);
+        if (hid == null) throw new IllegalArgumentException("Vui lòng chọn cơ sở trước khi gửi quà.");
+        List<Long> recipients = new ArrayList<>();
+        if (req.getSelectedGuests() != null && !req.getSelectedGuests().isEmpty()) {
+            for (String value : req.getSelectedGuests()) {
+                try { recipients.add(Long.valueOf(value)); } catch (NumberFormatException ignored) { }
+            }
+        }
+        int sentCount = 0;
+        String message = (req.getMessage() == null ? "Cảm ơn bạn đã tham gia hoạt động tại homestay." : req.getMessage().trim())
+                + (req.getGiftItem() == null || req.getGiftItem().isBlank() ? "" : " Phần quà: " + req.getGiftItem().trim() + ".");
+        for (Long recipientId : new LinkedHashSet<>(recipients)) {
+            Boolean isParticipant = jdbcTemplate.queryForObject("SELECT EXISTS(SELECT 1 FROM guest_task_submissions WHERE homestay_id = ? AND tourist_id = ? AND LOWER(status) = 'approved')", Boolean.class, hid, recipientId);
+            if (Boolean.TRUE.equals(isParticipant)) {
+                notificationService.create(recipientId, "Bạn nhận được quà tri ân", message, "REWARD", hid, "/notifications");
+                sentCount++;
+            }
+        }
 
         Map<String, Object> res = new HashMap<>();
-        res.put("success", true);
-        res.put("message", "Đã gửi quà tri ân thành công tới " + count + " khách hàng xuất sắc!");
-        res.put("sentCount", count);
+        res.put("success", sentCount > 0);
+        res.put("message", sentCount > 0 ? "Đã lưu và gửi thông báo quà tri ân tới " + sentCount + " du khách." : "Không có du khách đủ điều kiện để nhận quà.");
+        res.put("sentCount", sentCount);
         res.put("giftItem", req.getGiftItem());
         return res;
     }
@@ -556,6 +408,7 @@ public class OwnerMissionService {
     @Transactional(readOnly = true)
     public OwnerMissionStatsDTO getStats(Long homestayId) {
         Long hid = resolveHomestayId(homestayId);
+        if (hid == null) return OwnerMissionStatsDTO.builder().activeMissions(0).pendingToday(0).participantGuests(0).rewardedVouchers(0).interactionRate(0).topGuests(List.of()).rewardStocks(List.of()).build();
 
         long activeMissions;
         long pendingToday;
@@ -565,7 +418,8 @@ public class OwnerMissionService {
             activeMissions = guestTaskRepository.findByHomestayId(homestayId).stream()
                     .filter(t -> "active".equalsIgnoreCase(t.getStatus()))
                     .count();
-            pendingToday = submissionRepository.countByHomestayIdAndStatus(homestayId, "pending");
+            Long pendingCount = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM guest_task_submissions WHERE homestay_id = ? AND LOWER(status) = 'pending' AND CAST(submitted_at AS DATE) = CURRENT_DATE", Long.class, homestayId);
+            pendingToday = pendingCount == null ? 0 : pendingCount;
             rewardedVouchers = guestTaskRepository.findByHomestayId(homestayId).stream()
                     .mapToLong(t -> t.getGivenCount() != null ? t.getGivenCount() : 0)
                     .sum();
@@ -581,42 +435,31 @@ public class OwnerMissionService {
                     .sum();
         }
 
-        if (activeMissions == 0) activeMissions = 4;
-        if (rewardedVouchers == 0) rewardedVouchers = 96;
-
-        long participantGuests = 142; // Tổng số khách tham gia hoạt động tháng này
+        Long participantCount = jdbcTemplate.queryForObject("SELECT COUNT(DISTINCT tourist_id) FROM guest_task_submissions WHERE homestay_id = ? AND tourist_id IS NOT NULL", Long.class, hid);
+        long participantGuests = participantCount == null ? 0 : participantCount;
+        Long bookingGuestCount = jdbcTemplate.queryForObject("SELECT COUNT(DISTINCT tourist_id) FROM bookings WHERE homestay_id = ? AND tourist_id IS NOT NULL", Long.class, hid);
+        int interactionRate = bookingGuestCount == null || bookingGuestCount == 0 ? 0 : (int) Math.min(100, Math.round(participantGuests * 100.0 / bookingGuestCount));
 
         // Bảng xếp hạng Top khách tích cực
-        List<TopGuestDTO> topGuests = List.of(
-                TopGuestDTO.builder()
-                        .id(1L)
-                        .name("Hoàng Lan Anh")
-                        .points(280)
-                        .completed(5)
-                        .avatar("https://lh3.googleusercontent.com/aida-public/AB6AXuBM2p3xVWdv84AVmzpSgASDhrTJWBslvj9gqrIocFGTSa80ihcG4lcehUXD1yur0QqYvgSIR0sfQCQbHDpnxmX1B0NbaARMi116qNnbisQ0_sqa7JgXnyQMhoHPY3Iaa6L9k-FDayYklK7Ks29G59GDVm9uzDeX5qG0840EGEfjLUks1387sY1oCLzpTjUC20f3HXCH8CWYiCNJN_ZJn-tL-9zKgl6nGoxmg9otBPZcuWuo7KO-gIs")
-                        .build(),
-                TopGuestDTO.builder()
-                        .id(2L)
-                        .name("Đặng Quốc Tuấn")
-                        .points(210)
-                        .completed(4)
-                        .avatar("https://lh3.googleusercontent.com/aida-public/AB6AXuA0rpyMEE5nGfTtsGVNH0sMheHl0xL1Nh0I0T-S0mogDCf6_L8_WRKYd64wVjiFp7cvZSEDHbFEWziQgnMt0GhnTe0edIUHtKRJm83_Sv89eOqGYW7W2BMeTfOVi4kk4Ibmmx6vMgct7iPbSym5riRvts5r-eU0BoWYXDTjuaJ_PEZKAK1RwD3k5-xXkPa90Nu_AOfJjC5EqzLDQQ83CfkChif6Q4OZqPNIoovOTXyj_auiAKAO_7A")
-                        .build(),
-                TopGuestDTO.builder()
-                        .id(3L)
-                        .name("Nguyễn Phương Linh")
-                        .points(160)
-                        .completed(3)
-                        .avatar("https://lh3.googleusercontent.com/aida-public/AB6AXuD9O0vFuEGIJVTJSeQK1Jsp5j_IwhXL8ChEXsaM2bcG8OloI7TUCJqlm1Elu0BoIc245q_cEfERzfQklJm6qzTuFaMFG40CKliwBhKhDEUEzQwIS7TvPbSs8K83acaQrBvueOnC0JnWBpBNoyTDir47BjOTPRqu0JzImfPchOEaGcPvrymkvuwOa3BGdP-3q1W7vVYFHRay8HiBPzs0SozC7OxtIDZT_uOXzNdiKbM26xrEKZHRyWY")
-                        .build()
-        );
+        List<TopGuestDTO> topGuests = jdbcTemplate.query("""
+                SELECT tourist_id, MAX(guest_name) AS guest_name, MAX(guest_avatar) AS guest_avatar, COUNT(*) AS completed
+                FROM guest_task_submissions
+                WHERE homestay_id = ? AND tourist_id IS NOT NULL AND LOWER(status) = 'approved'
+                GROUP BY tourist_id ORDER BY completed DESC LIMIT 10
+                """, (rs, rowNum) -> TopGuestDTO.builder()
+                .id(rs.getLong("tourist_id"))
+                .name(rs.getString("guest_name") == null ? "Du khách" : rs.getString("guest_name"))
+                .completed(rs.getInt("completed"))
+                .points(null)
+                .avatar(rs.getString("guest_avatar"))
+                .build(), hid);
 
         return OwnerMissionStatsDTO.builder()
-                .activeMissions(activeMissions > 0 ? activeMissions : 4)
+                .activeMissions(activeMissions)
                 .pendingToday(pendingToday)
                 .participantGuests(participantGuests)
                 .rewardedVouchers(rewardedVouchers)
-                .interactionRate(68)
+                .interactionRate(interactionRate)
                 .topGuests(topGuests)
                 .rewardStocks(getRewardStocks(hid))
                 .build();
