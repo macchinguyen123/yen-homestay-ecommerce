@@ -103,6 +103,12 @@ export default function AdminLayout() {
                             </NavLink>
                         </li>
                         <li className="menu-item">
+                            <NavLink to="/admin/reviews" className={({ isActive }) => `menu-link ${isActive ? 'active' : ''}`}>
+                                <span className="material-symbols-outlined menu-icon">rate_review</span>
+                                <span>Đánh giá & Phân tích</span>
+                            </NavLink>
+                        </li>
+                        <li className="menu-item">
                             <NavLink to="/admin/complaints" className={({ isActive }) => `menu-link ${isActive ? 'active' : ''}`}>
                                 <span className="material-symbols-outlined menu-icon">report_problem</span>
                                 <span>Quản lý báo cáo & Khiếu nại</span>

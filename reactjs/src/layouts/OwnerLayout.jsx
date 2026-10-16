@@ -12,7 +12,7 @@ const OWNER_NAV = [
   { to: '/owner/services',   icon: 'bi-basket2',         label: 'Quản lý dịch vụ' },
   { to: '/owner/bookings',   icon: 'bi-journal-bookmark',label: 'Quản lý Booking' },
   { to: '/owner/missions',   icon: 'bi-trophy',          label: 'Quản lý nhiệm vụ' },
-  { to: '/owner/reviews',    icon: 'bi-star-half',       label: 'Quản lý đánh giá' },
+  { to: '/owner/reviews',    icon: 'bi-star-half',       label: 'Đánh giá & Phân tích' },
   { to: '/owner/discounts',  icon: 'bi-ticket-perforated', label: 'Quản lý mã giảm giá' },
   { to: '/owner/revenue',    icon: 'bi-bar-chart-line',  label: 'Doanh thu & thống kê' },
   { to: '/owner/packages',   icon: 'bi-megaphone',       label: 'Gói quảng cáo' },

@@ -125,6 +125,101 @@ async def extract_vector_file(file: UploadFile = File(...)):
         logger.error(f"Lỗi xử lý file ảnh: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Lỗi trích xuất vector từ file: {str(e)}")
 
+# ==============================================================================
+# PHẦN 2: REVIEW SENTIMENT & ASPECT-BASED NLP SERVICE
+# ==============================================================================
+
+class ReviewAnalyzeRequest(BaseModel):
+    review_id: int | None = None
+    rating: int = 5
+    comment: str
+
+class ReviewAnalyzeResponse(BaseModel):
+    sentiment: str              # POSITIVE, NEGATIVE, NEUTRAL
+    sentiment_score: float      # 0.0 - 1.0
+    aspect_tags: List[str]      # ["Vệ sinh", "Dịch vụ", ...]
+    ai_summary: str             # Tóm tắt góp ý
+
+POSITIVE_WORDS = {
+    "tuyệt vời", "xuất sắc", "rất tốt", "hài lòng", "sạch sẽ", "nhiệt tình", "thân thiện",
+    "chu đáo", "đẹp", "thoáng mát", "yên tĩnh", "xứng đáng", "tiện nghi", "chất lượng",
+    "ưng ý", "ngon", "ấm cúng", "thích", "chill", "view đẹp", "rẻ", "hợp lý", "ok", "tốt"
+}
+
+NEGATIVE_WORDS = {
+    "tệ", "thất vọng", "dơ", "bẩn", "kinh khủng", "hôi", "ồn ào", "cũ", "kém",
+    "khó chịu", "cau có", "chảnh", "thái độ", "đắt", "chặt chém", "lừa đảo", "hỏng",
+    "chậm", "chán", "muỗi", "ẩm mốc", "xa", "nguy hiểm", "chật", "chê", "không đáng"
+}
+
+NEGATION_WORDS = {"không", "chẳng", "chả", "chưa", "kém", "ít"}
+
+ASPECT_KEYWORDS = {
+    "Vệ sinh": ["sạch", "dơ", "bẩn", "rác", "mùi", "toilet", "vệ sinh", "ẩm mốc", "ga giường", "khăn"],
+    "Dịch vụ": ["chủ nhà", "nhân viên", "nhiệt tình", "thân thiện", "lễ tân", "thái độ", "phục vụ", "hỗ trợ", "chu đáo"],
+    "Tiện nghi": ["wifi", "mạng", "máy lạnh", "điều hòa", "nóng lạnh", "tivi", "tủ lạnh", "giường", "nệm", "ồn", "cách âm"],
+    "Giá cả": ["giá", "tiền", "đắt", "rẻ", "hợp lý", "xứng đáng", "phụ thu", "voucher", "ưu đãi"],
+    "Vị trí": ["vị trí", "view", "cảnh", "trung tâm", "xa", "gần", "dốc", "hẻm", "đường", "yên tĩnh", "biển", "đồi"]
+}
+
+def analyze_vietnamese_review(comment: str, rating: int) -> dict:
+    text = (comment or "").lower().strip()
+    pos_score = 0
+    neg_score = 0
+
+    for pw in POSITIVE_WORDS:
+        if pw in text:
+            pos_score += 1.5
+    for nw in NEGATIVE_WORDS:
+        if nw in text:
+            neg_score += 1.8
+
+    for neg in NEGATION_WORDS:
+        for pw in POSITIVE_WORDS:
+            if f"{neg} {pw}" in text or f"{neg} được {pw}" in text:
+                pos_score -= 1.5
+                neg_score += 2.0
+
+    if rating >= 4:
+        pos_score += (rating - 3) * 1.5
+    elif rating <= 2:
+        neg_score += (3 - rating) * 2.0
+
+    if neg_score > pos_score and (neg_score >= 1.5 or rating <= 2):
+        sentiment = "NEGATIVE"
+        sentiment_score = min(0.99, max(0.65, 0.5 + (neg_score - pos_score) * 0.1))
+    elif pos_score > neg_score and (pos_score >= 1.5 or rating >= 4):
+        sentiment = "POSITIVE"
+        sentiment_score = min(0.99, max(0.65, 0.5 + (pos_score - neg_score) * 0.1))
+    else:
+        sentiment = "NEUTRAL"
+        sentiment_score = 0.55
+
+    detected_aspects = []
+    for aspect, kw_list in ASPECT_KEYWORDS.items():
+        if any(kw in text for kw in kw_list):
+            detected_aspects.append(aspect)
+
+    aspect_str = ", ".join(detected_aspects) if detected_aspects else "trải nghiệm chung"
+    if sentiment == "POSITIVE":
+        ai_summary = f"Khách khen ngợi về {aspect_str}, trải nghiệm rất hài lòng ({rating}⭐)."
+    elif sentiment == "NEGATIVE":
+        ai_summary = f"Khách phàn nàn và không hài lòng về {aspect_str} ({rating}⭐)."
+    else:
+        ai_summary = f"Khách đánh giá mức trung bình, có góp ý liên quan đến {aspect_str} ({rating}⭐)."
+
+    return {
+        "sentiment": sentiment,
+        "sentiment_score": round(float(sentiment_score), 2),
+        "aspect_tags": detected_aspects,
+        "ai_summary": ai_summary
+    }
+
+@app.post("/analyze-review", response_model=ReviewAnalyzeResponse)
+def analyze_review_endpoint(req: ReviewAnalyzeRequest):
+    result = analyze_vietnamese_review(req.comment, req.rating)
+    return ReviewAnalyzeResponse(**result)
+
 if __name__ == "__main__":
     import uvicorn
     # Khởi chạy trên cổng 8000

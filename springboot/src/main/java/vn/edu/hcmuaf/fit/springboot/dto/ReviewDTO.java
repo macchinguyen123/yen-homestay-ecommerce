@@ -24,6 +24,10 @@ public class ReviewDTO {
     private String comment;
     private List<String> images;
     private String ownerReply;
+    private String sentiment; // POSITIVE, NEGATIVE, NEUTRAL
+    private Double sentimentScore;
+    private String aspectTags;
+    private String aiSummary;
     private LocalDateTime createdAt;
     private String formattedDate;
 }

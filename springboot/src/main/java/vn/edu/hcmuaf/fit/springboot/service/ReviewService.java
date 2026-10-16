@@ -25,7 +25,8 @@ public class ReviewService {
             "SELECT r.review_id, r.booking_id, r.homestay_id, h.name as homestay_name, " +
             "b.room_id, rm.room_name, " +
             "r.tourist_id, u.full_name, u.email, u.avatar, " +
-            "r.rating, r.comment, r.images, r.owner_reply, r.created_at " +
+            "r.rating, r.comment, r.images, r.owner_reply, r.created_at, " +
+            "r.sentiment, r.sentiment_score, r.aspect_tags, r.ai_summary " +
             "FROM reviews r " +
             "LEFT JOIN homestays h ON r.homestay_id = h.homestay_id " +
             "LEFT JOIN bookings b ON r.booking_id = b.booking_id " +
@@ -41,6 +42,45 @@ public class ReviewService {
             return jdbcTemplate.query(sql, this::mapRowToReviewDTO, homestayId);
         } catch (Exception e) {
             log.error("Lỗi khi truy vấn đánh giá homestay {}: {}", homestayId, e.getMessage());
+            return Collections.emptyList();
+        }
+    }
+
+    /**
+     * Lấy toàn bộ đánh giá của tất cả Homestay trên toàn hệ thống cho Admin
+     */
+    public List<ReviewDTO> getAllReviews() {
+        String sql = SELECT_JOINED_REVIEWS + "ORDER BY r.created_at DESC NULLS LAST";
+        try {
+            return jdbcTemplate.query(sql, this::mapRowToReviewDTO);
+        } catch (Exception e) {
+            log.error("Lỗi khi truy vấn tất cả đánh giá toàn hệ thống: {}", e.getMessage());
+            return Collections.emptyList();
+        }
+    }
+
+    /**
+     * Lấy toàn bộ đánh giá của các Homestay thuộc chủ nhà theo ownerId
+     */
+    public List<ReviewDTO> getReviewsByOwnerId(Long ownerId) {
+        String sql = SELECT_JOINED_REVIEWS + "WHERE h.owner_id = ? ORDER BY r.created_at DESC NULLS LAST";
+        try {
+            return jdbcTemplate.query(sql, this::mapRowToReviewDTO, ownerId);
+        } catch (Exception e) {
+            log.error("Lỗi khi truy vấn đánh giá theo ownerId {}: {}", ownerId, e.getMessage());
+            return Collections.emptyList();
+        }
+    }
+
+    /**
+     * Lấy toàn bộ đánh giá của các Homestay thuộc chủ nhà theo email
+     */
+    public List<ReviewDTO> getReviewsByOwnerEmail(String email) {
+        String sql = SELECT_JOINED_REVIEWS + "JOIN users owner ON h.owner_id = owner.user_id WHERE LOWER(owner.email) = LOWER(?) ORDER BY r.created_at DESC NULLS LAST";
+        try {
+            return jdbcTemplate.query(sql, this::mapRowToReviewDTO, email);
+        } catch (Exception e) {
+            log.error("Lỗi khi truy vấn đánh giá theo owner email {}: {}", email, e.getMessage());
             return Collections.emptyList();
         }
     }
@@ -122,6 +162,17 @@ public class ReviewService {
             roomName = "Phòng tiêu chuẩn";
         }
 
+        String sentiment = null;
+        Double sentimentScore = null;
+        String aspectTags = null;
+        String aiSummary = null;
+        try {
+            sentiment = rs.getString("sentiment");
+            sentimentScore = rs.getObject("sentiment_score") != null ? rs.getDouble("sentiment_score") : null;
+            aspectTags = rs.getString("aspect_tags");
+            aiSummary = rs.getString("ai_summary");
+        } catch (Exception ignored) {}
+
         return ReviewDTO.builder()
                 .id(rs.getLong("review_id"))
                 .bookingId(rs.getLong("booking_id"))
@@ -137,6 +188,10 @@ public class ReviewService {
                 .comment(rs.getString("comment"))
                 .images(images)
                 .ownerReply(rs.getString("owner_reply"))
+                .sentiment(sentiment)
+                .sentimentScore(sentimentScore)
+                .aspectTags(aspectTags)
+                .aiSummary(aiSummary)
                 .createdAt(createdAt)
                 .formattedDate(formattedDate)
                 .build();
