@@ -51,7 +51,6 @@ public class WishlistService {
         }
     }
 
-    private static final String DEFAULT_IMG = "https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=600&q=80";
 
     public static String toRegionSlug(String city) {
         if (city == null || city.trim().isEmpty()) return "all";
@@ -110,27 +109,6 @@ public class WishlistService {
     }
 
     /**
-     * Lấy danh sách homestay gợi ý/nổi bật từ DB để làm dữ liệu mẫu động khi chưa đăng nhập hoặc wishlist rỗng
-     */
-    @Cacheable("publicWishlist")
-    public List<WishlistDTO> getPublicWishlist() {
-        PageRequest pageRequest = PageRequest.of(0, 8, Sort.by(Sort.Direction.DESC, "rating"));
-        List<Homestay> topHomestays = homestayRepository.findAll(pageRequest).getContent();
-
-        List<Long> homestayIds = topHomestays.stream().map(Homestay::getId).collect(Collectors.toList());
-        Map<Long, String> imageMap = fetchPrimaryImages(homestayIds);
-        Map<Long, Integer> reviewCountMap = fetchReviewCounts(homestayIds);
-
-        List<WishlistDTO> result = new ArrayList<>();
-        int i = 0;
-        for (Homestay h : topHomestays) {
-            LocalDateTime fakeCreated = LocalDateTime.now().minusDays(i++);
-            result.add(buildDTO(h, null, null, fakeCreated, imageMap, reviewCountMap));
-        }
-        return result;
-    }
-
-    /**
      * Thêm homestay vào wishlist
      */
     @Transactional
@@ -139,6 +117,8 @@ public class WishlistService {
         if (userId == null || homestayId == null) {
             throw new IllegalArgumentException("User ID và Homestay ID không được để trống");
         }
+        Homestay h = homestayRepository.findById(homestayId)
+                .orElseThrow(() -> new IllegalArgumentException("Homestay không tồn tại: " + homestayId));
 
         Optional<Wishlist> existing = wishlistRepository.findByTouristIdAndHomestayId(userId, homestayId);
         Wishlist wishlist;
@@ -152,16 +132,6 @@ public class WishlistService {
                     .build();
             wishlist = wishlistRepository.save(wishlist);
             log.info("Đã thêm Homestay ID {} vào yêu thích của User ID {}", homestayId, userId);
-        }
-
-        Homestay h = homestayRepository.findById(homestayId).orElse(null);
-        if (h == null) {
-            return WishlistDTO.builder()
-                    .id(homestayId)
-                    .homestayId(homestayId)
-                    .touristId(userId)
-                    .createdAt(wishlist.getCreatedAt())
-                    .build();
         }
 
         Map<Long, String> imageMap = fetchPrimaryImages(Collections.singletonList(homestayId));
@@ -224,20 +194,17 @@ public class WishlistService {
         String city = h.getCity() != null ? h.getCity() : "Việt Nam";
         String region = toRegionSlug(city);
         String name = h.getName() != null ? h.getName() : "Homestay #" + h.getId();
-        Double rating = h.getRating() != null ? h.getRating() : 4.9;
-        int reviewCount = reviewCountMap.getOrDefault(h.getId(), 24);
-        int numRooms = h.getNumRooms() != null ? h.getNumRooms() : 2;
-        int maxGuests = h.getMaxGuests() != null ? h.getMaxGuests() : 4;
+        Double rating = h.getRating() != null ? h.getRating() : 0d;
+        int reviewCount = reviewCountMap.getOrDefault(h.getId(), 0);
+        int numRooms = h.getNumRooms() != null ? h.getNumRooms() : 0;
+        int maxGuests = h.getMaxGuests() != null ? h.getMaxGuests() : 0;
         String specs = numRooms + " phòng ngủ • " + maxGuests + " khách";
 
         String amenities = (h.getAmenities() != null && !h.getAmenities().trim().isEmpty())
                 ? h.getAmenities()
-                : "Bể bơi nước ấm · Lò sưởi củi · Sân BBQ";
+                : "";
 
-        String img = imageMap.getOrDefault(h.getId(), DEFAULT_IMG);
-        if (img == null || img.trim().isEmpty()) {
-            img = DEFAULT_IMG;
-        }
+        String img = imageMap.get(h.getId());
 
         long epoch = createdAt != null ? createdAt.toEpochSecond(ZoneOffset.UTC) : System.currentTimeMillis() / 1000;
 

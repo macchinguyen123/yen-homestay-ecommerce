@@ -1,21 +1,29 @@
 const API_BASE_URL = 'http://localhost:8081/api';
 
-// Memory cache for lightning fast (0ms) in-memory retrieval
 let memoryCache = null;
+let memoryCacheKey = null;
+
+function authHeaders() {
+  try {
+    const user = JSON.parse(localStorage.getItem('user') || 'null');
+    return user?.token ? { Authorization: `Bearer ${user.token}` } : {};
+  } catch { return {}; }
+}
 
 export const wishlistService = {
   /**
    * Lấy ngay lập tức từ bộ nhớ đệm (0ms) để giao diện không bị chớp hoặc chờ
    */
   getCachedWishlist(userId) {
-    if (memoryCache && memoryCache.length > 0) return memoryCache;
     const key = userId ? `wishlist_${userId}` : 'guest_wishlist';
+    if (memoryCacheKey === key && memoryCache !== null) return memoryCache;
     try {
       const raw = localStorage.getItem(key);
       if (raw) {
         const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed) && parsed.length > 0) {
+        if (Array.isArray(parsed)) {
           memoryCache = parsed;
+          memoryCacheKey = key;
           return parsed;
         }
       }
@@ -27,53 +35,29 @@ export const wishlistService = {
    * Lấy danh sách homestay yêu thích từ CSDL (tốc độ cao với cache đa tầng)
    */
   async getWishlist(userId) {
-    // 1. Nếu có userId, ưu tiên gọi API theo User
     if (userId) {
       try {
-        const response = await fetch(`${API_BASE_URL}/users/${userId}/wishlist`);
+        const response = await fetch(`${API_BASE_URL}/users/${userId}/wishlist`, { headers: authHeaders() });
         if (response.ok) {
           const data = await response.json();
-          if (Array.isArray(data) && data.length > 0) {
+          if (Array.isArray(data)) {
             memoryCache = data;
+            memoryCacheKey = `wishlist_${userId}`;
             localStorage.setItem(`wishlist_${userId}`, JSON.stringify(data));
             return { success: true, data };
           }
+          throw new Error(data?.message || 'Dữ liệu wishlist không hợp lệ');
         }
+        throw new Error(`HTTP ${response.status}`);
       } catch (err) {
-        console.warn('Lỗi kết nối API User Wishlist:', err);
+        throw err;
       }
     }
-
-    // 2. Kiểm tra bộ nhớ đệm local của guest nếu đã có thao tác chỉnh sửa
-    const guestLocal = localStorage.getItem('guest_wishlist');
-    if (guestLocal) {
-      try {
-        const parsed = JSON.parse(guestLocal);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          memoryCache = parsed;
-          return { success: true, data: parsed, isLocal: true };
-        }
-      } catch (e) {}
-    }
-
-    // 3. Lấy dữ liệu homestay động từ CSDL qua public API
-    try {
-      const response = await fetch(`${API_BASE_URL}/public/wishlist`);
-      if (response.ok) {
-        const data = await response.json();
-        if (Array.isArray(data)) {
-          memoryCache = data;
-          localStorage.setItem('guest_wishlist', JSON.stringify(data));
-          return { success: true, data };
-        }
-      }
-    } catch (err) {
-      console.warn('Lỗi lấy public wishlist từ CSDL, fallback sang cache:', err);
-    }
-
-    // 4. Fallback cuối cùng
-    const cached = this.getCachedWishlist(userId);
-    return { success: Boolean(cached), data: cached || [] };
+    const raw = localStorage.getItem('guest_wishlist');
+    const data = raw ? JSON.parse(raw) : [];
+    memoryCache = Array.isArray(data) ? data : [];
+    memoryCacheKey = 'guest_wishlist';
+    return { success: true, data: memoryCache, isLocal: true };
   },
 
   /**
@@ -82,32 +66,18 @@ export const wishlistService = {
   async addToWishlist(userId, homestayId, homestayObj = null) {
     memoryCache = null; // Invalidate cache
     const targetId = Number(homestayId);
-
-    // Đồng bộ ngay lập tức vào bộ nhớ cache của client
-    const cacheKey = userId ? `wishlist_${userId}` : 'guest_wishlist';
-    try {
-      const raw = localStorage.getItem(cacheKey);
-      let list = raw ? JSON.parse(raw) : [];
-      if (!list.some(item => Number(item.id || item.homestayId) === targetId)) {
-        if (homestayObj) {
-          list.unshift(homestayObj);
-        } else {
-          list.unshift({ id: targetId, homestayId: targetId });
-        }
-        localStorage.setItem(cacheKey, JSON.stringify(list));
-      }
-    } catch (e) {}
+    if (!userId) throw new Error('Bạn cần đăng nhập để lưu homestay yêu thích.');
+    if (!Number.isInteger(targetId) || targetId <= 0) throw new Error('Homestay không hợp lệ.');
 
     // Gửi yêu cầu lưu vào CSDL qua backend API
-    if (userId) {
-      try {
+    try {
         const response = await fetch(`${API_BASE_URL}/users/${userId}/wishlist`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...authHeaders() },
           body: JSON.stringify({ homestayId: targetId }),
         });
-        if (response.ok) {
-          const res = await response.json();
+        const res = await response.json().catch(() => ({}));
+        if (response.ok && res.success !== false) {
           if (res.data) {
             try {
               const raw = localStorage.getItem(`wishlist_${userId}`);
@@ -120,12 +90,8 @@ export const wishlistService = {
           }
           return { success: true, data: res.data };
         }
-      } catch (err) {
-        console.warn('Lỗi thêm yêu thích vào DB:', err);
-      }
-    }
-
-    return { success: true };
+        throw new Error(res.message || `Không thể lưu wishlist (HTTP ${response.status}).`);
+    } catch (err) { throw err; }
   },
 
   /**
@@ -150,17 +116,15 @@ export const wishlistService = {
     if (userId) {
       try {
         const response = await fetch(`${API_BASE_URL}/users/${userId}/wishlist/${targetId}`, {
-          method: 'DELETE',
+          method: 'DELETE', headers: authHeaders(),
         });
         if (response.ok) {
           return { success: true };
         }
-      } catch (err) {
-        console.warn('Lỗi xóa yêu thích trong DB:', err);
-      }
+      } catch (err) { throw err; }
     }
 
-    return { success: true };
+    throw new Error('Bạn cần đăng nhập để xóa homestay yêu thích.');
   },
 
   /**
@@ -171,17 +135,14 @@ export const wishlistService = {
     if (userId) {
       try {
         const response = await fetch(`${API_BASE_URL}/users/${userId}/wishlist`, {
-          method: 'DELETE',
+          method: 'DELETE', headers: authHeaders(),
         });
         if (response.ok) {
           localStorage.removeItem(`wishlist_${userId}`);
           return { success: true };
         }
-      } catch (err) {
-        console.warn('Lỗi xóa sạch yêu thích trong DB:', err);
-      }
+      } catch (err) { throw err; }
     }
-    localStorage.removeItem('guest_wishlist');
-    return { success: true };
+    throw new Error('Bạn cần đăng nhập để xóa danh sách yêu thích.');
   }
 };

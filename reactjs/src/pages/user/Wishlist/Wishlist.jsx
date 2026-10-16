@@ -14,10 +14,11 @@ const SORT_OPTIONS = [
 
 export default function Wishlist() {
   const initialUser = authService.getCurrentUser();
+  // Hiển thị ngay bản ghi đã đồng bộ thành công gần nhất, sau đó revalidate từ DB.
   const cachedData = wishlistService.getCachedWishlist(initialUser ? initialUser.id : null);
 
   const [items, setItems] = useState(cachedData || []);
-  const [loading, setLoading] = useState(!cachedData || cachedData.length === 0);
+  const [loading, setLoading] = useState(!cachedData);
   const [activeRegion, setActiveRegion] = useState('all');
   const [sortBy, setSortBy] = useState('recent');
   const [sortDropdownOpen, setSortDropdownOpen] = useState(false);
@@ -74,6 +75,7 @@ export default function Wishlist() {
   // Xóa 1 sản phẩm khỏi yêu thích
   const handleRemoveItem = async (id, title) => {
     const targetId = Number(id);
+    const previousItems = items;
     setItems((prev) => prev.filter((item) => Number(item.id || item.homestayId) !== targetId));
 
     try {
@@ -83,7 +85,9 @@ export default function Wishlist() {
         localStorage.setItem('guest_wishlist', JSON.stringify(updated));
       }
     } catch (e) {
-      console.warn('Lỗi khi xóa trong DB:', e);
+      setItems(previousItems);
+      triggerToast(e.message || 'Không thể xóa khỏi danh sách yêu thích.', 'bi-exclamation-circle-fill text-danger');
+      return;
     }
 
     triggerToast(`Đã xóa "${title || 'Homestay'}" khỏi danh sách yêu thích!`, 'bi-heartbreak-fill text-danger');
