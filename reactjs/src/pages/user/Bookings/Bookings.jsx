@@ -54,6 +54,10 @@ export default function Bookings() {
   const handleChatOwner = async (arg) => {
     const user = authService.getCurrentUser();
     if (!user) { navigate('/login'); return; }
+    if (user?.role === 'OWNER') {
+      showToast('Bạn chính là chủ homestay bạn không thể chat với bản thân');
+      return;
+    }
     const homestayId = Number(
       (typeof arg === 'number' || (typeof arg === 'string' && !isNaN(arg)))
         ? arg
@@ -64,7 +68,11 @@ export default function Bookings() {
       const conversation = await chatService.open(homestayId);
       navigate('/messages', { state: { conversation } });
     } catch (err) {
-      showToast(err.message || 'Không thể mở cuộc trò chuyện.');
+      if (err.message?.includes('chủ') || err.message?.includes('bản thân')) {
+        showToast('Bạn chính là chủ homestay bạn không thể chat với bản thân');
+      } else {
+        showToast(err.message || 'Không thể mở cuộc trò chuyện.');
+      }
     }
   };
 

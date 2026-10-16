@@ -777,18 +777,6 @@ export default function HomestayDetail() {
   const [descExpanded, setDescExpanded] = useState(false);
   const [wishlist, setWishlist] = useState({});
   const [toast, setToast] = useState({ show: false, msg: '' });
-  const handleChatOwner = async () => {
-    const user = authService.getCurrentUser();
-    if (!user) { navigate('/login'); return; }
-    const homestayId = Number(homestay?.id || id);
-    if (!homestayId) return;
-    try {
-      const conversation = await chatService.open(homestayId);
-      navigate('/messages', { state: { conversation } });
-    } catch (e) {
-      setToast({ show: true, msg: e.message || 'Không thể mở cuộc trò chuyện.' });
-    }
-  };
 
   const location = useLocation();
 
@@ -1022,6 +1010,27 @@ export default function HomestayDetail() {
   };
 
   const navigate = useNavigate();
+
+  const handleChatOwner = async () => {
+    const user = authService.getCurrentUser();
+    if (!user) { navigate('/login'); return; }
+    if (user?.role === 'OWNER') {
+      showToast('Bạn chính là chủ homestay bạn không thể chat với bản thân');
+      return;
+    }
+    const homestayId = Number(homestay?.id || id);
+    if (!homestayId) return;
+    try {
+      const conversation = await chatService.open(homestayId);
+      navigate('/messages', { state: { conversation } });
+    } catch (e) {
+      if (e.message?.includes('chủ') || e.message?.includes('bản thân')) {
+        showToast('Bạn chính là chủ homestay bạn không thể chat với bản thân');
+      } else {
+        showToast(e.message || 'Không thể mở cuộc trò chuyện.');
+      }
+    }
+  };
 
   // Đánh giá và số lượt bình luận thực tế hoàn toàn từ CSDL (bảng reviews & users)
   const homestayReviewCount = reviewStats?.totalReviews ?? dbReviews.length;
