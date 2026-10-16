@@ -724,3 +724,6 @@
   flex-shrink: 0;
 }
 
+
+.owner-hs-item-placeholder { display: grid; place-items: center; background: #ecfdf5; color: #059669; }
+.owner-hs-error { color: #b91c1c; white-space: normal; padding: 8px 10px; }
