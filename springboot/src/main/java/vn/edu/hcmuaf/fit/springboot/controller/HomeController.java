@@ -207,16 +207,19 @@ public class HomeController {
             String citySlug = "other";
             if (h.getCity() != null) {
                 String c = h.getCity().toLowerCase();
-                if (c.contains("đà lạt")) citySlug = "dalat";
-                else if (c.contains("đà nẵng")) citySlug = "danang";
-                else if (c.contains("hội an")) citySlug = "hoian";
+                if (c.contains("đà lạt") || c.contains("da lat")) citySlug = "dalat";
+                else if (c.contains("đà nẵng") || c.contains("da nang")) citySlug = "danang";
+                else if (c.contains("hội an") || c.contains("hoi an")) citySlug = "hoian";
                 else if (c.contains("sapa") || c.contains("sa pa")) citySlug = "sapa";
+                else if (c.contains("ninh bình") || c.contains("ninh binh")) citySlug = "ninhbinh";
+                else if (c.contains("phú quốc") || c.contains("phu quoc")) citySlug = "phuquoc";
+                else if (c.contains("hà nội") || c.contains("ha noi")) citySlug = "hanoi";
                 else citySlug = c.replaceAll("\\s+", "-");
             }
             map.put("city", citySlug);
             map.put("location", h.getCity() != null ? h.getCity() : (h.getAddress() != null ? h.getAddress() : "Việt Nam"));
-            map.put("rating", h.getRating() != null ? h.getRating() : 4.5);
-            map.put("reviews", reviewCountMap.getOrDefault(h.getId(), 10));
+            map.put("rating", h.getRating() != null ? h.getRating() : 4.8);
+            map.put("reviews", reviewCountMap.getOrDefault(h.getId(), 25));
             map.put("specs", (h.getNumRooms() != null ? h.getNumRooms() : 1) + " phòng ngủ · " + (h.getMaxGuests() != null ? h.getMaxGuests() : 2) + " khách");
             map.put("amenities", h.getAmenities() != null ? h.getAmenities() : "Đầy đủ tiện nghi");
             map.put("price", formatPrice(h.getBasePrice()));
@@ -224,15 +227,15 @@ public class HomeController {
             return map;
         }).collect(Collectors.toList());
 
-        // 5. Hot Homestays (Top 4)
-        List<Map<String, Object>> hotHomestays = mappedHomestays.stream().limit(4).map(m -> {
+        // 5. Hot Homestays (Top 16)
+        List<Map<String, Object>> hotHomestays = mappedHomestays.stream().limit(16).map(m -> {
             Map<String, Object> updated = new HashMap<>(m);
             updated.put("tag", "Top Bán Chạy");
             return updated;
         }).collect(Collectors.toList());
 
-        // 6. Favorite Homestays (Next 4 or Random 4)
-        List<Map<String, Object>> favoritesHomestays = mappedHomestays.stream().skip(Math.max(0, mappedHomestays.size() - 4)).map(m -> {
+        // 6. Favorite Homestays (Toàn bộ danh sách homestay chất lượng theo từng thành phố)
+        List<Map<String, Object>> favoritesHomestays = mappedHomestays.stream().map(m -> {
             Map<String, Object> updated = new HashMap<>(m);
             updated.put("tag", "Du khách yêu thích");
             return updated;
