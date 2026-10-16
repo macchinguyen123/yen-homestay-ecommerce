@@ -15,6 +15,19 @@ function removeVietnameseTones(str) {
   return s.toLowerCase().trim();
 }
 
+// Hàm phân loại tỉnh thành cho Homestay
+export function getCitySlug(cityStr = '', locationStr = '') {
+  const combined = ((cityStr || '') + ' ' + (locationStr || '')).toLowerCase();
+  if (combined.includes('đà lạt') || combined.includes('da lat') || combined.includes('dalat') || combined.includes('lâm đồng')) return 'dalat';
+  if (combined.includes('đà nẵng') || combined.includes('da nang') || combined.includes('danang') || combined.includes('sơn trà')) return 'danang';
+  if (combined.includes('hội an') || combined.includes('hoi an') || combined.includes('hoian') || combined.includes('quảng nam')) return 'hoian';
+  if (combined.includes('sapa') || combined.includes('sa pa') || combined.includes('lào cai')) return 'sapa';
+  if (combined.includes('ninh bình') || combined.includes('ninh binh') || combined.includes('tràng an') || combined.includes('gia viễn')) return 'ninhbinh';
+  if (combined.includes('phú quốc') || combined.includes('phu quoc') || combined.includes('kiên giang')) return 'phuquoc';
+  if (combined.includes('hà nội') || combined.includes('ha noi') || combined.includes('hanoi') || combined.includes('ba vì')) return 'hanoi';
+  return 'other';
+}
+
 // Danh mục điểm đến thịnh hành & gợi ý phong cách du lịch
 const POPULAR_DESTINATIONS = [
   { name: 'Đà Lạt', desc: 'Thành phố mộng mơ & săn mây', icon: 'bi-cloud-sun', homestaysCount: '120+ homestay', badge: 'Hot' },
@@ -356,86 +369,74 @@ export default function Homepage() {
       setIsLoading(true);
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 2500);
+        const timeoutId = setTimeout(() => controller.abort(), 3500);
 
-        const homeRes = await fetch('http://localhost:8081/api/public/home', { signal: controller.signal });
+        const [homeRes, realHomestays] = await Promise.all([
+          fetch('http://localhost:8081/api/public/home', { signal: controller.signal })
+            .then(res => res.ok ? res.json() : null)
+            .catch(() => null),
+          homestayService.getAllHomestays().catch(() => null)
+        ]);
         clearTimeout(timeoutId);
 
-        if (homeRes.ok) {
-          const data = await homeRes.json();
-          if (data && data.heroSlides && isMounted) {
-            const mappedExperiences = (data.experiences || []).map(exp => ({
-              ...exp,
-              cat: exp.cat || getCategorySlug(exp)
-            }));
-            setHomeData(prev => ({
-              ...prev,
-              ...data,
-              experiences: mappedExperiences.length > 0 ? mappedExperiences : prev.experiences
-            }));
-            setIsLoading(false);
-            return; // Data loaded in 1 lightning-fast request!
-          }
+        if (!isMounted) return;
+
+        let mappedHomestays = [];
+        if (Array.isArray(realHomestays) && realHomestays.length > 0) {
+          mappedHomestays = realHomestays.map((h, i) => {
+            const citySlug = getCitySlug(h.city, h.address || h.location);
+            let ratingVal = h.rating ? (h.rating > 5 ? (h.rating / 2).toFixed(1) : Number(h.rating).toFixed(1)) : '5';
+            if (ratingVal.endsWith('.0')) ratingVal = ratingVal.slice(0, -2);
+            const reviewsVal = h.reviewCount || h.reviews || h.totalReviews || (h.id ? ((Number(String(h.id).replace(/\D/g, '')) || 1) * 7) % 65 + 18 : 25);
+            const priceVal = Number(h.price || h.basePrice || h.pricePerNight || 1200000);
+            const priceFormatted = Number(priceVal).toLocaleString('vi-VN') + 'đ';
+
+            const numRooms = h.rooms?.length || h.numRooms || (h.id ? ((Number(String(h.id).replace(/\D/g, '')) || 2) % 4 + 2) : 3);
+            const numGuests = h.maxGuests || (numRooms * 2 + 2);
+            const specsVal = `${numRooms} phòng ngủ · ${numGuests} khách`;
+
+            const amenitiesVal = h.amenities || h.tags || 'Sân gạch & giếng nước · Bếp củi truyền thống · Không gian xanh';
+            const imgVal = (h.images && h.images.length > 0 ? h.images[0] : null) || h.image || h.primaryImage || h.thumb || h.gallery?.[0] || 'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=600&q=80';
+            const tagVal = i % 4 === 0 ? 'Top 1 Bán Chạy' : (i % 4 === 1 ? 'Du khách yêu thích' : (i % 4 === 2 ? 'Chủ nhà tận tâm' : 'Đã đặt 30+ lần'));
+
+            return {
+              id: h.id || h.homestayId,
+              name: h.name,
+              city: citySlug,
+              location: h.city || h.address || 'Việt Nam',
+              rating: ratingVal,
+              reviews: reviewsVal,
+              specs: specsVal,
+              amenities: amenitiesVal,
+              price: priceFormatted,
+              tag: tagVal,
+              img: imgVal
+            };
+          });
         }
-      } catch (err) {
-        console.warn('Lỗi hoặc timeout khi tải dữ liệu trang chủ trực tiếp, chuyển sang phương án fallback:', err);
-      }
 
-      try {
-        const realHomestays = await homestayService.getAllHomestays();
-        if (isMounted && realHomestays && realHomestays.length > 0) {
-          const mappedHomestays = realHomestays.map((h, i) => ({
-            id: h.id || h.homestayId,
-            name: h.name,
-            city: (h.city || 'dalat').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').replace(/ /g, ''),
-            location: h.address || h.city,
-            rating: h.rating || 5.0,
-            reviews: h.reviews || h.totalReviews || Math.floor(Math.random() * 200) + 10,
-            specs: `${h.numRooms || 1} phòng ngủ · ${h.maxGuests || 2} khách`,
-            amenities: h.amenities || 'Tiện nghi tiêu chuẩn',
-            price: h.basePrice ? Number(h.basePrice).toLocaleString('vi-VN') + 'đ' : (h.price ? (typeof h.price === 'number' ? h.price.toLocaleString('vi-VN') + 'đ' : h.price) : '1.500.000đ'),
-            tag: i === 0 ? 'Top 1 Bán Chạy' : (i < 3 ? `Đã đặt ${30 - i} lần` : 'Khuyến mãi'),
-            img: (h.images && h.images.length > 0) ? h.images[0] : (h.image || h.primaryImage || 'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=600&q=80')
+        if (homeRes) {
+          const mappedExperiences = (homeRes.experiences || []).map(exp => ({
+            ...exp,
+            cat: exp.cat || getCategorySlug(exp)
           }));
-
-          // Dynamic Festival homestays filtered from real database homestays
-          const danangHs = mappedHomestays.filter(h => (h.location + ' ' + h.city).toLowerCase().includes('danang') || (h.location + ' ' + h.city).toLowerCase().includes('đà nẵng') || (h.location + ' ' + h.city).toLowerCase().includes('da nang'));
-          const dalatHs = mappedHomestays.filter(h => (h.location + ' ' + h.city).toLowerCase().includes('dalat') || (h.location + ' ' + h.city).toLowerCase().includes('đà lạt') || (h.location + ' ' + h.city).toLowerCase().includes('da lat'));
-
-          const dynamicFestivals = {
-            diff: {
-              badge: 'Sắp diễn ra vào tháng 6',
-              name: 'Lễ Hội Pháo Hoa Quốc Tế Đà Nẵng (DIFF)',
-              location: 'Sân khấu bờ sông Hàn, TP. Đà Nẵng',
-              date: '08/06 - 13/07/2026',
-              homestays: (danangHs.length > 0 ? danangHs : mappedHomestays.slice(0, 3)).map((h, idx) => ({
-                ...h,
-                distance: `Cách điểm bắn pháo hoa ~${(idx + 1) * 350}m`,
-                tag: idx % 2 === 0 ? 'Gần khán đài pháo hoa' : 'Đi bộ ra lễ hội'
-              }))
-            },
-            dalat: {
-              badge: 'Khai mạc cuối năm',
-              name: 'Festival Hoa Đà Lạt Sắc Màu Xứ Ngàn Hoa',
-              location: 'Quảng trường Lâm Viên & Hồ Xuân Hương, Đà Lạt',
-              date: '18/12 - 31/12/2026',
-              homestays: (dalatHs.length > 0 ? dalatHs : mappedHomestays.slice(0, 3)).map((h, idx) => ({
-                ...h,
-                distance: `Cách Quảng trường Lâm Viên ~${(idx + 1) * 400}m`,
-                tag: idx % 2 === 0 ? 'Đi bộ ra Festival' : 'Săn mây thung lũng'
-              }))
-            }
-          };
 
           setHomeData(prev => ({
             ...prev,
-            hotHomestays: mappedHomestays,
-            favoritesHomestays: mappedHomestays,
-            festivals: dynamicFestivals
+            ...homeRes,
+            experiences: mappedExperiences.length > 0 ? mappedExperiences : prev.experiences,
+            hotHomestays: mappedHomestays.length > 0 ? mappedHomestays.slice(0, 16) : (homeRes.hotHomestays && homeRes.hotHomestays.length > 0 ? homeRes.hotHomestays : prev.hotHomestays),
+            favoritesHomestays: mappedHomestays.length > 0 ? mappedHomestays : (homeRes.favoritesHomestays && homeRes.favoritesHomestays.length > 0 ? homeRes.favoritesHomestays : prev.favoritesHomestays)
+          }));
+        } else if (mappedHomestays.length > 0) {
+          setHomeData(prev => ({
+            ...prev,
+            hotHomestays: mappedHomestays.slice(0, 16),
+            favoritesHomestays: mappedHomestays
           }));
         }
       } catch (err) {
-        console.warn('Failed to fetch real homestays:', err);
+        console.warn('Lỗi khi tải dữ liệu trang chủ:', err);
       } finally {
         if (isMounted) setIsLoading(false);
       }
@@ -612,10 +613,13 @@ export default function Homepage() {
     }
   };
 
-  const filteredFavorites = (homeData.favoritesHomestays || []).filter((h) => {
-    if (favCityFilter === 'all') return true;
-    return h.city === favCityFilter;
-  });
+  const filteredFavorites = useMemo(() => {
+    const list = homeData.favoritesHomestays || [];
+    if (favCityFilter === 'all') {
+      return list.slice(0, 32);
+    }
+    return list.filter((h) => h.city === favCityFilter);
+  }, [homeData.favoritesHomestays, favCityFilter]);
 
   const festivalTabs = (databaseFestivals && databaseFestivals.length > 0) ? databaseFestivals : DEFAULT_FESTIVALS;
   const activeFestData = festivalTabs.find(festival => festival.key === activeFestivalKey) || festivalTabs[0];
@@ -1541,7 +1545,7 @@ export default function Homepage() {
           <h2 className="section-title">Những homestay được yêu thích</h2>
           <p className="section-subtitle">Đánh giá thực tế từ hàng ngàn du khách đã trải nghiệm trọn vẹn sự tận tâm của chủ nhà</p>
 
-          <div className="filter-tabs-wrapper">
+          <div className="filter-tabs-wrapper" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
             <div className="city-filter-tabs">
               {[
                 { key: 'all', label: 'Tất cả' },
@@ -1549,6 +1553,9 @@ export default function Homepage() {
                 { key: 'danang', label: 'Đà Nẵng' },
                 { key: 'hoian', label: 'Hội An' },
                 { key: 'sapa', label: 'Sapa' },
+                { key: 'ninhbinh', label: 'Ninh Bình' },
+                { key: 'phuquoc', label: 'Phú Quốc' },
+                { key: 'hanoi', label: 'Hà Nội' },
               ].map((tab) => (
                 <button
                   key={tab.key}
@@ -1562,6 +1569,27 @@ export default function Homepage() {
                   {tab.label}
                 </button>
               ))}
+            </div>
+
+            <div className="slider-nav-controls">
+              <button
+                type="button"
+                className="slider-nav-circle-btn"
+                onClick={() => scrollSlider(favSliderRef, -1)}
+                aria-label="Xem homestay trước"
+                title="Lướt qua trái"
+              >
+                <i className="bi bi-chevron-left" />
+              </button>
+              <button
+                type="button"
+                className="slider-nav-circle-btn"
+                onClick={() => scrollSlider(favSliderRef, 1)}
+                aria-label="Xem homestay tiếp theo"
+                title="Lướt qua phải"
+              >
+                <i className="bi bi-chevron-right" />
+              </button>
             </div>
           </div>
 
@@ -1603,7 +1631,9 @@ export default function Homepage() {
                 <div key={h.id} className="homestay-slider-item">
                   <div className="homestay-card">
                     <div className="card-img-wrapper">
-                      <span className="card-top-tag">{h.tag}</span>
+                      <span className="card-top-tag tag-hot">
+                        <i className="bi bi-fire" /> {h.tag || 'Top Bán Chạy'}
+                      </span>
                       <button
                         type="button"
                         className={`card-wishlist-btn ${isWishlisted(h.id, h.name) ? 'active' : ''}`}

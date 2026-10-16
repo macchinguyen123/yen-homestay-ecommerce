@@ -1,5 +1,5 @@
 import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from 'react';
-import { useNavigate, useParams, useSearchParams, useLocation } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams, useLocation, Link } from 'react-router-dom';
 import './HomestayDetail.css';
 import { authService } from '../../../services/authService';
 import { viewedHistoryService } from '../../../services/viewedHistoryService';
@@ -18,6 +18,18 @@ import {
 import { GalleryModal } from '@/components/ui/interactive-bento-gallery';
 
 // ─── Helpers ──────────────────────────────────────────────────
+function formatAmenities(raw) {
+  if (!raw) return 'Tiện nghi tiêu chuẩn';
+  if (Array.isArray(raw)) {
+    return raw.map(s => String(s).trim()).filter(Boolean).join(' · ');
+  }
+  let str = String(raw).trim();
+  str = str.replace(/^[{\[\s"]+/, '').replace(/[}\]\s"]+$/, '');
+  str = str.replace(/"\s*,\s*"/g, ' · ').replace(/"\s*/g, '').replace(/\s*"/g, '');
+  str = str.replace(/[{}[\]"]/g, '');
+  return str || 'Tiện nghi tiêu chuẩn';
+}
+
 function toInputDate(d) {
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
@@ -816,6 +828,9 @@ export default function HomestayDetail() {
   const [dbExperiences, setDbExperiences] = useState([]);
   const [loadingExperiences, setLoadingExperiences] = useState(false);
 
+  // Danh sách toàn bộ homestay thực tế từ CSDL để gợi ý homestay tương tự phong phú
+  const [allHomestays, setAllHomestays] = useState([]);
+
   // Bộ lọc và phân trang đánh giá trực tiếp trên trang Homestay
   const [pageReviewStars, setPageReviewStars] = useState('all');
   const [pageReviewPhotoOnly, setPageReviewPhotoOnly] = useState(false);
@@ -825,6 +840,18 @@ export default function HomestayDetail() {
   const roomsSectionRef = useRef(null);
   const reviewsSectionRef = useRef(null);
   const toastTimer = useRef(null);
+  const similarSliderRef = useRef(null);
+
+  const scrollSlider = (ref, direction) => {
+    if (ref && ref.current) {
+      const containerWidth = ref.current.clientWidth;
+      const scrollStep = containerWidth > 768 ? Math.floor(containerWidth * 0.75) : 300;
+      ref.current.scrollBy({
+        left: direction * scrollStep,
+        behavior: 'smooth'
+      });
+    }
+  };
 
   // Cuộn ngay lập tức lên đầu trang khi mở chi tiết homestay
   useLayoutEffect(() => {
@@ -868,10 +895,16 @@ export default function HomestayDetail() {
           setLoading(false);
         }
 
-        // Nạp song song Reviews, Stats và Experiences trong nền
+        // Nạp song song Reviews, Stats, Experiences và toàn bộ danh sách Homestay trong nền
         const targetHsId = homestayIdNum || (activeH?.id && !isNaN(activeH.id) ? Number(activeH.id) : 1);
         if (targetHsId) {
           setLoadingExperiences(true);
+          homestayService.getAllHomestays().then((list) => {
+            if (isMounted && Array.isArray(list) && list.length > 0) {
+              setAllHomestays(list);
+            }
+          }).catch(() => {});
+
           Promise.all([
             reviewService.getReviewsByHomestayId(targetHsId),
             reviewService.getReviewStats(targetHsId),
@@ -1055,23 +1088,93 @@ export default function HomestayDetail() {
     : EXPERIENCE_PREVIEW_IDS.map((eid) => experiencesData.find((x) => x.id === eid)).filter(Boolean);
 
   const relatedHomestays = useMemo(() => {
-    const others = SAMPLE_HOMESTAYS.filter(
-      (h) => String(h.id) !== String(homestay?.id) && h.name !== homestay?.name
-    );
-    const sameCity = others.filter((h) => homestay?.city && h.city && h.city.toLowerCase() === homestay.city.toLowerCase());
-    const pool = [...sameCity, ...others.filter((h) => !sameCity.includes(h))];
-    return pool.slice(0, 3).map((h) => ({
-      id: h.id,
-      name: h.name,
-      location: h.location || h.city || 'Việt Nam',
-      rating: h.rating ? (h.rating > 5 ? (h.rating / 2).toFixed(2) : Number(h.rating).toFixed(2)) : '4.90',
-      reviews: h.reviewCount || h.reviews || 68,
-      specs: `${h.rooms?.length || 2} loại phòng · Phù hợp nghỉ dưỡng`,
-      amenities: h.tags?.join(' · ') || 'Wifi miễn phí · Bữa sáng · Ban công',
-      price: fmtVND(h.price || h.pricePerNight || 850000),
-      img: h.image || h.gallery?.[0] || 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=700&q=80'
-    }));
-  }, [homestay]);
+    const sourcePool = allHomestays && allHomestays.length > 0 ? allHomestays : SAMPLE_HOMESTAYS;
+    const currentId = String(homestay?.id || id || '');
+    const currentName = (homestay?.name || '').trim().toLowerCase();
+    const currentCity = (homestay?.city || homestay?.location || '').trim().toLowerCase();
+    const currentCategoryId = homestay?.categoryId || homestay?.category?.id;
+    const currentPrice = Number(homestay?.price || homestay?.basePrice || minPrice || 1000000);
+
+    const others = sourcePool.filter((h) => {
+      const hId = String(h.id);
+      const hName = (h.name || '').trim().toLowerCase();
+      return hId !== currentId && hName !== currentName;
+    });
+
+    if (others.length === 0) return [];
+
+    const currentSeed = Number(currentId.replace(/\D/g, '')) || 1;
+
+    const scored = others.map((h) => {
+      let score = 0;
+      const hCity = (h.city || h.location || h.address || '').toLowerCase();
+      const hCat = h.categoryId || h.category?.id;
+      const hPrice = Number(h.price || h.basePrice || h.pricePerNight || 1000000);
+      const hIdNum = Number(String(h.id).replace(/\D/g, '')) || 1;
+
+      // 1. Cùng thành phố / khu vực (+100 điểm)
+      if (currentCity) {
+        if (hCity.includes(currentCity) || currentCity.includes(hCity)) {
+          score += 100;
+        } else {
+          const regions = ['đà lạt', 'sapa', 'hội an', 'ninh bình', 'phú quốc', 'huế', 'ba vì', 'đà nẵng', 'khánh hòa', 'nha trang', 'hà nội', 'hạ long', 'vũng tàu'];
+          for (const reg of regions) {
+            if (currentCity.includes(reg) && hCity.includes(reg)) {
+              score += 90;
+              break;
+            }
+          }
+        }
+      }
+
+      // 2. Cùng phân loại / kiểu homestay (+45 điểm)
+      if (currentCategoryId && hCat && currentCategoryId === hCat) score += 45;
+
+      // 3. Phân khúc giá tương đồng chênh lệch dưới 40% (+25 điểm)
+      if (currentPrice > 0 && Math.abs(hPrice - currentPrice) / currentPrice < 0.4) score += 25;
+
+      // 4. Điểm đánh giá cao (+ tối đa 20 điểm)
+      const hRatingNum = Number(h.rating || 4.8);
+      score += Math.min(hRatingNum * 4, 20);
+
+      // 5. Yếu tố ngẫu nhiên theo ID homestay hiện tại để mỗi homestay gợi ý danh sách phong phú khác biệt
+      const pseudoRandom = ((currentSeed * 37 + hIdNum * 19) % 73);
+      score += pseudoRandom;
+
+      return { h, score };
+    });
+
+    scored.sort((a, b) => b.score - a.score);
+
+    return scored.slice(0, 16).map(({ h, score }) => {
+      let ratingVal = h.rating ? (h.rating > 5 ? (h.rating / 2).toFixed(1) : Number(h.rating).toFixed(1)) : '5';
+      if (ratingVal.endsWith('.0')) ratingVal = ratingVal.slice(0, -2);
+      const reviewsVal = h.reviewCount || h.reviews || (h.id ? ((Number(String(h.id).replace(/\D/g, '')) || 1) * 7) % 65 + 18 : 1);
+      const priceVal = Number(h.price || h.basePrice || h.pricePerNight || 850000);
+      const imgVal = h.image || h.primaryImage || h.thumb || h.gallery?.[0] || 'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=600&q=80';
+      const locVal = h.city || h.location || h.address || 'Việt Nam';
+      
+      const numRooms = h.rooms?.length || (h.id ? ((Number(String(h.id).replace(/\D/g, '')) || 2) % 4 + 2) : 4);
+      const numGuests = h.maxGuests || (numRooms * 2 + 2);
+      const specsVal = `${numRooms} phòng ngủ · ${numGuests} khách`;
+
+      const amenitiesVal = h.amenities || h.tags || 'Sân gạch & giếng nước · Bếp củi truyền thống · Không gian xanh';
+      const tagVal = h.tag || (score > 120 ? 'Top Bán Chạy' : (score > 80 ? 'Yêu thích' : 'Top Bán Chạy'));
+
+      return {
+        id: h.id,
+        name: h.name,
+        location: locVal,
+        rating: ratingVal,
+        reviews: reviewsVal,
+        specs: specsVal,
+        amenities: amenitiesVal,
+        price: fmtVND(priceVal),
+        img: imgVal,
+        tag: tagVal
+      };
+    });
+  }, [allHomestays, homestay, id, minPrice]);
 
   const homestayName = homestay?.name || 'The Pine Hill Retreat';
   const homestayAddress = homestay?.address || homestay?.location || 'Phường 3, TP. Đà Lạt, Lâm Đồng';
@@ -1582,50 +1685,159 @@ export default function HomestayDetail() {
         <div className="hd-container">
           <div className="similar-head">
             <div>
-              <h2 className="similar-title">Homestay tương tự {homestay?.city ? `gần ${homestay.city}` : 'được yêu thích'}</h2>
-              <p className="similar-sub">Cùng phong cách nghỉ dưỡng tiện nghi và không gian thiên nhiên trong lành.</p>
+              <h2 className="similar-title">Homestay tương tự {homestay?.city ? `tại ${homestay.city}` : 'được yêu thích nhất'}</h2>
+              <p className="similar-sub">Gợi ý {relatedHomestays.length} điểm đến cùng phong cách nghỉ dưỡng tiện nghi và không gian thiên nhiên trong lành.</p>
+            </div>
+            <div className="slider-nav-controls">
+              <button
+                type="button"
+                className="slider-nav-circle-btn"
+                onClick={() => scrollSlider(similarSliderRef, -1)}
+                aria-label="Xem homestay trước"
+                title="Lướt qua trái"
+              >
+                <i className="bi bi-chevron-left" />
+              </button>
+              <button
+                type="button"
+                className="slider-nav-circle-btn"
+                onClick={() => scrollSlider(similarSliderRef, 1)}
+                aria-label="Xem homestay tiếp theo"
+                title="Lướt qua phải"
+              >
+                <i className="bi bi-chevron-right" />
+              </button>
             </div>
           </div>
-          <div className="similar-grid">
-            {relatedHomestays.map((item, i) => (
-              <article key={item.id || i} className="sim-card">
-                <button type="button"
-                  className={`sim-wish ${wishlist[item.name] ? 'active' : ''}`}
-                  onClick={() => {
-                    setWishlist((w) => ({ ...w, [item.name]: !w[item.name] }));
-                    showToast(!wishlist[item.name] ? `Đã thêm "${item.name}" vào Wishlist!` : `Đã bỏ lưu "${item.name}" khỏi Wishlist.`);
-                  }}
-                  title="Lưu vào Wishlist">
-                  <i className={`bi ${wishlist[item.name] ? 'bi-heart-fill' : 'bi-heart'}`} />
-                </button>
-                <div className="sim-media" style={{ cursor: 'pointer' }} onClick={() => navigate(`/homestay/${item.id}`)}>
-                  <img src={item.img} alt={item.name} loading="lazy" />
-                </div>
-                <div className="sim-body">
-                  <div className="sim-meta">
-                    <span className="sim-loc"><i className="bi bi-geo-alt-fill" /> {item.location}</span>
-                    <span className="sim-rate"><i className="bi bi-star-fill" /> {item.rating} <small>({item.reviews})</small></span>
-                  </div>
-                  <h3 className="sim-title">
-                    <a href={`/homestay/${item.id}`} onClick={(e) => { e.preventDefault(); navigate(`/homestay/${item.id}`); }}>
-                      {item.name}
-                    </a>
-                  </h3>
-                  <p className="sim-specs">{item.specs}</p>
-                  <ul className="sim-tags">
-                    {item.amenities.split(' · ').map((a, j) => <li key={j}>{a}</li>)}
-                  </ul>
-                  <div className="sim-foot">
-                    <div className="sim-price">
-                      <small>Giá từ</small><b>{item.price}</b><small>/ đêm</small>
+
+          <div className="homestay-slider-wrap">
+            <button
+              type="button"
+              className="homestay-slider-arrow arrow-prev"
+              style={{
+                position: 'absolute',
+                top: '50%',
+                left: '-20px',
+                transform: 'translateY(-50%)',
+                zIndex: 35,
+                width: '44px',
+                height: '52px',
+                borderRadius: '12px',
+                background: 'rgba(255, 255, 255, 0.85)',
+                backdropFilter: 'blur(12px)',
+                WebkitBackdropFilter: 'blur(12px)',
+                border: '1.5px solid rgba(255, 255, 255, 0.95)',
+                boxShadow: '0 6px 20px rgba(15, 23, 42, 0.14)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '1.25rem',
+                color: '#1E293B',
+                cursor: 'pointer',
+                outline: 'none',
+                transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+              }}
+              onClick={() => scrollSlider(similarSliderRef, -1)}
+              aria-label="Xem homestay trước"
+            >
+              <i className="bi bi-chevron-left" />
+            </button>
+
+            <div className="homestay-slider-track" ref={similarSliderRef}>
+              {relatedHomestays.map((h, i) => (
+                <div key={h.id || i} className="homestay-slider-item">
+                  <div className="homestay-card">
+                    <div className="card-img-wrapper">
+                      <span className="card-top-tag tag-hot">
+                        <i className="bi bi-fire" /> {h.tag}
+                      </span>
+                      <button
+                        type="button"
+                        className={`card-wishlist-btn ${wishlist[h.name] ? 'active' : ''}`}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setWishlist((w) => ({ ...w, [h.name]: !w[h.name] }));
+                          showToast(!wishlist[h.name] ? `Đã thêm "${h.name}" vào Wishlist!` : `Đã bỏ lưu "${h.name}" khỏi Wishlist.`);
+                        }}
+                        title={wishlist[h.name] ? 'Bỏ yêu thích' : 'Lưu vào yêu thích'}
+                      >
+                        <i className={`bi ${wishlist[h.name] ? 'bi-heart-fill' : 'bi-heart'}`} />
+                      </button>
+                      <Link to={`/homestay/${h.id}`} style={{ display: 'block', height: '100%' }}>
+                        <img
+                          src={h.img}
+                          alt={h.name}
+                          loading="lazy"
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        />
+                      </Link>
                     </div>
-                    <button type="button" className="yn-btn yn-btn--primary yn-btn--sm" onClick={() => navigate(`/homestay/${item.id}`)}>
-                      Xem chi tiết
-                    </button>
+                    <div className="card-body">
+                      <div className="card-location-rating">
+                        <span className="card-location">
+                          <i className="bi bi-geo-alt-fill text-success" /> {h.location}
+                        </span>
+                        <span className="card-rating">
+                          <i className="bi bi-star-fill" /> {h.rating} ({h.reviews})
+                        </span>
+                      </div>
+                      <h3 className="card-title">
+                        <Link to={`/homestay/${h.id}`}>{h.name}</Link>
+                      </h3>
+                      <div className="card-specs">
+                        <span>{h.specs}</span>
+                      </div>
+                      <div className="card-amenities-box">
+                        <span className="amenities-label">Tiện nghi nổi bật:</span>
+                        <p className="amenities-items">{formatAmenities(h.amenities)}</p>
+                      </div>
+                      <div className="card-footer-row">
+                        <div>
+                          <span className="price-label">Giá từ:</span>
+                          <span className="card-price">{h.price}</span>
+                        </div>
+                        <Link to={`/homestay/${h.id}`} className="btn-view-room">
+                          Xem homestay
+                        </Link>
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </article>
-            ))}
+              ))}
+            </div>
+
+            <button
+              type="button"
+              className="homestay-slider-arrow arrow-next"
+              style={{
+                position: 'absolute',
+                top: '50%',
+                right: '-20px',
+                transform: 'translateY(-50%)',
+                zIndex: 35,
+                width: '44px',
+                height: '52px',
+                borderRadius: '12px',
+                background: 'rgba(255, 255, 255, 0.85)',
+                backdropFilter: 'blur(12px)',
+                WebkitBackdropFilter: 'blur(12px)',
+                border: '1.5px solid rgba(255, 255, 255, 0.95)',
+                boxShadow: '0 6px 20px rgba(15, 23, 42, 0.14)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '1.25rem',
+                color: '#1E293B',
+                cursor: 'pointer',
+                outline: 'none',
+                transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+              }}
+              onClick={() => scrollSlider(similarSliderRef, 1)}
+              aria-label="Xem homestay tiếp theo"
+            >
+              <i className="bi bi-chevron-right" />
+            </button>
           </div>
         </div>
       </section>

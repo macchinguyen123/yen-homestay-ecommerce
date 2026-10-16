@@ -138,19 +138,20 @@ public class ReviewAnalyticsController {
 
         badReview = reviewRepository.save(badReview);
 
-        return ResponseEntity.ok(Map.of(
-                "success", true,
-                "message", "Đã tạo thành công dữ liệu đánh giá xấu giả định cho chủ nhà lethimai86@gmail.com và hiển thị trên Admin!",
-                "reviewId", badReview.getId(),
-                "homestayId", targetHomestay.getId(),
-                "homestayName", targetHomestay.getName(),
-                "ownerEmail", owner.getEmail(),
-                "ownerName", owner.getFullName(),
-                "rating", badReview.getRating(),
-                "sentiment", badReview.getSentiment(),
-                "aspectTags", badReview.getAspectTags(),
-                "comment", badReview.getComment()
-        ));
+        Map<String, Object> respMap = new LinkedHashMap<>();
+        respMap.put("success", true);
+        respMap.put("message", "Đã tạo thành công dữ liệu đánh giá xấu giả định cho chủ nhà lethimai86@gmail.com và hiển thị trên Admin!");
+        respMap.put("reviewId", badReview.getId());
+        respMap.put("homestayId", targetHomestay.getId());
+        respMap.put("homestayName", targetHomestay.getName());
+        respMap.put("ownerEmail", owner.getEmail());
+        respMap.put("ownerName", owner.getFullName());
+        respMap.put("rating", badReview.getRating());
+        respMap.put("sentiment", badReview.getSentiment());
+        respMap.put("aspectTags", badReview.getAspectTags());
+        respMap.put("comment", badReview.getComment());
+
+        return ResponseEntity.ok(respMap);
     }
 
     // Owner gửi phản hồi review
