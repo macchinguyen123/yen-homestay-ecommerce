@@ -80,18 +80,6 @@ export default function Promotions() {
     return savedVoucherIds.includes(voucher.code) || savedVoucherIds.includes(voucher.id);
   };
 
-  const handleToggleSave = (item) => {
-    const isSaved = isVoucherSaved(item);
-    let nextSavedIds;
-    if (isSaved) {
-      nextSavedIds = savedVoucherIds.filter((id) => id !== item.code && id !== item.id);
-      triggerToast(`Đã bỏ lưu voucher "${item.code}".`);
-    } else {
-      nextSavedIds = [...savedVoucherIds, item.code];
-      triggerToast(`Đã lưu voucher "${item.code}" vào ví của bạn!`);
-    }
-    saveSavedIds(nextSavedIds);
-  };
 
   const handleSaveToWallet = (item) => {
     if (isVoucherSaved(item)) {
@@ -207,42 +195,7 @@ export default function Promotions() {
             >
               {item.collectionBadge}
             </span>
-            <button
-              className={`nearby-heart-btn ${saved ? 'active text-danger' : ''}`}
-              onClick={(e) => {
-                e.stopPropagation();
-                handleToggleSave(item);
-              }}
-              title={saved ? 'Bỏ lưu voucher' : 'Lưu voucher vào ví'}
-              style={{
-                position: 'absolute',
-                top: '10px',
-                right: '10px',
-                left: 'auto',
-                bottom: 'auto',
-                zIndex: 10,
-                width: '32px',
-                height: '32px',
-                borderRadius: '50%',
-                backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                border: 'none',
-                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.18)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: 'pointer',
-                padding: 0
-              }}
-            >
-              <i
-                className={`bi ${saved ? 'bi-heart-fill text-danger' : 'bi-heart'}`}
-                style={{
-                  fontSize: '0.95rem',
-                  color: saved ? '#E11D48' : '#475569',
-                  lineHeight: 1
-                }}
-              ></i>
-            </button>
+
             <img
               src={item.homestayImg}
               alt={item.homestayName}
@@ -360,7 +313,7 @@ export default function Promotions() {
 
               <div className="p-stat-item">
                 <div className="p-stat-icon">
-                  <i className="bi bi-house-heart"></i>
+                  <i className="bi bi-house-door-fill"></i>
                 </div>
                 <div className="p-stat-info">
                   <p className="v-val">{totalHomestaysCount} Homestay</p>

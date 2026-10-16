@@ -1,7 +1,8 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { authService } from '../../../services/authService';
 import { bookingService } from '../../../services/bookingService';
+import { chatService } from '../../../services/chatService';
 import './Bookings.css';
 
 const mapBooking = (b) => ({
@@ -43,9 +44,36 @@ export default function Bookings() {
   const [cmpContact, setCmpContact] = useState('');
   const [cmpResolution, setCmpResolution] = useState('apology');
 
+  const navigate = useNavigate();
+
   const showToast = (msg) => {
     setToast({ show: true, msg });
     setTimeout(() => setToast({ show: false, msg: '' }), 3200);
+  };
+
+  const handleChatOwner = async (arg) => {
+    const user = authService.getCurrentUser();
+    if (!user) { navigate('/login'); return; }
+    if (user?.role === 'OWNER') {
+      showToast('Bạn chính là chủ homestay bạn không thể chat với bản thân');
+      return;
+    }
+    const homestayId = Number(
+      (typeof arg === 'number' || (typeof arg === 'string' && !isNaN(arg)))
+        ? arg
+        : arg?.currentTarget?.dataset?.homestayId || arg?.target?.closest('button')?.dataset?.homestayId || arg?.homestayId || filteredBookings[0]?.homestayId
+    );
+    if (!homestayId) return;
+    try {
+      const conversation = await chatService.open(homestayId);
+      navigate('/messages', { state: { conversation } });
+    } catch (err) {
+      if (err.message?.includes('chủ') || err.message?.includes('bản thân')) {
+        showToast('Bạn chính là chủ homestay bạn không thể chat với bản thân');
+      } else {
+        showToast(err.message || 'Không thể mở cuộc trò chuyện.');
+      }
+    }
   };
 
   const loadBookings = useCallback(async () => {
@@ -353,8 +381,8 @@ export default function Bookings() {
 
                       {/* CARD FOOTER */}
                       <div className="bk-card-footer">
-                        <button type="button" className="btn-action-ghost" onClick={() => showToast(`Liên hệ hotline ${bk.homestayName}: 0949.050.888`)}>
-                          <i className="bi bi-telephone-fill text-success me-1" /> Liên hệ chủ nhà
+                        <button type="button" className="yn-btn yn-btn--outline yn-btn--lg yn-btn--block" data-homestay-id={bk.homestayId} onClick={handleChatOwner}>
+                          <i className="bi bi-chat-dots" /> Chat với chủ nhà
                         </button>
                         <div style={{ display: 'flex', gap: 8 }}>
                           <button type="button" className="btn-action-ghost" onClick={() => showToast(`Đang mở hóa đơn điện tử đơn ${bk.code}...`)}>

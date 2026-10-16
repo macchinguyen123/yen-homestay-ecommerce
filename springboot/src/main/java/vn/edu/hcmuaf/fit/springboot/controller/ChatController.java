@@ -32,7 +32,7 @@ public class ChatController {
         List<Map<String,Object>> hs=jdbc.queryForList("SELECT owner_id FROM homestays WHERE homestay_id=?",hid);
         if(hs.isEmpty()) throw new ResponseStatusException(HttpStatus.NOT_FOUND,"Homestay không tồn tại");
         long owner=((Number)hs.get(0).get("owner_id")).longValue();
-        if(owner==user) throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Chủ nhà không thể tự chat với mình");
+        if(owner==user) throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Bạn chính là chủ homestay bạn không thể chat với bản thân");
         jdbc.update("INSERT INTO chat_conversations(homestay_id,customer_id,owner_id) VALUES(?,?,?) ON CONFLICT(homestay_id,customer_id) DO NOTHING",hid,user,owner);
         return jdbc.queryForMap("SELECT c.*,h.name homestay_name FROM chat_conversations c JOIN homestays h ON h.homestay_id=c.homestay_id WHERE c.homestay_id=? AND c.customer_id=?",hid,user);
     }
