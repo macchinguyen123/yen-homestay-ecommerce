@@ -391,11 +391,17 @@ export default function Category() {
         await wishlistService.removeFromWishlist(currentUser ? currentUser.id : null, id);
         triggerToast(`Đã bỏ "${name}" khỏi danh sách yêu thích.`);
       } else {
-        await wishlistService.addToWishlist(currentUser ? currentUser.id : null, id, h);
         triggerToast(`Đã thêm "${name}" vào danh sách yêu thích!`);
+        await wishlistService.addToWishlist(currentUser ? currentUser.id : null, id, h);
       }
     } catch (err) {
       console.warn('Lỗi lưu CSDL wishlist:', err);
+      setWishlistIds((prev) => {
+        const next = new Set(prev);
+        if (alreadyLiked) next.add(id); else { next.delete(id); next.delete(name); }
+        return next;
+      });
+      triggerToast(err.message || 'Không thể cập nhật danh sách yêu thích.', 'bi-exclamation-circle-fill text-danger');
     }
   };
 

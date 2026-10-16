@@ -18,14 +18,6 @@ public class WishlistController {
     private final WishlistService wishlistService;
 
     /**
-     * Lấy danh sách homestay yêu thích mặc định từ CSDL (dành cho khách chưa đăng nhập hoặc xem danh sách gợi ý)
-     */
-    @GetMapping("/api/public/wishlist")
-    public ResponseEntity<List<WishlistDTO>> getPublicWishlist() {
-        return ResponseEntity.ok(wishlistService.getPublicWishlist());
-    }
-
-    /**
      * Lấy danh sách homestay yêu thích của User từ CSDL
      */
     @GetMapping("/api/users/{userId}/wishlist")
@@ -60,8 +52,8 @@ public class WishlistController {
                 }
             }
 
-            if (targetHomestayId == null) {
-                targetHomestayId = 1L;
+            if (targetHomestayId == null || targetHomestayId <= 0) {
+                throw new IllegalArgumentException("homestayId là bắt buộc");
             }
 
             WishlistDTO result = wishlistService.addToWishlist(userId, targetHomestayId);
