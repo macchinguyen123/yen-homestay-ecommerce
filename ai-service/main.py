@@ -70,6 +70,8 @@ def extract_embedding_from_pil(image: Image.Image) -> List[float]:
     inputs = processor(images=image, return_tensors="pt").to(device)
     with torch.no_grad():
         image_features = model.get_image_features(**inputs)
+        if hasattr(image_features, "pooler_output"):
+            image_features = image_features.pooler_output
         # Chuẩn hóa L2 norm để độ dài vector = 1.0 (phục vụ Cosine Distance trên pgvector)
         image_features = image_features / image_features.norm(p=2, dim=-1, keepdim=True)
         vector = image_features[0].cpu().numpy().tolist()

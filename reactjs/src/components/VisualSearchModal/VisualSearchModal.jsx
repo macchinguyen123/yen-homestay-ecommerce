@@ -1,9 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { visualSearchService } from '../../services/visualSearchService';
 import './VisualSearchModal.css';
 
 export default function VisualSearchModal({ isOpen, onClose }) {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('upload'); // 'upload' | 'url'
   const [selectedFile, setSelectedFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState('');
@@ -12,6 +13,8 @@ export default function VisualSearchModal({ isOpen, onClose }) {
   const [results, setResults] = useState(null);
   const [error, setError] = useState('');
   const [isDragging, setIsDragging] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [syncMessage, setSyncMessage] = useState('');
 
   const fileInputRef = useRef(null);
 
@@ -43,6 +46,8 @@ export default function VisualSearchModal({ isOpen, onClose }) {
     setResults(null);
     setError('');
     setLoading(false);
+    setSyncing(false);
+    setSyncMessage('');
   };
 
   const handleFileSelect = (file) => {
@@ -87,51 +92,86 @@ export default function VisualSearchModal({ isOpen, onClose }) {
 
     try {
       let res;
+      let searchedImg = previewUrl;
       if (activeTab === 'upload') {
         if (!selectedFile) {
           setError('Vui lòng chọn hoặc tải lên một bức ảnh trước.');
           setLoading(false);
           return;
         }
-        res = await visualSearchService.searchByImage(selectedFile, 8);
+        res = await visualSearchService.searchByImage(selectedFile, 12);
       } else {
         if (!inputUrl || !inputUrl.trim()) {
           setError('Vui lòng dán đường dẫn (URL) ảnh.');
           setLoading(false);
           return;
         }
-        res = await visualSearchService.searchByImageUrl(inputUrl.trim(), 8);
+        searchedImg = inputUrl.trim();
+        res = await visualSearchService.searchByImageUrl(inputUrl.trim(), 12);
       }
 
-      if (res && res.success && Array.isArray(res.data)) {
-        setResults(res.data);
+      // Lọc các kết quả có độ tương đồng từ 65% trở lên, loại bỏ các ảnh có % thấp
+      const rawList = (res && res.success && Array.isArray(res.data)) ? res.data : [];
+      const qualified = rawList.filter((item) => (item.similarity ?? 0) >= 65.0);
+
+      // Khi có kết quả phù hợp: Tự động chuyển sang trang tìm kiếm (độ tương đồng cao nhất xếp ở đầu)
+      if (qualified.length > 0) {
+        handleClose();
+        navigate('/search', {
+          state: {
+            visualResults: qualified,
+            visualSearchImage: searchedImg,
+          }
+        });
+        return;
       } else {
+        // Ảnh có độ tương đồng quá thấp hoặc không khớp
         setResults([]);
       }
     } catch (err) {
       console.error('Visual Search error:', err);
-      setError(err.message || 'Không thể kết nối đến máy chủ AI tìm kiếm ảnh.');
+      setError(err.message || 'Không thể kết nối đến máy chủ tìm kiếm ảnh.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSyncEmbeddings = async () => {
+    try {
+      setSyncing(true);
+      setError('');
+      setSyncMessage('Đang chuẩn bị hệ thống...');
+      await visualSearchService.setupPgvector();
+      
+      setSyncMessage('Đang cập nhật dữ liệu hình ảnh (vui lòng chờ trong giây lát)...');
+      const res = await visualSearchService.syncEmbeddings();
+      
+      if (res && res.report) {
+        setSyncMessage(`Đã cập nhật dữ liệu thành công (${res.report.success} ảnh)! Bạn hãy bấm "Tìm kiếm ngay" lại nhé.`);
+      } else {
+        setSyncMessage('Đã cập nhật dữ liệu thành công! Bạn hãy bấm "Tìm kiếm ngay" lại nhé.');
+      }
+    } catch (err) {
+      console.error('Lỗi sync:', err);
+      setSyncMessage('Chưa thể cập nhật: ' + (err.message || 'Không thể kết nối'));
+    } finally {
+      setSyncing(false);
     }
   };
 
   return (
     <div className="vsm-overlay" onClick={handleClose}>
       <div className="vsm-dialog" onClick={(e) => e.stopPropagation()}>
-        {/* Header */}
+        {/* Header - Thân thiện người dùng, không thuật ngữ chuyên môn */}
         <div className="vsm-header">
           <div className="vsm-title-wrap">
             <div className="vsm-icon-badge">
               <i className="bi bi-camera-fill" />
             </div>
             <div>
-              <h2 className="vsm-title">
-                Tìm kiếm bằng hình ảnh
-                <span className="vsm-model-tag">AI CLIP ViT-B/32</span>
-              </h2>
+              <h2 className="vsm-title">Tìm kiếm bằng hình ảnh</h2>
               <p className="vsm-subtitle">
-                Tải ảnh homestay/phòng ưng ý, AI sẽ quét đặc trưng vector & gợi ý chỗ nghỉ tương đồng nhất
+                Tải ảnh homestay bạn thích, hệ thống sẽ tìm các chỗ nghỉ có phong cách tương tự nhất
               </p>
             </div>
           </div>
@@ -191,19 +231,27 @@ export default function VisualSearchModal({ isOpen, onClose }) {
                 placeholder="Dán link ảnh tại đây (vd: https://images.unsplash.com/...)"
                 value={inputUrl}
                 onChange={(e) => setInputUrl(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter') { setPreviewUrl(inputUrl); handleExecuteSearch(); } }}
+                onKeyDown={(e) => { 
+                  if (e.key === 'Enter' && inputUrl.trim()) { 
+                    setPreviewUrl(inputUrl.trim()); 
+                  } 
+                }}
               />
               <button
                 type="button"
                 className="vsm-btn-submit-url"
-                onClick={() => { setPreviewUrl(inputUrl); handleExecuteSearch(); }}
+                onClick={() => { 
+                  if (inputUrl.trim()) {
+                    setPreviewUrl(inputUrl.trim()); 
+                  }
+                }}
               >
                 Tiếp tục
               </button>
             </div>
           )}
 
-          {/* Selected Image Preview & Scan Box */}
+          {/* Selected Image Preview & Action Box */}
           {previewUrl && (
             <div className="vsm-preview-container">
               <div className="vsm-preview-img-box">
@@ -212,10 +260,10 @@ export default function VisualSearchModal({ isOpen, onClose }) {
               </div>
               <div className="vsm-preview-meta">
                 <div className="vsm-preview-filename">
-                  {selectedFile ? selectedFile.name : 'Ảnh từ liên kết URL'}
+                  {selectedFile ? selectedFile.name : 'Ảnh từ liên kết'}
                 </div>
-                <div style={{ fontSize: '0.82rem', color: '#64748b' }}>
-                  {loading ? 'AI đang phân tích đặc trưng ảnh (Vector 512)...' : 'Đã tải ảnh lên thành công'}
+                <div style={{ fontSize: '0.85rem', color: '#64748b' }}>
+                  {loading ? 'Đang tìm kiếm chỗ nghỉ có phong cách tương tự...' : 'Đã tải ảnh lên thành công'}
                 </div>
                 <div className="vsm-preview-actions">
                   <button
@@ -227,11 +275,11 @@ export default function VisualSearchModal({ isOpen, onClose }) {
                     {loading ? (
                       <>
                         <span className="spinner-border spinner-border-sm" role="status" />
-                        Đang quét vector...
+                        Đang tìm kiếm...
                       </>
                     ) : (
                       <>
-                        <i className="bi bi-magic" />
+                        <i className="bi bi-search" />
                         Tìm kiếm ngay
                       </>
                     )}
@@ -257,64 +305,42 @@ export default function VisualSearchModal({ isOpen, onClose }) {
             </div>
           )}
 
-          {/* Results List */}
-          {results !== null && (
-            <div>
-              <div className="vsm-results-heading">
-                <h3 className="vsm-results-title">
-                  <i className="bi bi-stars text-warning" /> Homestay tương đồng nhất
-                </h3>
-                <span className="vsm-results-count">{results.length} kết quả</span>
+          {/* Khi không tìm thấy kết quả hoặc ảnh có % thấp */}
+          {results !== null && results.length === 0 && (
+            <div className="vsm-empty-box">
+              <i className="bi bi-image" />
+              <h4>Không tìm thấy ảnh nào giống</h4>
+              <p>Ảnh bạn chọn có độ tương đồng quá thấp so với các chỗ nghỉ hiện có. Bạn hãy thử tải ảnh khác rõ nét hơn về phòng ốc hoặc kiến trúc homestay nhé!</p>
+              
+              <div style={{ marginTop: '1rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
+                <button
+                  type="button"
+                  onClick={handleSyncEmbeddings}
+                  disabled={syncing}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    padding: '0.65rem 1.25rem',
+                    background: '#15803d',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '10px',
+                    fontWeight: 600,
+                    fontSize: '0.9rem',
+                    cursor: syncing ? 'not-allowed' : 'pointer',
+                    boxShadow: '0 2px 8px rgba(21, 128, 61, 0.25)'
+                  }}
+                >
+                  <i className={`bi ${syncing ? 'bi-arrow-repeat spin' : 'bi-arrow-clockwise'}`} />
+                  {syncing ? 'Đang cập nhật dữ liệu hình ảnh...' : '⚡ Cập nhật dữ liệu tìm kiếm ảnh'}
+                </button>
+                {syncMessage && (
+                  <p style={{ color: '#15803d', fontSize: '0.85rem', fontWeight: 600, margin: '0.25rem 0 0' }}>
+                    {syncMessage}
+                  </p>
+                )}
               </div>
-
-              {results.length === 0 ? (
-                <div className="vsm-empty-box">
-                  <i className="bi bi-search" />
-                  <h4>Chưa tìm thấy homestay tương đồng</h4>
-                  <p>Hãy thử tải ảnh rõ nét hơn về kiến trúc hoặc phòng ốc homestay nhé!</p>
-                </div>
-              ) : (
-                <div className="vsm-results-grid">
-                  {results.map((item) => (
-                    <Link
-                      key={item.homestayId}
-                      to={`/homestay/${item.homestayId}`}
-                      className="vsm-result-card"
-                      onClick={handleClose}
-                    >
-                      <div className="vsm-card-thumb-wrap">
-                        <img
-                          src={item.matchedImageUrl || 'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=300&q=80'}
-                          alt={item.name}
-                          className="vsm-card-thumb"
-                        />
-                        <span className="vsm-card-match-badge">
-                          {item.similarity}% Giống
-                        </span>
-                      </div>
-                      <div className="vsm-card-info">
-                        <div>
-                          <h4 className="vsm-card-name" title={item.name}>
-                            {item.name}
-                          </h4>
-                          <div className="vsm-card-loc">
-                            <i className="bi bi-geo-alt-fill text-success" />
-                            <span>{item.city || item.address || 'Việt Nam'}</span>
-                          </div>
-                        </div>
-                        <div className="vsm-card-price-row">
-                          <span className="vsm-card-price">
-                            {item.basePrice ? Number(item.basePrice).toLocaleString('vi-VN') + 'đ' : 'Liên hệ'}
-                          </span>
-                          <span className="vsm-card-rating">
-                            <i className="bi bi-star-fill" /> {item.rating || 5.0}
-                          </span>
-                        </div>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              )}
             </div>
           )}
         </div>
