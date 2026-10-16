@@ -31,4 +31,23 @@ public class ReviewController {
     public ResponseEntity<ReviewStatsDTO> getReviewStats(@PathVariable Long homestayId) {
         return ResponseEntity.ok(reviewService.getReviewStatsByHomestayId(homestayId));
     }
+
+    @GetMapping("/all")
+    public ResponseEntity<List<ReviewDTO>> getAllReviews() {
+        return ResponseEntity.ok(reviewService.getAllReviews());
+    }
+
+    @GetMapping("/owner")
+    public ResponseEntity<List<ReviewDTO>> getReviewsByOwner(
+            @RequestParam(required = false) Long ownerId,
+            @RequestParam(required = false) String email
+    ) {
+        if (email != null && !email.isBlank()) {
+            return ResponseEntity.ok(reviewService.getReviewsByOwnerEmail(email));
+        }
+        if (ownerId != null) {
+            return ResponseEntity.ok(reviewService.getReviewsByOwnerId(ownerId));
+        }
+        return ResponseEntity.ok(reviewService.getReviewsByOwnerEmail("lethimai86@gmail.com"));
+    }
 }

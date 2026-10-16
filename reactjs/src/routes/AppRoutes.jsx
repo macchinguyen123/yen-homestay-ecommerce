@@ -47,6 +47,7 @@ import AdminManageHomestay from '../pages/admin/ManageHomestay/ManageHomestay';
 import ManageTransactions from '../pages/admin/ManageTransactions/ManageTransactions';
 import ReportsStatistics from '../pages/admin/ReportsStatistics/ReportsStatistics';
 import VoucherManagement from '../pages/admin/VoucherManagement/VoucherManagement';
+import AdminReviewAnalytics from '../pages/admin/AdminReviewAnalytics/AdminReviewAnalytics';
 
 import ProtectedRoute from './ProtectedRoute';
 
@@ -123,6 +124,7 @@ export default function AppRoutes() {
           <Route path="/admin/local-content" element={<LocalContent />} />
           <Route path="/admin/transactions" element={<ManageTransactions />} />
           <Route path="/admin/reports" element={<ReportsStatistics />} />
+          <Route path="/admin/reviews" element={<AdminReviewAnalytics />} />
           <Route path="/admin/vouchers" element={<VoucherManagement />} />
         </Route>
       </Route>

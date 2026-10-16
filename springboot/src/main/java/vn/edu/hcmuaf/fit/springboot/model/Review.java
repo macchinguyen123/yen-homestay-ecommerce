@@ -44,6 +44,18 @@ public class Review {
     @Column(name = "owner_reply", columnDefinition = "TEXT")
     private String ownerReply;
 
+    @Column(length = 20)
+    private String sentiment; // POSITIVE, NEGATIVE, NEUTRAL
+
+    @Column(name = "sentiment_score")
+    private Double sentimentScore;
+
+    @Column(name = "aspect_tags")
+    private String aspectTags; // e.g. "Vệ sinh, Dịch vụ"
+
+    @Column(name = "ai_summary", columnDefinition = "TEXT")
+    private String aiSummary;
+
     @Column(name = "reviewed_at")
     private LocalDateTime reviewedAt;
 

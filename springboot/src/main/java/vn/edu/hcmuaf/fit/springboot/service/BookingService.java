@@ -37,6 +37,7 @@ public class BookingService {
     private final HomestayRepository homestayRepository;
     private final NotificationService notificationService;
     private final UserRepository userRepository;
+    private final ReviewSentimentService reviewSentimentService;
 
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
     private static final Locale VI_LOCALE = new Locale("vi", "VN");
@@ -441,6 +442,7 @@ public class BookingService {
         }
 
         Review savedReview = reviewRepository.save(review);
+        reviewSentimentService.analyzeAsync(savedReview);
         homestayRepository.findById(homestayId).ifPresent(h -> notificationService.create(h.getOwnerId(),
                 "Khách vừa gửi đánh giá mới", "Homestay " + h.getName() + " vừa nhận được đánh giá mới.",
                 "REVIEW", savedReview.getId(), "/owner/reviews"));
