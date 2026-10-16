@@ -7,6 +7,7 @@ import { roomService } from '../../../services/roomService';
 import { homestayService } from '../../../services/homestayService';
 import { reviewService } from '../../../services/reviewService';
 import { ownerService } from '../../../services/ownerService';
+import { chatService } from '../../../services/chatService';
 import { SAMPLE_HOMESTAYS } from '../../../data/sampleHomestays';
 import {
   roomsData, galleryImages, amenitiesData, AMENITY_GROUPS,
@@ -764,6 +765,18 @@ export default function HomestayDetail() {
   const [descExpanded, setDescExpanded] = useState(false);
   const [wishlist, setWishlist] = useState({});
   const [toast, setToast] = useState({ show: false, msg: '' });
+  const handleChatOwner = async () => {
+    const user = authService.getCurrentUser();
+    if (!user) { navigate('/login'); return; }
+    const homestayId = Number(homestay?.id || id);
+    if (!homestayId) return;
+    try {
+      const conversation = await chatService.open(homestayId);
+      navigate('/messages', { state: { conversation } });
+    } catch (e) {
+      setToast({ show: true, msg: e.message || 'Không thể mở cuộc trò chuyện.' });
+    }
+  };
 
   const location = useLocation();
 
@@ -1553,6 +1566,9 @@ export default function HomestayDetail() {
               <div className="summary-rating"><i className="bi bi-star-fill" /> {homestayRating} · {homestayReviewCount} đánh giá</div>
               <button type="button" className="yn-btn yn-btn--primary yn-btn--lg yn-btn--block" onClick={scrollToRooms}>
                 Xem các loại phòng
+              </button>
+              <button type="button" className="yn-btn yn-btn--outline yn-btn--lg yn-btn--block" onClick={handleChatOwner}>
+                <i className="bi bi-chat-dots" /> Chat với chủ nhà
               </button>
               <p className="summary-note">
                 <i className="bi bi-check2-circle" /> {rooms.length} loại phòng còn trống · Miễn phí hủy trong 48 giờ
