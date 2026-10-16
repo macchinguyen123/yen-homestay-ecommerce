@@ -68,7 +68,9 @@ public class AuthService {
                     .build();
         }
 
-        if (!Boolean.TRUE.equals(user.getActive()) || "BLOCKED".equalsIgnoreCase(user.getStatus())) {
+        String userStatus = user.getStatus() == null ? "" : user.getStatus().toUpperCase().trim();
+        boolean isExplicitlyBlocked = userStatus.equals("BLOCKED") || userStatus.equals("BANNED") || userStatus.equals("SUSPENDED");
+        if (isExplicitlyBlocked || Boolean.FALSE.equals(user.getActive())) {
             return LoginResponse.builder()
                     .success(false)
                     .message("Tài khoản của bạn đã bị khóa hoặc chưa kích hoạt!")

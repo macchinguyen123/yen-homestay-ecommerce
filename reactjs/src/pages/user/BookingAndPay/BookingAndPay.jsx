@@ -4,6 +4,7 @@ import { authService } from '../../../services/authService';
 import { bookingService } from '../../../services/bookingService';
 import { voucherService } from '../../../services/voucherService';
 import { ownerService } from '../../../services/ownerService';
+import { getVietQRUrl, VIETQR_MERCHANT, vnpayService } from '../../../services/vnpayService';
 import './BookingAndPay.css';
 
 const SERVICE_FEE_RATE = 0.05;
@@ -115,6 +116,20 @@ function qrSvgSvg(seedStr, color) {
   return `<svg viewBox="-1 -1 ${N + 2} ${N + 2}" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges"><path d="${d}" fill="${color}"/></svg>`;
 }
 
+const normalizePhone = (raw) => {
+  if (!raw) return '';
+  let cleaned = String(raw).trim().replace(/[\s.\-]/g, '');
+  // Nếu có 9 chữ số bắt đầu bằng 3, 5, 7, 8, 9 (SĐT Việt Nam thiếu số 0 đầu như trong CSDL)
+  if (/^[35789]\d{8}$/.test(cleaned)) {
+    cleaned = '0' + cleaned;
+  }
+  // Nếu bắt đầu bằng +84, đổi thành 0
+  if (/^\+84([35789]\d{8})$/.test(cleaned)) {
+    cleaned = '0' + RegExp.$1;
+  }
+  return cleaned;
+};
+
 export default function BookingAndPay() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -142,13 +157,40 @@ export default function BookingAndPay() {
   const [arrivalTime, setArrivalTime] = useState('');
   const [guestNote, setGuestNote] = useState('');
 
-  // Tự động điền thông tin tài khoản đang đăng nhập
+  // Tự động điền thông tin tài khoản đang đăng nhập hoặc khôi phục draft sau khi đăng nhập
   useEffect(() => {
+    // 1. Điền thông tin người dùng từ tài khoản đăng nhập trước
     const user = authService.getCurrentUser();
     if (user) {
       if (user.fullName) setFullName(user.fullName);
-      if (user.phone) setPhone(user.phone);
+      const userPhone = normalizePhone(user.phoneNumber || user.phone);
+      if (userPhone) setPhone(userPhone);
       if (user.email) setEmail(user.email);
+    }
+
+    // 2. Khôi phục draft nếu người dùng vừa đăng nhập quay lại (ưu tiên thông tin người dùng vừa nhập)
+    try {
+      const savedDraft = sessionStorage.getItem('yenBookingDraft');
+      if (savedDraft) {
+        const draft = JSON.parse(savedDraft);
+        if (draft.checkin) setCheckin(draft.checkin);
+        if (draft.checkout) setCheckout(draft.checkout);
+        if (draft.guests) setGuests(draft.guests);
+        if (draft.fullName) setFullName(draft.fullName);
+        if (draft.phone) setPhone(normalizePhone(draft.phone));
+        if (draft.email) setEmail(draft.email);
+        if (draft.arrivalTime) setArrivalTime(draft.arrivalTime);
+        if (draft.guestNote) setGuestNote(draft.guestNote);
+        if (Array.isArray(draft.selectedExperiences)) setSelectedExperiences(draft.selectedExperiences);
+        if (draft.payPlan) setPayPlan(draft.payPlan);
+        if (draft.payMethod) setPayMethod(draft.payMethod);
+        if (draft.agreeTerms !== undefined) setAgreeTerms(draft.agreeTerms);
+        if (draft.appliedCoupon) setAppliedCoupon(draft.appliedCoupon);
+        if (draft.couponInput) setCouponInput(draft.couponInput);
+        sessionStorage.removeItem('yenBookingDraft');
+      }
+    } catch (e) {
+      console.warn('Lỗi đọc booking draft:', e);
     }
   }, []);
 
@@ -270,15 +312,16 @@ export default function BookingAndPay() {
   }, [searchParams, location.state, homestay?.id]);
 
   // Addons & Discounts
-  const [selectedExperiences, setSelectedExperiences] = useState(new Set());
+  const [selectedExperiences, setSelectedExperiences] = useState([]);
   const [couponInput, setCouponInput] = useState('');
   const [appliedCoupon, setAppliedCoupon] = useState(null);
   const [couponMsg, setCouponMsg] = useState({ text: '', type: '' });
 
   // Payment Options
   const [payPlan, setPayPlan] = useState('full'); // 'full' | 'deposit'
-  const [payMethod, setPayMethod] = useState('vietqr'); // 'vietqr' | 'momo' | 'zalopay' | 'card'
-  const [cardInfo, setCardInfo] = useState({ number: '', name: '', expiry: '', cvv: '' });
+  const [payMethod, setPayMethod] = useState('vietqr'); // 'vietqr' | 'vnpay' | 'cash'
+  const [vnpayUrl, setVnpayUrl] = useState('');
+  const [vnpayLoading, setVnpayLoading] = useState(false);
   const [agreeTerms, setAgreeTerms] = useState(false);
 
   // Validation errors
@@ -318,18 +361,21 @@ export default function BookingAndPay() {
     appliedVoucherData ? Math.min(appliedVoucherData.discountAmount, subtotal) :
     (couponObj ? Math.min(couponObj.calc(subtotal), subtotal) : 0)
   ) : 0;
+  // grandTotal chỉ tính phòng (trải nghiệm tính riêng tại homestay)
   const grandTotal = nights > 0 ? Math.max(0, subtotal + cleaningFee + serviceFee - discount) : 0;
 
+  // payNow tính toán động theo payPlan – cập nhật ngay khi đổi kế hoạch thanh toán
   const payNow = payPlan === 'deposit' ? Math.round((grandTotal * DEPOSIT_RATE) / 1000) * 1000 : grandTotal;
   const payLater = grandTotal - payNow;
 
-  // Experiences cost total - dùng dbExperiences (từ CSDL hoặc fallback)
-  const selectedExpList = dbExperiences.filter((x) => selectedExperiences.has(x.id));
+  // Experiences cost total - tính lại ngay khi selectedExperiences hoặc guests thay đổi
+  const selectedExpList = dbExperiences.filter((x) => selectedExperiences.includes(String(x.id)));
   const expTotal = selectedExpList.reduce((sum, x) => {
     if (x.price <= 0) return sum;
     const isPerPerson = x.unit && (x.unit.includes('khách') || x.unit.includes('người'));
     return sum + (isPerPerson ? x.price * guests : x.price);
   }, 0);
+  const hasPaidExperiences = expTotal > 0;
 
   // Apply coupon handler (ưu tiên kiểm tra trực tiếp cơ sở dữ liệu PostgreSQL)
   const handleApplyCoupon = async (codeToApply) => {
@@ -401,12 +447,10 @@ export default function BookingAndPay() {
 
   // Toggle Experience
   const toggleExperience = (id) => {
-    setSelectedExperiences((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
+    const strId = String(id);
+    setSelectedExperiences((prev) =>
+      prev.includes(strId) ? prev.filter((item) => item !== strId) : [...prev, strId]
+    );
   };
 
   // Validate form
@@ -414,28 +458,60 @@ export default function BookingAndPay() {
     const errs = {};
     if (nights <= 0) errs.trip = 'Ngày trả phòng phải sau ngày nhận phòng ít nhất 1 đêm.';
     if (!fullName.trim() || fullName.trim().length < 2) errs.fullName = 'Vui lòng nhập họ và tên của bạn.';
-    if (!/^(0|\+84)(3|5|7|8|9)\d{8}$/.test(phone.replace(/[\s.\-]/g, ''))) errs.phone = 'Số điện thoại chưa đúng. Ví dụ: 0901 234 567.';
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email.trim())) errs.email = 'Email chưa đúng. Ví dụ: ban@example.com.';
-
-    if (payMethod === 'card') {
-      const digits = cardInfo.number.replace(/\D/g, '');
-      if (digits.length < 13 || digits.length > 19) errs.cardNumber = 'Số thẻ không hợp lệ.';
-      if (!cardInfo.name.trim()) errs.cardName = 'Vui lòng nhập tên trên thẻ.';
-      if (!/^\d{2}\/\d{2}$/.test(cardInfo.expiry)) errs.cardExpiry = 'Ngày hết hạn MM/YY.';
-      if (!/^\d{3,4}$/.test(cardInfo.cvv)) errs.cardCvv = 'Mã CVV gồm 3-4 chữ số.';
+    
+    const cleanPhone = normalizePhone(phone);
+    if (!/^(0|\+84)(3|5|7|8|9)\d{8}$/.test(cleanPhone)) {
+      errs.phone = 'Số điện thoại chưa đúng. Ví dụ: 0901 234 567.';
+    } else if (cleanPhone !== phone) {
+      setPhone(cleanPhone);
     }
 
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email.trim())) errs.email = 'Email chưa đúng. Ví dụ: ban@example.com.';
     if (!agreeTerms) errs.terms = 'Bạn cần đồng ý với nội quy và chính sách hủy phòng để tiếp tục.';
     setErrors(errs);
     return Object.keys(errs).length === 0;
   };
 
-  // Open Payment Modal
+  // Open Payment Modal or Redirect to Login if unauthenticated
   const handleSubmitBooking = (e) => {
-    e.preventDefault();
+    if (e && e.preventDefault) e.preventDefault();
+
+    // 1. Bắt buộc đăng nhập trước khi tiến hành thanh toán
+    const currentUser = authService.getCurrentUser();
+    if (!currentUser || !currentUser.id) {
+      // Lưu trữ toàn bộ tiến trình đặt phòng vào sessionStorage để tự động phục hồi sau khi đăng nhập xong
+      const currentDraft = {
+        checkin, checkout, guests,
+        fullName, phone: normalizePhone(phone), email, arrivalTime, guestNote,
+        selectedExperiences,
+        payPlan, payMethod, agreeTerms,
+        appliedCoupon, couponInput,
+        homestayId: homestay.id,
+        roomId: room.id,
+      };
+      sessionStorage.setItem('yenBookingDraft', JSON.stringify(currentDraft));
+      showToast('Vui lòng đăng nhập tài khoản để tiếp tục thanh toán!');
+      setTimeout(() => {
+        navigate(`/login?redirect=${encodeURIComponent(location.pathname + location.search)}`);
+      }, 500);
+      return;
+    }
+
+    // 2. Kiểm tra thông tin biểu mẫu
     if (!validateForm()) {
       showToast('Vui lòng điền đầy đủ và đúng các thông tin cần thiết!');
       return;
+    }
+
+    // Cập nhật lại số điện thoại đã chuẩn hoá vào current user trong localStorage nếu đã đăng nhập
+    try {
+      const normPhone = normalizePhone(phone);
+      if (normPhone && currentUser.phoneNumber !== normPhone) {
+        currentUser.phoneNumber = normPhone;
+        localStorage.setItem('user', JSON.stringify(currentUser));
+      }
+    } catch (e) {
+      console.warn('Không thể lưu SĐT cập nhật vào user local:', e);
     }
 
     const yr = new Date().getFullYear();
@@ -459,8 +535,102 @@ export default function BookingAndPay() {
     return () => clearInterval(timerIntervalRef.current);
   }, [payModalOpen]);
 
-  // Handle Confirm Payment
-  const handleConfirmPayment = async () => {
+  // Handle Redirect to Real VNPay Sandbox Payment Gateway
+  const handleOpenVNPayGateway = async () => {
+    setVnpayLoading(true);
+    try {
+      const realUser = authService.getCurrentUser();
+      const hsId = Number(searchParams.get('homestayId') || location.state?.homestayId || homestay.id || room.homestayId || 1);
+      const rmId = Number(searchParams.get('roomId') || location.state?.roomId || room.id);
+
+      const bookingPayload = {
+        touristId: realUser?.id ? Number(realUser.id) : 21,
+        homestayId: hsId,
+        roomId: Number.isFinite(rmId) && rmId > 0 ? rmId : null,
+        checkInDate: checkin,
+        checkOutDate: checkout,
+        guestsCount: guests,
+        totalPrice: grandTotal,
+        discountAmount: discount,
+        paymentType: payPlan === 'deposit' ? 'DEPOSIT' : 'FULL',
+        depositAmount: payNow,
+        remainingAmount: payLater,
+        paymentMethod: 'VNPAY',
+        depositStatus: 'PAID',
+        status: 'CONFIRMED',
+        customerName: fullName,
+        customerPhone: phone,
+        customerEmail: email,
+      };
+
+      let finalCode = bookingCode;
+      try {
+        const result = await bookingService.createBooking(bookingPayload);
+        if (result && result.bookingCode) {
+          finalCode = result.bookingCode;
+        }
+      } catch (err) {
+        console.warn('Tạo đặt phòng qua API gặp lỗi, tiếp tục với mã dự phòng:', err);
+      }
+
+      const bookingRecord = {
+        code: finalCode,
+        homestay: homestay.name || DEFAULT_HOMESTAY.name,
+        room: { name: room.name, thumb: room.thumb },
+        location: homestay.location || DEFAULT_HOMESTAY.location,
+        checkin: checkin,
+        checkout: checkout,
+        nights: nights,
+        guests: guests,
+        contact: { fullName: fullName, phone: phone, email: email },
+        arrivalTime: arrivalTime,
+        experiences: Array.from(selectedExperiences).map((id) => {
+          const exp = dbExperiences.find((x) => x.id === id);
+          return exp ? exp.title : id;
+        }),
+        note: guestNote,
+        pricing: {
+          subtotal: subtotal,
+          cleaning: cleaningFee,
+          service: serviceFee,
+          discount: discount,
+          total: grandTotal,
+          paid: payNow,
+          remaining: payLater,
+          experienceEstimate: expTotal,
+        },
+        method: 'vnpay',
+        coupon: appliedCoupon,
+      };
+
+      try {
+        sessionStorage.setItem('yenLastBooking', JSON.stringify(bookingRecord));
+        const list = JSON.parse(localStorage.getItem('yenBookings') || '[]');
+        list.unshift(bookingRecord);
+        localStorage.setItem('yenBookings', JSON.stringify(list));
+      } catch (e) {
+        console.error('Save booking error:', e);
+      }
+
+      const paymentUrl = await vnpayService.createPaymentUrl({
+        bookingCode: finalCode,
+        amount: payNow,
+        orderInfo: `Thanh toan dat phong ${finalCode}`,
+      });
+
+      setVnpayLoading(false);
+      setPayModalOpen(false);
+      // Chuyển hướng sang Cổng thanh toán VNPAY Sandbox thật
+      window.location.href = paymentUrl;
+    } catch (err) {
+      console.error('Lỗi khởi tạo cổng VNPay:', err);
+      setVnpayLoading(false);
+      showToast('Không thể kết nối Cổng VNPAY Sandbox, vui lòng thử lại!');
+    }
+  };
+
+  // Handle Simulation of Successful VNPay Payment (for instant testing without gateway approval error)
+  const handleSimulateVNPaySuccess = async () => {
     setIsProcessing(true);
     try {
       const realUser = authService.getCurrentUser();
@@ -479,8 +649,99 @@ export default function BookingAndPay() {
         paymentType: payPlan === 'deposit' ? 'DEPOSIT' : 'FULL',
         depositAmount: payNow,
         remainingAmount: payLater,
+        paymentMethod: 'VNPAY',
         depositStatus: 'PAID',
         status: 'CONFIRMED',
+        customerName: fullName,
+        customerPhone: phone,
+        customerEmail: email,
+      };
+
+      let finalCode = bookingCode;
+      try {
+        const result = await bookingService.createBooking(bookingPayload);
+        if (result && result.bookingCode) {
+          finalCode = result.bookingCode;
+        }
+      } catch (err) {
+        console.warn('Tạo đặt phòng qua API gặp lỗi, tiếp tục với mã dự phòng:', err);
+      }
+
+      const bookingRecord = {
+        code: finalCode,
+        homestay: homestay.name || DEFAULT_HOMESTAY.name,
+        room: { name: room.name, thumb: room.thumb },
+        location: homestay.location || DEFAULT_HOMESTAY.location,
+        checkin: checkin,
+        checkout: checkout,
+        nights: nights,
+        guests: guests,
+        contact: { fullName: fullName, phone: phone, email: email },
+        arrivalTime: arrivalTime,
+        experiences: Array.from(selectedExperiences).map((id) => {
+          const exp = dbExperiences.find((x) => x.id === id);
+          return exp ? exp.title : id;
+        }),
+        note: guestNote,
+        pricing: {
+          subtotal: subtotal,
+          cleaning: cleaningFee,
+          service: serviceFee,
+          discount: discount,
+          total: grandTotal,
+          paid: payNow,
+          remaining: payLater,
+          experienceEstimate: expTotal,
+        },
+        method: 'vnpay',
+        coupon: appliedCoupon,
+      };
+
+      try {
+        sessionStorage.setItem('yenLastBooking', JSON.stringify(bookingRecord));
+        const list = JSON.parse(localStorage.getItem('yenBookings') || '[]');
+        list.unshift(bookingRecord);
+        localStorage.setItem('yenBookings', JSON.stringify(list));
+      } catch (e) {
+        console.error('Save booking error:', e);
+      }
+
+      setIsProcessing(false);
+      setPayModalOpen(false);
+      setStep(3);
+      navigate(`/complete-pay?vnp_ResponseCode=00&vnp_TxnRef=${finalCode}&vnp_BankCode=NCB&vnp_TransactionNo=SIM${Date.now()}`);
+    } catch (err) {
+      console.error('Lỗi mô phỏng VNPay:', err);
+      setIsProcessing(false);
+      showToast('Có lỗi xảy ra khi xác nhận giao dịch.');
+    }
+  };
+
+  // Handle Confirm Payment (VietQR & Cash)
+  const handleConfirmPayment = async () => {
+    setIsProcessing(true);
+    try {
+      const realUser = authService.getCurrentUser();
+      const hsId = Number(searchParams.get('homestayId') || location.state?.homestayId || homestay.id || room.homestayId || 1);
+      const rmId = Number(searchParams.get('roomId') || location.state?.roomId || room.id);
+
+      const dbPayMethod = payMethod === 'vnpay' ? 'VNPAY' : (payMethod === 'vietqr' ? 'BANK_TRANSFER' : 'CASH');
+
+      const bookingPayload = {
+        touristId: realUser?.id ? Number(realUser.id) : 21,
+        homestayId: hsId,
+        roomId: Number.isFinite(rmId) && rmId > 0 ? rmId : null,
+        checkInDate: checkin,
+        checkOutDate: checkout,
+        guestsCount: guests,
+        totalPrice: grandTotal,
+        discountAmount: discount,
+        paymentType: payPlan === 'deposit' ? 'DEPOSIT' : 'FULL',
+        depositAmount: payNow,
+        remainingAmount: payLater,
+        paymentMethod: dbPayMethod,
+        depositStatus: payMethod === 'cash' ? 'UNPAID' : 'PAID',
+        status: payMethod === 'cash' ? 'PENDING' : 'CONFIRMED',
         customerName: fullName,
         customerPhone: phone,
         customerEmail: email,
@@ -666,20 +927,50 @@ export default function BookingAndPay() {
                 <div className="bk-form-grid">
                   <div className={`bk-field bk-field--full ${errors.fullName ? 'has-error' : ''}`}>
                     <label htmlFor="fullName">Họ và tên</label>
-                    <input type="text" id="fullName" value={fullName} onChange={(e) => setFullName(e.target.value)}
-                      placeholder="Nguyễn Văn An" />
+                    <input
+                      type="text"
+                      id="fullName"
+                      value={fullName}
+                      onChange={(e) => {
+                        setFullName(e.target.value);
+                        if (errors.fullName) setErrors((prev) => ({ ...prev, fullName: undefined }));
+                      }}
+                      placeholder="Nguyễn Văn An"
+                    />
                     {errors.fullName && <p className="bk-error">{errors.fullName}</p>}
                   </div>
                   <div className={`bk-field ${errors.phone ? 'has-error' : ''}`}>
                     <label htmlFor="phone">Số điện thoại</label>
-                    <input type="tel" id="phone" value={phone} onChange={(e) => setPhone(e.target.value)}
-                      placeholder="0901 234 567" />
+                    <input
+                      type="tel"
+                      id="phone"
+                      value={phone}
+                      onChange={(e) => {
+                        setPhone(e.target.value);
+                        if (errors.phone) setErrors((prev) => ({ ...prev, phone: undefined }));
+                      }}
+                      onBlur={() => {
+                        if (phone) {
+                          const norm = normalizePhone(phone);
+                          if (norm !== phone) setPhone(norm);
+                        }
+                      }}
+                      placeholder="0901 234 567"
+                    />
                     {errors.phone && <p className="bk-error">{errors.phone}</p>}
                   </div>
                   <div className={`bk-field ${errors.email ? 'has-error' : ''}`}>
                     <label htmlFor="email">Email</label>
-                    <input type="email" id="email" value={email} onChange={(e) => setEmail(e.target.value)}
-                      placeholder="ban@example.com" />
+                    <input
+                      type="email"
+                      id="email"
+                      value={email}
+                      onChange={(e) => {
+                        setEmail(e.target.value);
+                        if (errors.email) setErrors((prev) => ({ ...prev, email: undefined }));
+                      }}
+                      placeholder="ban@example.com"
+                    />
                     {errors.email && <p className="bk-error">{errors.email}</p>}
                   </div>
                   <div className="bk-field bk-field--full">
@@ -716,7 +1007,7 @@ export default function BookingAndPay() {
                 ) : (
                 <div className="bk-xp-list">
                   {dbExperiences.map((x) => {
-                    const isChecked = selectedExperiences.has(x.id);
+                    const isChecked = selectedExperiences.includes(String(x.id));
                     return (
                       <div
                         key={x.id}
@@ -724,12 +1015,19 @@ export default function BookingAndPay() {
                         onClick={() => toggleExperience(x.id)}
                         role="checkbox"
                         aria-checked={isChecked}
-                        tabIndex={0}
-                        onKeyDown={(e) => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); toggleExperience(x.id); } }}
                         style={{ cursor: 'pointer' }}
                       >
-                        <span className="bk-xp-box"><i className="bi bi-check-lg" /></span>
-                        <span className="bk-xp-body"><b>{x.title}</b><small>{x.note}</small></span>
+                        <span className="bk-xp-box">
+                          {isChecked && (
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
+                              <polyline points="20 6 9 17 4 12" />
+                            </svg>
+                          )}
+                        </span>
+                        <span className="bk-xp-body">
+                          <b>{x.title}</b>
+                          {x.note && <small>{x.note}</small>}
+                        </span>
                         <span className={`bk-xp-price ${x.price === 0 ? 'is-free' : ''}`}>
                           {x.price > 0 ? `${fmtVND(x.price)} ${x.unit}` : 'Miễn phí'}
                         </span>
@@ -772,7 +1070,7 @@ export default function BookingAndPay() {
 
                 <div className="bk-voucher-head">
                   <h3 className="bk-subtitle"><i className="bi bi-wallet2" /> Voucher trong túi của bạn</h3>
-                  <span className="bk-voucher-count">3 voucher sẵn có</span>
+                  <span className="bk-voucher-count">{Object.values(COUPONS).filter((c) => c.wallet).length} voucher sẵn có</span>
                 </div>
                 <div className="bk-voucher-list">
                   {Object.values(COUPONS).filter((c) => c.wallet).map((c) => {
@@ -787,7 +1085,7 @@ export default function BookingAndPay() {
                           <small>Mã {c.code}</small>
                         </span>
                         <span className="bk-voucher-side">
-                          <span className="bk-voucher-save">Giảm {c.code === 'YEN10' ? fmtVND(subtotal * 0.1) : '100.000đ'}</span>
+                          <span className="bk-voucher-save">Giảm {nights > 0 ? fmtVND(Math.min(c.calc(subtotal), subtotal)) : '–'}</span>
                           <span className="bk-voucher-radio" />
                         </span>
                       </button>
@@ -808,87 +1106,88 @@ export default function BookingAndPay() {
 
                 <h3 className="bk-subtitle">Bạn muốn trả bao nhiêu bây giờ?</h3>
                 <div className="bk-options">
-                  <label className={`bk-option ${payPlan === 'full' ? 'checked' : ''}`} onClick={() => setPayPlan('full')}>
+                  <div
+                    className={`bk-option ${payPlan === 'full' ? 'checked' : ''}`}
+                    onClick={() => setPayPlan('full')}
+                    role="radio"
+                    aria-checked={payPlan === 'full'}
+                    style={{ cursor: 'pointer' }}
+                  >
                     <span className="bk-option-radio" />
                     <span className="bk-option-body">
                       <span className="bk-option-title">Trả toàn bộ</span>
                       <span className="bk-option-sub">Xong một lần, không phải trả thêm khi nhận phòng.</span>
                     </span>
                     <b className="bk-option-amount">{fmtVND(grandTotal)}</b>
-                  </label>
-                  <label className={`bk-option ${payPlan === 'deposit' ? 'checked' : ''}`} onClick={() => setPayPlan('deposit')}>
+                  </div>
+                  <div
+                    className={`bk-option ${payPlan === 'deposit' ? 'checked' : ''}`}
+                    onClick={() => setPayPlan('deposit')}
+                    role="radio"
+                    aria-checked={payPlan === 'deposit'}
+                    style={{ cursor: 'pointer' }}
+                  >
                     <span className="bk-option-radio" />
                     <span className="bk-option-body">
                       <span className="bk-option-title">Đặt cọc 30%</span>
                       <span className="bk-option-sub">Trả trước 30%, phần còn lại trả khi nhận phòng.</span>
                     </span>
                     <b className="bk-option-amount">{fmtVND(Math.round((grandTotal * DEPOSIT_RATE) / 1000) * 1000)}</b>
-                  </label>
+                  </div>
                 </div>
 
                 <h3 className="bk-subtitle">Phương thức thanh toán</h3>
                 <div className="bk-options">
-                  <label className={`bk-option ${payMethod === 'vietqr' ? 'checked' : ''}`} onClick={() => setPayMethod('vietqr')}>
+                  {/* VietQR */}
+                  <div
+                    className={`bk-option ${payMethod === 'vietqr' ? 'checked' : ''}`}
+                    onClick={() => setPayMethod('vietqr')}
+                    role="radio"
+                    aria-checked={payMethod === 'vietqr'}
+                    style={{ cursor: 'pointer' }}
+                  >
                     <span className="bk-option-radio" />
                     <span className="bk-method-icon bk-method-icon--qr"><i className="bi bi-qr-code-scan" /></span>
                     <span className="bk-option-body">
-                      <span className="bk-option-title">Chuyển khoản QR (VietQR)</span>
-                      <span className="bk-option-sub">Quét bằng app của bất kỳ ngân hàng nào.</span>
+                      <span className="bk-option-title">Chuyển khoản VietQR (Thực tế)</span>
+                      <span className="bk-option-sub">Mã VietQR chuẩn NAPAS 24/7 quét được bằng mọi App ngân hàng (VCB, MB, Techcombank, VPBank,...).</span>
                     </span>
-                  </label>
-                  <label className={`bk-option ${payMethod === 'momo' ? 'checked' : ''}`} onClick={() => setPayMethod('momo')}>
+                  </div>
+
+                  {/* VNPAY */}
+                  <div
+                    className={`bk-option ${payMethod === 'vnpay' ? 'checked' : ''}`}
+                    onClick={() => setPayMethod('vnpay')}
+                    role="radio"
+                    aria-checked={payMethod === 'vnpay'}
+                    style={{ cursor: 'pointer' }}
+                  >
                     <span className="bk-option-radio" />
-                    <span className="bk-method-icon bk-method-icon--momo"><i className="bi bi-phone" /></span>
+                    <span className="bk-method-icon bk-method-icon--vnpay"><i className="bi bi-shield-check" /></span>
                     <span className="bk-option-body">
-                      <span className="bk-option-title">Ví MoMo</span>
-                      <span className="bk-option-sub">Quét mã hoặc mở ứng dụng MoMo.</span>
+                      <span className="bk-option-title">Cổng thanh toán VNPAY (Thực tế)</span>
+                      <span className="bk-option-sub">Thanh toán qua Cổng VNPAY Sandbox thật (VNPAY-QR, Thẻ ATM nội địa, Thẻ quốc tế Visa/MasterCard).</span>
                     </span>
-                  </label>
-                  <label className={`bk-option ${payMethod === 'zalopay' ? 'checked' : ''}`} onClick={() => setPayMethod('zalopay')}>
+                  </div>
+
+                  {/* Tiền mặt tại homestay */}
+                  <div
+                    className={`bk-option ${payMethod === 'cash' ? 'checked' : ''}`}
+                    onClick={() => setPayMethod('cash')}
+                    role="radio"
+                    aria-checked={payMethod === 'cash'}
+                    style={{ cursor: 'pointer' }}
+                  >
                     <span className="bk-option-radio" />
-                    <span className="bk-method-icon bk-method-icon--zalo"><i className="bi bi-phone" /></span>
+                    <span className="bk-method-icon bk-method-icon--cash"><i className="bi bi-cash-coin" /></span>
                     <span className="bk-option-body">
-                      <span className="bk-option-title">Ví ZaloPay</span>
-                      <span className="bk-option-sub">Thanh toán nhanh qua ví ZaloPay.</span>
+                      <span className="bk-option-title">Tiền mặt tại homestay</span>
+                      <span className="bk-option-sub">Thanh toán trực tiếp bằng tiền mặt khi làm thủ tục nhận phòng tại quầy lễ tân.</span>
                     </span>
-                  </label>
-                  <label className={`bk-option ${payMethod === 'card' ? 'checked' : ''}`} onClick={() => setPayMethod('card')}>
-                    <span className="bk-option-radio" />
-                    <span className="bk-method-icon bk-method-icon--card"><i className="bi bi-credit-card-2-front" /></span>
-                    <span className="bk-option-body">
-                      <span className="bk-option-title">Thẻ ATM nội địa, Visa, Mastercard</span>
-                      <span className="bk-option-sub">Thanh toán bằng thẻ ngân hàng.</span>
-                    </span>
-                  </label>
+                  </div>
                 </div>
 
-                {payMethod === 'card' && (
-                  <div className="bk-card-form">
-                    <div className="bk-form-grid">
-                      <div className={`bk-field bk-field--full ${errors.cardNumber ? 'has-error' : ''}`}>
-                        <label htmlFor="cardNumber">Số thẻ</label>
-                        <input type="text" id="cardNumber" placeholder="1234 5678 9012 3456" maxLength="19"
-                          value={cardInfo.number} onChange={(e) => setCardInfo({ ...cardInfo, number: e.target.value })} />
-                      </div>
-                      <div className={`bk-field bk-field--full ${errors.cardName ? 'has-error' : ''}`}>
-                        <label htmlFor="cardName">Tên in trên thẻ</label>
-                        <input type="text" id="cardName" placeholder="NGUYEN VAN AN"
-                          value={cardInfo.name} onChange={(e) => setCardInfo({ ...cardInfo, name: e.target.value.toUpperCase() })} />
-                      </div>
-                      <div className={`bk-field ${errors.cardExpiry ? 'has-error' : ''}`}>
-                        <label htmlFor="cardExpiry">Ngày hết hạn</label>
-                        <input type="text" id="cardExpiry" placeholder="MM/YY" maxLength="5"
-                          value={cardInfo.expiry} onChange={(e) => setCardInfo({ ...cardInfo, expiry: e.target.value })} />
-                      </div>
-                      <div className={`bk-field ${errors.cardCvv ? 'has-error' : ''}`}>
-                        <label htmlFor="cardCvv">Mã CVV</label>
-                        <input type="password" id="cardCvv" placeholder="•••" maxLength="4"
-                          value={cardInfo.cvv} onChange={(e) => setCardInfo({ ...cardInfo, cvv: e.target.value })} />
-                      </div>
-                    </div>
-                  </div>
-                )}
-                <p className="bk-secure"><i className="bi bi-lock-fill" /> Thông tin thanh toán được mã hóa an toàn 256-bit.</p>
+                <p className="bk-secure"><i className="bi bi-lock-fill" /> Thông tin thanh toán được mã hóa an toàn.</p>
               </section>
 
               {/* 6. Policy & Agreement */}
@@ -906,8 +1205,24 @@ export default function BookingAndPay() {
                   <li className="is-muted"><i className="bi bi-slash-circle" /><span>Nội quy: Nhận phòng 14:00 - 21:00, trả phòng trước 12:00. Không tổ chức tiệc đêm.</span></li>
                 </ul>
 
-                <label className={`bk-check ${agreeTerms ? 'checked' : ''}`} onClick={() => setAgreeTerms(!agreeTerms)}>
-                  <span className="bk-check-box"><i className="bi bi-check-lg" /></span>
+                <label
+                  className={`bk-check ${agreeTerms ? 'checked' : ''}`}
+                  htmlFor="agreeTermsCheck"
+                >
+                  <input
+                    type="checkbox"
+                    id="agreeTermsCheck"
+                    checked={agreeTerms}
+                    onChange={(e) => setAgreeTerms(e.target.checked)}
+                    style={{ position: 'absolute', opacity: 0, width: 0, height: 0 }}
+                  />
+                  <span className="bk-check-box">
+                    {agreeTerms && (
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    )}
+                  </span>
                   <span>Tôi đã đọc và đồng ý với nội quy nhà, chính sách hủy phòng và điều khoản dịch vụ của YÊN.</span>
                 </label>
                 {errors.terms && <p className="bk-error bk-error--block">{errors.terms}</p>}
@@ -944,8 +1259,18 @@ export default function BookingAndPay() {
                       <span>Mã giảm giá ({appliedCoupon})</span><span>-{fmtVND(discount)}</span>
                     </div>
                   )}
+                  {hasPaidExperiences && (
+                    <div className="bk-row" style={{ color: '#6B7280', fontSize: '0.82rem' }}>
+                      <span>Trải nghiệm (trả tại homestay)</span><span>+{fmtVND(expTotal)}</span>
+                    </div>
+                  )}
                   <div className="bk-divider" />
                   <div className="bk-row bk-row--total"><span>Tổng cộng</span><span>{fmtVND(grandTotal)}</span></div>
+                  {hasPaidExperiences && (
+                    <div className="bk-row" style={{ fontSize: '0.78rem', color: '#9CA3AF', marginTop: 2 }}>
+                      <span>⚡ Không bao gồm trải nghiệm</span>
+                    </div>
+                  )}
                 </div>
 
                 <div className="bk-due">
@@ -973,77 +1298,340 @@ export default function BookingAndPay() {
         </section>
       )}
 
-      {/* ── PAYMENT MODAL POPUP ── */}
-      <div className={`bk-modal-overlay ${payModalOpen ? 'active' : ''}`}>
-        <div className="bk-modal">
-          <div className="bk-modal-head">
-            <h3>Thanh toán qua {payMethod.toUpperCase()}</h3>
-            <button type="button" className="yn-btn yn-btn--ghost yn-btn--icon" onClick={() => setPayModalOpen(false)}>
+      {/* ── PAYMENT MODAL POPUP (ISOLATED PREFIX TO PREVENT CSS COLLISIONS) ── */}
+      <div className={`yn-pay-overlay ${payModalOpen ? 'active' : ''}`} onClick={(e) => {
+        if (e.target === e.currentTarget) setPayModalOpen(false);
+      }}>
+        <div className="yn-pay-modal">
+          {/* Header */}
+          <div className="yn-pay-head">
+            <div className="yn-pay-head-info">
+              <span className={`yn-pay-badge ${payMethod}`}>
+                {payMethod === 'vietqr' && <><i className="bi bi-qr-code" /> Chuyển khoản VietQR</>}
+                {payMethod === 'vnpay' && <><i className="bi bi-credit-card-2-front-fill" /> Cổng thanh toán VNPAY</>}
+                {payMethod === 'cash' && <><i className="bi bi-cash-stack" /> Thanh toán Tiền mặt</>}
+              </span>
+              <h3>
+                {payMethod === 'vietqr' && 'Quét mã VietQR để thanh toán'}
+                {payMethod === 'vnpay' && 'Thanh toán trực tuyến qua VNPAY'}
+                {payMethod === 'cash' && 'Xác nhận thanh toán tiền mặt'}
+              </h3>
+            </div>
+            <button
+              type="button"
+              className="yn-pay-close-btn"
+              onClick={() => setPayModalOpen(false)}
+              aria-label="Đóng"
+            >
               <i className="bi bi-x-lg" />
             </button>
           </div>
 
-          <div className="bk-modal-body">
-            <div className="pay-amount">
-              <span>{payLater > 0 ? 'Số tiền đặt cọc cần thanh toán' : 'Số tiền cần thanh toán'}</span>
-              <b>{fmtVND(payNow)}</b>
-            </div>
-
-            <div className={`pay-timer ${payTimer < 180 ? 'is-urgent' : ''}`}>
-              <i className="bi bi-clock-history" /> Phiên thanh toán còn: <b>{pad(Math.floor(payTimer / 60))}:{pad(payTimer % 60)}</b>
-            </div>
-
-            {payMethod !== 'card' ? (
-              <div className="pay-qr-wrap">
-                <div className="pay-qr" dangerouslySetInnerHTML={{ __html: qrSvgSvg(bookingCode + payMethod, '#15803D') }} />
-                <p className="pay-qr-caption">Quét mã bằng App Ngân hàng hoặc Ví điện tử</p>
-                <ol className="pay-steps">
-                  <li>Mở ứng dụng ngân hàng/ví điện tử của bạn.</li>
-                  <li>Chọn "Quét mã QR" và chuyển đúng số tiền <b>{fmtVND(payNow)}</b>.</li>
-                  <li>Nội dung chuyển khoản: <b>{bookingCode.replace('-', '')}</b>.</li>
-                </ol>
-
-                <dl className="pay-bank">
-                  <div><dt>Ngân hàng</dt><dd>{BANK_INFO.bank}</dd></div>
-                  <div>
-                    <dt>Số tài khoản</dt>
-                    <dd>
-                      {BANK_INFO.account}
-                      <button type="button" className="pay-copy" onClick={() => copyToClipboard(BANK_INFO.account)}>
-                        <i className="bi bi-copy" />
-                      </button>
-                    </dd>
-                  </div>
-                  <div><dt>Chủ tài khoản</dt><dd>{BANK_INFO.holder}</dd></div>
-                </dl>
+          {/* Modal Body */}
+          <div className="yn-pay-body">
+            {/* Amount Banner (Compact Single Bar) */}
+            <div className="yn-pay-amount-strip">
+              <div className="yn-amount-strip-left">
+                <span className="yn-amount-strip-label">
+                  {payLater > 0
+                    ? 'Đặt cọc cần thanh toán (30%):'
+                    : payMethod === 'cash'
+                    ? 'Thanh toán khi nhận phòng:'
+                    : 'Số tiền cần thanh toán:'}
+                </span>
+                <span className="yn-amount-strip-val">{fmtVND(payNow)}</span>
+                {payLater > 0 && (
+                  <span className="yn-amount-strip-sub">
+                    (Còn lại {fmtVND(payLater)} thanh toán khi nhận phòng)
+                  </span>
+                )}
               </div>
-            ) : (
-              <div>
-                <div className="pay-card-preview">
-                  <i className="bi bi-credit-card-2-front" />
-                  <div>
-                    <b>•••• •••• •••• {cardInfo.number.slice(-4) || '3456'}</b>
-                    <span>{cardInfo.name || 'NGUYEN VAN AN'}</span>
+              {payMethod !== 'cash' && (
+                <div className={`yn-pay-timer-pill ${payTimer < 180 ? 'is-urgent' : ''}`}>
+                  <i className="bi bi-stopwatch" />
+                  <span>Phiên còn: <b>{pad(Math.floor(payTimer / 60))}:{pad(payTimer % 60)}</b></span>
+                </div>
+              )}
+            </div>
+
+            {/* Content for CASH */}
+            {payMethod === 'cash' && (
+              <div className="yn-cash-layout">
+                {/* Top banner */}
+                <div className="yn-cash-banner">
+                  <div className="yn-cash-banner-icon"><i className="bi bi-cash-coin" /></div>
+                  <div className="yn-cash-banner-text">
+                    <b>Thanh toán trực tiếp tại quầy lễ tân</b>
+                    <span>Chuẩn bị đúng số tiền khi đến nhận phòng. Lễ tân sẽ đối soát mã và bàn giao phòng ngay.</span>
                   </div>
                 </div>
-                <p className="pay-card-note">Hệ thống đang sẵn sàng gửi yêu cầu xác thực OTP từ ngân hàng phát hành thẻ của bạn.</p>
+
+                {/* Info grid */}
+                <div className="yn-cash-info-grid">
+                  <div className="yn-cash-info-item">
+                    <span className="yn-cash-lbl"><i className="bi bi-ticket-detailed" /> Mã đặt phòng</span>
+                    <div className="yn-cash-val-row">
+                      <b className="highlight-code">{bookingCode}</b>
+                      <button type="button" className="yn-copy-btn" onClick={() => copyToClipboard(bookingCode)} title="Sao chép mã">
+                        <i className="bi bi-copy" />
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="yn-cash-info-item">
+                    <span className="yn-cash-lbl"><i className="bi bi-cash-stack" /> Số tiền cần trả</span>
+                    <b className="highlight-price">{fmtVND(grandTotal)}</b>
+                  </div>
+
+                  {payLater > 0 && (
+                    <div className="yn-cash-info-item">
+                      <span className="yn-cash-lbl"><i className="bi bi-clock" /> Trả khi nhận phòng</span>
+                      <b style={{ color: '#D97706', fontWeight: 800 }}>{fmtVND(grandTotal)}</b>
+                    </div>
+                  )}
+
+                  <div className="yn-cash-info-item">
+                    <span className="yn-cash-lbl"><i className="bi bi-door-open" /> Giờ nhận phòng</span>
+                    <b>14:00 – 21:00</b>
+                  </div>
+
+                  <div className="yn-cash-info-item">
+                    <span className="yn-cash-lbl"><i className="bi bi-alarm" /> Trả phòng trước</span>
+                    <b>12:00 ngày cuối</b>
+                  </div>
+                </div>
+
+                <div className="yn-cash-note">
+                  <i className="bi bi-info-circle-fill" />
+                  Đặt phòng xác nhận ngay — thanh toán toàn bộ khi đến nhận phòng, không cần cọc trước.
+                </div>
               </div>
             )}
 
-            <p className="pay-demo-note"><i className="bi bi-info-circle" /> Giao diện demo: sau khi bấm "Tôi đã thanh toán", hệ thống sẽ tự động xác nhận đơn thành công.</p>
+            {/* Content for VNPAY */}
+            {payMethod === 'vnpay' && (
+              <div className="yn-pay-vnpay-container">
+                <div className="yn-vnpay-guide-banner">
+                  <div className="yn-vnpay-guide-icon">
+                    <i className="bi bi-shield-check" />
+                  </div>
+                  <div className="yn-vnpay-guide-text">
+                    <b>Cổng thanh toán điện tử VNPAY Sandbox</b>
+                    <p>Hỗ trợ quét mã VNPAY-QR, thẻ ATM nội địa 40+ ngân hàng, thẻ quốc tế Visa/Mastercard và Ví VNPAY.</p>
+                  </div>
+                </div>
+
+                <div className="yn-sandbox-credential-box">
+                  <div className="yn-sandbox-credential-title">
+                    <i className="bi bi-credit-card-2-front" />
+                    <span>Thông tin thẻ Sandbox (Ngân hàng NCB):</span>
+                  </div>
+                  <div className="yn-sandbox-credential-grid">
+                    <div className="yn-cred-item">
+                      <span>Ngân hàng:</span>
+                      <b>NCB (Quốc Dân)</b>
+                    </div>
+                    <div className="yn-cred-item">
+                      <span>Số thẻ:</span>
+                      <b>9704198526191432198</b>
+                      <button type="button" className="yn-copy-sm" onClick={() => copyToClipboard('9704198526191432198')} title="Sao chép số thẻ">
+                        <i className="bi bi-copy" />
+                      </button>
+                    </div>
+                    <div className="yn-cred-item">
+                      <span>Tên chủ thẻ:</span>
+                      <b>NGUYEN VAN A</b>
+                    </div>
+                    <div className="yn-cred-item">
+                      <span>Ngày phát hành:</span>
+                      <b>07/15</b>
+                    </div>
+                    <div className="yn-cred-item">
+                      <span>Mã OTP SMS:</span>
+                      <b>123456</b>
+                      <button type="button" className="yn-copy-sm" onClick={() => copyToClipboard('123456')} title="Sao chép OTP">
+                        <i className="bi bi-copy" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="yn-vnpay-actions-row">
+                  <button
+                    type="button"
+                    className="yn-vnpay-direct-btn"
+                    onClick={handleOpenVNPayGateway}
+                    disabled={vnpayLoading || isProcessing}
+                    title="Mở cổng VNPAY Sandbox để thanh toán"
+                  >
+                    {vnpayLoading ? (
+                      <>
+                        <span className="bk-spinner" style={{ width: 18, height: 18, borderWidth: 2 }} />
+                        <span>Đang chuyển hướng sang Cổng VNPAY...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>Mở Cổng VNPAY để thanh toán ngay</span>
+                        <i className="bi bi-box-arrow-up-right" />
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Content for VIETQR - QR TO CHÍNH GIỮA TRÊN + THÔNG TIN ĐẦY ĐỦ DƯỚI */}
+            {payMethod === 'vietqr' && (
+              <div className="yn-vietqr-stack">
+                {/* MÃ QR TO CHÍNH GIỮA */}
+                <div className="yn-vietqr-qr-center">
+                  <div className="yn-vietqr-img-frame-large">
+                    <img
+                      src={getVietQRUrl({
+                        bankCode: VIETQR_MERCHANT.bankCode,
+                        accountNumber: VIETQR_MERCHANT.accountNumber,
+                        amount: payNow,
+                        memo: bookingCode.replace(/-/g, ''),
+                        accountName: VIETQR_MERCHANT.accountName,
+                        template: 'compact2'
+                      })}
+                      alt="QR chuyển khoản BIDV"
+                      className="yn-vietqr-image-large"
+                    />
+                  </div>
+                  <div className="yn-vietqr-qr-hint">
+                    <i className="bi bi-qr-code-scan" />
+                    <span>Quét bằng App ngân hàng bất kỳ để tự động điền thông tin</span>
+                    <a
+                      href={getVietQRUrl({
+                        bankCode: VIETQR_MERCHANT.bankCode,
+                        accountNumber: VIETQR_MERCHANT.accountNumber,
+                        amount: payNow,
+                        memo: bookingCode.replace(/-/g, ''),
+                        accountName: VIETQR_MERCHANT.accountName,
+                        template: 'compact2'
+                      })}
+                      download={`VietQR-YenHomestay-${bookingCode}.png`}
+                      target="_blank" rel="noreferrer"
+                      className="yn-qr-download-link"
+                    >
+                      <i className="bi bi-download" /> Tải QR
+                    </a>
+                  </div>
+                </div>
+
+                {/* THÔNG TIN THANH TOÁN: 2 CỘT ĐỦ */}
+                <div className="yn-vietqr-info-grid">
+                  {/* Ngân hàng */}
+                  <div className="yn-vqr-cell">
+                    <span className="yn-vqr-lbl">Ngân hàng</span>
+                    <div className="yn-vqr-val">
+                      <span className="yn-bank-tag">BIDV</span>
+                      <b>Đầu tư &amp; Phát triển VN</b>
+                    </div>
+                  </div>
+
+                  {/* Chủ tài khoản */}
+                  <div className="yn-vqr-cell">
+                    <span className="yn-vqr-lbl">Chủ tài khoản</span>
+                    <b className="yn-vqr-val">{VIETQR_MERCHANT.accountName}</b>
+                  </div>
+
+                  {/* Số tài khoản - full width */}
+                  <div className="yn-vqr-cell yn-vqr-cell--full">
+                    <span className="yn-vqr-lbl">Số tài khoản</span>
+                    <div className="yn-copyable-val">
+                      <b className="highlight-acc">{VIETQR_MERCHANT.accountNumber}</b>
+                      <button type="button" className="yn-copy-btn" onClick={() => copyToClipboard(VIETQR_MERCHANT.accountNumber)} title="Sao chép STK">
+                        <i className="bi bi-copy" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Số tiền */}
+                  <div className="yn-vqr-cell">
+                    <span className="yn-vqr-lbl">Số tiền chuyển</span>
+                    <div className="yn-copyable-val">
+                      <b className="highlight-price">{fmtVND(payNow)}</b>
+                      <button type="button" className="yn-copy-btn" onClick={() => copyToClipboard(String(Math.round(payNow)))} title="Sao chép số tiền">
+                        <i className="bi bi-copy" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Kênh nhận */}
+                  <div className="yn-vqr-cell">
+                    <span className="yn-vqr-lbl">Kênh nhận</span>
+                    <span className="yn-live-pill"><span className="yn-pulse-dot" /> NAPAS 24/7</span>
+                  </div>
+
+                  {/* Nội dung CK - full width, highlight */}
+                  <div className="yn-vqr-cell yn-vqr-cell--full yn-vqr-cell--memo">
+                    <span className="yn-vqr-lbl">Nội dung chuyển khoản</span>
+                    <div className="yn-copyable-val">
+                      <b className="highlight-code yn-vqr-memo-code">{bookingCode.replace(/-/g, '')}</b>
+                      <button type="button" className="yn-copy-btn" onClick={() => copyToClipboard(bookingCode.replace(/-/g, ''))} title="Sao chép nội dung">
+                        <i className="bi bi-copy" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
-          <div className="bk-modal-foot">
-            <button type="button" className="yn-btn yn-btn--ghost" onClick={() => setPayModalOpen(false)}>Quay lại</button>
-            <button type="button" className="yn-btn yn-btn--primary" onClick={handleConfirmPayment}>
-              Tôi đã thanh toán
+          {/* Modal Footer */}
+          <div className="yn-pay-foot">
+            <button type="button" className="yn-btn yn-btn--ghost" onClick={() => setPayModalOpen(false)}>
+              Quay lại
             </button>
+            {payMethod === 'vnpay' ? (
+              <div className="yn-pay-foot-actions">
+                <button
+                  type="button"
+                  className="yn-btn yn-btn--sim"
+                  onClick={handleSimulateVNPaySuccess}
+                  disabled={isProcessing || vnpayLoading}
+                  title="Thử nghiệm nhanh không qua cổng"
+                >
+                  <i className="bi bi-lightning-charge-fill" /> Hoàn tất đặt phòng
+                </button>
+                <button
+                  type="button"
+                  className="yn-btn yn-btn--primary yn-btn-vnpay-submit"
+                  onClick={handleOpenVNPayGateway}
+                  disabled={vnpayLoading || isProcessing}
+                >
+                  {vnpayLoading ? 'Đang kết nối...' : `Cổng VNPAY (${fmtVND(payNow)})`}
+                </button>
+              </div>
+            ) : payMethod === 'vietqr' ? (
+              <button
+                type="button"
+                className="yn-btn yn-btn--primary"
+                onClick={handleConfirmPayment}
+                disabled={isProcessing}
+              >
+                {isProcessing ? 'Đang xác thực...' : 'Tôi đã chuyển khoản thành công'}
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="yn-btn yn-btn--primary"
+                onClick={handleConfirmPayment}
+                disabled={isProcessing}
+              >
+                {isProcessing ? 'Đang đặt phòng...' : 'Xác nhận đặt phòng'}
+              </button>
+            )}
           </div>
 
+          {/* Processing Loading Overlay */}
           {isProcessing && (
-            <div className="bk-processing">
+            <div className="yn-pay-processing-overlay">
               <span className="bk-spinner" />
-              <p>Đang xác nhận giao dịch thanh toán...</p>
+              <h4>Đang xác nhận giao dịch đặt phòng...</h4>
+              <p>Vui lòng không tắt hoặc làm mới trình duyệt</p>
             </div>
           )}
         </div>

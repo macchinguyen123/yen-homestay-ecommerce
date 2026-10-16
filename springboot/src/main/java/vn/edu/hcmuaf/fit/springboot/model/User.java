@@ -97,10 +97,16 @@ public class User {
     }
 
     public Boolean getActive() {
-        if (status != null) {
-            return "ACTIVE".equalsIgnoreCase(status) || "TRUE".equalsIgnoreCase(status) || "1".equals(status);
+        if (status == null || status.isBlank()) {
+            return active != null ? active : true;
         }
-        return active != null ? active : true;
+        String s = status.toUpperCase().trim();
+        // Chỉ block khi rõ ràng là inactive/blocked
+        if (s.equals("INACTIVE") || s.equals("BLOCKED") || s.equals("SUSPENDED") || s.equals("BANNED")) {
+            return false;
+        }
+        // Các trạng thái khác ("ACTIVE", "VERIFIED", "CONFIRMED", "ENABLED", "APPROVED", ...) đều cho phép
+        return true;
     }
 
     public void setActive(Boolean active) {
