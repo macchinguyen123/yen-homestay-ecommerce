@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { Link, useSearchParams, useNavigate } from 'react-router-dom';
+import { Link, useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import SearchSidebar from '../../../components/SearchSidebar/SearchSidebar';
 import { SAMPLE_HOMESTAYS } from '../../../data/sampleHomestays';
 import { homestayService } from '../../../services/homestayService';
@@ -84,6 +84,7 @@ const truncateDesc = (text, maxLength = 135) => {
 
 export default function SearchResult() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
 
   // Query Params & Search keyword
@@ -91,6 +92,18 @@ export default function SearchResult() {
   const [searchInput, setSearchInput] = useState(queryDestParam);
   const [searchQuery, setSearchQuery] = useState(queryDestParam);
   const [isVisualSearchOpen, setIsVisualSearchOpen] = useState(false);
+
+  // Trạng thái tìm kiếm bằng hình ảnh
+  const [visualActive, setVisualActive] = useState(!!location.state?.visualResults);
+  const [visualImage, setVisualImage] = useState(location.state?.visualSearchImage || '');
+
+  // Xóa chế độ tìm ảnh để quay về tìm kiếm thông thường
+  const handleClearVisualSearch = () => {
+    setVisualActive(false);
+    setVisualImage('');
+    navigate('/search', { replace: true, state: {} });
+    setSearchQuery('');
+  };
 
   // Đồng bộ khi URL thay đổi từ bên ngoài (trang chủ hoặc nút back/forward)
   useEffect(() => {
@@ -101,6 +114,10 @@ export default function SearchResult() {
   // Tìm kiếm trực tiếp tức thì khi người dùng gõ
   const handleInputChange = (e) => {
     const val = e.target.value;
+    if (visualActive) {
+      setVisualActive(false);
+      setVisualImage('');
+    }
     setSearchInput(val);
     setSearchQuery(val);
     setCurrentPage(1);
@@ -213,9 +230,68 @@ export default function SearchResult() {
   const [homestays, setHomestays] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  // Lắng nghe kết quả tìm kiếm bằng hình ảnh từ Modal
+  useEffect(() => {
+    if (location.state?.visualResults && location.state.visualResults.length > 0) {
+      setVisualActive(true);
+      setVisualImage(location.state.visualSearchImage || '');
+      setSearchInput('');
+      setSearchQuery('');
+
+      const fetchAndMapVisualResults = async () => {
+        setLoading(true);
+        try {
+          const all = await homestayService.getAllHomestays();
+          const map = new Map((all || []).map((h) => [String(h.id), h]));
+
+          // Giữ đúng thứ tự từ backend (độ tương đồng cao nhất xếp ở đầu tiên)
+          const mapped = location.state.visualResults.map((item) => {
+            const found = map.get(String(item.homestayId));
+            if (found) {
+              return {
+                ...found,
+                image: item.matchedImageUrl || found.image || found.primaryImage,
+                primaryImage: item.matchedImageUrl || found.primaryImage || found.image,
+              };
+            }
+            return {
+              id: item.homestayId,
+              name: item.name,
+              city: item.city,
+              address: item.address,
+              location: item.city || item.address,
+              basePrice: item.basePrice,
+              pricePerNight: item.basePrice,
+              rating: item.rating || 5.0,
+              image: item.matchedImageUrl,
+              primaryImage: item.matchedImageUrl,
+              services: ['Nhận phòng 24h'],
+              roomAmenities: ['Máy lạnh', 'Wifi'],
+              amenities: ['Wifi miễn phí', 'Ban công view đẹp'],
+              travelGroups: ['Cặp đôi', 'Gia đình'],
+              desc: 'Homestay có kiến trúc và phong cách tương đồng với hình ảnh bạn đã tìm kiếm.',
+            };
+          });
+
+          setHomestays(mapped);
+        } catch (e) {
+          console.error('Lỗi khi tải dữ liệu tìm kiếm ảnh:', e);
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      fetchAndMapVisualResults();
+    }
+  }, [location.state]);
+
   useEffect(() => {
     let isMounted = true;
     const fetchHomestaysFromDb = async () => {
+      // Nếu đang hiển thị kết quả từ tìm kiếm hình ảnh và chưa gõ từ khóa mới thì không ghi đè
+      if (visualActive && (!searchQuery || !searchQuery.trim())) {
+        return;
+      }
       setLoading(true);
       try {
         const dbList = await homestayService.searchHomestays(searchQuery);
@@ -246,7 +322,7 @@ export default function SearchResult() {
       isMounted = false;
       clearTimeout(timer);
     };
-  }, [searchQuery]);
+  }, [searchQuery, visualActive]);
 
   const clearAllFilters = () => {
     setMinPrice('');
@@ -322,6 +398,11 @@ export default function SearchResult() {
     });
 
     // Sắp xếp
+    if (visualActive && (!searchQuery || !searchQuery.trim())) {
+      // Giữ nguyên thứ tự phù hợp nhất ở đầu danh sách
+      return list;
+    }
+
     return [...list].sort((a, b) => {
       const priceA = Number(a.pricePerNight ?? a.price ?? a.basePrice ?? 0);
       const priceB = Number(b.pricePerNight ?? b.price ?? b.basePrice ?? 0);
@@ -454,7 +535,7 @@ export default function SearchResult() {
               type="button"
               className="search-visual-btn"
               style={{ width: '44px', height: '44px', marginLeft: '6px' }}
-              title="Tìm kiếm bằng hình ảnh (AI CLIP)"
+              title="Tìm kiếm bằng hình ảnh"
               onClick={() => setIsVisualSearchOpen(true)}
             >
               <i className="bi bi-camera-fill" />
@@ -480,11 +561,77 @@ export default function SearchResult() {
             })}
           </div>
 
+          {/* 2.5 Banner thông báo khi tìm kiếm bằng hình ảnh */}
+          {visualActive && (
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '12px 18px',
+              backgroundColor: '#f0fdf4',
+              border: '1.5px solid #86efac',
+              borderRadius: '16px',
+              marginBottom: '18px',
+              boxShadow: '0 4px 14px rgba(21, 128, 61, 0.08)'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                {visualImage && (
+                  <img
+                    src={visualImage}
+                    alt="Ảnh tìm kiếm"
+                    style={{
+                      width: '54px',
+                      height: '54px',
+                      borderRadius: '10px',
+                      objectFit: 'cover',
+                      border: '1.5px solid #15803d'
+                    }}
+                  />
+                )}
+                <div>
+                  <div style={{ fontWeight: 700, color: '#166534', fontSize: '15px' }}>
+                    <i className="bi bi-camera-fill me-2" />
+                    Chỗ nghỉ có phong cách tương tự với ảnh của bạn
+                  </div>
+                  <div style={{ fontSize: '13px', color: '#15803d', marginTop: '2px' }}>
+                    Đã tự động xếp các chỗ nghỉ phù hợp nhất lên đầu danh sách
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handleClearVisualSearch}
+                style={{
+                  background: '#ffffff',
+                  border: '1px solid #86efac',
+                  color: '#15803d',
+                  padding: '7px 14px',
+                  borderRadius: '10px',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px'
+                }}
+              >
+                <i className="bi bi-x-lg" /> Xem tất cả chỗ nghỉ
+              </button>
+            </div>
+          )}
+
           {/* 3. Header toolbar: Gợi ý khi nhập khoảng trắng hoặc không có từ khóa */}
           <div className="results-header">
             <div>
               <h2>
-                {isSuggestion ? (
+                {visualActive ? (
+                  <>
+                    <span className="badge bg-success-subtle text-success me-2 px-2.5 py-1" style={{ fontSize: '13px', fontWeight: 600, borderRadius: '8px' }}>
+                      <i className="bi bi-camera-fill me-1"></i> Tìm theo hình ảnh
+                    </span>
+                    Kết quả tìm kiếm phù hợp ({filteredHomestays.length} chỗ nghỉ)
+                  </>
+                ) : isSuggestion ? (
                   <>
                     <span className="badge bg-success-subtle text-success me-2 px-2.5 py-1" style={{ fontSize: '13px', fontWeight: 600, borderRadius: '8px' }}>
                       <i className="bi bi-stars me-1"></i> Gợi ý cho bạn
@@ -546,9 +693,13 @@ export default function SearchResult() {
             </div>
           ) : filteredHomestays.length === 0 ? (
             <div className="empty-results">
-              <i className="bi bi-geo-alt-fill display-4 text-success mb-2 d-block"></i>
-              <h3>Chưa tìm thấy chỗ nghỉ phù hợp</h3>
-              <p>Hãy thử đổi từ khóa tìm kiếm, mở rộng khoảng giá hoặc xóa bớt các bộ lọc tiện nghi nhé!</p>
+              <i className={`bi ${visualActive ? 'bi-image' : 'bi-geo-alt-fill'} display-4 text-success mb-2 d-block`}></i>
+              <h3>{visualActive ? 'Không tìm thấy ảnh nào giống' : 'Chưa tìm thấy chỗ nghỉ phù hợp'}</h3>
+              <p>
+                {visualActive
+                  ? 'Ảnh bạn tải lên có độ tương đồng quá thấp so với các chỗ nghỉ hiện có. Hãy thử chọn một ảnh khác rõ nét hơn về phòng ốc hoặc kiến trúc homestay nhé!'
+                  : 'Hãy thử đổi từ khóa tìm kiếm, mở rộng khoảng giá hoặc xóa bớt các bộ lọc tiện nghi nhé!'}
+              </p>
               <button type="button" className="btn btn-outline-success mt-3" onClick={clearAllFilters}>
                 Xem tất cả {homestays.length} chỗ nghỉ
               </button>

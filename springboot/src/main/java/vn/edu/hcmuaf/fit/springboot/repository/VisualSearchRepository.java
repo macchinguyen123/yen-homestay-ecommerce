@@ -18,9 +18,9 @@ public class VisualSearchRepository {
 
     /**
      * Tìm kiếm top homestay theo khoảng cách Cosine với vector truy vấn (512 chiều)
-     * Sử dụng ROW_NUMBER() để mỗi homestay chỉ xuất hiện 1 lần với ảnh khớp nhất
+     * Chỉ lấy các homestay có độ tương đồng >= minSimilarity (mặc định 65%)
      */
-    public List<VisualSearchItemDTO> searchSimilarHomestays(String vectorString, int limit) {
+    public List<VisualSearchItemDTO> searchSimilarHomestays(String vectorString, int limit, double minSimilarity) {
         String sql = """
             WITH ranked AS (
                 SELECT 
@@ -36,7 +36,7 @@ public class VisualSearchRepository {
                     ROW_NUMBER() OVER(PARTITION BY h.homestay_id ORDER BY (hi.embedding <=> cast(? as vector)) ASC) as rn
                 FROM homestay_images hi
                 JOIN homestays h ON hi.homestay_id = h.homestay_id
-                WHERE hi.embedding IS NOT NULL AND h.status = 'ACTIVE'
+                WHERE hi.embedding IS NOT NULL AND (h.status IS NULL OR UPPER(h.status) = 'ACTIVE')
             )
             SELECT 
                 homestay_id, 
@@ -49,7 +49,7 @@ public class VisualSearchRepository {
                 raw_similarity, 
                 distance
             FROM ranked
-            WHERE rn = 1
+            WHERE rn = 1 AND raw_similarity >= ?
             ORDER BY distance ASC
             LIMIT ?;
         """;
@@ -80,8 +80,13 @@ public class VisualSearchRepository {
             vectorString,
             vectorString,
             vectorString,
+            minSimilarity,
             limit
         );
+    }
+
+    public List<VisualSearchItemDTO> searchSimilarHomestays(String vectorString, int limit) {
+        return searchSimilarHomestays(vectorString, limit, 0.65);
     }
 
     /**

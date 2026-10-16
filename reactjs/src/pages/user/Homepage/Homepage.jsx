@@ -874,14 +874,13 @@ export default function Homepage() {
                   <button
                     type="button"
                     className="search-visual-btn"
-                    title="Tìm kiếm bằng hình ảnh (AI CLIP)"
+                    title="Tìm kiếm bằng hình ảnh"
                     onClick={() => {
                       setIsVisualSearchOpen(true);
                       setIsSearchOpen(false);
                     }}
                   >
                     <i className="bi bi-camera-fill" />
-                    <span className="visual-badge">AI</span>
                   </button>
 
                   {/* Submit */}
