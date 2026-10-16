@@ -137,6 +137,16 @@ export default function Header() {
                 <span>Đặt phòng</span>
               </NavLink>
             </li>
+              <li className="yen-nav-item">
+                  <NavLink
+                      to="/messages"
+                      className={({ isActive }) => `yen-nav-link ${isActive ? 'active' : ''}`}
+                      onClick={closeMobileMenu}
+                  >
+                      <i className="bi bi-chat-dots nav-icon" />
+                      <span>Tin nhắn</span>
+                  </NavLink>
+              </li>
 
             <li className="yen-nav-item">
               <NavLink

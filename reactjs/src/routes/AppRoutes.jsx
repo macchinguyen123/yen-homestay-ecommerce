@@ -21,6 +21,7 @@ import SearchResult from '../pages/user/SearchResult/SearchResult';
 import Support from '../pages/user/Support/Support';
 import Wishlist from '../pages/user/Wishlist/Wishlist';
 import Category from '../pages/user/Category/Category';
+import Messages from '../pages/user/Messages/Messages';
 
 // Owner Pages
 import OwnerDashboard from '../pages/owner/Dashboard/OwnerDashboard';
@@ -82,6 +83,7 @@ export default function AppRoutes() {
         <Route path="/search-result" element={<SearchResult />} />
         <Route path="/support" element={<Support />} />
         <Route path="/wishlist" element={<Wishlist />} />
+        <Route path="/messages" element={<Messages />} />
         <Route path="/category" element={<Category />} />
         <Route path="/category/:id" element={<Category />} />
         <Route path="/categories" element={<Category />} />
@@ -100,6 +102,7 @@ export default function AppRoutes() {
           <Route path="/owner/manage-room" element={<ManageRoom />} />
           <Route path="/owner/services" element={<ManageService />} />
           <Route path="/owner/bookings" element={<ManageBooking />} />
+          <Route path="/owner/messages" element={<Messages />} />
           <Route path="/owner/missions" element={<ManageMission />} />
           <Route path="/owner/reviews" element={<ManageReviews />} />
           <Route path="/owner/discounts" element={<ManageDiscount />} />

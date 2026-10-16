@@ -11,6 +11,7 @@ const OWNER_NAV = [
   { to: '/owner/rooms',      icon: 'bi-door-open',       label: 'Quản lý phòng' },
   { to: '/owner/services',   icon: 'bi-basket2',         label: 'Quản lý dịch vụ' },
   { to: '/owner/bookings',   icon: 'bi-journal-bookmark',label: 'Quản lý Booking' },
+  { to: '/owner/messages',   icon: 'bi-chat-dots',        label: 'Tin nhắn' },
   { to: '/owner/missions',   icon: 'bi-trophy',          label: 'Quản lý nhiệm vụ' },
   { to: '/owner/reviews',    icon: 'bi-star-half',       label: 'Đánh giá & Phân tích' },
   { to: '/owner/discounts',  icon: 'bi-ticket-perforated', label: 'Quản lý mã giảm giá' },
