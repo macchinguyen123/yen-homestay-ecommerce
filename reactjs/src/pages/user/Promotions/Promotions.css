@@ -505,40 +505,6 @@ body {
 .tag-teal { background: #0F766E; }
 .tag-red { background: #991B1B; }
 
-.nearby-heart-btn {
-  position: absolute !important;
-  top: 10px !important;
-  right: 10px !important;
-  left: auto !important;
-  bottom: auto !important;
-  width: 32px !important;
-  height: 32px !important;
-  background: rgba(255, 255, 255, 0.95) !important;
-  border-radius: 50% !important;
-  border: none !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  font-size: 0.95rem !important;
-  color: #475569 !important;
-  cursor: pointer !important;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18) !important;
-  transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
-  z-index: 10 !important;
-  padding: 0 !important;
-}
-
-.nearby-heart-btn:hover {
-  background: #FFFFFF !important;
-  color: #E11D48 !important;
-  transform: scale(1.15) !important;
-  box-shadow: 0 4px 12px rgba(225, 29, 72, 0.28) !important;
-}
-
-.nearby-heart-btn.active,
-.nearby-heart-btn.active i {
-  color: #E11D48 !important;
-}
 
 .nearby-body.compact-body {
   padding: 10px 12px 12px;

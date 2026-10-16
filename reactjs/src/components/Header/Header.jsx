@@ -104,16 +104,7 @@ export default function Header() {
               </NavLink>
             </li>
 
-            <li className="yen-nav-item">
-              <NavLink
-                to="/wishlist"
-                className={({ isActive }) => `yen-nav-link ${isActive ? 'active' : ''}`}
-                onClick={closeMobileMenu}
-              >
-                <i className="bi bi-heart nav-icon" />
-                <span>Yêu thích</span>
-              </NavLink>
-            </li>
+
 
             <li className="yen-nav-item">
               <NavLink
