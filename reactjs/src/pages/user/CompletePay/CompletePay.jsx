@@ -8,6 +8,8 @@ const LAST_KEY = 'yenLastBooking';
 
 const METHOD_LABELS = {
   vietqr: 'Chuyển khoản QR (VietQR)',
+  vnpay: 'Cổng thanh toán VNPAY (Sandbox)',
+  cash: 'Tiền mặt tại homestay',
   momo: 'Ví MoMo',
   zalopay: 'ZaloPay',
   card: 'Thẻ ngân hàng',
@@ -33,8 +35,14 @@ export default function CompletePay() {
   const [toastMsg, setToastMsg] = useState('');
   const [showToast, setShowToast] = useState(false);
 
+  // VNPay callback params
+  const vnpResponseCode = searchParams.get('vnp_ResponseCode');
+  const vnpTxnRef = searchParams.get('vnp_TxnRef');
+  const vnpTransactionNo = searchParams.get('vnp_TransactionNo');
+  const vnpBankCode = searchParams.get('vnp_BankCode');
+
   useEffect(() => {
-    const code = searchParams.get('code');
+    const code = searchParams.get('code') || vnpTxnRef;
     let isMounted = true;
 
     async function loadBooking() {
@@ -217,6 +225,26 @@ export default function CompletePay() {
           <div className="cp-hero">
             <div className="cp-hero-icon"><i className="bi bi-check-lg" /></div>
             <h1>Đặt phòng thành công</h1>
+            {vnpResponseCode === '00' && (
+              <div style={{
+                display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 16px',
+                background: '#F0F9FF', border: '1px solid #BAE6FD', borderRadius: '9999px',
+                color: '#0369A1', fontSize: '0.86rem', fontWeight: 700, margin: '8px auto 14px'
+              }}>
+                <i className="bi bi-shield-check" style={{ fontSize: '1rem', color: '#0284C7' }} />
+                Đã thanh toán thành công qua Cổng VNPAY {vnpBankCode ? `(${vnpBankCode})` : ''} · Mã GD: #{vnpTransactionNo || 'VNPAY'}
+              </div>
+            )}
+            {vnpResponseCode && vnpResponseCode !== '00' && (
+              <div style={{
+                display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 16px',
+                background: '#FFF1F2', border: '1px solid #FECDD3', borderRadius: '9999px',
+                color: '#E11D48', fontSize: '0.86rem', fontWeight: 700, margin: '8px auto 14px'
+              }}>
+                <i className="bi bi-exclamation-triangle-fill" />
+                Giao dịch VNPAY đã bị hủy hoặc chưa hoàn tất (Mã: {vnpResponseCode}) · Đơn được giữ ở trạng thái Chờ thanh toán.
+              </div>
+            )}
             <p className="cp-hero-sub">
               Cảm ơn <b>{booking.contact?.fullName || 'quý khách'}</b>! Chúng tôi đã gửi email xác nhận tới <b>{booking.contact?.email}</b>.
               {isDeposit && ` Bạn đã đặt cọc ${fmtVND(pr.paid)}, phần còn lại trả khi nhận phòng.`}
