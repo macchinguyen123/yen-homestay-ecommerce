@@ -988,26 +988,75 @@ export default function ManageService() {
             <form onSubmit={handleSaveCombo}>
               <div className="modal-body-scroll">
                 <div className="form-group-item">
-                  <label className="form-label-title">Hình ảnh Combo</label>
+                  <label className="form-label-title">Hình ảnh Combo (Nhập URL hoặc Tải tệp)</label>
                   <div className="image-upload-row">
                     <div className="preview-square">
                       {comboForm.image ? (
-                        <img src={comboForm.image} alt="Preview" />
+                        <img
+                          src={comboForm.image}
+                          alt="Preview"
+                          onError={(e) => {
+                            e.target.onerror = null;
+                            e.target.src = 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=600&q=80';
+                          }}
+                        />
                       ) : (
                         <i className="bi bi-image" />
                       )}
                     </div>
                     <div className="upload-input-wrap">
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={(e) =>
-                          handleImageUpload(e, (dataUrl) =>
-                            setComboForm({ ...comboForm, image: dataUrl })
-                          )
-                        }
-                      />
-                      <span className="upload-hint">Khuyên dùng ảnh phong cảnh (tỉ lệ 16:9)</span>
+                      {/* Nhập link ảnh trực tiếp bằng URL */}
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        <div style={{ position: 'relative', flex: 1 }}>
+                          <span className="material-symbols-outlined" style={{ position: 'absolute', left: '10px', top: '10px', fontSize: '18px', color: '#64748b' }}>
+                            link
+                          </span>
+                          <input
+                            type="url"
+                            className="form-input-field"
+                            placeholder="Dán link ảnh trực tiếp (https://...)"
+                            value={comboForm.image || ''}
+                            onChange={(e) =>
+                              setComboForm({ ...comboForm, image: e.target.value })
+                            }
+                            style={{ paddingLeft: '36px', width: '100%' }}
+                          />
+                        </div>
+                        {comboForm.image && (
+                          <button
+                            type="button"
+                            title="Xóa link ảnh"
+                            onClick={() => setComboForm({ ...comboForm, image: '' })}
+                            style={{
+                              padding: '8px 12px',
+                              background: '#fee2e2',
+                              color: '#dc2626',
+                              border: '1px solid #fecaca',
+                              borderRadius: '8px',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center'
+                            }}
+                          >
+                            <i className="bi bi-x-lg" />
+                          </button>
+                        )}
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
+                        <span className="upload-hint" style={{ fontWeight: 600 }}>Hoặc chọn tệp:</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) =>
+                            handleImageUpload(e, (dataUrl) =>
+                              setComboForm({ ...comboForm, image: dataUrl })
+                            )
+                          }
+                        />
+                      </div>
+                      <span className="upload-hint">Hỗ trợ đường dẫn URL ảnh trực tuyến (HTTPS) hoặc tệp ảnh JPG, PNG từ máy.</span>
                     </div>
                   </div>
                 </div>
@@ -1120,34 +1169,84 @@ export default function ManageService() {
             </div>
             <form onSubmit={handleSaveService}>
               <div className="modal-body-scroll">
-                {/* Upload Image & Presets */}
+                {/* Upload Image & URL & Presets */}
                 <div className="form-group-item">
-                  <label className="form-label-title">Hình ảnh dịch vụ</label>
+                  <label className="form-label-title">Hình ảnh dịch vụ (Nhập URL hoặc Tải tệp)</label>
                   <div className="image-upload-row">
                     <div className="preview-square">
                       {serviceForm.image ? (
-                        <img src={serviceForm.image} alt="Preview" />
+                        <img
+                          src={serviceForm.image}
+                          alt="Preview"
+                          onError={(e) => {
+                            e.target.onerror = null;
+                            e.target.src = 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=600&q=80';
+                          }}
+                        />
                       ) : (
                         <i className="bi bi-image" />
                       )}
                     </div>
                     <div className="upload-input-wrap">
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={(e) =>
-                          handleImageUpload(e, (dataUrl) =>
-                            setServiceForm({ ...serviceForm, image: dataUrl })
-                          )
-                        }
-                      />
+                      {/* Nhập link ảnh trực tiếp bằng URL */}
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        <div style={{ position: 'relative', flex: 1 }}>
+                          <span className="material-symbols-outlined" style={{ position: 'absolute', left: '10px', top: '10px', fontSize: '18px', color: '#64748b' }}>
+                            link
+                          </span>
+                          <input
+                            type="url"
+                            className="form-input-field"
+                            placeholder="Dán link ảnh trực tiếp (https://...)"
+                            value={serviceForm.image || ''}
+                            onChange={(e) =>
+                              setServiceForm({ ...serviceForm, image: e.target.value })
+                            }
+                            style={{ paddingLeft: '36px', width: '100%' }}
+                          />
+                        </div>
+                        {serviceForm.image && (
+                          <button
+                            type="button"
+                            title="Xóa link ảnh"
+                            onClick={() => setServiceForm({ ...serviceForm, image: '' })}
+                            style={{
+                              padding: '8px 12px',
+                              background: '#fee2e2',
+                              color: '#dc2626',
+                              border: '1px solid #fecaca',
+                              borderRadius: '8px',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center'
+                            }}
+                          >
+                            <i className="bi bi-x-lg" />
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Tải tệp từ máy */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
+                        <span className="upload-hint" style={{ fontWeight: 600 }}>Hoặc chọn tệp:</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) =>
+                            handleImageUpload(e, (dataUrl) =>
+                              setServiceForm({ ...serviceForm, image: dataUrl })
+                            )
+                          }
+                        />
+                      </div>
                       <span className="upload-hint">
-                        Hỗ trợ JPG, PNG hoặc chọn nhanh ảnh mẫu có sẵn bên dưới.
+                        Hỗ trợ URL trực tiếp (Unsplash, Cloudinary, Imgur...) hoặc tệp ảnh JPG/PNG từ máy tính.
                       </span>
 
                       {/* Preset Image Thumbnails */}
                       <div className="preset-picker-wrap">
-                        <span className="preset-picker-label">Gợi ý ảnh đẹp theo chủ đề:</span>
+                        <span className="preset-picker-label">Hoặc chọn nhanh ảnh mẫu có sẵn:</span>
                         <div className="preset-thumbnails-row">
                           {PRESET_IMAGES.map((preset, idx) => (
                             <button

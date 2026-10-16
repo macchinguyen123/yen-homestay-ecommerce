@@ -28,5 +28,21 @@ public interface HomestayRepository extends JpaRepository<Homestay, Long> {
            "LOWER(h.city) LIKE LOWER(CONCAT('%', :kw, '%')) OR " +
            "LOWER(h.address) LIKE LOWER(CONCAT('%', :kw, '%'))")
     List<Homestay> searchByNameOrCityOrAddress(@org.springframework.data.repository.query.Param("kw") String kw);
+
+    List<Homestay> findTop5ByStatusIgnoreCaseOrderByIdDesc(String status);
+
+    @org.springframework.data.jpa.repository.Query("SELECT h FROM Homestay h WHERE " +
+           "(:city IS NULL OR LOWER(h.city) LIKE LOWER(CONCAT('%', :city, '%')) OR LOWER(h.address) LIKE LOWER(CONCAT('%', :city, '%'))) AND " +
+           "(:maxPrice IS NULL OR h.basePrice <= :maxPrice) AND " +
+           "(:minPrice IS NULL OR h.basePrice >= :minPrice) AND " +
+           "(:guests IS NULL OR h.maxGuests >= :guests) AND " +
+           "(LOWER(h.status) = 'active') " +
+           "ORDER BY h.rating DESC NULLS LAST, h.id DESC")
+    List<Homestay> filterHomestays(
+        @org.springframework.data.repository.query.Param("city") String city,
+        @org.springframework.data.repository.query.Param("minPrice") java.math.BigDecimal minPrice,
+        @org.springframework.data.repository.query.Param("maxPrice") java.math.BigDecimal maxPrice,
+        @org.springframework.data.repository.query.Param("guests") Integer guests
+    );
 }
 
