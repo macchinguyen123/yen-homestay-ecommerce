@@ -21,7 +21,7 @@ public class RoomImage {
     @Column(name = "room_id", nullable = false)
     private Long roomId;
 
-    @Column(name = "image_url", nullable = false)
+    @Column(name = "image_url", nullable = false, columnDefinition = "TEXT")
     private String imageUrl;
 
     @Column(name = "is_primary")

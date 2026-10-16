@@ -740,8 +740,8 @@ export default function BookingAndPay() {
         depositAmount: payNow,
         remainingAmount: payLater,
         paymentMethod: dbPayMethod,
-        depositStatus: payMethod === 'cash' ? 'UNPAID' : 'PAID',
-        status: payMethod === 'cash' ? 'PENDING' : 'CONFIRMED',
+        depositStatus: 'PAID',
+        status: 'CONFIRMED',
         customerName: fullName,
         customerPhone: phone,
         customerEmail: email,
@@ -1108,7 +1108,10 @@ export default function BookingAndPay() {
                 <div className="bk-options">
                   <div
                     className={`bk-option ${payPlan === 'full' ? 'checked' : ''}`}
-                    onClick={() => setPayPlan('full')}
+                    onClick={() => {
+                      setPayPlan('full');
+                      if (payMethod === 'cash') setPayMethod('vietqr');
+                    }}
                     role="radio"
                     aria-checked={payPlan === 'full'}
                     style={{ cursor: 'pointer' }}
@@ -1130,7 +1133,7 @@ export default function BookingAndPay() {
                     <span className="bk-option-radio" />
                     <span className="bk-option-body">
                       <span className="bk-option-title">Đặt cọc 30%</span>
-                      <span className="bk-option-sub">Trả trước 30%, phần còn lại trả khi nhận phòng.</span>
+                      <span className="bk-option-sub">Trả trước 30% qua QR, 70% còn lại thanh toán bằng tiền mặt khi nhận phòng.</span>
                     </span>
                     <b className="bk-option-amount">{fmtVND(Math.round((grandTotal * DEPOSIT_RATE) / 1000) * 1000)}</b>
                   </div>
@@ -1170,21 +1173,30 @@ export default function BookingAndPay() {
                     </span>
                   </div>
 
-                  {/* Tiền mặt tại homestay */}
-                  <div
-                    className={`bk-option ${payMethod === 'cash' ? 'checked' : ''}`}
-                    onClick={() => setPayMethod('cash')}
-                    role="radio"
-                    aria-checked={payMethod === 'cash'}
-                    style={{ cursor: 'pointer' }}
-                  >
-                    <span className="bk-option-radio" />
-                    <span className="bk-method-icon bk-method-icon--cash"><i className="bi bi-cash-coin" /></span>
-                    <span className="bk-option-body">
-                      <span className="bk-option-title">Tiền mặt tại homestay</span>
-                      <span className="bk-option-sub">Thanh toán trực tiếp bằng tiền mặt khi làm thủ tục nhận phòng tại quầy lễ tân.</span>
-                    </span>
-                  </div>
+                  {/* Tiền mặt tại homestay - CHỈ HIỂN THỊ KHI CHỌN ĐẶT CỌC 30% */}
+                  {payPlan === 'deposit' && (
+                    <div
+                      className={`bk-option ${payMethod === 'cash' ? 'checked' : ''}`}
+                      onClick={() => setPayMethod('cash')}
+                      role="radio"
+                      aria-checked={payMethod === 'cash'}
+                      style={{ cursor: 'pointer' }}
+                    >
+                      <span className="bk-option-radio" />
+                      <span className="bk-method-icon bk-method-icon--cash"><i className="bi bi-cash-coin" /></span>
+                      <span className="bk-option-body">
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                          <span className="bk-option-title">Tiền mặt tại homestay (Cọc 30% qua QR + 70% tiền mặt khi nhận phòng)</span>
+                          <span style={{ fontSize: '0.72rem', background: '#FEF3C7', color: '#92400E', padding: '2px 8px', borderRadius: '12px', fontWeight: 700 }}>
+                            Cọc {fmtVND(payNow)} · Trả sau {fmtVND(payLater)}
+                          </span>
+                        </div>
+                        <span className="bk-option-sub">
+                          Quét mã VietQR chuyển khoản trước 30% tiền cọc ({fmtVND(payNow)}) để giữ chỗ. Số tiền mặt còn lại 70% ({fmtVND(payLater)}) thanh toán trực tiếp tại quầy lễ tân khi nhận phòng.
+                        </span>
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 <p className="bk-secure"><i className="bi bi-lock-fill" /> Thông tin thanh toán được mã hóa an toàn.</p>
@@ -1354,56 +1366,154 @@ export default function BookingAndPay() {
               )}
             </div>
 
-            {/* Content for CASH */}
+            {/* Content for CASH (chỉ có khi đặt cọc 30% - hiển thị VietQR cọc 30% + hướng dẫn 70% tiền mặt) */}
             {payMethod === 'cash' && (
               <div className="yn-cash-layout">
                 {/* Top banner */}
                 <div className="yn-cash-banner">
-                  <div className="yn-cash-banner-icon"><i className="bi bi-cash-coin" /></div>
+                  <div className="yn-cash-banner-icon"><i className="bi bi-wallet2" /></div>
                   <div className="yn-cash-banner-text">
-                    <b>Thanh toán trực tiếp tại quầy lễ tân</b>
-                    <span>Chuẩn bị đúng số tiền khi đến nhận phòng. Lễ tân sẽ đối soát mã và bàn giao phòng ngay.</span>
+                    <b>Đặt cọc 30% qua VietQR &amp; Thanh toán 70% tiền mặt khi nhận phòng</b>
+                    <span>Quý khách chuyển khoản 30% tiền cọc qua mã VietQR dưới đây để xác nhận giữ phòng ngay. Số tiền 70% còn lại thanh toán bằng tiền mặt trực tiếp tại quầy lễ tân homestay.</span>
                   </div>
                 </div>
 
-                {/* Info grid */}
-                <div className="yn-cash-info-grid">
-                  <div className="yn-cash-info-item">
-                    <span className="yn-cash-lbl"><i className="bi bi-ticket-detailed" /> Mã đặt phòng</span>
-                    <div className="yn-cash-val-row">
-                      <b className="highlight-code">{bookingCode}</b>
-                      <button type="button" className="yn-copy-btn" onClick={() => copyToClipboard(bookingCode)} title="Sao chép mã">
-                        <i className="bi bi-copy" />
-                      </button>
+                {/* Phần 1: VietQR thanh toán 30% tiền cọc */}
+                <div className="yn-vietqr-stack" style={{ background: '#F8FAFC', padding: '14px', borderRadius: '14px', border: '1.5px solid #E2E8F0' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', marginBottom: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ background: '#DCFCE7', color: '#15803D', fontWeight: 800, fontSize: '0.75rem', padding: '3px 8px', borderRadius: '6px' }}>
+                        BƯỚC 1: CHUYỂN KHOẢN CỌC 30%
+                      </span>
+                      <b style={{ fontSize: '0.92rem', color: '#0F172A' }}>Quét mã VietQR cọc</b>
+                    </div>
+                    <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#15803D' }}>{fmtVND(payNow)}</span>
+                  </div>
+
+                  {/* MÃ QR TO CHÍNH GIỮA */}
+                  <div className="yn-vietqr-qr-center">
+                    <div className="yn-vietqr-img-frame-large">
+                      <img
+                        src={getVietQRUrl({
+                          bankCode: VIETQR_MERCHANT.bankCode,
+                          accountNumber: VIETQR_MERCHANT.accountNumber,
+                          amount: payNow,
+                          memo: bookingCode.replace(/-/g, ''),
+                          accountName: VIETQR_MERCHANT.accountName,
+                          template: 'compact2'
+                        })}
+                        alt="QR cọc 30% BIDV"
+                        className="yn-vietqr-image-large"
+                      />
+                    </div>
+                    <div className="yn-vietqr-qr-hint">
+                      <i className="bi bi-qr-code-scan" />
+                      <span>Quét bằng App ngân hàng bất kỳ để chuyển khoản 30% tiền cọc</span>
+                      <a
+                        href={getVietQRUrl({
+                          bankCode: VIETQR_MERCHANT.bankCode,
+                          accountNumber: VIETQR_MERCHANT.accountNumber,
+                          amount: payNow,
+                          memo: bookingCode.replace(/-/g, ''),
+                          accountName: VIETQR_MERCHANT.accountName,
+                          template: 'compact2'
+                        })}
+                        download={`VietQR-Coc30-${bookingCode}.png`}
+                        target="_blank" rel="noreferrer"
+                        className="yn-qr-download-link"
+                      >
+                        <i className="bi bi-download" /> Tải QR
+                      </a>
                     </div>
                   </div>
 
-                  <div className="yn-cash-info-item">
-                    <span className="yn-cash-lbl"><i className="bi bi-cash-stack" /> Số tiền cần trả</span>
-                    <b className="highlight-price">{fmtVND(grandTotal)}</b>
+                  {/* THÔNG TIN CHUYỂN KHOẢN TIỀN CỌC */}
+                  <div className="yn-vietqr-info-grid">
+                    <div className="yn-vqr-cell">
+                      <span className="yn-vqr-lbl">Ngân hàng thụ hưởng</span>
+                      <div className="yn-vqr-val">
+                        <span className="yn-bank-tag">BIDV</span>
+                        <b>Đầu tư &amp; Phát triển VN</b>
+                      </div>
+                    </div>
+                    <div className="yn-vqr-cell">
+                      <span className="yn-vqr-lbl">Chủ tài khoản</span>
+                      <b className="yn-vqr-val">{VIETQR_MERCHANT.accountName}</b>
+                    </div>
+                    <div className="yn-vqr-cell yn-vqr-cell--full">
+                      <span className="yn-vqr-lbl">Số tài khoản nhận cọc</span>
+                      <div className="yn-copyable-val">
+                        <b className="highlight-acc">{VIETQR_MERCHANT.accountNumber}</b>
+                        <button type="button" className="yn-copy-btn" onClick={() => copyToClipboard(VIETQR_MERCHANT.accountNumber)} title="Sao chép STK">
+                          <i className="bi bi-copy" />
+                        </button>
+                      </div>
+                    </div>
+                    <div className="yn-vqr-cell">
+                      <span className="yn-vqr-lbl">Tiền cọc cần chuyển (30%)</span>
+                      <div className="yn-copyable-val">
+                        <b className="highlight-price">{fmtVND(payNow)}</b>
+                        <button type="button" className="yn-copy-btn" onClick={() => copyToClipboard(String(Math.round(payNow)))} title="Sao chép tiền cọc">
+                          <i className="bi bi-copy" />
+                        </button>
+                      </div>
+                    </div>
+                    <div className="yn-vqr-cell">
+                      <span className="yn-vqr-lbl">Kênh nhận cọc</span>
+                      <span className="yn-live-pill"><span className="yn-pulse-dot" /> NAPAS 24/7 tức thì</span>
+                    </div>
+                    <div className="yn-vqr-cell yn-vqr-cell--full yn-vqr-cell--memo">
+                      <span className="yn-vqr-lbl">Nội dung chuyển khoản (Bắt buộc)</span>
+                      <div className="yn-copyable-val">
+                        <b className="highlight-code yn-vqr-memo-code">{bookingCode.replace(/-/g, '')}</b>
+                        <button type="button" className="yn-copy-btn" onClick={() => copyToClipboard(bookingCode.replace(/-/g, ''))} title="Sao chép nội dung">
+                          <i className="bi bi-copy" />
+                        </button>
+                      </div>
+                    </div>
                   </div>
+                </div>
 
-                  {payLater > 0 && (
+                {/* Phần 2: Tiền mặt còn lại thanh toán tại homestay */}
+                <div style={{ background: '#FFFBEB', border: '1.5px solid #FDE68A', borderRadius: '14px', padding: '14px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', marginBottom: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ background: '#FEF3C7', color: '#B45309', fontWeight: 800, fontSize: '0.75rem', padding: '3px 8px', borderRadius: '6px' }}>
+                        BƯỚC 2: TIỀN MẶT KHI NHẬN PHÒNG
+                      </span>
+                      <b style={{ fontSize: '0.92rem', color: '#92400E' }}>Thanh toán 70% còn lại</b>
+                    </div>
+                    <b style={{ color: '#D97706', fontSize: '1.05rem', fontWeight: 800 }}>{fmtVND(payLater)}</b>
+                  </div>
+                  
+                  <div className="yn-cash-info-grid" style={{ background: '#FFFFFF', border: '1px solid #FDE68A' }}>
                     <div className="yn-cash-info-item">
-                      <span className="yn-cash-lbl"><i className="bi bi-clock" /> Trả khi nhận phòng</span>
-                      <b style={{ color: '#D97706', fontWeight: 800 }}>{fmtVND(grandTotal)}</b>
+                      <span className="yn-cash-lbl"><i className="bi bi-cash-stack" /> Tiền mặt trả tại lễ tân (70%)</span>
+                      <b style={{ color: '#D97706', fontSize: '1.15rem', fontWeight: 800 }}>{fmtVND(payLater)}</b>
                     </div>
-                  )}
-
-                  <div className="yn-cash-info-item">
-                    <span className="yn-cash-lbl"><i className="bi bi-door-open" /> Giờ nhận phòng</span>
-                    <b>14:00 – 21:00</b>
+                    <div className="yn-cash-info-item">
+                      <span className="yn-cash-lbl"><i className="bi bi-ticket-detailed" /> Mã đối soát booking</span>
+                      <div className="yn-cash-val-row">
+                        <b className="highlight-code">{bookingCode}</b>
+                        <button type="button" className="yn-copy-btn" onClick={() => copyToClipboard(bookingCode)} title="Sao chép mã">
+                          <i className="bi bi-copy" />
+                        </button>
+                      </div>
+                    </div>
+                    <div className="yn-cash-info-item">
+                      <span className="yn-cash-lbl"><i className="bi bi-door-open" /> Giờ nhận phòng</span>
+                      <b>14:00 – 21:00</b>
+                    </div>
+                    <div className="yn-cash-info-item">
+                      <span className="yn-cash-lbl"><i className="bi bi-alarm" /> Trả phòng trước</span>
+                      <b>12:00 ngày trả</b>
+                    </div>
                   </div>
 
-                  <div className="yn-cash-info-item">
-                    <span className="yn-cash-lbl"><i className="bi bi-alarm" /> Trả phòng trước</span>
-                    <b>12:00 ngày cuối</b>
+                  <div className="yn-cash-note" style={{ marginTop: '10px' }}>
+                    <i className="bi bi-shield-check" />
+                    Sau khi quý khách bấm xác nhận chuyển khoản cọc 30%, hệ thống YÊN lập tức xuất phiếu giữ phòng. Số tiền mặt 70% ({fmtVND(payLater)}) quý khách chỉ cần thanh toán khi đến homestay và nhận phòng thực tế.
                   </div>
-                </div>
-
-                <div className="yn-cash-note">
-                  <i className="bi bi-info-circle-fill" />
-                  Đặt phòng xác nhận ngay — thanh toán toàn bộ khi đến nhận phòng, không cần cọc trước.
                 </div>
               </div>
             )}
@@ -1613,6 +1723,15 @@ export default function BookingAndPay() {
                 disabled={isProcessing}
               >
                 {isProcessing ? 'Đang xác thực...' : 'Tôi đã chuyển khoản thành công'}
+              </button>
+            ) : payMethod === 'cash' ? (
+              <button
+                type="button"
+                className="yn-btn yn-btn--primary"
+                onClick={handleConfirmPayment}
+                disabled={isProcessing}
+              >
+                {isProcessing ? 'Đang xác nhận đặt phòng...' : `Tôi đã chuyển khoản cọc 30% (${fmtVND(payNow)}) — Hoàn tất đặt phòng`}
               </button>
             ) : (
               <button

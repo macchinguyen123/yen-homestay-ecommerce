@@ -359,7 +359,9 @@ export default function CompletePay() {
                     <b>{fmtVND(pr.paid)}</b>
                   </div>
                   <p className="cp-paid-method">
-                    {METHOD_LABELS[booking.method] || 'Thanh toán trực tuyến'}
+                    {booking.method === 'cash'
+                      ? 'Cọc 30% qua VietQR + 70% tiền mặt tại quầy lễ tân'
+                      : (METHOD_LABELS[booking.method] || 'Thanh toán trực tuyến')}
                   </p>
                   {isDeposit && (
                     <div className="cp-row cp-row--later">
