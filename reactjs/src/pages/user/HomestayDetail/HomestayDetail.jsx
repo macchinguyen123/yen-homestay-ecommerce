@@ -1579,7 +1579,7 @@ export default function HomestayDetail() {
                       style={{ marginTop: '10px' }}
                       onClick={() => { setPageReviewStars('all'); setPageReviewPhotoOnly(false); setPageReviewsShown(6); }}
                     >
-                      Xóa bộ lọc
+                      Xóa bộ lọcn
                     </button>
                   )}
                 </div>
