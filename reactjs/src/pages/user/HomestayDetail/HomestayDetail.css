@@ -1205,272 +1205,661 @@ body {
 .room-modal-overlay.active { opacity: 1; visibility: visible; }
 
 .room-modal-container {
-    background: var(--white); border-radius: var(--radius-lg); width: 100%; max-width: 780px; max-height: 92vh;
-    overflow: hidden; box-shadow: var(--shadow-xl); transform: scale(0.95); transition: var(--transition-normal);
-    display: flex; flex-direction: column; position: relative;
+    background: var(--white); border-radius: 24px; width: 100%; max-width: 860px; max-height: 92vh;
+    overflow: hidden; box-shadow: 0 25px 60px -15px rgba(15, 23, 42, 0.35); transform: scale(0.96); transition: var(--transition-normal);
+    display: flex; flex-direction: column; position: relative; border: 1px solid rgba(255, 255, 255, 0.4);
 }
 .room-modal-overlay.active .room-modal-container { transform: scale(1); }
 
 .room-modal-close-btn {
-    position: absolute; top: 14px; right: 14px; width: 40px; height: 40px; border-radius: 50%;
-    background: rgba(255, 255, 255, 0.95); color: var(--dark-color); border: none;
-    display: flex; align-items: center; justify-content: center; font-size: 1.05rem; z-index: 20;
-    box-shadow: var(--shadow-lg); cursor: pointer; transition: var(--transition-fast);
+    position: absolute; top: 16px; right: 16px; width: 42px; height: 42px; border-radius: 50%;
+    background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(8px); color: #ffffff; border: 1px solid rgba(255, 255, 255, 0.3);
+    display: flex; align-items: center; justify-content: center; font-size: 1.1rem; z-index: 40;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25); cursor: pointer; transition: all 0.2s ease;
 }
-.room-modal-close-btn:hover { background: var(--primary-light); color: var(--primary-color); }
-.room-modal-close-btn:focus-visible { outline: 3px solid rgba(21, 128, 61, 0.35); outline-offset: 2px; }
+.room-modal-close-btn:hover { background: #15803d; color: #ffffff; transform: rotate(90deg) scale(1.08); border-color: #15803d; }
+.room-modal-close-btn:focus-visible { outline: 3px solid rgba(34, 197, 94, 0.5); outline-offset: 2px; }
 
 .room-modal-scroll { overflow-y: auto; flex-grow: 1; }
 
-.room-modal-gallery {
-    position: relative !important;
-    height: 340px;
-    background: var(--dark-color);
-    overflow: hidden !important;
+/* ══ BỘ SƯU TẬP ẢNH TƯƠNG TÁC CAO CẤP CỦA POPUP PHÒNG ══ */
+.room-modal-gallery-box {
+    position: relative;
+    background: #0f172a;
+    display: flex;
+    flex-direction: column;
 }
-.room-modal-gallery img {
+
+.room-gallery-viewport {
+    position: relative;
+    height: 380px;
+    background: #0b1120;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.room-gallery-viewport-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    user-select: none;
+    animation: roomImgFade 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes roomImgFade {
+    from { opacity: 0.6; transform: scale(1.02); }
+    to { opacity: 1; transform: scale(1); }
+}
+
+.room-gallery-vignette {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(15, 23, 42, 0.45) 0%, transparent 22%, transparent 68%, rgba(15, 23, 42, 0.75) 100%);
+    pointer-events: none;
+    z-index: 10;
+}
+
+.room-gallery-top-tags {
+    position: absolute;
+    top: 18px;
+    left: 18px;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.room-gallery-tag-type {
+    background: rgba(15, 23, 42, 0.75);
+    color: #ffffff;
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 5px 12px;
+    border-radius: 9999px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.room-gallery-tag-avail {
+    background: rgba(21, 128, 61, 0.9);
+    color: #ffffff;
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 5px 12px;
+    border-radius: 9999px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.room-avail-pulse-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #4ade80;
+    box-shadow: 0 0 0 3px rgba(74, 222, 128, 0.4);
+    animation: roomPulseDot 1.8s infinite;
+}
+
+@keyframes roomPulseDot {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.3); opacity: 0.6; }
+}
+
+/* Nút bấm chuyển ảnh Trái / Phải */
+.room-gallery-arrow-btn {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.94);
+    backdrop-filter: blur(8px);
+    color: #0f172a;
+    border: 1.5px solid rgba(255, 255, 255, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 25;
+    cursor: pointer;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.room-gallery-arrow-btn i {
+    font-size: 1.3rem;
+    line-height: 1;
+    color: #0f172a;
+    transition: transform 0.2s ease, color 0.2s ease;
+}
+.room-gallery-arrow-btn.prev {
+    left: 18px;
+}
+.room-gallery-arrow-btn.next {
+    right: 18px;
+}
+.room-gallery-arrow-btn:hover {
+    background: #15803d;
+    color: #ffffff;
+    border-color: #15803d;
+    transform: translateY(-50%) scale(1.12);
+    box-shadow: 0 10px 28px rgba(21, 128, 61, 0.45);
+}
+.room-gallery-arrow-btn:hover i {
+    color: #ffffff;
+}
+.room-gallery-arrow-btn.prev:hover i {
+    transform: translateX(-2px);
+}
+.room-gallery-arrow-btn.next:hover i {
+    transform: translateX(2px);
+}
+.room-gallery-arrow-btn:focus-visible {
+    outline: 3px solid rgba(255, 255, 255, 0.9);
+    outline-offset: 2px;
+}
+
+/* Thanh điều khiển dưới cùng ảnh */
+.room-gallery-bottom-controls {
+    position: absolute;
+    bottom: 14px;
+    left: 18px;
+    right: 18px;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.room-gallery-dots-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(15, 23, 42, 0.55);
+    backdrop-filter: blur(8px);
+    padding: 5px 10px;
+    border-radius: 9999px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.room-gallery-dot-indicator {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.45);
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    padding: 0;
+}
+.room-gallery-dot-indicator.active {
+    width: 20px;
+    border-radius: 9999px;
+    background: #22c55e;
+}
+
+.room-gallery-counter-pill {
+    background: rgba(15, 23, 42, 0.75);
+    color: #ffffff;
+    backdrop-filter: blur(8px);
+    font-size: 0.76rem;
+    font-weight: 700;
+    padding: 5px 12px;
+    border-radius: 9999px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+.room-gallery-counter-pill i {
+    color: #4ade80;
+}
+
+/* Dải ảnh thu nhỏ (Thumbnail Strip) */
+.room-gallery-thumb-track {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 18px;
+    background: #0f172a;
+    overflow-x: auto;
+    scrollbar-width: thin;
+    scrollbar-color: #334155 transparent;
+}
+.room-gallery-thumb-track::-webkit-scrollbar {
+    height: 5px;
+}
+.room-gallery-thumb-track::-webkit-scrollbar-thumb {
+    background: #334155;
+    border-radius: 9999px;
+}
+
+.room-gallery-thumb-btn {
+    width: 66px;
+    height: 48px;
+    flex-shrink: 0;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    background: #1e293b;
+    padding: 0;
+    cursor: pointer;
+    position: relative;
+    transition: all 0.2s ease;
+    opacity: 0.65;
+}
+.room-gallery-thumb-btn img {
     width: 100%;
     height: 100%;
     object-fit: cover;
     display: block;
 }
-
-.room-gallery-arrow {
-    position: absolute !important;
-    top: 50% !important;
-    transform: translateY(-50%) !important;
-    width: 44px !important;
-    height: 44px !important;
-    border-radius: 50% !important;
-    background: rgba(255, 255, 255, 0.95) !important;
-    color: #0f172a !important;
-    border: 1px solid rgba(0, 0, 0, 0.12) !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    z-index: 30 !important;
-    cursor: pointer !important;
-    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25) !important;
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+.room-gallery-thumb-btn:hover {
+    opacity: 0.95;
+    transform: translateY(-2px);
+    border-color: rgba(255, 255, 255, 0.6);
 }
-.room-gallery-arrow i {
-    font-size: 1.2rem !important;
-    line-height: 1 !important;
-    color: #0f172a !important;
+.room-gallery-thumb-btn.selected {
+    opacity: 1;
+    border-color: #22c55e;
+    box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.45);
+    transform: scale(1.05);
 }
-.room-gallery-arrow.prev {
-    left: 16px !important;
-    right: auto !important;
-}
-.room-gallery-arrow.next {
-    right: 16px !important;
-    left: auto !important;
-}
-.room-gallery-arrow:hover {
-    background: #15803d !important;
-    color: #ffffff !important;
-    border-color: #15803d !important;
-    transform: translateY(-50%) scale(1.08) !important;
-}
-.room-gallery-arrow:hover i {
-    color: #ffffff !important;
-}
-.room-gallery-arrow:focus-visible {
-    outline: 3px solid rgba(255, 255, 255, 0.8) !important;
-    outline-offset: 2px !important;
+.room-thumb-active-glow {
+    position: absolute;
+    inset: 0;
+    box-shadow: inset 0 0 0 2px #22c55e;
+    pointer-events: none;
 }
 
-.room-gallery-counter {
-    position: absolute !important;
-    bottom: 14px !important;
-    right: 14px !important;
-    background: rgba(15, 23, 42, 0.75) !important;
-    color: #ffffff !important;
-    font-size: 0.78rem !important;
-    font-weight: 700 !important;
-    padding: 4px 12px !important;
-    border-radius: var(--radius-full) !important;
-    z-index: 25 !important;
-    backdrop-filter: blur(4px);
+/* ══ BODY NỘI DUNG POPUP ══ */
+.room-modal-body {
+    padding: 24px 28px 24px;
 }
 
-.room-modal-body { padding: 24px 28px 20px; }
-.room-modal-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 14px; }
-.room-modal-tag {
-    display: inline-block; background: var(--secondary-bg); color: var(--secondary-color);
-    border: 1px solid var(--secondary-border); font-size: 0.74rem; font-weight: 700;
-    padding: 3px 10px; border-radius: var(--radius-full); margin-bottom: 8px;
-}
-.room-modal-title { font-size: 1.4rem; font-weight: 800; color: var(--dark-color); margin-bottom: 8px; line-height: 1.3; }
-.room-modal-specs { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 0.86rem; color: var(--text-muted); font-weight: 600; }
-.room-modal-specs i { color: var(--primary-color); margin-right: 4px; }
-.room-modal-price-tag { text-align: right; white-space: nowrap; flex-shrink: 0; }
-.room-modal-price-tag b { display: block; font-size: 1.35rem; font-weight: 800; color: var(--dark-color); }
-.room-modal-price-tag span { font-size: 0.78rem; color: var(--text-muted); }
-.room-modal-desc { font-size: 0.93rem; color: var(--text-main); line-height: 1.7; margin-bottom: 8px; }
-
-.room-modal-subtitle { font-size: 1.02rem; font-weight: 800; color: var(--dark-color); margin: 24px 0 12px; }
-.room-modal-subhead { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
-.room-modal-rating { font-size: 0.86rem; font-weight: 700; color: var(--dark-color); }
-.room-modal-rating i { color: var(--star-color); margin-right: 4px; }
-
-.room-modal-amenities { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 20px; }
-.room-amenity-chip { display: flex; align-items: center; gap: 10px; font-size: 0.88rem; color: var(--text-main); font-weight: 500; }
-.room-amenity-chip i { color: var(--primary-color); width: 20px; text-align: center; }
-
-/* Nhiệm vụ từ chủ phòng trong chi tiết phòng */
-.room-tasks-section {
-    margin-top: 24px;
-    margin-bottom: 24px;
-    padding: 18px 20px;
-    background: #f0fdf4;
-    border: 1.5px solid #bbf7d0;
-    border-radius: var(--radius-lg);
-}
-
-.room-tasks-head {
-    margin-bottom: 14px;
-}
-
-.room-tasks-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    background: #dcfce7;
-    color: #15803d;
-    font-size: 0.76rem;
-    font-weight: 700;
-    padding: 4px 10px;
-    border-radius: var(--radius-full);
-}
-
-.room-tasks-intro {
-    font-size: 0.86rem;
-    color: #4b5563;
-    line-height: 1.55;
-    margin: 6px 0 0;
-}
-
-.room-tasks-list {
+.room-modal-head-card {
     display: flex;
-    flex-direction: column;
-    gap: 12px;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 20px;
+    padding-bottom: 20px;
+    border-bottom: 1.5px solid #f1f5f9;
+    margin-bottom: 20px;
 }
 
-.room-task-card {
-    display: flex;
-    gap: 14px;
-    background: #ffffff;
-    border: 1px solid #e2e8f0;
-    border-radius: var(--radius-md);
-    padding: 14px 16px;
-    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
-}
-
-.room-task-card:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 14px rgba(22, 101, 52, 0.08);
-    border-color: #86efac;
-}
-
-.room-task-icon-col {
-    flex-shrink: 0;
-}
-
-.room-task-icon {
-    width: 42px;
-    height: 42px;
-    border-radius: 10px;
-    background: #dcfce7;
-    color: #16a34a;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.25rem;
-}
-
-.room-task-content {
+.room-modal-head-left {
     flex: 1;
     min-width: 0;
 }
 
-.room-task-title-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-    margin-bottom: 4px;
-}
-
-.room-task-title {
-    font-size: 0.95rem;
-    font-weight: 700;
-    color: var(--dark-color);
-}
-
-.room-task-status-tag {
-    font-size: 0.72rem;
-    font-weight: 700;
-    color: #15803d;
-    background: #f0fdf4;
-    border: 1px solid #86efac;
-    padding: 2px 8px;
-    border-radius: var(--radius-full);
+.room-modal-subtitle-tag {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
-    white-space: nowrap;
+    background: #f0fdf4;
+    color: #15803d;
+    border: 1px solid #bbf7d0;
+    font-size: 0.74rem;
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: 9999px;
+    margin-bottom: 8px;
 }
 
-.room-task-desc {
-    font-size: 0.86rem;
-    color: #64748b;
-    line-height: 1.5;
+.room-modal-title {
+    font-size: 1.45rem;
+    font-weight: 800;
+    color: var(--dark-color);
     margin: 0 0 8px;
+    line-height: 1.3;
 }
 
-.room-task-reward {
+.room-modal-meta-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.85rem;
+    color: #64748b;
+    flex-wrap: wrap;
+}
+.room-meta-rating {
+    display: inline-flex;
+    align-items: center;
+    font-weight: 600;
+    color: #0f172a;
+}
+.room-meta-sep {
+    color: #cbd5e1;
+}
+.room-meta-avail {
+    color: #15803d;
+    font-weight: 600;
+}
+
+.room-modal-price-box {
+    text-align: right;
+    white-space: nowrap;
+    flex-shrink: 0;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    padding: 10px 16px;
+}
+.room-price-sublabel {
+    display: block;
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+}
+.room-price-val-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: flex-end;
+    gap: 4px;
+    margin: 2px 0;
+}
+.room-price-num {
+    font-size: 1.45rem;
+    font-weight: 800;
+    color: #15803d;
+}
+.room-price-unit {
+    font-size: 0.8rem;
+    color: #64748b;
+    font-weight: 600;
+}
+.room-price-note {
+    display: block;
+    font-size: 0.7rem;
+    color: #94a3b8;
+}
+
+/* 4 THẺ THÔNG SỐ PHÒNG (SPECS CARDS) */
+.room-specs-cards-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-bottom: 24px;
+}
+@media (max-width: 720px) {
+    .room-specs-cards-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+.room-spec-card {
+    background: #f8fafc;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 14px;
+    padding: 12px 14px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    transition: all 0.2s ease;
+}
+.room-spec-card:hover {
+    border-color: #86efac;
+    background: #f0fdf4;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(21, 128, 61, 0.08);
+}
+.room-spec-icon-wrap {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    background: #dcfce7;
+    color: #15803d;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.15rem;
+    flex-shrink: 0;
+}
+.room-spec-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+.room-spec-lbl {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: #64748b;
+    text-transform: uppercase;
+}
+.room-spec-val {
+    font-size: 0.9rem;
+    font-weight: 800;
+    color: #0f172a;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.room-modal-section {
+    margin-bottom: 22px;
+}
+.room-modal-sec-title {
+    font-size: 1rem;
+    font-weight: 800;
+    color: var(--dark-color);
+    margin: 0 0 10px;
+    display: flex;
+    align-items: center;
+}
+.room-modal-sec-title i {
+    color: #15803d;
+}
+
+.room-modal-desc {
+    font-size: 0.93rem;
+    color: #334155;
+    line-height: 1.7;
+    margin: 0;
+}
+
+/* Tiện nghi phòng dạng viên thuốc (Pills) */
+.room-modal-amenities-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 10px;
+}
+.room-amenity-pill-item {
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    color: #166534;
+    font-size: 0.84rem;
+    font-weight: 600;
+    padding: 6px 14px;
+    border-radius: 9999px;
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    background: #fefce8;
-    border: 1px solid #fef08a;
-    color: #854d0e;
-    font-size: 0.82rem;
+    transition: all 0.15s ease;
+}
+.room-amenity-pill-item i {
+    color: #16a34a;
+    font-size: 0.95rem;
+}
+.room-amenity-pill-item:hover {
+    background: #dcfce7;
+    border-color: #86efac;
+    transform: translateY(-1px);
+}
+
+/* Khối chọn ngày & số khách hiện đại */
+.room-booking-widget-box {
+    background: #f8fafc;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 18px;
+    padding: 20px;
+    margin-top: 24px;
+}
+
+.room-booking-form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 12px;
+}
+@media (max-width: 650px) {
+    .room-booking-form-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.room-booking-field-modern {
+    background: #ffffff;
+    border: 1.5px solid #cbd5e1;
+    border-radius: 12px;
+    padding: 10px 14px;
+    transition: var(--transition-fast);
+}
+.room-booking-field-modern:focus-within {
+    border-color: #15803d;
+    box-shadow: 0 0 0 3px rgba(21, 128, 61, 0.12);
+}
+.room-booking-field-modern label {
+    display: block;
+    font-size: 0.72rem;
+    font-weight: 800;
+    color: #64748b;
+    margin-bottom: 4px;
+}
+.room-booking-field-modern input,
+.room-booking-field-modern select {
+    width: 100%;
+    background: transparent;
+    border: none;
+    outline: none;
+    font-family: inherit;
+    font-size: 0.92rem;
+    font-weight: 700;
+    color: var(--dark-color);
+    cursor: pointer;
+}
+
+.room-price-breakdown-card {
+    background: #ffffff;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 14px;
+    padding: 16px 18px;
+    margin-top: 16px;
+}
+.breakdown-card-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: #475569;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px dashed #e2e8f0;
+}
+.breakdown-guarantee-tag {
+    color: #15803d;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.75rem;
+}
+.breakdown-total-row {
+    margin-top: 8px;
+}
+.breakdown-total-price {
+    font-size: 1.15rem;
+    font-weight: 800;
+    color: #15803d;
+}
+
+/* Đánh giá chung block */
+.room-modal-reviews-footer-block {
+    margin-top: 24px;
+    padding-top: 20px;
+    border-top: 1.5px solid #f1f5f9;
+}
+.room-modal-rating-badge {
+    display: inline-flex;
+    align-items: center;
+    background: #fffbeb;
+    color: #92400e;
+    border: 1px solid #fde68a;
+    font-size: 0.8rem;
+    font-weight: 700;
     padding: 4px 10px;
-    border-radius: 6px;
+    border-radius: 9999px;
+}
+.room-reviews-note {
+    font-size: 0.85rem;
+    color: #64748b;
+    margin: 6px 0 14px;
+    line-height: 1.5;
 }
 
-.room-task-reward i {
-    color: #ca8a04;
-}
-
-.room-booking-form { display: grid; grid-template-columns: 1fr; gap: 12px; }
-.room-booking-date-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.room-booking-field {
-    border: 1.5px solid var(--border-color); border-radius: var(--radius-md); padding: 10px 14px;
-    transition: var(--transition-fast); background: var(--white);
-}
-.room-booking-field:focus-within { border-color: var(--primary-color); box-shadow: 0 0 0 3px rgba(21, 128, 61, 0.12); }
-.room-booking-field label { display: block; font-size: 0.72rem; font-weight: 800; color: var(--text-muted); margin-bottom: 4px; }
-.room-booking-field input,
-.room-booking-field select {
-    width: 100%; background: transparent; border: none; outline: none; font-family: inherit;
-    font-size: 0.94rem; font-weight: 700; color: var(--dark-color); cursor: pointer;
-}
-.room-booking-warning { font-size: 0.82rem; color: var(--accent-color); font-weight: 600; margin-top: 10px; min-height: 1em; }
-
-.room-price-breakdown { background: var(--light-bg); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 14px 18px; margin-top: 14px; }
-
-.room-modal-reviews { display: flex; flex-direction: column; gap: 12px; margin-bottom: 14px; }
-
+/* ══ THANH ĐẶT PHÒNG DƯỚI CÙNG (STICKY FOOTER) ══ */
 .room-modal-footer {
-    border-top: 1px solid var(--border-color); padding: 16px 28px; display: flex; align-items: center;
-    justify-content: space-between; gap: 16px; background: var(--white); flex-shrink: 0;
+    border-top: 1.5px solid #e2e8f0;
+    padding: 18px 28px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    background: #ffffff;
+    flex-shrink: 0;
+    box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.04);
 }
-.room-modal-footer-price { display: flex; flex-direction: column; }
-.room-modal-footer-price b { font-size: 1.2rem; font-weight: 800; color: var(--dark-color); }
-.room-modal-footer-price span { font-size: 0.78rem; color: var(--text-muted); }
+.room-modal-footer-price-wrap {
+    display: flex;
+    flex-direction: column;
+}
+.room-footer-label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: #64748b;
+    text-transform: uppercase;
+}
+.room-footer-amount-row {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+}
+.room-footer-total {
+    font-size: 1.4rem;
+    font-weight: 800;
+    color: #15803d;
+}
+.room-footer-nights {
+    font-size: 0.82rem;
+    color: #64748b;
+    font-weight: 600;
+}
+.yn-btn-modal-book {
+    padding: 12px 28px !important;
+    font-size: 1rem !important;
+    font-weight: 800 !important;
+    border-radius: 12px !important;
+    box-shadow: 0 4px 14px rgba(21, 128, 61, 0.3) !important;
+    transition: all 0.2s ease !important;
+}
+.yn-btn-modal-book:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 8px 20px rgba(21, 128, 61, 0.4) !important;
+}
+
+
 
 /* ==========================================================================
    9. POPUP TRƯỢT TỪ PHẢI (dùng chung cho ĐÁNH GIÁ và TRẢI NGHIỆM)

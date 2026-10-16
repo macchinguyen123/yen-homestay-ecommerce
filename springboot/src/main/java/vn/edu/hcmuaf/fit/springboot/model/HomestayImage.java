@@ -21,7 +21,7 @@ public class HomestayImage {
     @Column(name = "homestay_id", nullable = false)
     private Long homestayId;
 
-    @Column(name = "image_url", nullable = false)
+    @Column(name = "image_url", nullable = false, columnDefinition = "TEXT")
     private String imageUrl;
 
     @Column(name = "is_primary")

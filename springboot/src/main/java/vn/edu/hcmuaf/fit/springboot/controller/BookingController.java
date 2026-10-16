@@ -18,11 +18,14 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/public/bookings")
 @CrossOrigin(origins = "*")
-@RequiredArgsConstructor
 @Slf4j
 public class BookingController {
 
     private final BookingService bookingService;
+
+    public BookingController(BookingService bookingService) {
+        this.bookingService = bookingService;
+    }
 
     /**
      * Lấy toàn bộ lịch sử đặt phòng thật của người dùng

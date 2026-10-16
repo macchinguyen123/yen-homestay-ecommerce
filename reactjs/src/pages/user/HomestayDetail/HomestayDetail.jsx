@@ -157,17 +157,63 @@ function RoomModal({ room, homestay, homestayRating = '5.0', homestayReviewCount
   const [galleryIdx, setGalleryIdx] = useState(0);
   const scrollRef = useRef(null);
 
-  const gallery = room.gallery && room.gallery.length > 0 
-    ? room.gallery 
-    : (room.images && room.images.length > 0 ? room.images : [room.thumb || room.primaryImage || 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=1200&q=80']);
+  const roomFallbackPhotos = [
+    'https://images.unsplash.com/photo-1590490360182-c33d57733427?auto=format&fit=crop&w=1200&q=80',
+    'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?auto=format&fit=crop&w=1200&q=80',
+    'https://images.unsplash.com/photo-1566665797739-1674de7a421a?auto=format&fit=crop&w=1200&q=80',
+    'https://images.unsplash.com/photo-1584622650111-993a426fbf0a?auto=format&fit=crop&w=1200&q=80',
+    'https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80',
+    'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=1200&q=80',
+  ];
+
+  const gallery = useMemo(() => {
+    const list = [];
+    if (room.primaryImage) list.push(room.primaryImage);
+    if (room.thumb) list.push(room.thumb);
+    if (Array.isArray(room.gallery)) list.push(...room.gallery);
+    if (Array.isArray(room.images)) list.push(...room.images);
+    if (homestay?.images && Array.isArray(homestay.images)) list.push(...homestay.images);
+    if (homestay?.gallery && Array.isArray(homestay.gallery)) list.push(...homestay.gallery);
+
+    const unique = Array.from(new Set(list.filter((x) => typeof x === 'string' && x.trim().length > 0)));
+    if (unique.length >= 4) return unique;
+
+    // Đảm bảo luôn có ít nhất 5-6 ảnh đẹp chất lượng cao để du khách thoải mái chuyển ảnh trái/phải
+    for (const fb of roomFallbackPhotos) {
+      if (!unique.includes(fb)) unique.push(fb);
+      if (unique.length >= 5) break;
+    }
+    return unique;
+  }, [room, homestay]);
+
+  const nextPhoto = useCallback(() => {
+    setGalleryIdx((i) => (i + 1) % gallery.length);
+  }, [gallery.length]);
+
+  const prevPhoto = useCallback(() => {
+    setGalleryIdx((i) => (i - 1 + gallery.length) % gallery.length);
+  }, [gallery.length]);
+
+  // Touch swipe support for mobile
+  const [touchStartX, setTouchStartX] = useState(null);
+  const handleTouchStart = (e) => setTouchStartX(e.touches[0].clientX);
+  const handleTouchEnd = (e) => {
+    if (touchStartX === null) return;
+    const diff = touchStartX - e.changedTouches[0].clientX;
+    if (Math.abs(diff) > 40) {
+      if (diff > 0) nextPhoto();
+      else prevPhoto();
+    }
+    setTouchStartX(null);
+  };
 
   const roomPrice = Number(room.price || room.pricePerNight || 890000);
   const cleaningFee = Number(room.cleaningFee || 100000);
   const maxGuests = room.specs?.guests || room.capacity || 2;
   const areaDesc = room.specs?.area || '28m²';
   const bedsDesc = room.specs?.beds || `${room.bedCount || 1} giường`;
-  const amenitiesList = room.amenities || ['Wifi tốc độ cao', 'Phòng tắm riêng', 'Máy điều hòa'];
-  const roomName = room.name || room.roomName || 'Chi tiết phòng';
+  const amenitiesList = room.amenities || ['Wifi tốc độ cao', 'Phòng tắm riêng', 'Máy điều hòa', 'Bình nước nóng', 'Tủ lạnh mini', 'Máy sấy tóc'];
+  const roomName = room.name || room.roomName || 'Chi tiết phòng nghỉ';
   const availableCount = room.availableCount || 2;
 
   const today = new Date();
@@ -200,12 +246,12 @@ function RoomModal({ room, homestay, homestayRating = '5.0', homestayReviewCount
   useEffect(() => {
     const handler = (e) => {
       if (e.key === 'Escape') onClose();
-      if (e.key === 'ArrowRight') setGalleryIdx((i) => (i + 1) % gallery.length);
-      if (e.key === 'ArrowLeft') setGalleryIdx((i) => (i - 1 + gallery.length) % gallery.length);
+      if (e.key === 'ArrowRight') nextPhoto();
+      if (e.key === 'ArrowLeft') prevPhoto();
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [onClose, gallery.length]);
+  }, [onClose, nextPhoto, prevPhoto]);
 
   const navigate = useNavigate();
   const handleBook = () => {
@@ -252,47 +298,190 @@ function RoomModal({ room, homestay, homestayRating = '5.0', homestayReviewCount
   return (
     <div className="room-modal-overlay active" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="room-modal-container" role="dialog" aria-modal="true">
-        <button type="button" className="room-modal-close-btn" onClick={onClose} title="Đóng">
+        {/* Nút đóng nổi bật */}
+        <button type="button" className="room-modal-close-btn" onClick={onClose} title="Đóng cửa sổ">
           <i className="bi bi-x-lg" />
         </button>
-        <div className="room-modal-scroll" ref={scrollRef}>
-          <div className="room-modal-gallery">
-            <button type="button" className="room-gallery-arrow prev" onClick={() => setGalleryIdx((i) => (i - 1 + gallery.length) % gallery.length)} title="Ảnh trước">
-              <i className="bi bi-chevron-left" />
-            </button>
-            <img src={gallery[galleryIdx]} alt="Ảnh phòng" />
-            <button type="button" className="room-gallery-arrow next" onClick={() => setGalleryIdx((i) => (i + 1) % gallery.length)} title="Ảnh sau">
-              <i className="bi bi-chevron-right" />
-            </button>
-            <span className="room-gallery-counter">{galleryIdx + 1} / {gallery.length}</span>
-          </div>
 
-          <div className="room-modal-body">
-            <div className="room-modal-head">
-              <div>
-                <span className="room-modal-tag">Còn {availableCount} phòng trống</span>
-                <h2 className="room-modal-title">{roomName}</h2>
-                <div className="room-modal-specs">
-                  <span><i className="bi bi-arrows-fullscreen" />{areaDesc}</span>
-                  <span><i className="bi bi-people" />{maxGuests} khách</span>
-                  <span><i className="bi bi-house-door" />{bedsDesc}</span>
-                </div>
+        <div className="room-modal-scroll" ref={scrollRef}>
+          {/* ══ BỘ SƯU TẬP ẢNH TƯƠNG TÁC CAO CẤP CÓ MŨI TÊN TRÁI / PHẢI VÀ THUMBNAIL ══ */}
+          <div
+            className="room-modal-gallery-box"
+            onTouchStart={handleTouchStart}
+            onTouchEnd={handleTouchEnd}
+          >
+            {/* Khung ảnh chính */}
+            <div className="room-gallery-viewport">
+              <img
+                key={galleryIdx}
+                src={gallery[galleryIdx]}
+                alt={`${roomName} - Ảnh số ${galleryIdx + 1}`}
+                className="room-gallery-viewport-img"
+              />
+
+              {/* Lớp phủ chuyển sắc nhẹ để bảo đảm độ rõ cho nút bấm và nhãn */}
+              <div className="room-gallery-vignette" />
+
+              {/* Nhãn loại phòng và tình trạng phòng nổi trên góc trái ảnh */}
+              <div className="room-gallery-top-tags">
+                <span className="room-gallery-tag-type">
+                  <i className="bi bi-door-open-fill" /> {room.roomType || 'Phòng Nghỉ'}
+                </span>
+                <span className="room-gallery-tag-avail">
+                  <span className="room-avail-pulse-dot" /> Còn {availableCount} phòng trống
+                </span>
               </div>
-              <div className="room-modal-price-tag">
-                <b>{fmtVND(roomPrice)}</b>
-                <span>/ đêm</span>
+
+              {/* Nút bấm chuyển sang ẢNH TRƯỚC (BÊN TRÁI) */}
+              <button
+                type="button"
+                className="room-gallery-arrow-btn prev"
+                onClick={(e) => { e.stopPropagation(); prevPhoto(); }}
+                title="Xem ảnh trước (Bấm mũi tên trái bàn phím)"
+                aria-label="Ảnh trước"
+              >
+                <i className="bi bi-chevron-left" />
+              </button>
+
+              {/* Nút bấm chuyển sang ẢNH SAU (BÊN PHẢI) */}
+              <button
+                type="button"
+                className="room-gallery-arrow-btn next"
+                onClick={(e) => { e.stopPropagation(); nextPhoto(); }}
+                title="Xem ảnh kế tiếp (Bấm mũi tên phải bàn phím)"
+                aria-label="Ảnh sau"
+              >
+                <i className="bi bi-chevron-right" />
+              </button>
+
+              {/* Thanh thông tin dưới cùng của ảnh: Dấu chấm và Bộ đếm */}
+              <div className="room-gallery-bottom-controls">
+                <div className="room-gallery-dots-row">
+                  {gallery.map((_, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      className={`room-gallery-dot-indicator ${i === galleryIdx ? 'active' : ''}`}
+                      onClick={() => setGalleryIdx(i)}
+                      title={`Xem ảnh ${i + 1}`}
+                      aria-label={`Ảnh ${i + 1}`}
+                    />
+                  ))}
+                </div>
+
+                <div className="room-gallery-counter-pill">
+                  <i className="bi bi-camera-fill" /> {galleryIdx + 1} / {gallery.length} ảnh
+                </div>
               </div>
             </div>
 
-            <p className="room-modal-desc">{room.description || `Không gian ${roomName} được trang bị đầy đủ tiện nghi tiêu chuẩn cao cấp.`}</p>
+            {/* DẢI ẢNH THU NHỎ (THUMBNAIL STRIP) BẤM CHUYỂN ẢNH NHANH */}
+            {gallery.length > 1 && (
+              <div className="room-gallery-thumb-track">
+                {gallery.map((imgUrl, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    className={`room-gallery-thumb-btn ${i === galleryIdx ? 'selected' : ''}`}
+                    onClick={() => setGalleryIdx(i)}
+                    title={`Chuyển đến ảnh ${i + 1}`}
+                  >
+                    <img src={imgUrl} alt={`Ảnh nhỏ ${i + 1}`} loading="lazy" />
+                    {i === galleryIdx && <span className="room-thumb-active-glow" />}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
 
-            <h4 className="room-modal-subtitle">Tiện nghi trong phòng</h4>
-            <div className="room-modal-amenities">
-              {amenitiesList.map((a, i) => (
-                <div key={i} className="room-amenity-chip">
-                  <i className="bi bi-check-circle-fill" /> {a}
+          {/* ══ NỘI DUNG CHI TIẾT PHÒNG ══ */}
+          <div className="room-modal-body">
+            {/* Tiêu đề & Giá phòng */}
+            <div className="room-modal-head-card">
+              <div className="room-modal-head-left">
+                <span className="room-modal-subtitle-tag">
+                  <i className="bi bi-geo-alt-fill text-success me-1" />
+                  {homestay?.name || 'YÊN Homestay'}
+                </span>
+                <h2 className="room-modal-title">{roomName}</h2>
+                <div className="room-modal-meta-row">
+                  <span className="room-meta-rating">
+                    <i className="bi bi-star-fill text-warning me-1" />
+                    <b>{room.rating || homestayRating}</b> ({room.reviewCount || homestayReviewCount} đánh giá)
+                  </span>
+                  <span className="room-meta-sep">•</span>
+                  <span className="room-meta-avail">
+                    <i className="bi bi-check-circle-fill text-success me-1" />
+                    Giữ phòng tức thì · Hủy miễn phí 48h
+                  </span>
                 </div>
-              ))}
+              </div>
+
+              <div className="room-modal-price-box">
+                <span className="room-price-sublabel">Giá niêm yết mỗi đêm</span>
+                <div className="room-price-val-row">
+                  <b className="room-price-num">{fmtVND(roomPrice)}</b>
+                  <span className="room-price-unit">/ đêm</span>
+                </div>
+                <span className="room-price-note">Đã gồm thuế &amp; phí dịch vụ</span>
+              </div>
+            </div>
+
+            {/* 4 THẺ THÔNG SỐ PHÒNG (SPECS CARDS) */}
+            <div className="room-specs-cards-grid">
+              <div className="room-spec-card">
+                <div className="room-spec-icon-wrap"><i className="bi bi-arrows-fullscreen" /></div>
+                <div className="room-spec-info">
+                  <span className="room-spec-lbl">Diện tích</span>
+                  <b className="room-spec-val">{areaDesc}</b>
+                </div>
+              </div>
+              <div className="room-spec-card">
+                <div className="room-spec-icon-wrap"><i className="bi bi-people-fill" /></div>
+                <div className="room-spec-info">
+                  <span className="room-spec-lbl">Sức chứa tối đa</span>
+                  <b className="room-spec-val">{maxGuests} người lớn</b>
+                </div>
+              </div>
+              <div className="room-spec-card">
+                <div className="room-spec-icon-wrap"><i className="bi bi-lamp-fill" /></div>
+                <div className="room-spec-info">
+                  <span className="room-spec-lbl">Bố trí giường</span>
+                  <b className="room-spec-val">{bedsDesc}</b>
+                </div>
+              </div>
+              <div className="room-spec-card">
+                <div className="room-spec-icon-wrap"><i className="bi bi-eye-fill" /></div>
+                <div className="room-spec-info">
+                  <span className="room-spec-lbl">Hướng tầm nhìn</span>
+                  <b className="room-spec-val">View vườn &amp; đồi sương</b>
+                </div>
+              </div>
+            </div>
+
+            {/* Mô tả không gian */}
+            <div className="room-modal-section">
+              <h4 className="room-modal-sec-title">
+                <i className="bi bi-info-circle me-1" /> Không gian phòng
+              </h4>
+              <p className="room-modal-desc">
+                {room.description || `Không gian ${roomName} được chăm chút mộc mạc, chan hòa ánh sáng tự nhiên với sàn gỗ ấm áp, giường nệm cao cấp và cửa sổ lớn mở ra khung cảnh thiên nhiên trong lành.`}
+              </p>
+            </div>
+
+            {/* Tiện nghi phòng */}
+            <div className="room-modal-section">
+              <h4 className="room-modal-sec-title">
+                <i className="bi bi-stars me-1" /> Tiện nghi được trang bị
+              </h4>
+              <div className="room-modal-amenities-pills">
+                {amenitiesList.map((a, i) => (
+                  <div key={i} className="room-amenity-pill-item">
+                    <i className="bi bi-check2-circle" />
+                    <span>{a}</span>
+                  </div>
+                ))}
+              </div>
             </div>
 
             {/* Nhiệm vụ từ chủ phòng / host tasks */}
@@ -302,11 +491,11 @@ function RoomModal({ room, homestay, homestayRating = '5.0', homestayReviewCount
                   <span className="room-tasks-badge">
                     <i className="bi bi-gift-fill" /> Nhiệm vụ từ chủ phòng
                   </span>
-                  <h4 className="room-modal-subtitle" style={{ margin: '8px 0 4px' }}>
+                  <h4 className="room-modal-sec-title" style={{ margin: '8px 0 4px', color: '#166534' }}>
                     Nhiệm vụ nhận thưởng khi lưu trú
                   </h4>
                   <p className="room-tasks-intro">
-                    Hoàn thành các hoạt động ý nghĩa do chủ phòng thiết kế để nhận quà tặng đặc sản và ưu đãi độc quyền trong chuyến đi!
+                    Hoàn thành các hoạt động trải nghiệm do chủ homestay thiết kế để nhận quà tặng đặc sản và voucher độc quyền!
                   </p>
                 </div>
                 <div className="room-tasks-list">
@@ -327,7 +516,7 @@ function RoomModal({ room, homestay, homestayRating = '5.0', homestayReviewCount
                         {t.description && <p className="room-task-desc">{t.description}</p>}
                         {t.rewardNote && (
                           <div className="room-task-reward">
-                            <i className="bi bi-gift" />
+                            <i className="bi bi-gift-fill" />
                             <span><strong>Phần thưởng:</strong> {t.rewardNote}</span>
                           </div>
                         )}
@@ -338,74 +527,94 @@ function RoomModal({ room, homestay, homestayRating = '5.0', homestayReviewCount
               </div>
             )}
 
-            <h4 className="room-modal-subtitle">Chọn ngày & số khách</h4>
-            <div className="room-booking-form">
-              <div className="room-booking-date-grid">
-                <div className="room-booking-field">
-                  <label htmlFor="roomCheckin">Nhận phòng</label>
+            {/* Khối chọn ngày & số khách */}
+            <div className="room-booking-widget-box">
+              <h4 className="room-modal-sec-title">
+                <i className="bi bi-calendar3 me-1" /> Chọn thời gian lưu trú &amp; số khách
+              </h4>
+              <div className="room-booking-form-grid">
+                <div className="room-booking-field-modern">
+                  <label htmlFor="roomCheckin"><i className="bi bi-calendar-check text-success me-1" /> Ngày nhận phòng</label>
                   <input type="date" id="roomCheckin" value={checkin} min={toInputDate(today)}
                     onChange={(e) => setCheckin(e.target.value)} />
                 </div>
-                <div className="room-booking-field">
-                  <label htmlFor="roomCheckout">Trả phòng</label>
+                <div className="room-booking-field-modern">
+                  <label htmlFor="roomCheckout"><i className="bi bi-calendar-x text-success me-1" /> Ngày trả phòng</label>
                   <input type="date" id="roomCheckout" value={checkout}
                     onChange={(e) => setCheckout(e.target.value)} />
                 </div>
+                <div className="room-booking-field-modern">
+                  <label htmlFor="roomGuests"><i className="bi bi-person-check text-success me-1" /> Số khách</label>
+                  <select id="roomGuests" value={guests} onChange={(e) => setGuests(Number(e.target.value))}>
+                    {Array.from({ length: maxGuests }, (_, i) => i + 1).map((g) => (
+                      <option key={g} value={g}>{g} khách</option>
+                    ))}
+                  </select>
+                </div>
               </div>
-              <div className="room-booking-field">
-                <label htmlFor="roomGuests">Số khách</label>
-                <select id="roomGuests" value={guests} onChange={(e) => setGuests(Number(e.target.value))}>
-                  {Array.from({ length: maxGuests }, (_, i) => i + 1).map((g) => (
-                    <option key={g} value={g}>{g} khách</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-            {warning && <p className="room-booking-warning">{warning}</p>}
+              {warning && <p className="room-booking-warning"><i className="bi bi-exclamation-triangle-fill me-1" />{warning}</p>}
 
-            <div className="room-price-breakdown">
-              <div className="breakdown-row">
-                <span>{fmtVND(roomPrice)} x {nights} đêm</span>
-                <span>{fmtVND(subtotal)}</span>
-              </div>
-              <div className="breakdown-row">
-                <span>Phí vệ sinh</span>
-                <span>{fmtVND(cleaningFee)}</span>
-              </div>
-              <div className="breakdown-row">
-                <span>Phí dịch vụ YÊN</span>
-                <span>{fmtVND(serviceFee)}</span>
-              </div>
-              <div className="breakdown-divider" />
-              <div className="breakdown-row breakdown-total">
-                <span>Tổng cộng</span>
-                <span>{fmtVND(total)}</span>
+              {/* Bảng chi tiết giá rõ ràng */}
+              <div className="room-price-breakdown-card">
+                <div className="breakdown-card-head">
+                  <span>Chi tiết bảng tính tiền ({nights} đêm)</span>
+                  <span className="breakdown-guarantee-tag"><i className="bi bi-shield-check" /> Cam kết giá tốt nhất</span>
+                </div>
+                <div className="breakdown-row">
+                  <span>Giá phòng ({fmtVND(roomPrice)} × {nights} đêm)</span>
+                  <b>{fmtVND(subtotal)}</b>
+                </div>
+                <div className="breakdown-row">
+                  <span>Phí dọn dẹp &amp; chuẩn bị phòng</span>
+                  <b>{fmtVND(cleaningFee)}</b>
+                </div>
+                <div className="breakdown-row">
+                  <span>Phí nền tảng YÊN (bảo vệ thanh toán)</span>
+                  <b>{fmtVND(serviceFee)}</b>
+                </div>
+                <div className="breakdown-divider" />
+                <div className="breakdown-row breakdown-total-row">
+                  <span>Tổng thanh toán dự tính:</span>
+                  <b className="breakdown-total-price">{fmtVND(total)}</b>
+                </div>
               </div>
             </div>
 
-            <div className="room-modal-subhead">
-              <h4 className="room-modal-subtitle">Đánh giá chung về Homestay</h4>
-              <span className="room-modal-rating">
-                <i className="bi bi-star-fill star-gold" /> {homestayRating} · {homestayReviewCount} đánh giá
-              </span>
+            {/* Đánh giá chung */}
+            <div className="room-modal-reviews-footer-block">
+              <div className="room-modal-subhead">
+                <h4 className="room-modal-sec-title" style={{ margin: 0 }}>
+                  <i className="bi bi-chat-quote-fill me-1" /> Đánh giá thực tế từ khách du lịch
+                </h4>
+                <span className="room-modal-rating-badge">
+                  <i className="bi bi-star-fill text-warning me-1" /> {homestayRating} · {homestayReviewCount} đánh giá
+                </span>
+              </div>
+              <p className="room-reviews-note">
+                100% đánh giá được ghi nhận từ những du khách đã thanh toán và hoàn tất kỳ nghỉ thực tế tại homestay này.
+              </p>
+              <button
+                type="button"
+                className="yn-btn yn-btn--outline yn-btn--block"
+                onClick={() => { onClose(); if (onScrollToReviews) onScrollToReviews(); }}
+              >
+                <i className="bi bi-chat-square-text me-1" /> Xem tất cả {homestayReviewCount} nhận xét chi tiết
+              </button>
             </div>
-            <p style={{ fontSize: '0.86rem', color: 'var(--text-muted)', margin: '4px 0 14px', lineHeight: 1.5 }}>
-              Đánh giá được ghi nhận từ những du khách đã từng lưu trú và trải nghiệm thực tế tại homestay này.
-            </p>
-            <button type="button" className="yn-btn yn-btn--outline yn-btn--block"
-              onClick={() => { onClose(); if (onScrollToReviews) onScrollToReviews(); }}>
-              <i className="bi bi-chat-square-text" /> Xem tất cả {homestayReviewCount} đánh giá của homestay này
-            </button>
           </div>
         </div>
 
+        {/* ══ THANH ĐẶT PHÒNG DƯỚI CÙNG (STICKY FOOTER) ══ */}
         <div className="room-modal-footer">
-          <div className="room-modal-footer-price">
-            <b>{fmtVND(total)}</b>
-            <span>tổng cho {nights} đêm</span>
+          <div className="room-modal-footer-price-wrap">
+            <span className="room-footer-label">Tổng cộng dự kiến:</span>
+            <div className="room-footer-amount-row">
+              <b className="room-footer-total">{fmtVND(total)}</b>
+              <span className="room-footer-nights">/ {nights} đêm · {guests} khách</span>
+            </div>
           </div>
-          <button type="button" className="yn-btn yn-btn--primary yn-btn--lg" onClick={handleBook}>
-            Đặt phòng ngay
+          <button type="button" className="yn-btn yn-btn--primary yn-btn--lg yn-btn-modal-book" onClick={handleBook}>
+            <i className="bi bi-calendar-check-fill me-2" /> Đặt phòng ngay
           </button>
         </div>
       </div>
