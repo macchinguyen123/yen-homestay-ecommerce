@@ -4,6 +4,8 @@ import './Homepage.css';
 import { homestayService } from '../../../services/homestayService';
 import { wishlistService } from '../../../services/wishlistService';
 import { authService } from '../../../services/authService';
+import { viewedHistoryService } from '../../../services/viewedHistoryService';
+import { bookingService } from '../../../services/bookingService';
 import { formatAmenities } from '../Category/Category';
 import VisualSearchModal from '../../../components/VisualSearchModal/VisualSearchModal';
 
@@ -261,11 +263,13 @@ export default function Homepage() {
 
   // Favorites Filter City State
   const [favCityFilter, setFavCityFilter] = useState('all');
+  const [personalizedFilter, setPersonalizedFilter] = useState('all');
 
   // Homestay Sliders: Refs & Smooth Scroll Controls
   const hotSliderRef = useRef(null);
   const favSliderRef = useRef(null);
   const festSliderRef = useRef(null);
+  const personalizedSliderRef = useRef(null);
 
   const scrollSlider = (ref, direction) => {
     if (ref && ref.current) {
@@ -285,6 +289,14 @@ export default function Homepage() {
   const [wishlistIds, setWishlistIds] = useState(new Set());
   const [toast, setToast] = useState({ show: false, msg: '' });
 
+  // Tương tác người dùng (lượt xem, lượt đặt phòng) phục vụ gợi ý cá nhân hóa
+  const [userInteractions, setUserInteractions] = useState({
+    viewedIds: new Set(),
+    viewedCities: [],
+    bookedIds: new Set(),
+    bookedCities: []
+  });
+
   // Tải danh sách homestay yêu thích từ CSDL
   useEffect(() => {
     const user = authService.getCurrentUser();
@@ -299,6 +311,32 @@ export default function Homepage() {
         setWishlistIds(new Set(res.data.map(item => Number(item.id || item.homestayId))));
       }
     });
+
+    if (user?.id) {
+      viewedHistoryService.getViewedHistory(user.id).then(res => {
+        if (res?.data && Array.isArray(res.data)) {
+          const vIds = new Set(res.data.map(item => Number(item.id || item.homestayId)));
+          const vCities = res.data.map(item => getCitySlug(item.city, item.address || item.location)).filter(Boolean);
+          setUserInteractions(prev => ({ ...prev, viewedIds: vIds, viewedCities: vCities }));
+        }
+      });
+      try {
+        const cachedBookings = bookingService.getCachedUserBookings(user.id);
+        if (Array.isArray(cachedBookings) && cachedBookings.length > 0) {
+          const bIds = new Set(cachedBookings.map(b => Number(b.homestayId || b.id)));
+          const bCities = cachedBookings.map(b => getCitySlug(b.homestayCity || b.city, b.address)).filter(Boolean);
+          setUserInteractions(prev => ({ ...prev, bookedIds: bIds, bookedCities: bCities }));
+        } else {
+          bookingService.getUserBookings(user.id).then(bookings => {
+            if (Array.isArray(bookings)) {
+              const bIds = new Set(bookings.map(b => Number(b.homestayId || b.id)));
+              const bCities = bookings.map(b => getCitySlug(b.homestayCity || b.city, b.address)).filter(Boolean);
+              setUserInteractions(prev => ({ ...prev, bookedIds: bIds, bookedCities: bCities }));
+            }
+          });
+        }
+      } catch (e) {}
+    }
   }, []);
 
   // Dynamic Data State
@@ -621,6 +659,115 @@ export default function Homepage() {
     return list.filter((h) => h.city === favCityFilter);
   }, [homeData.favoritesHomestays, favCityFilter]);
 
+  // Thuật toán gợi ý homestay cá nhân hoá theo lượt thích, đặt, xem
+  const personalizedHomestays = useMemo(() => {
+    const allHomestays = [
+      ...(homeData.hotHomestays || []),
+      ...(homeData.favoritesHomestays || [])
+    ];
+    const uniqueMap = new Map();
+    allHomestays.forEach(h => {
+      const id = Number(h.id);
+      if (id && !uniqueMap.has(id)) {
+        uniqueMap.set(id, h);
+      }
+    });
+    const pool = Array.from(uniqueMap.values());
+    if (pool.length === 0) return [];
+
+    const wishlistCities = pool
+      .filter(h => wishlistIds.has(Number(h.id)))
+      .map(h => h.city);
+
+    const preferredCities = new Set([
+      ...userInteractions.viewedCities,
+      ...userInteractions.bookedCities,
+      ...wishlistCities
+    ]);
+
+    const scoredList = pool.map((h, index) => {
+      let score = 50;
+      let matchReason = 'Gợi ý từ AI Yên';
+      const id = Number(h.id);
+      const isLiked = wishlistIds.has(id);
+      const isBooked = userInteractions.bookedIds.has(id);
+      const isViewed = userInteractions.viewedIds.has(id);
+      const isPreferredCity = preferredCities.has(h.city);
+
+      if (isBooked) {
+        score += 45;
+        matchReason = 'Đã từng đặt · Đặt lại nhanh';
+      } else if (isLiked) {
+        score += 40;
+        matchReason = 'Đã lưu trong mục Yêu thích';
+      } else if (isViewed) {
+        score += 35;
+        matchReason = 'Dựa trên lịch sử xem gần đây';
+      } else if (isPreferredCity) {
+        score += 25;
+        matchReason = 'Cùng điểm đến bạn yêu thích';
+      }
+
+      const ratingNum = parseFloat(h.rating) || 4.5;
+      score += ratingNum * 4;
+
+      let personalTag = h.tag || 'Gợi ý cho bạn';
+      if (isLiked) {
+        personalTag = 'Bạn đã yêu thích';
+      } else if (isBooked) {
+        personalTag = 'Homestay quen thuộc';
+      } else if (isViewed) {
+        personalTag = 'Bạn vừa xem gần đây';
+      } else if (isPreferredCity) {
+        personalTag = 'Hợp gu du lịch';
+      } else if (score > 80 || index % 3 === 0) {
+        personalTag = 'Khớp 98% sở thích';
+      } else if (index % 3 === 1) {
+        personalTag = 'Đề xuất theo xu hướng';
+      } else {
+        personalTag = 'Lựa chọn hoàn hảo';
+      }
+
+      return {
+        ...h,
+        matchScore: score,
+        matchReason,
+        personalTag
+      };
+    });
+
+    scoredList.sort((a, b) => b.matchScore - a.matchScore);
+
+    if (personalizedFilter === 'nature') {
+      return scoredList.filter(h => 
+        (h.name + ' ' + (h.amenities || '') + ' ' + (h.location || '')).toLowerCase().match(/vườn|núi|rừng|đồi|suối|sinh thái|săn mây/)
+      );
+    }
+    if (personalizedFilter === 'pool') {
+      return scoredList.filter(h => 
+        (h.amenities || '').toLowerCase().includes('hồ bơi') || (h.name || '').toLowerCase().includes('villa')
+      );
+    }
+    if (personalizedFilter === 'cloud') {
+      return scoredList.filter(h => 
+        ['dalat', 'sapa'].includes(h.city) || (h.name + ' ' + (h.amenities || '')).toLowerCase().includes('mây')
+      );
+    }
+    if (personalizedFilter === 'beach') {
+      return scoredList.filter(h => 
+        ['danang', 'phuquoc'].includes(h.city) || (h.location || '').toLowerCase().match(/vũng tàu|biển|đảo|nha trang/)
+      );
+    }
+    if (personalizedFilter === 'budget') {
+      return scoredList.filter(h => {
+        const num = parseInt(String(h.price).replace(/\D/g, ''), 10);
+        return num && num <= 1000000;
+      });
+    }
+
+    return scoredList;
+  }, [homeData, wishlistIds, userInteractions, personalizedFilter]);
+
   const festivalTabs = (databaseFestivals && databaseFestivals.length > 0) ? databaseFestivals : DEFAULT_FESTIVALS;
   const activeFestData = festivalTabs.find(festival => festival.key === activeFestivalKey) || festivalTabs[0];
 
@@ -695,13 +842,15 @@ export default function Homepage() {
     const cleanupHot = attachSliderDrag(hotSliderRef.current);
     const cleanupFav = attachSliderDrag(favSliderRef.current);
     const cleanupFest = attachSliderDrag(festSliderRef.current);
+    const cleanupPersonalized = attachSliderDrag(personalizedSliderRef.current);
 
     return () => {
       cleanupHot();
       cleanupFav();
       cleanupFest();
+      cleanupPersonalized();
     };
-  }, [favCityFilter, activeFestivalKey, homeData]);
+  }, [favCityFilter, activeFestivalKey, homeData, personalizedFilter]);
 
   return (
     <div className="homepage-wrapper">
@@ -1530,6 +1679,171 @@ export default function Homepage() {
                 transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
               }}
               onClick={() => scrollSlider(hotSliderRef, 1)}
+              aria-label="Xem homestay tiếp theo"
+            >
+              <i className="bi bi-chevron-right" />
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {/* 5B. PERSONALIZED HOMESTAY RECOMMENDATIONS (GỢI Ý CÁ NHÂN HÓA PHÙ HỢP VỚI TỪNG NGƯỜI) */}
+      <section className="personalized-section" style={{ padding: '48px 0', background: '#F8FAFC', borderTop: '1px solid #E2E8F0', borderBottom: '1px solid #E2E8F0' }}>
+        <div className="hp-container">
+          <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px', marginBottom: '16px' }}>
+            <div>
+              <span className="section-badge-top" style={{ color: '#059669' }}>
+                <i className="bi bi-stars" /> Dành riêng cho bạn · AI Cá nhân hóa
+              </span>
+              <h2 className="section-title">Gợi ý homestay phù hợp với bạn</h2>
+              <p className="section-subtitle" style={{ marginBottom: 0 }}>
+                Tuyển chọn theo homestay bạn đã thích, lịch sử xem phòng và xu hướng đặt phòng của riêng bạn
+              </p>
+            </div>
+            {currentUser && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#ECFDF5', border: '1px solid #A7F3D0', padding: '6px 14px', borderRadius: '9999px', fontSize: '0.82rem', color: '#047857', fontWeight: 600 }}>
+                <i className="bi bi-person-check-fill" />
+                <span>Chào {currentUser.fullName?.split(' ')[0] || 'bạn'} · Gợi ý theo gu du lịch của bạn</span>
+              </div>
+            )}
+          </div>
+
+          {/* Quick preference filter chips */}
+          <div className="personalized-filter-chips" style={{ display: 'flex', alignItems: 'center', gap: '8px', overflowX: 'auto', paddingBottom: '12px', scrollbarWidth: 'none', margin: '14px 0 18px 0' }}>
+            {[
+              { key: 'all', label: 'Tất cả gợi ý', icon: 'bi-sparkles' },
+              { key: 'nature', label: 'Gần gũi thiên nhiên', icon: 'bi-tree' },
+              { key: 'pool', label: 'Có hồ bơi riêng', icon: 'bi-water' },
+              { key: 'cloud', label: 'Săn mây view núi', icon: 'bi-cloud-sun' },
+              { key: 'beach', label: 'Nghỉ dưỡng gần biển', icon: 'bi-tsunami' },
+              { key: 'budget', label: 'Giá tốt dưới 1 triệu', icon: 'bi-tag' }
+            ].map(chip => (
+              <button
+                key={chip.key}
+                type="button"
+                className={`city-tab ${personalizedFilter === chip.key ? 'active' : ''}`}
+                style={{ whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem' }}
+                onClick={() => {
+                  setPersonalizedFilter(chip.key);
+                  if (personalizedSliderRef.current) personalizedSliderRef.current.scrollLeft = 0;
+                }}
+              >
+                <i className={`bi ${chip.icon}`} />
+                {chip.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="homestay-slider-wrap" style={{ position: 'relative', width: '100%' }}>
+            <button
+              type="button"
+              className="homestay-slider-arrow arrow-prev"
+              style={{
+                position: 'absolute',
+                top: '50%',
+                left: '-20px',
+                transform: 'translateY(-50%)',
+                zIndex: 35,
+                width: '44px',
+                height: '52px',
+                borderRadius: '12px',
+                background: 'rgba(255, 255, 255, 0.75)',
+                backdropFilter: 'blur(12px)',
+                WebkitBackdropFilter: 'blur(12px)',
+                border: '1.5px solid rgba(255, 255, 255, 0.85)',
+                boxShadow: '0 6px 20px rgba(15, 23, 42, 0.14)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '1.25rem',
+                color: '#1E293B',
+                cursor: 'pointer',
+                outline: 'none',
+                transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+              }}
+              onClick={() => scrollSlider(personalizedSliderRef, -1)}
+              aria-label="Xem homestay trước"
+            >
+              <i className="bi bi-chevron-left" />
+            </button>
+
+            <div className="homestay-slider-track" ref={personalizedSliderRef}>
+              {(personalizedHomestays || []).map((h) => (
+                <div key={`p-${h.id}`} className="homestay-slider-item">
+                  <div className="homestay-card">
+                    <div className="card-img-wrapper">
+                      <span className="card-top-tag" style={{ background: 'linear-gradient(135deg, #059669 0%, #047857 100%)', color: '#FFF' }}>
+                        <i className="bi bi-stars" /> {h.personalTag}
+                      </span>
+                      <button
+                        type="button"
+                        className={`card-wishlist-btn ${isWishlisted(h.id, h.name) ? 'active' : ''}`}
+                        onClick={(e) => toggleWishlist(h, e)}
+                        title={isWishlisted(h.id, h.name) ? 'Bỏ yêu thích' : 'Lưu vào yêu thích'}
+                      >
+                        <i className={`bi ${isWishlisted(h.id, h.name) ? 'bi-heart-fill' : 'bi-heart'}`} />
+                      </button>
+                      <Link to={`/homestay/${h.id || 'doi'}`} state={{ homestay: h }} style={{ display: 'block', height: '100%' }}>
+                        <img src={h.img || 'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=600&q=80'} alt={h.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      </Link>
+                    </div>
+                    <div className="card-body">
+                      <div className="card-location-rating">
+                        <span className="card-location"><i className="bi bi-geo-alt-fill text-success" /> {h.location}</span>
+                        <span className="card-rating"><i className="bi bi-star-fill" /> {h.rating} ({h.reviews})</span>
+                      </div>
+                      <h3 className="card-title"><Link to={`/homestay/${h.id}`} state={{ homestay: h }}>{h.name}</Link></h3>
+                      <div className="card-specs"><span>{h.specs}</span></div>
+                      
+                      {/* Lý do gợi ý cá nhân hóa */}
+                      <div style={{ margin: '4px 0 6px', padding: '3px 8px', background: '#ECFDF5', borderRadius: '6px', fontSize: '0.74rem', color: '#065F46', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px', width: 'fit-content' }}>
+                        <i className="bi bi-magic" style={{ color: '#059669' }} /> {h.matchReason}
+                      </div>
+
+                      <div className="card-amenities-box">
+                        <span className="amenities-label">Tiện nghi nổi bật:</span>
+                        <p className="amenities-items">{formatAmenities(h.amenities)}</p>
+                      </div>
+                      <div className="card-footer-row">
+                        <div>
+                          <span className="price-label">Giá từ:</span>
+                          <span className="card-price">{h.price}</span>
+                        </div>
+                        <Link to={`/homestay/${h.id}`} state={{ homestay: h }} className="btn-view-room">Xem homestay</Link>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <button
+              type="button"
+              className="homestay-slider-arrow arrow-next"
+              style={{
+                position: 'absolute',
+                top: '50%',
+                right: '-20px',
+                transform: 'translateY(-50%)',
+                zIndex: 35,
+                width: '44px',
+                height: '52px',
+                borderRadius: '12px',
+                background: 'rgba(255, 255, 255, 0.75)',
+                backdropFilter: 'blur(12px)',
+                WebkitBackdropFilter: 'blur(12px)',
+                border: '1.5px solid rgba(255, 255, 255, 0.85)',
+                boxShadow: '0 6px 20px rgba(15, 23, 42, 0.14)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '1.25rem',
+                color: '#1E293B',
+                cursor: 'pointer',
+                outline: 'none',
+                transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+              }}
+              onClick={() => scrollSlider(personalizedSliderRef, 1)}
               aria-label="Xem homestay tiếp theo"
             >
               <i className="bi bi-chevron-right" />

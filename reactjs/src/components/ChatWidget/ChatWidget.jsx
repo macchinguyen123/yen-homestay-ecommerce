@@ -5,6 +5,7 @@ import {
   X, Send, Bot, Sparkles, MapPin, Star, ArrowRight, RotateCcw, ChevronDown
 } from 'lucide-react';
 import { chatbotService } from '../../services/chatbotService';
+import mascotImg from '../../assets/yen-mascot.png';
 import './ChatWidget.css';
 
 const SUGGESTIONS = [
@@ -20,7 +21,7 @@ export default function ChatWidget() {
     {
       id: 1,
       sender: 'assistant',
-      text: 'Xin chào bạn! 🌿 Mình là trợ lý AI của Yên Homestay. Mình có thể giúp bạn tìm phòng theo địa điểm (Đà Lạt, Vũng Tàu, Sa Pa, Hà Nội...), mức giá và số lượng khách. Bạn đang dự định đi đâu thế ạ?',
+      text: 'Xin chào bạn! 🌿 Mình là Bé Yến - Trợ lý AI của Yên Homestay. Mình có thể giúp bạn tìm phòng theo địa điểm (Đà Lạt, Vũng Tàu, Sa Pa, Hà Nội...), mức giá và số lượng khách. Bạn đang dự định đi đâu thế ạ?',
       homestays: []
     }
   ]);
@@ -165,20 +166,21 @@ export default function ChatWidget() {
 
   return createPortal(
     <div className="yen-chat-root">
-      {/* Floating Action Button - Tròn xịn sò, luôn nằm bên phải màn hình */}
+      {/* Floating Action Button: Bé Yến Mascot nổi bật, nhấp vào mở chat */}
       {!isOpen && (
         <button
-          className="yen-chat-float-circle"
+          className="yen-chat-mascot-trigger"
           onClick={() => setIsOpen(true)}
-          title="Trò chuyện với Trợ lý AI Yên Homestay"
+          title="Trò chuyện với Bé Yến - Trợ lý AI Yên Homestay"
           aria-label="Mở Trợ lý AI Yên Homestay"
         >
-          <div className="yen-chat-pulse-ring"></div>
-          <div className="yen-chat-float-inner">
-            <Bot size={26} className="yen-bot-svg" />
-            <span className="yen-sparkle-badge">✨</span>
-          </div>
-          <span className="yen-chat-tooltip">Trợ lý AI Yên</span>
+          <div className="yen-mascot-glow"></div>
+          <img
+            src={mascotImg}
+            alt="Bé Yến - Trợ lý ChatBot Yên Homestay"
+            className="yen-mascot-float-img"
+          />
+          <span className="yen-mascot-tooltip">🌿 Trò chuyện cùng Bé Yến!</span>
         </button>
       )}
 
@@ -189,15 +191,15 @@ export default function ChatWidget() {
           <div className="yen-chat-header-luxury">
             <div className="yen-header-brand-block">
               <div className="yen-avatar-circle">
-                <Bot size={22} color="#ffffff" />
+                <img src={mascotImg} alt="Bé Yến Avatar" className="yen-mascot-header-avatar" />
                 <span className="yen-online-indicator"></span>
               </div>
               <div className="yen-header-titles">
                 <h4 className="yen-main-title">
-                  Trợ lý Yên Homestay
+                  Bé Yến · Trợ lý AI
                   <Sparkles size={14} className="yen-sparkle-icon" />
                 </h4>
-                <p className="yen-sub-title">Hỏi đáp & Tìm phòng thông minh</p>
+                <p className="yen-sub-title">Yên Homestay · Tìm phòng & Tư vấn</p>
               </div>
             </div>
             <div className="yen-header-control-btns">
@@ -225,8 +227,8 @@ export default function ChatWidget() {
             {messages.map((m) => (
               <div key={m.id} className={`yen-bubble-row ${m.sender}`}>
                 {m.sender === 'assistant' && (
-                  <div className="yen-bot-avatar-mini">
-                    <Bot size={14} />
+                  <div className="yen-bot-avatar-mini" title="Bé Yến AI">
+                    <img src={mascotImg} alt="Bé Yến" className="yen-mascot-bubble-avatar" />
                   </div>
                 )}
                 <div className="yen-bubble-card">
@@ -239,14 +241,14 @@ export default function ChatWidget() {
 
             {loading && (
               <div className="yen-bubble-row assistant">
-                <div className="yen-bot-avatar-mini">
-                  <Bot size={14} />
+                <div className="yen-bot-avatar-mini" title="Bé Yến AI">
+                  <img src={mascotImg} alt="Bé Yến" className="yen-mascot-bubble-avatar" />
                 </div>
                 <div className="yen-typing-pill">
                   <span className="yen-bounce-dot"></span>
                   <span className="yen-bounce-dot"></span>
                   <span className="yen-bounce-dot"></span>
-                  <span className="yen-typing-label">Đang tra cứu dữ liệu...</span>
+                  <span className="yen-typing-label">Bé Yến đang tra cứu phòng...</span>
                 </div>
               </div>
             )}

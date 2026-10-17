@@ -2,82 +2,84 @@
    YÊN HOMESTAY - LUXURY ROUND FLOATING AI CHATBOT (ChatWidget.css)
    ========================================================================== */
 
-/* Nút bấm tròn nổi cố định ở góc dưới bên phải màn hình */
-.yen-chat-float-circle {
+/* Nút bấm Mascot Bé Yến nổi bật cố định ở góc dưới bên phải màn hình */
+.yen-chat-mascot-trigger {
   position: fixed !important;
-  right: 28px !important;
-  bottom: 28px !important;
+  right: 24px !important;
+  bottom: 24px !important;
   z-index: 2147483647 !important;
-  width: 62px !important;
-  height: 62px !important;
-  border-radius: 50% !important;
-  background: linear-gradient(135deg, #10b981 0%, #059669 45%, #047857 100%) !important;
-  color: #ffffff !important;
-  border: 2px solid rgba(255, 255, 255, 0.45) !important;
-  box-shadow: 0 10px 28px -4px rgba(5, 150, 105, 0.55), 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+  background: transparent !important;
+  border: none !important;
+  padding: 0 !important;
   cursor: pointer !important;
+  outline: none !important;
   display: flex !important;
+  flex-direction: column !important;
   align-items: center !important;
   justify-content: center !important;
-  transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
-  outline: none !important;
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
+  user-select: none !important;
+  -webkit-tap-highlight-color: transparent !important;
 }
 
-.yen-chat-float-circle:hover {
-  transform: translateY(-4px) scale(1.08) !important;
-  box-shadow: 0 16px 36px -4px rgba(5, 150, 105, 0.68), 0 6px 16px rgba(0, 0, 0, 0.18) !important;
+.yen-mascot-float-img {
+  width: 102px;
+  height: 102px;
+  object-fit: contain;
+  filter: drop-shadow(0 10px 20px rgba(6, 78, 59, 0.32)) drop-shadow(0 2px 6px rgba(0, 0, 0, 0.12));
+  animation: yen-mascot-float 3.2s ease-in-out infinite;
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.3s ease;
 }
 
-.yen-chat-pulse-ring {
+.yen-chat-mascot-trigger:hover .yen-mascot-float-img {
+  transform: scale(1.12) translateY(-4px) rotate(2deg);
+  filter: drop-shadow(0 16px 28px rgba(5, 150, 105, 0.48)) drop-shadow(0 4px 10px rgba(0, 0, 0, 0.18));
+}
+
+.yen-chat-mascot-trigger:active .yen-mascot-float-img {
+  transform: scale(0.94);
+}
+
+@keyframes yen-mascot-float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+.yen-mascot-glow {
   position: absolute;
-  width: 100%;
-  height: 100%;
+  bottom: 4px;
+  width: 76px;
+  height: 22px;
   border-radius: 50%;
-  background: rgba(16, 185, 129, 0.4);
-  animation: yen-float-pulse 2.2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  background: radial-gradient(ellipse at center, rgba(16, 185, 129, 0.5) 0%, rgba(16, 185, 129, 0) 70%);
+  animation: yen-glow-pulse 3.2s ease-in-out infinite;
   pointer-events: none;
+  z-index: -1;
 }
 
-@keyframes yen-float-pulse {
-  0% { transform: scale(0.96); opacity: 0.9; }
-  60% { transform: scale(1.6); opacity: 0; }
-  100% { transform: scale(0.96); opacity: 0; }
+@keyframes yen-glow-pulse {
+  0%, 100% { transform: scale(0.9); opacity: 0.6; }
+  50% { transform: scale(1.3); opacity: 0.25; }
 }
 
-.yen-chat-float-inner {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.yen-sparkle-badge {
+/* Tooltip hiển thị khi hover Bé Yến Mascot */
+.yen-mascot-tooltip {
   position: absolute;
-  top: -8px;
-  right: -8px;
-  font-size: 13px;
-  line-height: 1;
-  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.25));
-  animation: yen-sparkle-bob 2.5s infinite ease-in-out;
-}
-
-@keyframes yen-sparkle-bob {
-  0%, 100% { transform: translateY(0) rotate(0deg); }
-  50% { transform: translateY(-3px) rotate(12deg); }
-}
-
-/* Tooltip hiển thị khi hover nút tròn */
-.yen-chat-tooltip {
-  position: absolute;
-  right: 74px;
-  background: #064e3b;
+  right: 110px;
+  bottom: 34px;
+  background: linear-gradient(135deg, #064e3b 0%, #065f46 100%);
   color: #ffffff;
-  padding: 6px 14px;
+  padding: 8px 16px;
   border-radius: 9999px;
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 600;
   white-space: nowrap;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 8px 24px rgba(6, 78, 59, 0.3);
+  border: 1px solid rgba(167, 243, 208, 0.35);
   opacity: 0;
   visibility: hidden;
   transform: translateX(10px);
@@ -85,18 +87,18 @@
   pointer-events: none;
 }
 
-.yen-chat-tooltip::after {
+.yen-mascot-tooltip::after {
   content: "";
   position: absolute;
-  right: -5px;
+  right: -6px;
   top: 50%;
   transform: translateY(-50%);
   border-width: 5px 0 5px 6px;
   border-style: solid;
-  border-color: transparent transparent transparent #064e3b;
+  border-color: transparent transparent transparent #065f46;
 }
 
-.yen-chat-float-circle:hover .yen-chat-tooltip {
+.yen-chat-mascot-trigger:hover .yen-mascot-tooltip {
   opacity: 1;
   visibility: visible;
   transform: translateX(0);
@@ -107,16 +109,16 @@
    ========================================================================== */
 .yen-chat-window-luxury {
   position: fixed !important;
-  right: 28px !important;
-  bottom: 104px !important;
-  width: 395px !important;
-  max-width: calc(100vw - 36px) !important;
-  height: 590px !important;
-  max-height: calc(100vh - 130px) !important;
+  right: 24px !important;
+  bottom: 24px !important;
+  width: 400px !important;
+  max-width: calc(100vw - 32px) !important;
+  height: 600px !important;
+  max-height: calc(100vh - 48px) !important;
   background: #ffffff !important;
   border-radius: 24px !important;
-  box-shadow: 0 20px 50px -10px rgba(6, 78, 59, 0.28), 0 8px 24px rgba(0, 0, 0, 0.1) !important;
-  border: 1px solid rgba(16, 185, 129, 0.2) !important;
+  box-shadow: 0 20px 50px -10px rgba(6, 78, 59, 0.3), 0 10px 30px rgba(0, 0, 0, 0.12) !important;
+  border: 1.5px solid rgba(16, 185, 129, 0.25) !important;
   display: flex !important;
   flex-direction: column !important;
   overflow: hidden !important;
@@ -154,24 +156,32 @@
 
 .yen-avatar-circle {
   position: relative;
-  width: 42px;
-  height: 42px;
+  width: 46px;
+  height: 46px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.18);
-  backdrop-filter: blur(4px);
-  border: 1.5px solid rgba(255, 255, 255, 0.4);
+  background: #ffffff;
+  border: 2px solid #a7f3d0;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+  flex-shrink: 0;
+  overflow: visible;
+}
+
+.yen-mascot-header-avatar {
+  width: 42px;
+  height: 42px;
+  object-fit: contain;
+  transform: scale(1.15) translateY(-1px);
 }
 
 .yen-online-indicator {
   position: absolute;
   bottom: 0px;
   right: 0px;
-  width: 11px;
-  height: 11px;
+  width: 12px;
+  height: 12px;
   background: #10b981;
   border-radius: 50%;
   border: 2px solid #064e3b;
@@ -252,16 +262,25 @@
 }
 
 .yen-bot-avatar-mini {
-  width: 26px;
-  height: 26px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
-  background: #d1fae5;
-  color: #047857;
+  background: #ffffff;
+  border: 1.5px solid #a7f3d0;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  margin-top: 4px;
+  margin-top: 2px;
+  box-shadow: 0 2px 6px rgba(6, 78, 59, 0.1);
+  overflow: hidden;
+}
+
+.yen-mascot-bubble-avatar {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+  transform: scale(1.15);
 }
 
 .yen-bubble-card {
@@ -557,3 +576,25 @@
   cursor: not-allowed;
   box-shadow: none;
 }
+
+/* ==========================================================================
+   RESPONSIVE MOBILE
+   ========================================================================== */
+@media (max-width: 640px) {
+  .yen-chat-mascot-trigger {
+    right: 14px !important;
+    bottom: 14px !important;
+  }
+  .yen-mascot-float-img {
+    width: 82px !important;
+    height: 82px !important;
+  }
+  .yen-chat-window-luxury {
+    right: 12px !important;
+    bottom: 12px !important;
+    width: calc(100vw - 24px) !important;
+    height: calc(100vh - 24px) !important;
+    border-radius: 20px !important;
+  }
+}
+
