@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { NavLink, Link, useNavigate } from 'react-router-dom';
 import { authService } from '../../services/authService';
+import { wishlistService } from '../../services/wishlistService';
 import logoImg from '../../assets/logo.png';
 import './Header.css';
 
@@ -9,10 +10,34 @@ export default function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [user, setUser] = useState(null);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [wishlistCount, setWishlistCount] = useState(0);
 
   useEffect(() => {
     const current = authService.getCurrentUser();
     setUser(current);
+
+    const updateWishlist = async () => {
+      try {
+        const cached = wishlistService.getCachedWishlist(current?.id);
+        if (Array.isArray(cached)) {
+          setWishlistCount(cached.length);
+        } else if (current?.id) {
+          const res = await wishlistService.getWishlist(current.id);
+          if (res?.data && Array.isArray(res.data)) {
+            setWishlistCount(res.data.length);
+          }
+        } else {
+          setWishlistCount(0);
+        }
+      } catch (e) {
+        setWishlistCount(0);
+      }
+    };
+    updateWishlist();
+
+    window.addEventListener('wishlist-updated', updateWishlist);
+    window.addEventListener('storage', updateWishlist);
+
     if (current?.id) {
       const apiBase = import.meta.env.VITE_API_BASE_URL?.replace(/\/auth\/?$/, '') || 'http://localhost:8081/api';
       const loadUnread = () => fetch(`${apiBase}/notifications/unread-count`, { headers: { Authorization: `Bearer ${current.token || ''}` } })
@@ -26,8 +51,17 @@ export default function Header() {
         try { const payload = JSON.parse(event.data); if (typeof payload.unreadCount === 'number') setUnreadCount(payload.unreadCount); else loadUnread(); }
         catch { loadUnread(); }
       };
-      return () => socket.close();
+      return () => {
+        socket.close();
+        window.removeEventListener('wishlist-updated', updateWishlist);
+        window.removeEventListener('storage', updateWishlist);
+      };
     }
+
+    return () => {
+      window.removeEventListener('wishlist-updated', updateWishlist);
+      window.removeEventListener('storage', updateWishlist);
+    };
   }, []);
 
   const handleLogout = () => {
@@ -50,21 +84,18 @@ export default function Header() {
     <header className="yen-header">
       <div className="yen-header-container">
         {/* Brand Logo YÊN */}
-        <Link to="/" className="yen-brand-logo" title="YÊN - Homestay Booking" onClick={closeMobileMenu}>
+        <Link to="/" className="yen-brand-logo" title="YÊN - Homestay Booking">
           <img src={logoImg} alt="YÊN Logo" className="yen-logo-img" />
         </Link>
 
-
-
         {/* Navigation Menu */}
         <nav>
-          <ul className={`yen-nav-list ${mobileMenuOpen ? 'show' : ''}`}>
+          <ul className="yen-nav-list">
             <li className="yen-nav-item">
               <NavLink
                 to="/"
                 end
                 className={({ isActive }) => `yen-nav-link ${isActive ? 'active' : ''}`}
-                onClick={closeMobileMenu}
               >
                 <i className="bi bi-house-door nav-icon" />
                 <span>Trang chủ</span>
@@ -90,6 +121,18 @@ export default function Header() {
               >
                 <i className="bi bi-gift nav-icon" />
                 <span>Khuyến mãi</span>
+              </NavLink>
+            </li>
+
+            <li className="yen-nav-item">
+              <NavLink
+                to="/wishlist"
+                className={({ isActive }) => `yen-nav-link ${isActive ? 'active' : ''}`}
+                onClick={closeMobileMenu}
+              >
+                <i className="bi bi-heart nav-icon" />
+                <span>Yêu thích</span>
+                {wishlistCount > 0 && <span className="yen-noti-badge">{wishlistCount}</span>}
               </NavLink>
             </li>
 

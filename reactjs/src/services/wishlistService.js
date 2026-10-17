@@ -86,6 +86,7 @@ export const wishlistService = {
               if (idx !== -1) list[idx] = res.data;
               else list.unshift(res.data);
               localStorage.setItem(`wishlist_${userId}`, JSON.stringify(list));
+              try { window.dispatchEvent(new Event('wishlist-updated')); } catch (e) {}
             } catch (err) {}
           }
           return { success: true, data: res.data };
@@ -109,6 +110,7 @@ export const wishlistService = {
         let list = JSON.parse(raw);
         list = list.filter(item => Number(item.id || item.homestayId) !== targetId);
         localStorage.setItem(cacheKey, JSON.stringify(list));
+        try { window.dispatchEvent(new Event('wishlist-updated')); } catch (e) {}
       }
     } catch (e) {}
 
@@ -119,6 +121,7 @@ export const wishlistService = {
           method: 'DELETE', headers: authHeaders(),
         });
         if (response.ok) {
+          try { window.dispatchEvent(new Event('wishlist-updated')); } catch (e) {}
           return { success: true };
         }
       } catch (err) { throw err; }
@@ -139,6 +142,7 @@ export const wishlistService = {
         });
         if (response.ok) {
           localStorage.removeItem(`wishlist_${userId}`);
+          try { window.dispatchEvent(new Event('wishlist-updated')); } catch (e) {}
           return { success: true };
         }
       } catch (err) { throw err; }
