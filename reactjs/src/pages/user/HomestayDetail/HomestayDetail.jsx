@@ -16,6 +16,8 @@ import {
   avatarColors, unsplashUrl, fmtVND, SERVICE_FEE_RATE,
 } from './homestayDetailData';
 import { GalleryModal } from '@/components/ui/interactive-bento-gallery';
+import PolaroidLineCarousel from '@/components/ui/polaroid-line-carousel';
+import ErrorBoundary from '@/components/ErrorBoundary';
 
 // ─── Helpers ──────────────────────────────────────────────────
 function formatAmenities(raw) {
@@ -172,40 +174,15 @@ function RoomModal({ room, homestay, homestayRating = '5.0', homestayReviewCount
     if (room.thumb) list.push(room.thumb);
     if (Array.isArray(room.gallery)) list.push(...room.gallery);
     if (Array.isArray(room.images)) list.push(...room.images);
-    if (homestay?.images && Array.isArray(homestay.images)) list.push(...homestay.images);
-    if (homestay?.gallery && Array.isArray(homestay.gallery)) list.push(...homestay.gallery);
 
     const unique = Array.from(new Set(list.filter((x) => typeof x === 'string' && x.trim().length > 0)));
-    if (unique.length >= 4) return unique;
+    if (unique.length > 0) return unique;
 
-    // Đảm bảo luôn có ít nhất 5-6 ảnh đẹp chất lượng cao để du khách thoải mái chuyển ảnh trái/phải
-    for (const fb of roomFallbackPhotos) {
-      if (!unique.includes(fb)) unique.push(fb);
-      if (unique.length >= 5) break;
-    }
-    return unique;
+    // Fallback chỉ khi phòng hoàn toàn không có bất kỳ ảnh nào
+    if (room.image) return [room.image];
+    if (homestay?.primaryImage) return [homestay.primaryImage];
+    return [roomFallbackPhotos[0]];
   }, [room, homestay]);
-
-  const nextPhoto = useCallback(() => {
-    setGalleryIdx((i) => (i + 1) % gallery.length);
-  }, [gallery.length]);
-
-  const prevPhoto = useCallback(() => {
-    setGalleryIdx((i) => (i - 1 + gallery.length) % gallery.length);
-  }, [gallery.length]);
-
-  // Touch swipe support for mobile
-  const [touchStartX, setTouchStartX] = useState(null);
-  const handleTouchStart = (e) => setTouchStartX(e.touches[0].clientX);
-  const handleTouchEnd = (e) => {
-    if (touchStartX === null) return;
-    const diff = touchStartX - e.changedTouches[0].clientX;
-    if (Math.abs(diff) > 40) {
-      if (diff > 0) nextPhoto();
-      else prevPhoto();
-    }
-    setTouchStartX(null);
-  };
 
   const roomPrice = Number(room.price || room.pricePerNight || 890000);
   const cleaningFee = Number(room.cleaningFee || 100000);
@@ -215,6 +192,25 @@ function RoomModal({ room, homestay, homestayRating = '5.0', homestayReviewCount
   const amenitiesList = room.amenities || ['Wifi tốc độ cao', 'Phòng tắm riêng', 'Máy điều hòa', 'Bình nước nóng', 'Tủ lạnh mini', 'Máy sấy tóc'];
   const roomName = room.name || room.roomName || 'Chi tiết phòng nghỉ';
   const availableCount = room.availableCount || 2;
+
+  const polaroidSlides = useMemo(() => {
+    const titles = [
+      'Không gian phòng ngủ',
+      'Góc thư giãn & ngắm cảnh',
+      'Nội thất & tiện nghi',
+      'Cửa sổ đón nắng mai',
+      'Phòng tắm sạch sẽ, tiện nghi',
+      'Góc check-in ấm cúng',
+      'Ban công thoáng đãng',
+      'Chi tiết decor mộc mạc',
+    ];
+    return (gallery || []).map((url, idx) => ({
+      image: url,
+      title: titles[idx % titles.length],
+      caption: `${roomName} — Ảnh ${idx + 1}/${gallery.length}`,
+      alt: `${roomName} - Ảnh số ${idx + 1}`,
+    }));
+  }, [gallery, roomName]);
 
   const today = new Date();
   const defaultCheckin = new Date(today); defaultCheckin.setDate(today.getDate() + 7);
@@ -246,12 +242,10 @@ function RoomModal({ room, homestay, homestayRating = '5.0', homestayReviewCount
   useEffect(() => {
     const handler = (e) => {
       if (e.key === 'Escape') onClose();
-      if (e.key === 'ArrowRight') nextPhoto();
-      if (e.key === 'ArrowLeft') prevPhoto();
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [onClose, nextPhoto, prevPhoto]);
+  }, [onClose]);
 
   const navigate = useNavigate();
   const handleBook = () => {
@@ -298,100 +292,42 @@ function RoomModal({ room, homestay, homestayRating = '5.0', homestayReviewCount
   return (
     <div className="room-modal-overlay active" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="room-modal-container" role="dialog" aria-modal="true">
-        {/* Nút đóng nổi bật */}
-        <button type="button" className="room-modal-close-btn" onClick={onClose} title="Đóng cửa sổ">
+        {/* Nút đóng chuẩn đẹp ở góc trên bên phải */}
+        <button
+          type="button"
+          className="room-modal-close-btn"
+          onClick={onClose}
+          title="Đóng cửa sổ"
+          aria-label="Đóng cửa sổ"
+        >
           <i className="bi bi-x-lg" />
         </button>
 
         <div className="room-modal-scroll" ref={scrollRef}>
-          {/* ══ BỘ SƯU TẬP ẢNH TƯƠNG TÁC CAO CẤP CÓ MŨI TÊN TRÁI / PHẢI VÀ THUMBNAIL ══ */}
-          <div
-            className="room-modal-gallery-box"
-            onTouchStart={handleTouchStart}
-            onTouchEnd={handleTouchEnd}
-          >
-            {/* Khung ảnh chính */}
-            <div className="room-gallery-viewport">
-              <img
-                key={galleryIdx}
-                src={gallery[galleryIdx]}
-                alt={`${roomName} - Ảnh số ${galleryIdx + 1}`}
-                className="room-gallery-viewport-img"
-              />
-
-              {/* Lớp phủ chuyển sắc nhẹ để bảo đảm độ rõ cho nút bấm và nhãn */}
-              <div className="room-gallery-vignette" />
-
-              {/* Nhãn loại phòng và tình trạng phòng nổi trên góc trái ảnh */}
-              <div className="room-gallery-top-tags">
-                <span className="room-gallery-tag-type">
-                  <i className="bi bi-door-open-fill" /> {room.roomType || 'Phòng Nghỉ'}
-                </span>
-                <span className="room-gallery-tag-avail">
-                  <span className="room-avail-pulse-dot" /> Còn {availableCount} phòng trống
-                </span>
-              </div>
-
-              {/* Nút bấm chuyển sang ẢNH TRƯỚC (BÊN TRÁI) */}
-              <button
-                type="button"
-                className="room-gallery-arrow-btn prev"
-                onClick={(e) => { e.stopPropagation(); prevPhoto(); }}
-                title="Xem ảnh trước (Bấm mũi tên trái bàn phím)"
-                aria-label="Ảnh trước"
-              >
-                <i className="bi bi-chevron-left" />
-              </button>
-
-              {/* Nút bấm chuyển sang ẢNH SAU (BÊN PHẢI) */}
-              <button
-                type="button"
-                className="room-gallery-arrow-btn next"
-                onClick={(e) => { e.stopPropagation(); nextPhoto(); }}
-                title="Xem ảnh kế tiếp (Bấm mũi tên phải bàn phím)"
-                aria-label="Ảnh sau"
-              >
-                <i className="bi bi-chevron-right" />
-              </button>
-
-              {/* Thanh thông tin dưới cùng của ảnh: Dấu chấm và Bộ đếm */}
-              <div className="room-gallery-bottom-controls">
-                <div className="room-gallery-dots-row">
-                  {gallery.map((_, i) => (
-                    <button
-                      key={i}
-                      type="button"
-                      className={`room-gallery-dot-indicator ${i === galleryIdx ? 'active' : ''}`}
-                      onClick={() => setGalleryIdx(i)}
-                      title={`Xem ảnh ${i + 1}`}
-                      aria-label={`Ảnh ${i + 1}`}
-                    />
-                  ))}
-                </div>
-
-                <div className="room-gallery-counter-pill">
-                  <i className="bi bi-camera-fill" /> {galleryIdx + 1} / {gallery.length} ảnh
-                </div>
-              </div>
+          {/* ══ BỘ SƯU TẬP ẢNH DẠNG POLAROID LINE CAROUSEL (DÂY TREO ẢNH MỘC MẠC) ══ */}
+          <div className="room-modal-gallery-box room-modal-gallery-box--polaroid">
+            {/* Tình trạng phòng nổi trên góc trái ảnh (đã bỏ chữ SINGLE theo yêu cầu) */}
+            <div className="room-gallery-top-tags">
+              <span className="room-gallery-tag-avail">
+                <span className="room-avail-pulse-dot" /> Còn {availableCount} phòng trống
+              </span>
             </div>
 
-            {/* DẢI ẢNH THU NHỎ (THUMBNAIL STRIP) BẤM CHUYỂN ẢNH NHANH */}
-            {gallery.length > 1 && (
-              <div className="room-gallery-thumb-track">
-                {gallery.map((imgUrl, i) => (
-                  <button
-                    key={i}
-                    type="button"
-                    className={`room-gallery-thumb-btn ${i === galleryIdx ? 'selected' : ''}`}
-                    onClick={() => setGalleryIdx(i)}
-                    title={`Chuyển đến ảnh ${i + 1}`}
-                  >
-                    <img src={imgUrl} alt={`Ảnh nhỏ ${i + 1}`} loading="lazy" />
-                    {i === galleryIdx && <span className="room-thumb-active-glow" />}
-                  </button>
-                ))}
-              </div>
-            )}
+            <ErrorBoundary>
+              <PolaroidLineCarousel
+                slides={polaroidSlides}
+                height="470px"
+                cardWidth={310}
+                sag={38}
+                swing={1.0}
+                autoplay={4500}
+                background="radial-gradient(ellipse at 50% 20%, #1e293b 0%, #0b1120 100%)"
+                ink="#ffffff"
+                string="#d4af37"
+                className="room-polaroid-carousel"
+                ariaLabel={`Bộ sưu tập ảnh phòng ${roomName}`}
+              />
+            </ErrorBoundary>
           </div>
 
           {/* ══ NỘI DUNG CHI TIẾT PHÒNG ══ */}
@@ -1036,6 +972,7 @@ export default function HomestayDetail() {
 
   const roomsSectionRef = useRef(null);
   const reviewsSectionRef = useRef(null);
+  const locationSectionRef = useRef(null);
   const toastTimer = useRef(null);
   const similarSliderRef = useRef(null);
 
@@ -1217,6 +1154,9 @@ export default function HomestayDetail() {
   const scrollToReviews = () => {
     reviewsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
+  const scrollToLocation = () => {
+    locationSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
 
   const navigate = useNavigate();
 
@@ -1396,6 +1336,29 @@ export default function HomestayDetail() {
 
   const homestayName = homestay?.name || 'The Pine Hill Retreat';
   const homestayAddress = homestay?.address || homestay?.location || 'Phường 3, TP. Đà Lạt, Lâm Đồng';
+  const homestayCity = homestay?.city || '';
+  const fullLocationAddress = useMemo(() => {
+    if (!homestayAddress) return homestayCity || 'TP. Đà Lạt, Lâm Đồng';
+    if (homestayCity && !homestayAddress.toLowerCase().includes(homestayCity.toLowerCase())) {
+      return `${homestayAddress}, ${homestayCity}`;
+    }
+    return homestayAddress;
+  }, [homestayAddress, homestayCity]);
+
+  // Google Maps URL nhúng bản đồ thực tế
+  const googleMapEmbedUrl = useMemo(() => {
+    return `https://maps.google.com/maps?q=${encodeURIComponent(fullLocationAddress)}&t=&z=14&ie=UTF8&iwloc=&output=embed`;
+  }, [fullLocationAddress]);
+
+  // Google Maps URL chỉ đường trực tiếp tới homestay
+  const googleMapDirectionsUrl = useMemo(() => {
+    return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(fullLocationAddress)}`;
+  }, [fullLocationAddress]);
+
+  // Google Maps URL tìm kiếm vị trí chi tiết
+  const googleMapSearchUrl = useMemo(() => {
+    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fullLocationAddress)}`;
+  }, [fullLocationAddress]);
   const homestayDescription = homestay?.description || homestay?.desc || `Ẩn mình giữa đồi thông Đà Lạt, The Pine Hill Retreat mang đến không gian nghỉ dưỡng mộc mạc mà ấm cúng, nơi bạn có thể nhóm lửa sưởi ấm buổi tối se lạnh và ngắm mây trôi ngay từ bồn tắm gỗ ngoài trời. Homestay có nhiều loại phòng khác nhau, từ phòng đôi ấm cúng cho cặp đôi đến villa toàn căn cho nhóm đông, phù hợp cho mọi nhu cầu nghỉ dưỡng chậm rãi cùng người thân hoặc bạn bè.`;
   const hostName = homestay?.ownerName || homestay?.hostName || 'Trần Văn Hùng';
   const hostAvatar = homestay?.ownerAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=240&q=80';
@@ -1459,7 +1422,12 @@ export default function HomestayDetail() {
                   <a onClick={scrollToReviews}>{homestayReviewCount} đánh giá</a>
                 </span>
                 <span className="detail-dot">•</span>
-                <span className="detail-location">
+                <span
+                  className="detail-location detail-location--clickable"
+                  onClick={scrollToLocation}
+                  style={{ cursor: 'pointer' }}
+                  title="Xem bản đồ và chỉ đường tới homestay"
+                >
                   <i className="bi bi-geo-alt-fill" /> {homestayAddress}
                 </span>
               </div>
@@ -1829,14 +1797,73 @@ export default function HomestayDetail() {
             </div>
             <div className="detail-divider" />
 
-            <div className="detail-block">
-              <h3 className="detail-block-title">Vị trí homestay</h3>
-              <p className="location-note">
-                <i className="bi bi-geo-alt-fill" /> {homestayAddress} · {homestay?.distance || 'Cách trung tâm 1.5km, thuận tiện di chuyển tham quan'}
-              </p>
+            <div className="detail-block" id="locationSection" ref={locationSectionRef}>
+              <div className="location-section-header">
+                <div>
+                  <h3 className="detail-block-title">Vị trí homestay</h3>
+                  <p className="location-note">
+                    <i className="bi bi-geo-alt-fill" /> {fullLocationAddress} · {homestay?.distance || 'Cách trung tâm 1.5km, thuận tiện di chuyển tham quan'}
+                  </p>
+                </div>
+                <a
+                  href={googleMapDirectionsUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="location-direct-link location-direct-link--primary"
+                  title="Chỉ đường trên Google Maps"
+                >
+                  <i className="bi bi-signpost-split-fill" /> Xem chỉ đường tới homestay
+                </a>
+              </div>
+
               <div className="location-map-box">
-                <img src={activeGallery[0] || "https://images.unsplash.com/photo-1524661135-423995f22d0b?auto=format&fit=crop&w=1200&q=80"} alt={`Vị trí ${homestayName}`} />
-                <div className="map-pin"><i className="bi bi-geo-alt-fill" /></div>
+                <iframe
+                  title={`Bản đồ vị trí ${homestayName}`}
+                  src={googleMapEmbedUrl}
+                  loading="lazy"
+                  allowFullScreen
+                  referrerPolicy="no-referrer-when-downgrade"
+                />
+              </div>
+
+              <div className="location-map-footer">
+                <div className="location-coords-badge">
+                  <i className="bi bi-pin-map-fill" />
+                  <span>{fullLocationAddress}</span>
+                </div>
+                <div className="location-actions">
+                  <button
+                    type="button"
+                    className="location-copy-btn"
+                    onClick={() => {
+                      if (navigator.clipboard && window.isSecureContext) {
+                        navigator.clipboard.writeText(fullLocationAddress).catch(() => {});
+                      }
+                      showToast('Đã sao chép địa chỉ homestay vào bộ nhớ tạm!');
+                    }}
+                    title="Sao chép địa chỉ"
+                  >
+                    <i className="bi bi-copy" /> Sao chép địa chỉ
+                  </button>
+                  <a
+                    href={googleMapSearchUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="location-direct-link"
+                    title="Mở trên Google Maps"
+                  >
+                    <i className="bi bi-box-arrow-up-right" /> Mở Google Maps
+                  </a>
+                  <a
+                    href={googleMapDirectionsUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="location-direct-link location-direct-link--primary"
+                    title="Xem chỉ đường trên Google Maps"
+                  >
+                    <i className="bi bi-signpost-split-fill" /> Xem chỉ đường tới homestay
+                  </a>
+                </div>
               </div>
             </div>
             <div className="detail-divider" />
