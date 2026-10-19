@@ -17,7 +17,7 @@ const mapBooking = (b) => ({
 
 export default function Bookings() {
   const currentUser = authService.getCurrentUser();
-  const userId = currentUser?.id;
+  const userId = currentUser?.id || currentUser?.userId || (sessionStorage.getItem('userId') ? Number(sessionStorage.getItem('userId')) : null);
   const initialData = useMemo(() => {
     return bookingService.getCachedUserBookings(userId).map(mapBooking);
   }, [userId]);
@@ -43,6 +43,15 @@ export default function Bookings() {
   const [cmpContent, setCmpContent] = useState('');
   const [cmpContact, setCmpContact] = useState('');
   const [cmpResolution, setCmpResolution] = useState('apology');
+
+  // Receipt Modal State
+  const [receiptModalOpen, setReceiptModalOpen] = useState(false);
+  const [activeReceiptBkId, setActiveReceiptBkId] = useState(null);
+
+  const openReceiptModal = (bkId) => {
+    setActiveReceiptBkId(bkId);
+    setReceiptModalOpen(true);
+  };
 
   const navigate = useNavigate();
 
@@ -91,6 +100,7 @@ export default function Bookings() {
     const upcomingCount = userBookings.filter((b) => b.status === 'upcoming').length;
     const completedCount = userBookings.filter((b) => b.status === 'completed').length;
     const complaintCount = userBookings.filter((b) => b.status === 'complaint').length;
+    const cancelledCount = userBookings.filter((b) => b.status === 'cancelled').length;
     const pendingTasksCount = userBookings.filter((b) => b.task && b.task.status === 'pending').length;
     return {
       all: userBookings.length,
@@ -98,6 +108,7 @@ export default function Bookings() {
       upcoming: upcomingCount,
       completed: completedCount,
       complaint: complaintCount,
+      cancelled: cancelledCount,
       pendingTasks: pendingTasksCount,
     };
   }, [userBookings]);
@@ -192,6 +203,7 @@ export default function Bookings() {
 
   const activeTaskBk = userBookings.find((b) => b.id === activeTaskBkId);
   const activeCmpBk = userBookings.find((b) => b.id === activeCmpBkId);
+  const activeReceiptBk = userBookings.find((b) => b.id === activeReceiptBkId);
 
   return (
     <div className="bk-page">
@@ -261,6 +273,12 @@ export default function Bookings() {
                   <span className="nav-item-label">Khiếu nại</span>
                   <span className="nav-badge-count">{stats.complaint}</span>
                 </button>
+                <button type="button" className={`account-nav-item ${currentFilter === 'cancelled' ? 'active' : ''}`}
+                  onClick={() => setCurrentFilter('cancelled')}>
+                  <i className="bi bi-x-circle-fill nav-item-icon text-danger" />
+                  <span className="nav-item-label">Đã hủy</span>
+                  <span className="nav-badge-count">{stats.cancelled}</span>
+                </button>
               </div>
             </div>
           </aside>
@@ -307,7 +325,7 @@ export default function Bookings() {
                         {bk.status === 'upcoming' && <span className="status-badge status-upcoming"><i className="bi bi-clock-history" /> SẮP NHẬN PHÒNG</span>}
                         {bk.status === 'completed' && <span className="status-badge status-completed"><i className="bi bi-check-circle-fill" /> ĐÃ HOÀN THÀNH</span>}
                         {bk.status === 'complaint' && <span className="status-badge status-complaint"><i className="bi bi-exclamation-triangle-fill" /> Khiếu nại ({bk.complaint?.statusText})</span>}
-                        {bk.status === 'cancelled' && <span className="status-badge status-complaint"><i className="bi bi-x-circle-fill" /> ĐÃ HỦY</span>}
+                        {bk.status === 'cancelled' && <span className="status-badge status-cancelled"><i className="bi bi-x-circle-fill" /> ĐÃ HỦY</span>}
                       </div>
 
                       <div className="bk-card-body">
@@ -316,7 +334,18 @@ export default function Bookings() {
                         </div>
                         <div className="bk-info-box">
                           <h3 className="bk-hs-name">{bk.homestayName}</h3>
-                          <div className="bk-hs-location"><i className="bi bi-geo-alt-fill text-danger" /> {bk.location}</div>
+                          <div className="bk-hs-location">
+                            <i className="bi bi-geo-alt-fill text-danger" /> {bk.location}
+                            <a
+                              href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent((bk.homestayName ? bk.homestayName + ' ' : '') + (bk.location || ''))}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="bk-hs-location-link"
+                              title="Mở ứng dụng Google Maps chỉ đường"
+                            >
+                              <i className="bi bi-compass" /> Chỉ đường
+                            </a>
+                          </div>
                           <div className="bk-specs-row">
                             <span><i className="bi bi-house-door text-success" /> {bk.roomType}</span>
                             <span>•</span>
@@ -384,9 +413,18 @@ export default function Bookings() {
                         <button type="button" className="yn-btn yn-btn--outline yn-btn--lg yn-btn--block" data-homestay-id={bk.homestayId} onClick={handleChatOwner}>
                           <i className="bi bi-chat-dots" /> Chat với chủ nhà
                         </button>
-                        <div style={{ display: 'flex', gap: 8 }}>
-                          <button type="button" className="btn-action-ghost" onClick={() => showToast(`Đang mở hóa đơn điện tử đơn ${bk.code}...`)}>
-                            <i className="bi bi-receipt" /> Hóa đơn
+                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                          <a
+                            href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent((bk.homestayName ? bk.homestayName + ' ' : '') + (bk.location || ''))}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="btn-direction-link"
+                            title="Mở Google Maps chỉ đường"
+                          >
+                            <i className="bi bi-geo-alt-fill" /> Chỉ đường Maps
+                          </a>
+                          <button type="button" className="btn-receipt-trigger" onClick={() => openReceiptModal(bk.id)}>
+                            <i className="bi bi-receipt" /> Biên lai
                           </button>
                           <button type="button" className="btn-complaint-trigger" onClick={() => openComplaintModal(bk.id)}>
                             <i className="bi bi-exclamation-triangle-fill" /> {bk.status === 'complaint' ? 'Xem khiếu nại' : 'Khiếu nại'}
@@ -529,6 +567,170 @@ export default function Bookings() {
                 <i className="bi bi-send-check-fill" /> Gửi khiếu nại chính thức
               </button>
             </form>
+          </div>
+        </div>
+      </div>
+
+      {/* ── MODAL XEM BIÊN LAI THANH TOÁN CHI TIẾT ── */}
+      <div className={`bk-modal-overlay ${receiptModalOpen ? 'show' : ''}`}>
+        <div className="bk-modal-card bk-modal-receipt-card">
+          <div className="bk-modal-head">
+            <h3><i className="bi bi-receipt text-success" /> Biên Lai Thanh Toán & Chi Tiết Đặt Phòng</h3>
+            <button type="button" className="bk-modal-close" onClick={() => setReceiptModalOpen(false)}>×</button>
+          </div>
+          <div className="bk-modal-body" style={{ maxHeight: '82vh', overflowY: 'auto' }}>
+            {activeReceiptBk && (
+              <div className="receipt-sheet">
+                <div className="receipt-brand-row">
+                  <div>
+                    <h2 className="receipt-brand-title">
+                      <i className="bi bi-house-heart-fill" /> YÊN Homestay
+                    </h2>
+                    <span style={{ fontSize: '0.8rem', color: '#64748B' }}>
+                      Nền tảng nghỉ dưỡng & du lịch sinh thái nông thôn
+                    </span>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: '0.78rem', color: '#64748B', fontWeight: 700, textTransform: 'uppercase' }}>MÃ ĐƠN ĐẶT</div>
+                    <div style={{ fontSize: '1.15rem', fontWeight: 900, color: '#15803D' }}>{activeReceiptBk.code}</div>
+                  </div>
+                </div>
+
+                <div className="receipt-meta-grid">
+                  <div className="receipt-meta-item">
+                    <span className="lbl">Du khách đặt phòng</span>
+                    <span className="val">{currentUser?.fullName || activeReceiptBk.touristName || 'Quý khách YÊN'}</span>
+                  </div>
+                  <div className="receipt-meta-item">
+                    <span className="lbl">Thời gian tạo đơn</span>
+                    <span className="val">
+                      {activeReceiptBk.createdAt ? new Date(activeReceiptBk.createdAt).toLocaleString('vi-VN') : 'Gần đây'}
+                    </span>
+                  </div>
+                  <div className="receipt-meta-item">
+                    <span className="lbl">Homestay</span>
+                    <span className="val">{activeReceiptBk.homestayName}</span>
+                  </div>
+                  <div className="receipt-meta-item">
+                    <span className="lbl">Địa chỉ vị trí</span>
+                    <span className="val">{activeReceiptBk.location}</span>
+                  </div>
+                  <div className="receipt-meta-item">
+                    <span className="lbl">Hạng phòng & Số khách</span>
+                    <span className="val">{activeReceiptBk.roomType} • {activeReceiptBk.guests}</span>
+                  </div>
+                  <div className="receipt-meta-item">
+                    <span className="lbl">Lịch lưu trú</span>
+                    <span className="val">
+                      {activeReceiptBk.checkIn} → {activeReceiptBk.checkOut} ({activeReceiptBk.nights} đêm)
+                    </span>
+                  </div>
+                </div>
+
+                <table className="receipt-detail-table">
+                  <thead>
+                    <tr>
+                      <th>Khoản mục thanh toán</th>
+                      <th>Chi tiết</th>
+                      <th className="text-right">Số tiền</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>
+                        <b>Tiền phòng lưu trú</b>
+                        <div style={{ fontSize: '0.78rem', color: '#64748B' }}>
+                          {activeReceiptBk.roomName || activeReceiptBk.roomType} x {activeReceiptBk.nights} đêm
+                        </div>
+                      </td>
+                      <td>{activeReceiptBk.guests}</td>
+                      <td className="text-right"><b>{activeReceiptBk.totalPrice}</b></td>
+                    </tr>
+                    <tr>
+                      <td>
+                        <b>Phụ phí dịch vụ & bảo hiểm</b>
+                        <div style={{ fontSize: '0.78rem', color: '#64748B' }}>Bảo hiểm trải nghiệm an toàn & CSKH 24/7</div>
+                      </td>
+                      <td>Miễn phí</td>
+                      <td className="text-right" style={{ color: '#15803D', fontWeight: 700 }}>0đ (YÊN tài trợ)</td>
+                    </tr>
+                    <tr>
+                      <td>
+                        <b>Hình thức thanh toán</b>
+                        <div style={{ fontSize: '0.78rem', color: '#64748B' }}>
+                          Trạng thái: {activeReceiptBk.payStatus || 'Chờ thanh toán'}
+                        </div>
+                      </td>
+                      <td>{activeReceiptBk.paymentType === 'DEPOSIT' ? 'Đặt cọc giữ phòng (DEPOSIT)' : 'Thanh toán trọn gói (100%)'}</td>
+                      <td className="text-right">
+                        <span className="status-badge status-active" style={{ fontSize: '0.72rem' }}>
+                          {activeReceiptBk.depositStatus || 'HELD'}
+                        </span>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+
+                {/* Highlight Tiền cọc */}
+                <div className="receipt-highlight-box">
+                  <div>
+                    <div className="lbl">Tiền cọc đã ghi nhận (Đã thanh toán)</div>
+                    <div style={{ fontSize: '0.76rem', color: '#166534', marginTop: 2 }}>
+                      {activeReceiptBk.depositStatus === 'HELD' || activeReceiptBk.depositStatus === 'PAID'
+                        ? '✓ Đã nhận cọc an toàn qua cổng giao dịch'
+                        : 'Đang chờ đối soát ngân hàng'}
+                    </div>
+                  </div>
+                  <div className="val">
+                    {activeReceiptBk.depositAmount && Number(activeReceiptBk.depositAmount) > 0
+                      ? Number(activeReceiptBk.depositAmount).toLocaleString('vi-VN') + 'đ'
+                      : activeReceiptBk.totalPrice}
+                  </div>
+                </div>
+
+                {/* Tiền còn lại phải trả tại Homestay */}
+                {activeReceiptBk.remainingAmount && Number(activeReceiptBk.remainingAmount) > 0 ? (
+                  <div className="receipt-balance-box">
+                    <div>
+                      <div className="lbl">Số tiền còn lại cần thanh toán khi nhận phòng</div>
+                      <div style={{ fontSize: '0.76rem', color: '#92400E', marginTop: 2 }}>
+                        Thanh toán trực tiếp cho chủ homestay bằng VietQR hoặc tiền mặt lúc Check-in
+                      </div>
+                    </div>
+                    <div className="val">
+                      {Number(activeReceiptBk.remainingAmount).toLocaleString('vi-VN')}đ
+                    </div>
+                  </div>
+                ) : null}
+
+                <div className="receipt-notes-card">
+                  <b>Chính sách & Quy định lưu trú YÊN Homestay:</b>
+                  <ul style={{ margin: '6px 0 0', paddingLeft: 18 }}>
+                    <li>Giờ nhận phòng tiêu chuẩn: <b>14:00</b> — Giờ trả phòng: <b>12:00</b>.</li>
+                    <li>Vui lòng xuất trình CCCD/Hộ chiếu khi làm thủ tục nhận phòng tại Homestay.</li>
+                    <li>Tiền cọc được bảo vệ bởi YÊN Homestay và chỉ giải ngân cho chủ nhà sau khi hoàn tất kỳ nghỉ.</li>
+                  </ul>
+                </div>
+
+                <div className="receipt-actions-row">
+                  <a
+                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent((activeReceiptBk.homestayName ? activeReceiptBk.homestayName + ' ' : '') + (activeReceiptBk.location || ''))}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="btn-direction-link"
+                    style={{ padding: '10px 16px', fontSize: '0.88rem' }}
+                  >
+                    <i className="bi bi-geo-alt-fill" /> Chỉ đường Maps
+                  </a>
+                  <button type="button" className="btn-print-receipt" onClick={() => window.print()}>
+                    <i className="bi bi-printer-fill" /> In biên lai / Lưu PDF
+                  </button>
+                  <button type="button" className="btn-close-receipt" onClick={() => setReceiptModalOpen(false)}>
+                    Đóng
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>

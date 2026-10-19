@@ -54,14 +54,22 @@ public class BookingService {
 
     /**
      * Lấy toàn bộ danh sách đặt phòng thực tế của người dùng từ CSDL Neon PostgreSQL
-     * Đã tối ưu hóa BATCH FETCHING (giảm từ 3N+1 queries xuống còn 3-4 queries) + CACHE
+     * Bọc try-catch riêng biệt cho reports, reviews, tasks để tránh 1 lỗi phụ làm hỏng toàn bộ danh sách
      */
-    @Cacheable(value = "userBookings", key = "#touristId")
     public List<UserBookingDTO> getUserBookings(Long touristId) {
+        if (touristId == null) {
+            return Collections.emptyList();
+        }
+
         String sql = """
             SELECT 
-                b.booking_id, b.booking_code, b.tourist_id, u.full_name as tourist_name, u.avatar as tourist_avatar,
-                b.homestay_id, h.name as homestay_name, h.city as homestay_city, h.address as homestay_address,
+                b.booking_id, b.booking_code, b.tourist_id, 
+                COALESCE(u.full_name, b.guest_name, 'Khách đặt phòng') as tourist_name, 
+                u.avatar as tourist_avatar,
+                b.homestay_id, 
+                COALESCE(h.name, 'Homestay YÊN') as homestay_name, 
+                h.city as homestay_city, 
+                h.address as homestay_address,
                 b.room_id, rm.room_name, rm.room_type,
                 b.check_in_date, b.check_out_date, b.guests_count,
                 b.total_price, b.discount_amount, b.deposit_amount, b.remaining_amount,
@@ -69,44 +77,85 @@ public class BookingService {
                 (SELECT hi.image_url FROM homestay_images hi WHERE hi.homestay_id = b.homestay_id ORDER BY hi.is_primary DESC, hi.image_id ASC LIMIT 1) as homestay_image,
                 (SELECT ri.image_url FROM room_images ri WHERE ri.room_id = b.room_id ORDER BY ri.is_primary DESC, ri.image_id ASC LIMIT 1) as room_image
             FROM bookings b
-            JOIN users u ON b.tourist_id = u.user_id
-            JOIN homestays h ON b.homestay_id = h.homestay_id
+            LEFT JOIN users u ON b.tourist_id = u.user_id
+            LEFT JOIN homestays h ON b.homestay_id = h.homestay_id
             LEFT JOIN rooms rm ON b.room_id = rm.room_id
             WHERE b.tourist_id = ?
-            ORDER BY b.created_at DESC
+            ORDER BY b.created_at DESC NULLS LAST, b.booking_id DESC
         """;
 
         try {
             List<RawBooking> rawList = jdbcTemplate.query(sql, (rs, rowNum) -> mapRawBooking(rs), touristId);
-            if (rawList.isEmpty()) {
+            if (rawList == null || rawList.isEmpty()) {
                 return Collections.emptyList();
             }
 
-            List<Long> bookingIds = rawList.stream().map(RawBooking::bookingId).distinct().toList();
-            List<Long> homestayIds = rawList.stream().map(RawBooking::homestayId).distinct().toList();
+            List<Long> bookingIds = rawList.stream().map(RawBooking::bookingId).filter(Objects::nonNull).distinct().toList();
+            List<Long> homestayIds = rawList.stream().map(RawBooking::homestayId).filter(Objects::nonNull).distinct().toList();
 
-            // BATCH FETCH 1: Reports (chỉ 1 query duy nhất cho toàn bộ danh sách)
+            // BATCH FETCH 1: Reports an toàn
             Map<Long, Report> reportMap = new HashMap<>();
-            if (!bookingIds.isEmpty()) {
-                reportRepository.findByBookingIdIn(bookingIds).forEach(r -> reportMap.putIfAbsent(r.getBookingId(), r));
+            try {
+                if (!bookingIds.isEmpty()) {
+                    List<Report> reps = reportRepository.findByBookingIdIn(bookingIds);
+                    if (reps != null) {
+                        for (Report r : reps) {
+                            if (r != null && r.getBookingId() != null) {
+                                reportMap.putIfAbsent(r.getBookingId(), r);
+                            }
+                        }
+                    }
+                }
+            } catch (Exception ex) {
+                log.warn("Bỏ qua lỗi tải reports: {}", ex.getMessage());
             }
 
-            // BATCH FETCH 2: Reviews (chỉ 1 query duy nhất cho toàn bộ danh sách)
+            // BATCH FETCH 2: Reviews an toàn
             Map<Long, Review> reviewMap = new HashMap<>();
-            if (!bookingIds.isEmpty()) {
-                reviewRepository.findByBookingIdIn(bookingIds).forEach(r -> reviewMap.putIfAbsent(r.getBookingId(), r));
+            try {
+                if (!bookingIds.isEmpty()) {
+                    List<Review> revs = reviewRepository.findByBookingIdIn(bookingIds);
+                    if (revs != null) {
+                        for (Review rev : revs) {
+                            if (rev != null && rev.getBookingId() != null) {
+                                reviewMap.putIfAbsent(rev.getBookingId(), rev);
+                            }
+                        }
+                    }
+                }
+            } catch (Exception ex) {
+                log.warn("Bỏ qua lỗi tải reviews: {}", ex.getMessage());
             }
 
-            // BATCH FETCH 3: Guest Tasks (chỉ 1 query duy nhất cho toàn bộ danh sách)
+            // BATCH FETCH 3: Guest Tasks an toàn
             Map<Long, GuestTask> taskMap = new HashMap<>();
-            if (!homestayIds.isEmpty()) {
-                guestTaskRepository.findByHomestayIdIn(homestayIds).forEach(t -> taskMap.putIfAbsent(t.getHomestayId(), t));
+            try {
+                if (!homestayIds.isEmpty()) {
+                    List<GuestTask> tasks = guestTaskRepository.findByHomestayIdIn(homestayIds);
+                    if (tasks != null) {
+                        for (GuestTask t : tasks) {
+                            if (t != null && t.getHomestayId() != null) {
+                                taskMap.putIfAbsent(t.getHomestayId(), t);
+                            }
+                        }
+                    }
+                }
+            } catch (Exception ex) {
+                log.warn("Bỏ qua lỗi tải guest tasks: {}", ex.getMessage());
             }
 
-            // Lắp ráp UserBookingDTO trong RAM O(1), không tốn thêm bất kỳ query DB nào
+            // Lắp ráp UserBookingDTO an toàn từng phần tử
             List<UserBookingDTO> result = new ArrayList<>();
             for (RawBooking raw : rawList) {
-                result.add(convertRawToDTO(raw, reportMap.get(raw.bookingId()), reviewMap.get(raw.bookingId()), taskMap.get(raw.homestayId())));
+                try {
+                    result.add(convertRawToDTO(raw, 
+                            raw.bookingId() != null ? reportMap.get(raw.bookingId()) : null, 
+                            raw.bookingId() != null ? reviewMap.get(raw.bookingId()) : null, 
+                            raw.homestayId() != null ? taskMap.get(raw.homestayId()) : null));
+                } catch (Exception ex) {
+                    log.error("Lỗi convert đơn đặt phòng ID {}: {}", raw.bookingId(), ex.getMessage());
+                    result.add(fallbackDTO(raw));
+                }
             }
             return result;
         } catch (Exception e) {
@@ -580,8 +629,15 @@ public class BookingService {
                         .build();
             }
 
+            Long taskIdVal = 1L;
+            if (taskEntity != null && taskEntity.getId() != null) {
+                taskIdVal = taskEntity.getId();
+            } else if (review != null && review.getTaskId() != null) {
+                taskIdVal = review.getTaskId();
+            }
+
             taskDTO = UserBookingDTO.TaskDTO.builder()
-                    .id(taskEntity != null ? taskEntity.getId() : (review != null ? review.getTaskId() : 1L))
+                    .id(taskIdVal)
                     .title(taskEntity != null ? taskEntity.getTitle() : "Danh sách việc cần làm tại Homestay")
                     .rewardText(hasReviewed ? "🎁 Đã nhận quà tặng từ Homestay" : rewardText)
                     .status(hasReviewed ? "completed" : "pending")
@@ -661,6 +717,50 @@ public class BookingService {
                 .createdAt(raw.createdAt())
                 .task(taskDTO)
                 .complaint(complaintDTO)
+                .build();
+    }
+
+    private UserBookingDTO fallbackDTO(RawBooking raw) {
+        BigDecimal tp = raw.totalPrice() != null ? raw.totalPrice() : BigDecimal.ZERO;
+        String formattedPrice = NumberFormat.getInstance(VI_LOCALE).format(tp) + "đ";
+        String cin = raw.checkInDate() != null ? raw.checkInDate().format(DATE_FMT) : "N/A";
+        String cout = raw.checkOutDate() != null ? raw.checkOutDate().format(DATE_FMT) : "N/A";
+        String img = (raw.homestayImage() != null && !raw.homestayImage().isBlank()) 
+                ? raw.homestayImage() 
+                : "https://images.unsplash.com/photo-1587061949409-02df41d5e562?auto=format&fit=crop&w=600&q=80";
+        String loc = (raw.homestayAddress() != null ? raw.homestayAddress() + ", " : "") + (raw.homestayCity() != null ? raw.homestayCity() : "Việt Nam");
+
+        return UserBookingDTO.builder()
+                .id(raw.bookingId())
+                .bookingCode(raw.bookingCode() != null ? raw.bookingCode() : "BK-" + raw.bookingId())
+                .touristId(raw.touristId())
+                .touristName(raw.touristName() != null ? raw.touristName() : "Khách đặt phòng")
+                .touristAvatar(raw.touristAvatar())
+                .homestayId(raw.homestayId())
+                .homestayName(raw.homestayName() != null ? raw.homestayName() : "Homestay YÊN")
+                .homestayImage(img)
+                .location(loc)
+                .roomId(raw.roomId())
+                .roomName(raw.roomName() != null ? raw.roomName() : "Phòng tiêu chuẩn")
+                .roomType(raw.roomType() != null ? raw.roomType() : "Phòng tiêu chuẩn")
+                .roomImage(raw.roomImage() != null ? raw.roomImage() : img)
+                .checkIn(cin)
+                .checkOut(cout)
+                .checkInDate(raw.checkInDate())
+                .checkOutDate(raw.checkOutDate())
+                .nights(1)
+                .guests((raw.guestsCount() > 0 ? raw.guestsCount() : 2) + " người lớn")
+                .guestsCount(raw.guestsCount() > 0 ? raw.guestsCount() : 2)
+                .totalPrice(formattedPrice)
+                .totalPriceRaw(tp)
+                .depositAmount(raw.depositAmount())
+                .remainingAmount(raw.remainingAmount())
+                .paymentType(raw.paymentType())
+                .depositStatus(raw.depositStatus())
+                .payStatus("Đã ghi nhận")
+                .status("completed")
+                .statusRaw(raw.status())
+                .createdAt(raw.createdAt())
                 .build();
     }
 }
