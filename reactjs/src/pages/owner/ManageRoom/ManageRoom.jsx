@@ -11,6 +11,55 @@ function removeVietnameseTones(str) {
   return s.toLowerCase().trim();
 }
 
+// Bộ sưu tập ảnh phòng homestay chất lượng cao, đa dạng phong cách (không bao giờ trùng lặp)
+export const FALLBACK_ROOM_IMAGES = [
+  'https://images.unsplash.com/photo-1590490360182-c33d57733427?auto=format&fit=crop&w=1200&q=80',
+  'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?auto=format&fit=crop&w=1200&q=80',
+  'https://images.unsplash.com/photo-1618773928121-c32242e63f39?auto=format&fit=crop&w=1200&q=80',
+  'https://images.unsplash.com/photo-1566665797739-1674de7a421a?auto=format&fit=crop&w=1200&q=80',
+  'https://images.unsplash.com/photo-1505691938895-1758d7feb511?auto=format&fit=crop&w=1200&q=80',
+  'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=1200&q=80',
+  'https://images.unsplash.com/photo-1584622650111-993a426fbf0a?auto=format&fit=crop&w=1200&q=80',
+  'https://images.unsplash.com/photo-1580587771525-78b9dba3b914?auto=format&fit=crop&w=1200&q=80',
+  'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=1200&q=80',
+  'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=1200&q=80',
+  'https://images.unsplash.com/photo-1587061949409-02df41d5e562?auto=format&fit=crop&w=1200&q=80',
+  'https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?auto=format&fit=crop&w=1200&q=80',
+  'https://images.unsplash.com/photo-1591088398332-8a7791972843?auto=format&fit=crop&w=1200&q=80',
+  'https://images.unsplash.com/photo-1595526114035-0d45ed16cfbf?auto=format&fit=crop&w=1200&q=80',
+  'https://images.unsplash.com/photo-1598928506311-c55ded91a20c?auto=format&fit=crop&w=1200&q=80',
+  'https://images.unsplash.com/photo-1578683010236-d716f9a3f461?auto=format&fit=crop&w=1200&q=80'
+];
+
+export function getRoomFallbackImage(id, type, name) {
+  if (type) {
+    const t = String(type).toUpperCase();
+    if (t.includes('FAMILY') || t.includes('GIA ĐÌNH')) {
+      return 'https://images.unsplash.com/photo-1505691938895-1758d7feb511?auto=format&fit=crop&w=1200&q=80';
+    }
+    if (t.includes('VILLA') || t.includes('PENTHOUSE')) {
+      return 'https://images.unsplash.com/photo-1580587771525-78b9dba3b914?auto=format&fit=crop&w=1200&q=80';
+    }
+    if (t.includes('BUNGALOW')) {
+      return 'https://images.unsplash.com/photo-1587061949409-02df41d5e562?auto=format&fit=crop&w=1200&q=80';
+    }
+    if (t.includes('DORM') || t.includes('TẬP THỂ') || t.includes('NHÀ SÀN')) {
+      return 'https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?auto=format&fit=crop&w=1200&q=80';
+    }
+    if (t.includes('MOUNTAIN') || t.includes('NÚI')) {
+      return 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=1200&q=80';
+    }
+  }
+  let hash = 0;
+  const str = String(id || name || 'room_default');
+  for (let i = 0; i < str.length; i++) {
+    hash = ((hash << 5) - hash) + str.charCodeAt(i);
+    hash |= 0;
+  }
+  const idx = Math.abs(hash) % FALLBACK_ROOM_IMAGES.length;
+  return FALLBACK_ROOM_IMAGES[idx];
+}
+
 export default function ManageRoom() {
   const [roomsList, setRoomsList] = useState([]);
   const [viewMode, setViewMode] = useState('cards'); // 'cards' | 'timeline' | 'both'
@@ -71,11 +120,12 @@ export default function ManageRoom() {
       }
       if (roomRes.ok) {
         const roomsData = await roomRes.json();
-        if (Array.isArray(roomsData)) {
+        if (Array.isArray(roomsData) && roomsData.length > 0) {
           const mappedRooms = roomsData.map(r => {
             const hsName = homestayMap[r.homestayId] || 'Homestay';
             const rName = r.roomName || r.name || `Phòng ${r.id}`;
             const rCode = r.code || r.roomCode || `P.${r.id}`;
+            const rImg = r.image || r.thumb || r.primaryImage || (Array.isArray(r.images) && r.images.length > 0 ? r.images[0] : null) || getRoomFallbackImage(r.id, r.roomType || r.type, rName);
             return {
               id: r.id,
               homestayId: r.homestayId || 1,
@@ -92,18 +142,22 @@ export default function ManageRoom() {
               status: (r.status || 'AVAILABLE').toLowerCase() === 'available' ? 'available' : ((r.status || '').toLowerCase() === 'occupied' ? 'occupied' : ((r.status || '').toLowerCase() === 'maintenance' ? 'maintenance' : 'available')),
               description: r.description || `Không gian nghỉ dưỡng tại ${hsName}`,
               amenities: r.amenities || ['Wifi', 'Điều hòa Inverter', 'Phòng tắm riêng'],
-              image: r.thumb || r.primaryImage || 'https://images.unsplash.com/photo-1590490360182-c33d57733427?auto=format&fit=crop&w=800&q=80',
+              image: rImg,
+              images: r.images && r.images.length > 0 ? r.images : [rImg],
               stay: 'Phòng sạch sẽ sẵn sàng đón khách'
             };
           });
           setRoomsList(mappedRooms);
           return;
+        } else if (Array.isArray(roomsData) && roomsData.length === 0 && initialRoomsData?.rooms?.length > 0) {
+          setRoomsList(initialRoomsData.rooms);
+          return;
         }
       }
-      setRoomsList([]);
+      setRoomsList(initialRoomsData?.rooms || []);
     } catch (err) {
       console.error('Lỗi nạp phòng từ CSDL:', err);
-      setRoomsList([]);
+      setRoomsList(initialRoomsData?.rooms || []);
     } finally {
       setLoading(false);
     }
@@ -131,7 +185,8 @@ export default function ManageRoom() {
     price: 800000,
     status: 'available',
     description: '',
-    amenities: 'Wifi, Điều hòa, Bồn tắm'
+    amenities: 'Wifi, Điều hòa, Bồn tắm',
+    image: ''
   });
 
   // Bulk Price Form State
@@ -355,6 +410,7 @@ export default function ManageRoom() {
     const currentHsId = (activeHomestayId && activeHomestayId !== 'all')
       ? activeHomestayId
       : (homestaysList[0]?.id || 1);
+    const fallbackNewImg = getRoomFallbackImage(Date.now(), 'Garden View', `Phòng ${roomsList.length + 1}`);
     setRoomFormData({
       code: `P.${100 + roomsList.length + 1}`,
       name: '',
@@ -366,7 +422,8 @@ export default function ManageRoom() {
       price: 900000,
       status: 'available',
       description: '',
-      amenities: 'Wifi, Điều hòa Inverter, Ban công'
+      amenities: 'Wifi, Điều hòa Inverter, Ban công',
+      image: fallbackNewImg
     });
     setSelectedRoom(null);
     setIsEditModalOpen(true);
@@ -386,7 +443,8 @@ export default function ManageRoom() {
       price: room.price,
       status: room.status,
       description: room.description,
-      amenities: Array.isArray(room.amenities) ? room.amenities.join(', ') : room.amenities
+      amenities: Array.isArray(room.amenities) ? room.amenities.join(', ') : room.amenities,
+      image: room.image || ''
     });
     setIsEditModalOpen(true);
   };
@@ -403,6 +461,7 @@ export default function ManageRoom() {
     const targetHomestayId = Number(roomFormData.homestayId) || (activeHomestayId ? Number(activeHomestayId) : 1);
 
     if (selectedRoom) {
+      const updatedImg = roomFormData.image || selectedRoom.image || getRoomFallbackImage(selectedRoom.id, roomFormData.type, roomFormData.name);
       // Cập nhật local
       setRoomsList((prev) =>
         prev.map((r) =>
@@ -410,6 +469,7 @@ export default function ManageRoom() {
             ? {
                 ...r,
                 ...roomFormData,
+                image: updatedImg,
                 homestayId: targetHomestayId,
                 amenities: amenitiesArr
               }
@@ -426,7 +486,8 @@ export default function ManageRoom() {
             type: roomFormData.type,
             capacity: Number(roomFormData.capacity),
             price: Number(roomFormData.price),
-            status: roomFormData.status
+            status: roomFormData.status,
+            image: updatedImg
           };
           let res = await fetch(`http://localhost:8081/api/admin/rooms/${selectedRoom.id}`, {
             method: 'PUT',
@@ -448,6 +509,7 @@ export default function ManageRoom() {
     } else {
       // Async DB Create
       try {
+        const chosenImage = roomFormData.image || getRoomFallbackImage(Date.now(), roomFormData.type, roomFormData.name);
         const payload = {
           homestayId: targetHomestayId,
           name: roomFormData.name,
@@ -455,7 +517,8 @@ export default function ManageRoom() {
           type: roomFormData.type,
           capacity: Number(roomFormData.capacity),
           price: Number(roomFormData.price),
-          status: 'AVAILABLE'
+          status: 'AVAILABLE',
+          image: chosenImage
         };
 
         let createdData = null;
@@ -497,7 +560,8 @@ export default function ManageRoom() {
           status: 'available',
           description: roomFormData.description,
           amenities: amenitiesArr,
-          image: 'https://images.unsplash.com/photo-1590490360182-c33d57733427?auto=format&fit=crop&w=800&q=80',
+          image: chosenImage,
+          images: [chosenImage],
           stay: 'Phòng mới sẵn sàng đón khách'
         };
 
@@ -898,7 +962,14 @@ export default function ManageRoom() {
               <div key={room.code} className="room-card-box">
                 {/* Media Header */}
                 <div className="room-card-media">
-                  <img src={room.image} alt={room.name} />
+                  <img
+                    src={room.image}
+                    alt={room.name}
+                    onError={(e) => {
+                      e.target.onerror = null;
+                      e.target.src = getRoomFallbackImage(room.id, room.type, room.name);
+                    }}
+                  />
                   <div className="room-media-gradient" />
 
                   {/* Mã phòng badge */}
@@ -1239,12 +1310,42 @@ export default function ManageRoom() {
             onClick={(e) => e.stopPropagation()}
           >
             {/* Hero Image Card Header */}
-            <div className="detail-hero-card">
+            <div className="detail-hero-card" style={{ position: 'relative' }}>
               <img
                 src={selectedRoom.image}
                 alt={selectedRoom.name}
                 className="detail-hero-img"
+                onError={(e) => {
+                  e.target.onerror = null;
+                  e.target.src = getRoomFallbackImage(selectedRoom.id, selectedRoom.type, selectedRoom.name);
+                }}
               />
+              {Array.isArray(selectedRoom.images) && selectedRoom.images.length > 1 && (
+                <div style={{ position: 'absolute', bottom: '14px', right: '16px', zIndex: 10, display: 'flex', gap: '6px' }}>
+                  {selectedRoom.images.map((imgUrl, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => setSelectedRoom({ ...selectedRoom, image: imgUrl })}
+                      style={{
+                        width: '36px',
+                        height: '26px',
+                        borderRadius: '6px',
+                        border: selectedRoom.image === imgUrl ? '2px solid #10b981' : '1px solid rgba(255,255,255,0.7)',
+                        overflow: 'hidden',
+                        padding: 0,
+                        cursor: 'pointer',
+                        boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
+                        opacity: selectedRoom.image === imgUrl ? 1 : 0.75,
+                        transition: 'all 0.15s ease'
+                      }}
+                      title={`Xem ảnh ${i + 1}`}
+                    >
+                      <img src={imgUrl} alt={`Thumbnail ${i}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    </button>
+                  ))}
+                </div>
+              )}
               <div className="detail-hero-overlay">
                 <div className="detail-hero-top">
                   <div className="detail-badge-code">
@@ -1572,6 +1673,81 @@ export default function ManageRoom() {
                       setRoomFormData({ ...roomFormData, amenities: e.target.value })
                     }
                   />
+                </div>
+
+                {/* Hình ảnh đại diện phòng */}
+                <div className="room-form-row">
+                  <label className="room-form-label">
+                    <span>Hình ảnh đại diện phòng (URL ảnh)</span>
+                  </label>
+                  <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '8px' }}>
+                    <input
+                      type="url"
+                      className="room-form-input"
+                      placeholder="https://images.unsplash.com/..."
+                      value={roomFormData.image}
+                      onChange={(e) => setRoomFormData({ ...roomFormData, image: e.target.value })}
+                      style={{ flex: 1 }}
+                    />
+                    {roomFormData.image && (
+                      <div
+                        style={{
+                          width: '64px',
+                          height: '46px',
+                          borderRadius: '8px',
+                          overflow: 'hidden',
+                          border: '2px solid #10b981',
+                          flexShrink: 0,
+                          boxShadow: '0 2px 6px rgba(0,0,0,0.1)'
+                        }}
+                      >
+                        <img
+                          src={roomFormData.image}
+                          alt="Room Preview"
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                          onError={(e) => {
+                            e.target.onerror = null;
+                            e.target.src = FALLBACK_ROOM_IMAGES[0];
+                          }}
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Chọn nhanh ảnh mẫu chuẩn */}
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '4px' }}>
+                    <span style={{ fontSize: '11px', color: '#64748b', alignSelf: 'center', marginRight: '4px' }}>
+                      Chọn mẫu ảnh nhanh:
+                    </span>
+                    {[
+                      { label: '🌿 View Vườn', url: 'https://images.unsplash.com/photo-1590490360182-c33d57733427?auto=format&fit=crop&w=1200&q=80' },
+                      { label: '🏔️ View Núi', url: 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=1200&q=80' },
+                      { label: '🪵 Bungalow Suối', url: 'https://images.unsplash.com/photo-1587061949409-02df41d5e562?auto=format&fit=crop&w=1200&q=80' },
+                      { label: '👨‍👩‍👧 Phòng Gia đình', url: 'https://images.unsplash.com/photo-1505691938895-1758d7feb511?auto=format&fit=crop&w=1200&q=80' },
+                      { label: '✨ Deluxe Sang trọng', url: 'https://images.unsplash.com/photo-1618773928121-c32242e63f39?auto=format&fit=crop&w=1200&q=80' },
+                      { label: '🌅 Ban công Panorama', url: 'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=1200&q=80' },
+                      { label: '🏡 Nhà sàn ấm cúng', url: 'https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?auto=format&fit=crop&w=1200&q=80' }
+                    ].map((preset, pIdx) => (
+                      <button
+                        key={pIdx}
+                        type="button"
+                        onClick={() => setRoomFormData({ ...roomFormData, image: preset.url })}
+                        style={{
+                          fontSize: '11px',
+                          padding: '4px 9px',
+                          borderRadius: '6px',
+                          border: roomFormData.image === preset.url ? '1.5px solid #059669' : '1px solid #cbd5e1',
+                          background: roomFormData.image === preset.url ? '#ecfdf5' : '#f8fafc',
+                          color: roomFormData.image === preset.url ? '#065f46' : '#334155',
+                          cursor: 'pointer',
+                          fontWeight: roomFormData.image === preset.url ? '600' : '400',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        {preset.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 <div className="room-form-row">

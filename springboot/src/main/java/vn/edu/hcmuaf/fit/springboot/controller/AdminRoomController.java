@@ -20,7 +20,46 @@ public class AdminRoomController {
 
     private final RoomRepository roomRepository;
     private final vn.edu.hcmuaf.fit.springboot.repository.HomestayRepository homestayRepository;
+    private final vn.edu.hcmuaf.fit.springboot.repository.RoomImageRepository roomImageRepository;
     private final CacheManager cacheManager;
+
+    private static final String[] CURATED_ROOM_IMAGES = new String[]{
+        "https://images.unsplash.com/photo-1590490360182-c33d57733427?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1618773928121-c32242e63f39?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1566665797739-1674de7a421a?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1505691938895-1758d7feb511?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1584622650111-993a426fbf0a?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1580587771525-78b9dba3b914?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1587061949409-02df41d5e562?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1591088398332-8a7791972843?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1595526114035-0d45ed16cfbf?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1598928506311-c55ded91a20c?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1578683010236-d716f9a3f461?auto=format&fit=crop&w=1200&q=80"
+    };
+
+    private String resolveFallbackRoomImage(Long roomId, String roomType, String roomName) {
+        if (roomType != null) {
+            String t = roomType.toUpperCase();
+            if (t.contains("FAMILY") || t.contains("GIA ĐÌNH")) {
+                return "https://images.unsplash.com/photo-1505691938895-1758d7feb511?auto=format&fit=crop&w=1200&q=80";
+            } else if (t.contains("VILLA") || t.contains("PENTHOUSE")) {
+                return "https://images.unsplash.com/photo-1580587771525-78b9dba3b914?auto=format&fit=crop&w=1200&q=80";
+            } else if (t.contains("BUNGALOW")) {
+                return "https://images.unsplash.com/photo-1587061949409-02df41d5e562?auto=format&fit=crop&w=1200&q=80";
+            } else if (t.contains("DORM") || t.contains("TẬP THỂ") || t.contains("NHÀ SÀN")) {
+                return "https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?auto=format&fit=crop&w=1200&q=80";
+            } else if (t.contains("MOUNTAIN") || t.contains("NÚI")) {
+                return "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=1200&q=80";
+            }
+        }
+        int idx = (int) (Math.abs(roomId != null ? roomId : 1) % CURATED_ROOM_IMAGES.length);
+        return CURATED_ROOM_IMAGES[idx];
+    }
 
     private void clearAllCaches() {
         try {
@@ -55,9 +94,47 @@ public class AdminRoomController {
         } else {
             rooms = roomRepository.findAll();
         }
+
+        List<Long> roomIds = rooms.stream().map(Room::getId).collect(java.util.stream.Collectors.toList());
+        List<vn.edu.hcmuaf.fit.springboot.model.RoomImage> allImages = roomIds.isEmpty()
+                ? java.util.Collections.emptyList()
+                : roomImageRepository.findByRoomIdIn(roomIds);
+        Map<Long, List<vn.edu.hcmuaf.fit.springboot.model.RoomImage>> imagesByRoom = allImages.stream()
+                .collect(java.util.stream.Collectors.groupingBy(vn.edu.hcmuaf.fit.springboot.model.RoomImage::getRoomId));
+
         rooms.forEach(r -> {
             if (r.getRoomCode() == null || r.getRoomCode().trim().isEmpty()) {
                 r.setRoomCode("P." + r.getId());
+            }
+            List<vn.edu.hcmuaf.fit.springboot.model.RoomImage> rImages = imagesByRoom.getOrDefault(r.getId(), java.util.Collections.emptyList());
+            String primaryUrl = rImages.stream()
+                    .filter(img -> Boolean.TRUE.equals(img.getIsPrimary()))
+                    .map(vn.edu.hcmuaf.fit.springboot.model.RoomImage::getImageUrl)
+                    .findFirst()
+                    .orElse(rImages.isEmpty() ? null : rImages.get(0).getImageUrl());
+
+            if (primaryUrl == null || primaryUrl.trim().isEmpty()) {
+                primaryUrl = resolveFallbackRoomImage(r.getId(), r.getRoomType(), r.getRoomName());
+                try {
+                    vn.edu.hcmuaf.fit.springboot.model.RoomImage savedImg = roomImageRepository.save(
+                            vn.edu.hcmuaf.fit.springboot.model.RoomImage.builder()
+                                    .roomId(r.getId())
+                                    .imageUrl(primaryUrl)
+                                    .isPrimary(true)
+                                    .build()
+                    );
+                    rImages = List.of(savedImg);
+                } catch (Exception e) {
+                    log.warn("Không thể lưu ảnh tự động cho phòng {}: {}", r.getId(), e.getMessage());
+                }
+            }
+
+            r.setPrimaryImage(primaryUrl);
+            r.setThumb(primaryUrl);
+            if (!rImages.isEmpty()) {
+                r.setImages(rImages.stream().map(vn.edu.hcmuaf.fit.springboot.model.RoomImage::getImageUrl).collect(java.util.stream.Collectors.toList()));
+            } else {
+                r.setImages(List.of(primaryUrl));
             }
         });
         return ResponseEntity.ok(rooms);
@@ -89,8 +166,31 @@ public class AdminRoomController {
             if (roomCode != null) saved.setRoomCode(roomCode);
             else saved.setRoomCode("P." + saved.getId());
 
+            String imgUrl = payload.get("image") != null ? payload.get("image").toString()
+                    : (payload.get("imageUrl") != null ? payload.get("imageUrl").toString()
+                    : (payload.get("thumb") != null ? payload.get("thumb").toString() : null));
+
+            if (imgUrl == null || imgUrl.trim().isEmpty()) {
+                imgUrl = resolveFallbackRoomImage(saved.getId(), saved.getRoomType(), saved.getRoomName());
+            }
+
+            try {
+                roomImageRepository.save(vn.edu.hcmuaf.fit.springboot.model.RoomImage.builder()
+                        .roomId(saved.getId())
+                        .imageUrl(imgUrl.trim())
+                        .isPrimary(true)
+                        .build());
+            } catch (Exception e) {
+                log.warn("Không thể lưu ảnh cho phòng mới {}: {}", saved.getId(), e.getMessage());
+            }
+
+            saved.setPrimaryImage(imgUrl.trim());
+            saved.setThumb(imgUrl.trim());
+            saved.setImages(List.of(imgUrl.trim()));
+
             clearAllCaches();
-            log.info("Đã lưu phòng mới vào Neon CSDL: ID={}, Code={}, Name={}, HomestayId={}", saved.getId(), saved.getRoomCode(), saved.getRoomName(), saved.getHomestayId());
+            log.info("Đã lưu phòng mới vào Neon CSDL: ID={}, Code={}, Name={}, HomestayId={}, Image={}",
+                    saved.getId(), saved.getRoomCode(), saved.getRoomName(), saved.getHomestayId(), imgUrl);
             return ResponseEntity.ok(saved);
         } catch (Exception e) {
             log.error("Lỗi khi tạo phòng mới trong CSDL Neon: {}", e.getMessage(), e);
@@ -114,6 +214,52 @@ public class AdminRoomController {
             if (payload.containsKey("code")) updated.setRoomCode(payload.get("code").toString());
             else if (updated.getRoomCode() == null) updated.setRoomCode("P." + updated.getId());
 
+            String newImg = payload.get("image") != null ? payload.get("image").toString()
+                    : (payload.get("imageUrl") != null ? payload.get("imageUrl").toString()
+                    : (payload.get("thumb") != null ? payload.get("thumb").toString() : null));
+
+            if (newImg != null && !newImg.trim().isEmpty()) {
+                try {
+                    List<vn.edu.hcmuaf.fit.springboot.model.RoomImage> existing = roomImageRepository.findByRoomId(room.getId());
+                    if (!existing.isEmpty()) {
+                        vn.edu.hcmuaf.fit.springboot.model.RoomImage primary = existing.stream()
+                                .filter(img -> Boolean.TRUE.equals(img.getIsPrimary()))
+                                .findFirst()
+                                .orElse(existing.get(0));
+                        primary.setImageUrl(newImg.trim());
+                        roomImageRepository.save(primary);
+                    } else {
+                        roomImageRepository.save(vn.edu.hcmuaf.fit.springboot.model.RoomImage.builder()
+                                .roomId(room.getId())
+                                .imageUrl(newImg.trim())
+                                .isPrimary(true)
+                                .build());
+                    }
+                } catch (Exception e) {
+                    log.warn("Không thể cập nhật ảnh phòng ID {}: {}", room.getId(), e.getMessage());
+                }
+                updated.setPrimaryImage(newImg.trim());
+                updated.setThumb(newImg.trim());
+                updated.setImages(List.of(newImg.trim()));
+            } else {
+                List<vn.edu.hcmuaf.fit.springboot.model.RoomImage> existing = roomImageRepository.findByRoomId(room.getId());
+                String pImg = existing.stream()
+                        .filter(img -> Boolean.TRUE.equals(img.getIsPrimary()))
+                        .map(vn.edu.hcmuaf.fit.springboot.model.RoomImage::getImageUrl)
+                        .findFirst()
+                        .orElse(existing.isEmpty() ? null : existing.get(0).getImageUrl());
+                if (pImg == null) {
+                    pImg = resolveFallbackRoomImage(updated.getId(), updated.getRoomType(), updated.getRoomName());
+                }
+                updated.setPrimaryImage(pImg);
+                updated.setThumb(pImg);
+                if (!existing.isEmpty()) {
+                    updated.setImages(existing.stream().map(vn.edu.hcmuaf.fit.springboot.model.RoomImage::getImageUrl).collect(java.util.stream.Collectors.toList()));
+                } else {
+                    updated.setImages(List.of(pImg));
+                }
+            }
+
             clearAllCaches();
             log.info("Đã cập nhật phòng ID {} trong Neon CSDL: {}", updated.getId(), updated.getRoomName());
             return ResponseEntity.ok(updated);
@@ -123,6 +269,12 @@ public class AdminRoomController {
     @DeleteMapping({"/api/admin/rooms/{id}", "/api/public/admin/rooms/{id}"})
     public ResponseEntity<Void> deleteRoom(@PathVariable Long id) {
         try {
+            try {
+                List<vn.edu.hcmuaf.fit.springboot.model.RoomImage> imgs = roomImageRepository.findByRoomId(id);
+                if (!imgs.isEmpty()) {
+                    roomImageRepository.deleteAll(imgs);
+                }
+            } catch (Exception ignored) {}
             roomRepository.deleteById(id);
             clearAllCaches();
             log.info("Đã xóa phòng ID {} khỏi Neon CSDL", id);
