@@ -48,6 +48,24 @@ public class Room {
         return this.roomCode != null && !this.roomCode.trim().isEmpty() ? this.roomCode : "P." + (this.id != null ? this.id : "");
     }
 
+    @Transient
+    @com.fasterxml.jackson.annotation.JsonProperty("primaryImage")
+    private String primaryImage;
+
+    @Transient
+    @com.fasterxml.jackson.annotation.JsonProperty("thumb")
+    private String thumb;
+
+    @Transient
+    @com.fasterxml.jackson.annotation.JsonProperty("image")
+    public String getImage() {
+        return this.primaryImage != null && !this.primaryImage.trim().isEmpty() ? this.primaryImage : this.thumb;
+    }
+
+    @Transient
+    @com.fasterxml.jackson.annotation.JsonProperty("images")
+    private java.util.List<String> images;
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
