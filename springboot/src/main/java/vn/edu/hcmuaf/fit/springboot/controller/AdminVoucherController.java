@@ -24,12 +24,16 @@ import java.util.stream.Collectors;
 @RestController
 @RequestMapping({"/api/admin/vouchers", "/api/public/admin/vouchers"})
 @CrossOrigin(origins = "*")
-@RequiredArgsConstructor
 @Slf4j
 public class AdminVoucherController {
 
     private final VoucherRepository voucherRepository;
     private final HomestayRepository homestayRepository;
+
+    public AdminVoucherController(VoucherRepository voucherRepository, HomestayRepository homestayRepository) {
+        this.voucherRepository = voucherRepository;
+        this.homestayRepository = homestayRepository;
+    }
 
     private static final DateTimeFormatter DTF = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
@@ -45,13 +49,17 @@ public class AdminVoucherController {
         List<Voucher> all = voucherRepository.findAll();
         LocalDate today = LocalDate.now();
 
-        long total = all.size();
+        long total = all.stream().filter(v -> !"PENDING".equalsIgnoreCase(v.getStatus())).count();
+        long pending = all.stream().filter(v -> "PENDING".equalsIgnoreCase(v.getStatus())).count();
+        long rejected = all.stream().filter(v -> "REJECTED".equalsIgnoreCase(v.getStatus())).count();
         long active = all.stream()
                 .filter(v -> "ACTIVE".equalsIgnoreCase(v.getStatus())
                         && (v.getExpiryDate() == null || !v.getExpiryDate().isBefore(today)))
                 .count();
         long expired = all.stream()
-                .filter(v -> v.getExpiryDate() != null && v.getExpiryDate().isBefore(today))
+                .filter(v -> !"PENDING".equalsIgnoreCase(v.getStatus())
+                        && !"REJECTED".equalsIgnoreCase(v.getStatus())
+                        && v.getExpiryDate() != null && v.getExpiryDate().isBefore(today))
                 .count();
         long disabled = all.stream()
                 .filter(v -> "DISABLED".equalsIgnoreCase(v.getStatus()))
@@ -82,6 +90,8 @@ public class AdminVoucherController {
 
         Map<String, Object> stats = new HashMap<>();
         stats.put("total", total);
+        stats.put("pending", pending);
+        stats.put("rejected", rejected);
         stats.put("active", active);
         stats.put("expired", expired);
         stats.put("disabled", disabled);
@@ -142,10 +152,31 @@ public class AdminVoucherController {
         return ResponseEntity.ok(result);
     }
 
+    // ─────────────────────────────────────────────────────────────────────────
+    // 2.1 DANH SÁCH MÃ GIẢM GIÁ ĐANG CHỜ DUYỆT (PENDING)
+    // ─────────────────────────────────────────────────────────────────────────
+
     /**
-     * Lấy chi tiết một mã giảm giá theo ID
+     * Lấy danh sách mã giảm giá đang chờ duyệt (status = PENDING)
+     * Đặt TRƯỚC mapping /{id} để tránh bị bắt nhầm thành ID
      */
-    @GetMapping("/{id}")
+    @GetMapping("/pending")
+    public ResponseEntity<List<Map<String, Object>>> getPendingVouchers() {
+        List<Voucher> pending = voucherRepository.findAll().stream()
+                .filter(v -> "PENDING".equalsIgnoreCase(v.getStatus()))
+                .collect(Collectors.toList());
+        Map<Long, String> hsNameMap = buildHsNameMap();
+        LocalDate today = LocalDate.now();
+        List<Map<String, Object>> result = pending.stream()
+                .map(v -> mapVoucherToResponse(v, hsNameMap, today))
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(result);
+    }
+
+    /**
+     * Lấy chi tiết một mã giảm giá theo ID (chỉ nhận số)
+     */
+    @GetMapping("/{id:[0-9]+}")
     public ResponseEntity<?> getVoucherById(@PathVariable Long id) {
         Optional<Voucher> opt = voucherRepository.findById(id);
         if (opt.isEmpty()) {
@@ -305,7 +336,55 @@ public class AdminVoucherController {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // 6. XÓA MÃ GIẢM GIÁ
+    // 6. DUYỆT / TỪ CHỐI MÃ GIẢM GIÁ TỪ CHỦ HOMESTAY
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Admin duyệt mã giảm giá (PENDING -> ACTIVE)
+     */
+    @PostMapping("/{id:[0-9]+}/approve")
+    @CacheEvict(value = "publicVouchers", allEntries = true)
+    public ResponseEntity<?> approveVoucher(@PathVariable Long id) {
+        Optional<Voucher> opt = voucherRepository.findById(id);
+        if (opt.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Không tìm thấy mã giảm giá"));
+        }
+        Voucher v = opt.get();
+        if (!"PENDING".equalsIgnoreCase(v.getStatus())) {
+            return ResponseEntity.badRequest().body(Map.of("success", false,
+                    "message", "Chỉ có thể duyệt mã đang ở trạng thái chờ duyệt (PENDING)"));
+        }
+        v.setStatus("ACTIVE");
+        voucherRepository.save(v);
+        Map<Long, String> hsNameMap = buildHsNameMap();
+        log.info("Admin đã DUYỆT mã giảm giá ID={} code={}", id, v.getCode());
+        return ResponseEntity.ok(mapVoucherToResponse(v, hsNameMap, LocalDate.now()));
+    }
+
+    /**
+     * Admin từ chối mã giảm giá (PENDING -> DISABLED)
+     */
+    @PostMapping("/{id:[0-9]+}/reject")
+    @CacheEvict(value = "publicVouchers", allEntries = true)
+    public ResponseEntity<?> rejectVoucher(@PathVariable Long id) {
+        Optional<Voucher> opt = voucherRepository.findById(id);
+        if (opt.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Không tìm thấy mã giảm giá"));
+        }
+        Voucher v = opt.get();
+        if (!"PENDING".equalsIgnoreCase(v.getStatus())) {
+            return ResponseEntity.badRequest().body(Map.of("success", false,
+                    "message", "Chỉ có thể từ chối mã đang ở trạng thái chờ duyệt (PENDING)"));
+        }
+        v.setStatus("REJECTED");
+        voucherRepository.save(v);
+        Map<Long, String> hsNameMap = buildHsNameMap();
+        log.info("Admin đã TỪ CHỐI mã giảm giá ID={} code={}", id, v.getCode());
+        return ResponseEntity.ok(mapVoucherToResponse(v, hsNameMap, LocalDate.now()));
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // 7. XÓA MÃ GIẢM GIÁ
     // ─────────────────────────────────────────────────────────────────────────
 
     /**
@@ -333,6 +412,8 @@ public class AdminVoucherController {
     }
 
     private String resolveStatus(Voucher v, LocalDate today) {
+        if ("PENDING".equalsIgnoreCase(v.getStatus())) return "pending";
+        if ("REJECTED".equalsIgnoreCase(v.getStatus())) return "rejected";
         if ("DISABLED".equalsIgnoreCase(v.getStatus())) return "disabled";
         if (v.getExpiryDate() != null && v.getExpiryDate().isBefore(today)) return "expired";
         if (v.getStartDate() != null && v.getStartDate().isAfter(today)) return "upcoming";
@@ -342,6 +423,7 @@ public class AdminVoucherController {
     private Map<String, Object> mapVoucherToResponse(Voucher v, Map<Long, String> hsNameMap, LocalDate today) {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("id", v.getId());
+        m.put("ownerId", v.getOwnerId());
         m.put("code", v.getCode());
         m.put("homestayId", v.getHomestayId());
         m.put("homestayName", v.getHomestayId() != null

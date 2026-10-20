@@ -185,7 +185,7 @@ export const adminVoucherService = {
   async getAllVouchers(status = 'all', type = 'all', keyword = '') {
     const today = new Date();
 
-    // 1. Thử Admin API
+    // 1. Ưu tiên Admin API - chấp nhận cả array rỗng (không fallback nếu kết nối thành công)
     for (const base of [ADMIN_BASE, PUBLIC_ADMIN]) {
       try {
         const params = new URLSearchParams({ status, type });
@@ -193,7 +193,8 @@ export const adminVoucherService = {
         const res = await safeFetch(`${base}?${params}`);
         if (res.ok) {
           const data = await res.json();
-          if (Array.isArray(data) && data.length > 0) {
+          if (Array.isArray(data)) {
+            // Admin API thành công → dùng kết quả này (kể cả rỗng)
             localStorage.setItem('admin_vouchers_cache', JSON.stringify(data));
             return data;
           }
@@ -203,33 +204,7 @@ export const adminVoucherService = {
       }
     }
 
-    // 2. Thử Owner API (hoạt động tốt trên Spring Boot hiện tại)
-    for (const base of [PUBLIC_OWNER, OWNER_BASE]) {
-      try {
-        const res = await safeFetch(base);
-        if (res.ok) {
-          const raw = await res.json();
-          if (Array.isArray(raw) && raw.length > 0) {
-            let vouchers = raw.map(v => normalizeOwnerVoucher(v, today));
-            if (status !== 'all') vouchers = vouchers.filter(v => v.status === status);
-            if (type !== 'all')   vouchers = vouchers.filter(v => v.discountType === type);
-            if (keyword) {
-              const q = keyword.toLowerCase();
-              vouchers = vouchers.filter(v =>
-                (v.code || '').toLowerCase().includes(q) ||
-                (v.homestayName || '').toLowerCase().includes(q)
-              );
-            }
-            localStorage.setItem('admin_vouchers_cache', JSON.stringify(vouchers));
-            return vouchers;
-          }
-        }
-      } catch (err) {
-        console.warn(`[adminVoucherService] Owner API failed (${base}):`, err.message);
-      }
-    }
-
-    // 3. Fallback: dùng public vouchers endpoint
+    // 2. Fallback: dùng public vouchers endpoint (chỉ khi admin API không kết nối được)
     try {
       const res = await safeFetch(PUBLIC_BASE);
       if (res.ok) {
@@ -253,7 +228,7 @@ export const adminVoucherService = {
       console.warn('[adminVoucherService] Public API failed:', err.message);
     }
 
-    // 4. Trả cache localStorage nếu mọi kết nối lỗi
+    // 3. Trả cache localStorage nếu mọi kết nối lỗi
     try {
       const cached = localStorage.getItem('admin_vouchers_cache');
       if (cached) return JSON.parse(cached);
@@ -421,5 +396,107 @@ export const adminVoucherService = {
       } catch (_) {}
     }
     throw new Error('Không thể xóa mã giảm giá. Vui lòng kiểm tra Spring Boot đang chạy.');
+  },
+
+  /**
+   * Lấy danh sách mã giảm giá đang chờ duyệt (PENDING) từ chủ homestay
+   * Chỉ tin vào backend - không merge localStorage để tránh mất dữ liệu từ owners khác
+   */
+  async getPendingVouchers() {
+    // Thử cả 2 endpoint admin - ưu tiên ADMIN_BASE (đầy đủ quyền hơn)
+    for (const base of [ADMIN_BASE, PUBLIC_ADMIN]) {
+      try {
+        const res = await safeFetch(`${base}/pending`);
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data)) {
+            console.log(`[adminVoucherService] getPendingVouchers: ${data.length} mã đang chờ duyệt từ ${base}`);
+            return data; // Luôn tin vào backend, kể cả array rỗng
+          }
+        }
+      } catch (err) {
+        console.warn(`[adminVoucherService] getPendingVouchers failed (${base}):`, err.message);
+      }
+    }
+
+    // Nếu backend không kết nối được, trả array rỗng (không dùng localStorage vì chỉ có data của 1 owner)
+    console.warn('[adminVoucherService] Không thể lấy danh sách chờ duyệt từ backend');
+    return [];
+  },
+
+  /**
+   * Admin duyệt mã giảm giá (PENDING → ACTIVE)
+   */
+  async approveVoucher(id) {
+    let serverOk = false;
+    let result = null;
+    for (const base of [PUBLIC_ADMIN, ADMIN_BASE]) {
+      try {
+        const res = await safeFetch(`${base}/${id}/approve`, { method: 'POST' });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok) {
+          result = data;
+          serverOk = true;
+          break;
+        }
+        if (res.status === 400 && data.message) throw new Error(data.message);
+      } catch (err) {
+        if (err.message && !err.message.includes('fetch')) throw err;
+      }
+    }
+
+    // Xóa cache voucher của tất cả owner để lần sau fetch lại từ backend
+    // (thành công hơn so với việc update từng key một vì có thể miss key mới)
+    try {
+      Object.keys(localStorage).forEach((key) => {
+        if (
+          key === 'owner_vouchers_data' ||
+          key.includes('vouchers_data') ||
+          key.startsWith('cached_owner_')
+        ) {
+          localStorage.removeItem(key);
+        }
+      });
+    } catch (_) {}
+
+    return result || { success: true, message: 'Đã duyệt mã thành công' };
+  },
+
+  /**
+   * Admin từ chối mã giảm giá (PENDING → REJECTED)
+   */
+  async rejectVoucher(id) {
+    let serverOk = false;
+    let result = null;
+    for (const base of [PUBLIC_ADMIN, ADMIN_BASE]) {
+      try {
+        const res = await safeFetch(`${base}/${id}/reject`, { method: 'POST' });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok) {
+          result = data;
+          serverOk = true;
+          break;
+        }
+        if (res.status === 400 && data.message) throw new Error(data.message);
+      } catch (err) {
+        if (err.message && !err.message.includes('fetch')) throw err;
+      }
+    }
+
+    // Xóa cache voucher của tất cả owner để lần sau fetch lại từ backend
+    try {
+      Object.keys(localStorage).forEach((key) => {
+        if (
+          key === 'owner_vouchers_data' ||
+          key.includes('vouchers_data') ||
+          key.startsWith('cached_owner_')
+        ) {
+          localStorage.removeItem(key);
+        }
+      });
+    } catch (_) {}
+
+    return result || { success: true, message: 'Đã từ chối mã' };
   }
 };
+

@@ -21,7 +21,6 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class OwnerVoucherService {
 
@@ -29,18 +28,53 @@ public class OwnerVoucherService {
     private final HomestayRepository homestayRepository;
     private final HomestayImageRepository homestayImageRepository;
 
+    public OwnerVoucherService(
+            VoucherRepository voucherRepository,
+            HomestayRepository homestayRepository,
+            HomestayImageRepository homestayImageRepository) {
+        this.voucherRepository = voucherRepository;
+        this.homestayRepository = homestayRepository;
+        this.homestayImageRepository = homestayImageRepository;
+    }
+
     private static final String DEFAULT_IMAGE = "https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=600&q=80";
 
     /**
      * Lấy danh sách voucher thuộc homestay hoặc toàn hệ thống
      */
-    public List<OwnerVoucherDTO> getVouchers(Long homestayId) {
-        List<Voucher> vouchers;
-        if (homestayId != null && homestayId > 0) {
-            vouchers = voucherRepository.findByHomestayIdOrHomestayIdIsNull(homestayId);
-        } else {
-            vouchers = voucherRepository.findAll();
-        }
+    public List<OwnerVoucherDTO> getVouchers(Long homestayId, Long ownerId) {
+        List<Long> ownerHomestayIds = (ownerId != null && ownerId > 0)
+                ? homestayRepository.findByOwnerId(ownerId).stream().map(Homestay::getId).filter(Objects::nonNull).collect(Collectors.toList())
+                : Collections.emptyList();
+
+        List<Voucher> vouchers = voucherRepository.findAll().stream()
+                .filter(v -> {
+                    // Filter homestay nếu người dùng chọn cụ thể 1 homestay
+                    if (homestayId != null && homestayId > 0) {
+                        if (!Objects.equals(v.getHomestayId(), homestayId)) {
+                            return false;
+                        }
+                    }
+
+                    // Nếu có ownerId: tài khoản nào tạo voucher thì chỉ tài khoản đó mới có voucher đó,
+                    // bên tài khoản khác không có, trừ khi 2 tài khoản owner đều cùng quản lý 1 homestay
+                    if (ownerId != null && ownerId > 0) {
+                        // 1. Do chính tài khoản owner này tạo (kể cả PENDING, REJECTED, ACTIVE, hay toàn sàn)
+                        if (v.getOwnerId() != null && v.getOwnerId().equals(ownerId)) {
+                            return true;
+                        }
+                        // 2. Thuộc homestay do owner này quản lý (kể cả 2 owner cùng quản lý 1 homestay)
+                        if (v.getHomestayId() != null && ownerHomestayIds.contains(v.getHomestayId())) {
+                            return true;
+                        }
+                        // Tài khoản khác không có quyền thấy voucher này
+                        return false;
+                    }
+
+                    // Nếu không có ownerId (Admin hoặc truy vấn chung)
+                    return homestayId == null || Objects.equals(v.getHomestayId(), homestayId);
+                })
+                .collect(Collectors.toList());
 
         Map<Long, Homestay> homestayMap = homestayRepository.findAll().stream()
                 .filter(h -> h.getId() != null)
@@ -62,7 +96,11 @@ public class OwnerVoucherService {
 
             // Map status
             String status = "active";
-            if ("DISABLED".equalsIgnoreCase(v.getStatus()) || "ENDED".equalsIgnoreCase(v.getStatus())) {
+            if ("PENDING".equalsIgnoreCase(v.getStatus())) {
+                status = "pending";
+            } else if ("REJECTED".equalsIgnoreCase(v.getStatus())) {
+                status = "rejected";
+            } else if ("DISABLED".equalsIgnoreCase(v.getStatus()) || "ENDED".equalsIgnoreCase(v.getStatus())) {
                 status = "ended";
             } else if (v.getExpiryDate() != null && v.getExpiryDate().isBefore(today)) {
                 status = "ended";
@@ -93,6 +131,8 @@ public class OwnerVoucherService {
                     .end(v.getExpiryDate() != null ? v.getExpiryDate().toString() : today.plusMonths(1).toString())
                     .audience(v.getHomestayId() != null ? "Khách đặt tại cơ sở" : "Công khai toàn sàn")
                     .status(status)
+                    .rawStatus(v.getStatus())
+                    .ownerId(v.getOwnerId())
                     .description("Áp dụng trực tiếp khi đặt phòng tại " + hsName + " qua nền tảng YÊN.")
                     .image(hsImg)
                     .revenue(rev)
@@ -103,8 +143,8 @@ public class OwnerVoucherService {
     /**
      * Thống kê KPI tổng quan cho voucher
      */
-    public OwnerVoucherStatsDTO getStats(Long homestayId) {
-        List<OwnerVoucherDTO> list = getVouchers(homestayId);
+    public OwnerVoucherStatsDTO getStats(Long homestayId, Long ownerId) {
+        List<OwnerVoucherDTO> list = getVouchers(homestayId, ownerId);
 
         long total = list.size();
         long active = list.stream().filter(v -> "active".equalsIgnoreCase(v.getStatus())).count();
@@ -189,38 +229,59 @@ public class OwnerVoucherService {
         Voucher v = new Voucher();
         v.setCode(code);
         v.setHomestayId(dto.getHomestayId());
+        
+        Long finalOwnerId = dto.getOwnerId();
+        if (finalOwnerId == null && dto.getHomestayId() != null) {
+            finalOwnerId = homestayRepository.findById(dto.getHomestayId())
+                    .map(Homestay::getOwnerId)
+                    .orElse(null);
+        }
+        v.setOwnerId(finalOwnerId);
+        dto.setOwnerId(finalOwnerId);
+
         v.setDiscountType("amount".equalsIgnoreCase(dto.getType()) ? "AMOUNT" : "PERCENT");
-        v.setValue(dto.getValue() != null ? dto.getValue() : BigDecimal.ZERO);
-        v.setMinOrderValue(dto.getMinOrder() != null ? dto.getMinOrder() : BigDecimal.ZERO);
-        v.setMaxDiscount(dto.getMaxDiscount() != null ? dto.getMaxDiscount() : BigDecimal.ZERO);
-        v.setUsageLimit(dto.getUsageLimit() != null ? dto.getUsageLimit() : 100);
+        BigDecimal val = dto.getValue() != null ? dto.getValue() : BigDecimal.ZERO;
+        if (val.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("Giá trị giảm giá phải lớn hơn 0");
+        }
+        if ("percent".equalsIgnoreCase(dto.getType()) && val.compareTo(BigDecimal.valueOf(100)) > 0) {
+            throw new IllegalArgumentException("Phần trăm giảm giá không được vượt quá 100%");
+        }
+        v.setValue(val);
+        v.setMinOrderValue(dto.getMinOrder() != null && dto.getMinOrder().compareTo(BigDecimal.ZERO) >= 0 ? dto.getMinOrder() : BigDecimal.ZERO);
+        v.setMaxDiscount(dto.getMaxDiscount() != null && dto.getMaxDiscount().compareTo(BigDecimal.ZERO) >= 0 ? dto.getMaxDiscount() : BigDecimal.ZERO);
+        v.setUsageLimit(dto.getUsageLimit() != null && dto.getUsageLimit() > 0 ? dto.getUsageLimit() : 100);
         v.setUsedCount(0);
 
+        LocalDate startDate = LocalDate.now();
         if (dto.getStart() != null && !dto.getStart().isEmpty()) {
             try {
-                v.setStartDate(LocalDate.parse(dto.getStart()));
-            } catch (Exception ignored) {
-                v.setStartDate(LocalDate.now());
-            }
-        } else {
-            v.setStartDate(LocalDate.now());
+                startDate = LocalDate.parse(dto.getStart());
+            } catch (Exception ignored) {}
         }
+        v.setStartDate(startDate);
 
+        LocalDate expiryDate = startDate.plusMonths(1);
         if (dto.getEnd() != null && !dto.getEnd().isEmpty()) {
             try {
-                v.setExpiryDate(LocalDate.parse(dto.getEnd()));
-            } catch (Exception ignored) {
-                v.setExpiryDate(LocalDate.now().plusMonths(1));
-            }
-        } else {
-            v.setExpiryDate(LocalDate.now().plusMonths(1));
+                LocalDate parsed = LocalDate.parse(dto.getEnd());
+                if (parsed.isAfter(startDate)) {
+                    expiryDate = parsed;
+                } else {
+                    expiryDate = startDate.plusDays(30);
+                }
+            } catch (Exception ignored) {}
         }
+        v.setExpiryDate(expiryDate);
 
-        v.setStatus("ended".equalsIgnoreCase(dto.getStatus()) ? "DISABLED" : "ACTIVE");
+        // Khi chủ homestay tạo mã giảm giá mới -> luôn ở trạng thái PENDING chờ Admin duyệt
+        v.setStatus("PENDING");
 
         Voucher saved = voucherRepository.save(v);
         dto.setId(saved.getId());
-        dto.setStatus("ACTIVE".equalsIgnoreCase(saved.getStatus()) ? "active" : "ended");
+        dto.setStatus("pending");
+        dto.setRawStatus("PENDING");
+        dto.setOwnerId(saved.getOwnerId());
         dto.setUsed(0);
         return dto;
     }
@@ -246,6 +307,9 @@ public class OwnerVoucherService {
 
         if (dto.getHomestayId() != null) {
             v.setHomestayId(dto.getHomestayId());
+        }
+        if (dto.getOwnerId() != null) {
+            v.setOwnerId(dto.getOwnerId());
         }
         if (dto.getType() != null) {
             v.setDiscountType("amount".equalsIgnoreCase(dto.getType()) ? "AMOUNT" : "PERCENT");
@@ -287,6 +351,10 @@ public class OwnerVoucherService {
         Voucher v = voucherRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy mã giảm giá với ID: " + id));
 
+        if ("PENDING".equalsIgnoreCase(v.getStatus())) {
+            throw new IllegalArgumentException("Mã giảm giá đang chờ Admin phê duyệt, chưa thể kích hoạt hoặc tạm ngưng.");
+        }
+
         String nextStatus = "ACTIVE".equalsIgnoreCase(v.getStatus()) ? "DISABLED" : "ACTIVE";
         v.setStatus(nextStatus);
         voucherRepository.save(v);
@@ -314,8 +382,8 @@ public class OwnerVoucherService {
     /**
      * Lấy lịch sử phát hành voucher
      */
-    public List<Map<String, Object>> getHistory(Long homestayId) {
-        List<OwnerVoucherDTO> vouchers = getVouchers(homestayId);
+    public List<Map<String, Object>> getHistory(Long homestayId, Long ownerId) {
+        List<OwnerVoucherDTO> vouchers = getVouchers(homestayId, ownerId);
         List<Map<String, Object>> history = new ArrayList<>();
 
         for (OwnerVoucherDTO v : vouchers) {

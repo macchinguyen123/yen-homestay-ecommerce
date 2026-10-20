@@ -22,6 +22,9 @@ public class Voucher {
     @Column(name = "homestay_id")
     private Long homestayId;
 
+    @Column(name = "owner_id")
+    private Long ownerId;
+
     @Column(unique = true, nullable = false)
     private String code;
 

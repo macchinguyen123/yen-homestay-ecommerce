@@ -20,6 +20,7 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/public/vouchers")
@@ -46,7 +47,9 @@ public class VoucherController {
     @GetMapping
     @Cacheable("publicVouchers")
     public ResponseEntity<List<Map<String, Object>>> getPublicVouchers() {
-        List<Voucher> vouchers = voucherRepository.findAll();
+        List<Voucher> vouchers = voucherRepository.findAll().stream()
+                .filter(v -> "ACTIVE".equalsIgnoreCase(v.getStatus()))
+                .collect(Collectors.toList());
         if (vouchers == null || vouchers.isEmpty()) {
             return ResponseEntity.ok(Collections.emptyList());
         }
@@ -295,6 +298,11 @@ public class VoucherController {
 
         Voucher v = opt.get();
         LocalDate today = LocalDate.now();
+        if ("PENDING".equalsIgnoreCase(v.getStatus())) {
+            resp.put("valid", false);
+            resp.put("message", "Mã giảm giá đang trong quá trình xét duyệt, chưa được kích hoạt.");
+            return ResponseEntity.ok(resp);
+        }
         if ("DISABLED".equalsIgnoreCase(v.getStatus()) || "EXPIRED".equalsIgnoreCase(v.getStatus())) {
             resp.put("valid", false);
             resp.put("message", "Mã giảm giá này hiện đang tạm ngưng hoặc đã hết hiệu lực.");

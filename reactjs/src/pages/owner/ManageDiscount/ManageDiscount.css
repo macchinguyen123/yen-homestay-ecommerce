@@ -227,28 +227,35 @@
 /* ── FILTER & HOMESTAY SELECTOR BAR (BALANCED & SLEEK) ─────── */
 .discount-filter-strip {
   background: #ffffff;
-  padding: 12px 20px;
+  padding: 16px 20px;
   border-radius: 16px;
   border: 1px solid #f1f5f9;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
+  flex-direction: column;
+  gap: 14px;
   margin-bottom: 24px;
+}
+
+/* Hàng trên: tabs trạng thái */
+.discount-filter-tabs-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  width: 100%;
 }
 
 .discount-tabs-list {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
   background: #f8fafc;
-  padding: 4px;
+  padding: 5px;
   border-radius: 12px;
   border: 1px solid #f1f5f9;
   overflow-x: auto;
   scrollbar-width: none;
-  flex-shrink: 0;
+  max-width: 100%;
 }
 
 .discount-tabs-list::-webkit-scrollbar {
@@ -256,7 +263,8 @@
 }
 
 .discount-tab-btn {
-  padding: 7px 16px;
+  position: relative;
+  padding: 7px 14px;
   border-radius: 9px;
   font-size: 0.82rem;
   font-weight: 600;
@@ -266,6 +274,9 @@
   cursor: pointer;
   white-space: nowrap;
   transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
 }
 
 .discount-tab-btn:hover {
@@ -280,42 +291,46 @@
   box-shadow: 0 1px 4px rgba(0, 44, 30, 0.2);
 }
 
-.discount-controls-group {
+/* Hàng dưới: bộ chọn Homestay & thanh tìm kiếm */
+.discount-filter-controls-row {
   display: flex;
   align-items: center;
-  gap: 12px;
-  flex-shrink: 0;
-  flex-wrap: nowrap;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding-top: 12px;
+  border-top: 1px dashed #e2e8f0;
 }
 
 .discount-hs-select-wrap {
   position: relative;
   display: flex;
   align-items: center;
+  flex-shrink: 0;
 }
 
 .discount-hs-select-wrap i {
   position: absolute;
-  left: 12px;
+  left: 14px;
   color: #15803d;
   font-size: 0.95rem;
   pointer-events: none;
 }
 
 .discount-hs-select {
-  height: 40px;
+  height: 42px;
   box-sizing: border-box;
-  padding: 0 32px 0 36px;
+  padding: 0 34px 0 38px;
   border-radius: 10px;
   border: 1px solid #cbd5e1;
   background: #ffffff;
-  font-size: 0.84rem;
+  font-size: 0.86rem;
   font-weight: 600;
   color: #0f172a;
   outline: none;
   cursor: pointer;
-  min-width: 200px;
-  max-width: 260px;
+  min-width: 260px;
+  max-width: 400px;
   text-overflow: ellipsis;
   white-space: nowrap;
   transition: all 0.2s ease;
@@ -330,11 +345,14 @@
   position: relative;
   display: flex;
   align-items: center;
+  flex: 1;
+  max-width: 380px;
+  min-width: 220px;
 }
 
 .discount-search-box i.bi-search {
   position: absolute;
-  left: 12px;
+  left: 14px;
   top: 50%;
   transform: translateY(-50%);
   color: #94a3b8;
@@ -343,14 +361,14 @@
 }
 
 .discount-search-box input {
-  height: 40px;
+  height: 42px;
   box-sizing: border-box;
-  width: 220px;
-  padding: 0 30px 0 36px;
+  width: 100%;
+  padding: 0 32px 0 38px;
   border-radius: 10px;
   border: 1px solid #cbd5e1;
   background: #ffffff;
-  font-size: 0.84rem;
+  font-size: 0.86rem;
   color: #0f172a;
   outline: none;
   transition: all 0.2s ease;
@@ -359,12 +377,11 @@
 .discount-search-box input:focus {
   border-color: #15803d;
   box-shadow: 0 0 0 3px rgba(21, 128, 61, 0.12);
-  width: 240px;
 }
 
 .discount-search-clear {
   position: absolute;
-  right: 8px;
+  right: 10px;
   top: 50%;
   transform: translateY(-50%);
   border: none;
@@ -382,36 +399,154 @@
   color: #0f172a;
 }
 
-@media (max-width: 1080px) {
-  .discount-filter-strip {
+@media (max-width: 900px) {
+  .discount-filter-controls-row {
     flex-direction: column;
     align-items: stretch;
-    gap: 14px;
-    padding: 14px 16px;
+    gap: 12px;
   }
-  .discount-tabs-list {
-    width: 100%;
-    overflow-x: auto;
-    padding-bottom: 2px;
-  }
-  .discount-controls-group {
-    width: 100%;
-    display: flex;
-    gap: 10px;
-  }
-  .discount-hs-select-wrap {
-    flex: 1;
-  }
-  .discount-hs-select {
+  .discount-hs-select-wrap,
+  .discount-hs-select,
+  .discount-search-box {
     width: 100%;
     max-width: none;
   }
-  .discount-search-box {
-    flex: 1;
-  }
-  .discount-search-box input {
-    width: 100% !important;
-  }
+}
+
+/* ── AMBER TAB (chờ duyệt) ──────────────────────────── */
+.discount-tab-btn--amber {
+  color: #b45309;
+}
+
+.discount-tab-btn--amber:hover {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.discount-tab-btn--amber.active {
+  background: #b45309;
+  color: #ffffff;
+}
+
+/* ── RED TAB (bị từ chối) ───────────────────────────── */
+.discount-tab-btn--red {
+  color: #dc2626;
+}
+
+.discount-tab-btn--red:hover {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.discount-tab-btn--red.active {
+  background: #dc2626;
+  color: #ffffff;
+}
+
+/* Chấm nháy báo pending */
+.discount-pending-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #f59e0b;
+  animation: blink-dot 1.4s infinite;
+  flex-shrink: 0;
+}
+
+/* Chấm báo rejected */
+.discount-rejected-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #dc2626;
+  flex-shrink: 0;
+}
+
+@keyframes blink-dot {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.25; }
+}
+
+/* ── PAGINATION ──────────────────────────────────── */
+.discount-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid #f1f5f9;
+  flex-wrap: wrap;
+}
+
+.discount-page-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  color: #475569;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: all 0.18s ease;
+}
+
+.discount-page-btn:hover:not(:disabled) {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+  color: #0f172a;
+}
+
+.discount-page-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.discount-page-numbers {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.discount-page-num {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  color: #475569;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.18s ease;
+}
+
+.discount-page-num:hover:not(.active) {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.discount-page-num.active {
+  background: #002c1e;
+  color: #ffffff;
+  border-color: #002c1e;
+  font-weight: 700;
+  box-shadow: 0 2px 6px rgba(0, 44, 30, 0.2);
+}
+
+.discount-page-info {
+  font-size: 0.78rem;
+  color: #94a3b8;
+  margin-left: 4px;
+  white-space: nowrap;
 }
 
 /* ── TICKET CARDS GRID ─────────────────────────────────────── */
@@ -469,6 +604,12 @@
   color: #166534;
 }
 
+.ticket-status-badge.pending {
+  background: #fef3c7;
+  color: #b45309;
+  border: 1px solid #fde68a;
+}
+
 .ticket-status-badge.upcoming {
   background: #fef3c7;
   color: #b45309;
@@ -477,6 +618,58 @@
 .ticket-status-badge.ended {
   background: #fee2e2;
   color: #dc2626;
+}
+
+.ticket-status-badge.rejected {
+  background: #fee2e2;
+  color: #b91c1c;
+  border: 1px solid #fca5a5;
+}
+
+.voucher-ticket-card.is-pending {
+  border: 1.5px solid #fde68a;
+}
+
+.voucher-ticket-card.is-rejected {
+  border: 1.5px solid #fca5a5;
+  background: #fffafa;
+}
+
+.ticket-pending-alert {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  color: #92400e;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 0.78rem;
+  font-weight: 500;
+}
+
+.ticket-rejected-alert {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 0.78rem;
+  font-weight: 500;
+}
+
+.discount-modal-pending-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: 12px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
 }
 
 .ticket-body-content {
