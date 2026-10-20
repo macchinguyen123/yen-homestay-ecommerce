@@ -15,19 +15,23 @@ import java.util.Map;
 @RestController
 @RequestMapping({"/api/owner/vouchers", "/api/public/owner/vouchers"})
 @CrossOrigin(origins = "*")
-@RequiredArgsConstructor
 @Slf4j
 public class OwnerVoucherController {
 
     private final OwnerVoucherService ownerVoucherService;
+
+    public OwnerVoucherController(OwnerVoucherService ownerVoucherService) {
+        this.ownerVoucherService = ownerVoucherService;
+    }
 
     /**
      * Lấy danh sách voucher theo cơ sở homestay hoặc toàn hệ thống
      */
     @GetMapping
     public ResponseEntity<List<OwnerVoucherDTO>> getVouchers(
-            @RequestParam(value = "homestayId", required = false) Long homestayId) {
-        return ResponseEntity.ok(ownerVoucherService.getVouchers(homestayId));
+            @RequestParam(value = "homestayId", required = false) Long homestayId,
+            @RequestParam(value = "ownerId", required = false) Long ownerId) {
+        return ResponseEntity.ok(ownerVoucherService.getVouchers(homestayId, ownerId));
     }
 
     /**
@@ -35,8 +39,9 @@ public class OwnerVoucherController {
      */
     @GetMapping("/stats")
     public ResponseEntity<OwnerVoucherStatsDTO> getStats(
-            @RequestParam(value = "homestayId", required = false) Long homestayId) {
-        return ResponseEntity.ok(ownerVoucherService.getStats(homestayId));
+            @RequestParam(value = "homestayId", required = false) Long homestayId,
+            @RequestParam(value = "ownerId", required = false) Long ownerId) {
+        return ResponseEntity.ok(ownerVoucherService.getStats(homestayId, ownerId));
     }
 
     /**
@@ -44,16 +49,22 @@ public class OwnerVoucherController {
      */
     @GetMapping("/history")
     public ResponseEntity<List<Map<String, Object>>> getHistory(
-            @RequestParam(value = "homestayId", required = false) Long homestayId) {
-        return ResponseEntity.ok(ownerVoucherService.getHistory(homestayId));
+            @RequestParam(value = "homestayId", required = false) Long homestayId,
+            @RequestParam(value = "ownerId", required = false) Long ownerId) {
+        return ResponseEntity.ok(ownerVoucherService.getHistory(homestayId, ownerId));
     }
 
     /**
      * Tạo mã giảm giá mới
      */
     @PostMapping
-    public ResponseEntity<?> createVoucher(@RequestBody OwnerVoucherDTO dto) {
+    public ResponseEntity<?> createVoucher(
+            @RequestBody OwnerVoucherDTO dto,
+            @RequestParam(value = "ownerId", required = false) Long ownerId) {
         try {
+            if (dto.getOwnerId() == null && ownerId != null) {
+                dto.setOwnerId(ownerId);
+            }
             OwnerVoucherDTO created = ownerVoucherService.createVoucher(dto);
             return ResponseEntity.ok(created);
         } catch (IllegalArgumentException e) {

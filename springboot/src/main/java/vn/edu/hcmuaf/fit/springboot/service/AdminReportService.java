@@ -20,7 +20,6 @@ import java.util.stream.Collectors;
 
 @Service
 @Slf4j
-@RequiredArgsConstructor
 public class AdminReportService {
 
     private final BookingRepository bookingRepository;
@@ -29,6 +28,21 @@ public class AdminReportService {
     private final HomestayRepository homestayRepository;
     private final VoucherRepository voucherRepository;
     private final HomestayAdRepository homestayAdRepository;
+
+    public AdminReportService(
+            BookingRepository bookingRepository,
+            PaymentRepository paymentRepository,
+            UserRepository userRepository,
+            HomestayRepository homestayRepository,
+            VoucherRepository voucherRepository,
+            HomestayAdRepository homestayAdRepository) {
+        this.bookingRepository = bookingRepository;
+        this.paymentRepository = paymentRepository;
+        this.userRepository = userRepository;
+        this.homestayRepository = homestayRepository;
+        this.voucherRepository = voucherRepository;
+        this.homestayAdRepository = homestayAdRepository;
+    }
 
     private static final DecimalFormat CURRENCY_FORMAT;
 

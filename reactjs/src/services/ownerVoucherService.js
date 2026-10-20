@@ -10,6 +10,43 @@ const getAuthHeaders = () => {
   return headers;
 };
 
+/**
+ * Lấy ownerId từ user đã đăng nhập trong localStorage
+ */
+function getCurrentOwnerId() {
+  try {
+    const user = JSON.parse(localStorage.getItem('user') || 'null');
+    return user?.id ? String(user.id) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Tạo cache key riêng theo tài khoản owner (không phân biệt homestay)
+ */
+function makeCacheKey() {
+  const ownerId = getCurrentOwnerId() || 'unknown';
+  return `cached_owner_${ownerId}_vouchers_all`;
+}
+
+/**
+ * Xóa toàn bộ cache voucher của owner hiện tại
+ */
+function clearOwnerCache() {
+  try {
+    const ownerId = getCurrentOwnerId() || 'unknown';
+    Object.keys(localStorage).forEach((key) => {
+      if (
+        key.startsWith(`cached_owner_${ownerId}_vouchers_`) ||
+        key.startsWith(`owner_${ownerId}_vouchers_`)
+      ) {
+        localStorage.removeItem(key);
+      }
+    });
+  } catch (_) {}
+}
+
 async function safeFetch(url, options = {}) {
   const defaultOpts = {
     headers: getAuthHeaders(),
@@ -33,16 +70,25 @@ async function safeFetch(url, options = {}) {
 
 export const ownerVoucherService = {
   /**
-   * Lấy danh sách mã giảm giá theo homestay hoặc toàn hệ thống
+   * Lấy TẤT CẢ mã giảm giá của owner đăng nhập.
+   * KHÔNG truyền homestayId lên API để backend trả về toàn bộ vouchers của owner,
+   * kể cả PENDING/REJECTED thuộc mọi homestay.
+   * Filter theo homestay thực hiện hoàn toàn ở client-side (ManageDiscount.jsx).
    */
-  async getVouchers(homestayId) {
+  async getVouchers() {
+    const ownerId = getCurrentOwnerId();
     try {
-      const query = homestayId && homestayId !== 'all' ? `?homestayId=${homestayId}` : '';
+      const params = new URLSearchParams();
+      if (ownerId) params.set('ownerId', ownerId);
+      const query = params.toString() ? `?${params.toString()}` : '';
       const res = await safeFetch(`${API_BASE_URL}${query}`);
       if (res.ok) {
         const data = await res.json();
-        if (Array.isArray(data) && data.length > 0) {
-          localStorage.setItem(`cached_owner_vouchers_${homestayId || 'all'}`, JSON.stringify(data));
+        if (Array.isArray(data)) {
+          // Lưu cache toàn bộ (không phân biệt homestay)
+          try {
+            localStorage.setItem(makeCacheKey(), JSON.stringify(data));
+          } catch (_) {}
           return data;
         }
       }
@@ -50,22 +96,29 @@ export const ownerVoucherService = {
       console.warn('Lỗi kết nối CSDL voucher, kích hoạt bộ nhớ đệm:', err.message);
     }
 
+    // Fallback: chỉ dùng cache khi backend không phản hồi
     try {
-      const cached = localStorage.getItem(`cached_owner_vouchers_${homestayId || 'all'}`);
+      const cached = localStorage.getItem(makeCacheKey());
       if (cached) return JSON.parse(cached);
-      const fallbackSaved = localStorage.getItem('owner_vouchers_data');
-      if (fallbackSaved) return JSON.parse(fallbackSaved);
     } catch (e) {}
 
     return null;
   },
 
   /**
+   * Xóa toàn bộ cache voucher của owner hiện tại
+   */
+  clearCache: clearOwnerCache,
+
+  /**
    * Lấy thống kê KPI và tỉ lệ chuyển đổi voucher
    */
-  async getStats(homestayId) {
+  async getStats() {
+    const ownerId = getCurrentOwnerId();
     try {
-      const query = homestayId && homestayId !== 'all' ? `?homestayId=${homestayId}` : '';
+      const params = new URLSearchParams();
+      if (ownerId) params.set('ownerId', ownerId);
+      const query = params.toString() ? `?${params.toString()}` : '';
       const res = await safeFetch(`${API_BASE_URL}/stats${query}`);
       if (res.ok) {
         return await res.json();
@@ -79,9 +132,12 @@ export const ownerVoucherService = {
   /**
    * Lấy lịch sử phát hành các chiến dịch voucher
    */
-  async getHistory(homestayId) {
+  async getHistory() {
+    const ownerId = getCurrentOwnerId();
     try {
-      const query = homestayId && homestayId !== 'all' ? `?homestayId=${homestayId}` : '';
+      const params = new URLSearchParams();
+      if (ownerId) params.set('ownerId', ownerId);
+      const query = params.toString() ? `?${params.toString()}` : '';
       const res = await safeFetch(`${API_BASE_URL}/history${query}`);
       if (res.ok) {
         return await res.json();
@@ -89,10 +145,6 @@ export const ownerVoucherService = {
     } catch (err) {
       console.warn('Lỗi lấy lịch sử voucher từ CSDL:', err.message);
     }
-    try {
-      const saved = localStorage.getItem('owner_voucher_history');
-      if (saved) return JSON.parse(saved);
-    } catch (e) {}
     return null;
   },
 
@@ -100,19 +152,27 @@ export const ownerVoucherService = {
    * Tạo mã giảm giá mới
    */
   async createVoucher(payload) {
+    const ownerId = getCurrentOwnerId();
+    const finalPayload = {
+      ...payload,
+      ownerId: payload.ownerId || (ownerId ? Number(ownerId) : null)
+    };
     try {
-      const res = await safeFetch(API_BASE_URL, {
+      const query = ownerId ? `?ownerId=${ownerId}` : '';
+      const res = await safeFetch(`${API_BASE_URL}${query}`, {
         method: 'POST',
-        body: JSON.stringify(payload)
+        body: JSON.stringify(finalPayload)
       });
       if (res.ok) {
-        return await res.json();
+        const created = await res.json();
+        // Xóa toàn bộ cache của tài khoản này để tải lại mới nhất
+        clearOwnerCache();
+        return created;
       }
       const errData = await res.json().catch(() => ({}));
       throw new Error(errData.message || 'Lỗi khi lưu mã giảm giá lên máy chủ');
     } catch (err) {
       console.warn('Backend create voucher error, falling back locally:', err.message);
-      // Re-throw so component handles specific error (e.g. duplicate code)
       throw err;
     }
   },

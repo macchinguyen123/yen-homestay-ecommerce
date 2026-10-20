@@ -1,0 +1,13 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "java",
+            "name": "SpringbootApplication",
+            "request": "launch",
+            "mainClass": "vn.edu.hcmuaf.fit.springboot.SpringbootApplication",
+            "projectName": "springboot",
+            "cwd": "${workspaceFolder}/springboot"
+        }
+    ]
+}

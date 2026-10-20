@@ -27,7 +27,9 @@ public class OwnerVoucherDTO {
     private String start; // YYYY-MM-DD
     private String end;   // YYYY-MM-DD
     private String audience;
-    private String status; // "active" | "upcoming" | "ended"
+    private String status; // "active" | "upcoming" | "ended" | "pending" | "rejected"
+    private String rawStatus; // "PENDING" | "ACTIVE" | "REJECTED" | "DISABLED"
+    private Long ownerId;
     private String description;
     private String image;
     private BigDecimal revenue;

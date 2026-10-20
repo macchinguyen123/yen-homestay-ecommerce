@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import './ManageDiscount.css';
 import {
   INITIAL_VOUCHERS,
@@ -18,6 +18,17 @@ const IMAGE_PRESETS = [
 ];
 
 export default function ManageDiscount() {
+  // ─── Owner-scoped localStorage keys ─────────────────────────
+  const getOwnerKey = (suffix) => {
+    try {
+      const user = JSON.parse(localStorage.getItem('user') || 'null');
+      const uid = user?.id || 'guest';
+      return `owner_${uid}_${suffix}`;
+    } catch {
+      return `owner_guest_${suffix}`;
+    }
+  };
+
   // ─── Active Homestay & Homestay List ─────────────────────────
   const [activeHomestayId, setActiveHomestayId] = useState(
     () => localStorage.getItem('ownerActiveHomestayId') || 'all'
@@ -31,47 +42,55 @@ export default function ManageDiscount() {
     }
   });
 
-  // ─── Vouchers & History State ────────────────────────────────
-  const [vouchers, setVouchers] = useState(() => {
-    try {
-      const saved = localStorage.getItem('owner_vouchers_data');
-      return saved ? JSON.parse(saved) : INITIAL_VOUCHERS;
-    } catch {
-      return INITIAL_VOUCHERS;
-    }
-  });
+  // ─── Ref: prevent loadData overwrite after create ─────────────
+  const skipNextLoadRef = useRef(false);
 
-  const [history, setHistory] = useState(() => {
-    try {
-      const saved = localStorage.getItem('owner_voucher_history');
-      return saved ? JSON.parse(saved) : VOUCHER_HISTORY_SEED;
-    } catch {
-      return VOUCHER_HISTORY_SEED;
-    }
-  });
+  // ─── Vouchers & History State ────────────────────────────────
+  // Không đọc từ localStorage khi init để tránh stale data (pending → active sau approve)
+  const [vouchers, setVouchers] = useState([]);
+  const [history, setHistory] = useState([]);
 
   const [loading, setLoading] = useState(false);
 
-  // Sync to localStorage
+  // ─── Filter & Search ──────────────────────────────────────────
+  const [filter, setFilter] = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // ─── Pagination ───────────────────────────────────────────────
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 6; // số card mỗi trang
+
+  // Sync to per-account localStorage (chỉ dùng để khôi phục khi backend offline)
   useEffect(() => {
-    localStorage.setItem('owner_vouchers_data', JSON.stringify(vouchers));
+    if (vouchers.length === 0) return; // Không ghi đè khi chưa load xong
+    try {
+      localStorage.setItem(getOwnerKey('vouchers_data'), JSON.stringify(vouchers));
+    } catch (_) {}
   }, [vouchers]);
 
   useEffect(() => {
-    localStorage.setItem('owner_voucher_history', JSON.stringify(history));
+    if (history.length === 0) return;
+    try {
+      localStorage.setItem(getOwnerKey('voucher_history'), JSON.stringify(history));
+    } catch (_) {}
   }, [history]);
 
-  // Fetch homestays list
+  // Fetch homestays list (chỉ lấy các homestay thuộc quyền quản lý của owner này)
   const fetchHomestays = async () => {
     try {
-      const res = await fetch('http://localhost:8081/api/public/homestays');
+      const user = JSON.parse(localStorage.getItem('user') || 'null');
+      const uid = user?.id;
+      const url = uid
+        ? `http://localhost:8081/api/public/admin/homestays?ownerId=${uid}`
+        : 'http://localhost:8081/api/public/homestays';
+      const res = await fetch(url);
       if (res.ok) {
         const data = await res.json();
-        if (Array.isArray(data) && data.length > 0) {
+        if (Array.isArray(data)) {
           setHomestaysList(data);
           try {
             localStorage.setItem(
-              'owner_homestays',
+              getOwnerKey('homestays'),
               JSON.stringify(data.map((h) => ({ id: h.id, name: h.name, city: h.city || '' })))
             );
           } catch (e) {}
@@ -82,23 +101,29 @@ export default function ManageDiscount() {
     }
   };
 
-  // Load vouchers & history from service
+  // Load TẤT CẢ vouchers của owner từ backend (không filter homestay ở API)
+  // Filter homestay được thực hiện client-side trong filteredVouchers
   const loadData = async () => {
     setLoading(true);
     try {
-      const list = await ownerVoucherService.getVouchers(activeHomestayId);
-      if (list && Array.isArray(list) && list.length > 0) {
+      const list = await ownerVoucherService.getVouchers();
+      if (list && Array.isArray(list)) {
+        // Backend đã trả về đúng và đầy đủ — dùng trực tiếp, không merge cache
         setVouchers(list);
+        try {
+          localStorage.setItem(getOwnerKey('vouchers_data'), JSON.stringify(list));
+        } catch (_) {}
       } else {
-        const saved = localStorage.getItem('owner_vouchers_data');
+        // Chỉ fallback localStorage khi backend không phản hồi
+        const saved = localStorage.getItem(getOwnerKey('vouchers_data'));
         if (saved) {
           setVouchers(JSON.parse(saved));
         } else {
-          setVouchers(INITIAL_VOUCHERS);
+          setVouchers([]);
         }
       }
 
-      const hist = await ownerVoucherService.getHistory(activeHomestayId);
+      const hist = await ownerVoucherService.getHistory();
       if (hist && Array.isArray(hist) && hist.length > 0) {
         setHistory(hist);
       }
@@ -110,20 +135,129 @@ export default function ManageDiscount() {
   };
 
   useEffect(() => {
+    // Xóa cache cũ để đảm bảo luôn fetch fresh từ backend
+    ownerVoucherService.clearCache();
     fetchHomestays();
     loadData();
 
     const handleSync = () => {
       const stored = localStorage.getItem('ownerActiveHomestayId') || 'all';
       setActiveHomestayId(stored);
+      // Không gọi loadData() ở đây - activeHomestayId chỉ ảnh hưởng client-side filter
     };
     window.addEventListener('ownerActiveHomestayChanged', handleSync);
-    return () => window.removeEventListener('ownerActiveHomestayChanged', handleSync);
+
+    // Xử lý sự kiện duyệt / từ chối / tạo mã từ Admin hoặc tab khác
+    const handleSyncPayload = (data) => {
+      if (!data) return;
+      if (data.type === 'VOUCHER_APPROVED') {
+        // Cập nhật ngay state + xóa cache để lần focus tới fetch lại
+        ownerVoucherService.clearCache();
+        setVouchers((prev) => {
+          const updated = prev.map((v) =>
+            String(v.id) === String(data.id) || (data.code && v.code === data.code)
+              ? { ...v, status: 'active', rawStatus: 'ACTIVE' }
+              : v
+          );
+          try {
+            localStorage.setItem(getOwnerKey('vouchers_data'), JSON.stringify(updated));
+          } catch (_) {}
+          return updated;
+        });
+        showToast(`✅ Mã "${data.code || data.id}" vừa được Admin phê duyệt kích hoạt!`);
+      } else if (data.type === 'VOUCHER_REJECTED') {
+        ownerVoucherService.clearCache();
+        setVouchers((prev) => {
+          const updated = prev.map((v) =>
+            String(v.id) === String(data.id) || (data.code && v.code === data.code)
+              ? { ...v, status: 'rejected', rawStatus: 'REJECTED' }
+              : v
+          );
+          try {
+            localStorage.setItem(getOwnerKey('vouchers_data'), JSON.stringify(updated));
+          } catch (_) {}
+          return updated;
+        });
+        showToast(`❌ Mã "${data.code || data.id}" đã bị Admin từ chối phê duyệt!`, 'error');
+      } else if (data.type === 'VOUCHER_CREATED' && data.voucher) {
+        const user = JSON.parse(localStorage.getItem('user') || 'null');
+        const uid = user?.id ? String(user.id) : null;
+        if (!data.voucher.ownerId || String(data.voucher.ownerId) === String(uid)) {
+          setVouchers((prev) => {
+            if (prev.some((v) => v.code === data.voucher.code)) return prev;
+            const updated = [data.voucher, ...prev];
+            try {
+              localStorage.setItem(getOwnerKey('vouchers_data'), JSON.stringify(updated));
+            } catch (_) {}
+            return updated;
+          });
+        }
+      }
+      // Đồng bộ lại với backend sau khi cập nhật optimistic
+      loadData();
+    };
+
+    let channel = null;
+    try {
+      if ('BroadcastChannel' in window) {
+        channel = new BroadcastChannel('voucher_channel');
+        channel.onmessage = (event) => {
+          handleSyncPayload(event.data);
+        };
+      }
+    } catch (_) {}
+
+    const handleStorage = (e) => {
+      if (e.key === 'voucher_sync_event' && e.newValue) {
+        try {
+          handleSyncPayload(JSON.parse(e.newValue));
+        } catch (_) {
+          loadData();
+        }
+      }
+      // Không trigger loadData() khi vouchers_data thay đổi - tránh reload loop
+    };
+    window.addEventListener('storage', handleStorage);
+
+    const handleCustomSync = (e) => {
+      handleSyncPayload(e.detail);
+    };
+    window.addEventListener('voucher_sync_event', handleCustomSync);
+    window.addEventListener('voucher_approved', handleCustomSync);
+    window.addEventListener('voucher_rejected', handleCustomSync);
+    window.addEventListener('voucher_created', handleCustomSync);
+    // Khi user quay lại tab: xóa cache + fetch fresh (bắt được approve từ admin tab khác)
+    const handleFocus = () => {
+      ownerVoucherService.clearCache();
+      loadData();
+    };
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      window.removeEventListener('ownerActiveHomestayChanged', handleSync);
+      window.removeEventListener('storage', handleStorage);
+      window.removeEventListener('voucher_sync_event', handleCustomSync);
+      window.removeEventListener('voucher_approved', handleCustomSync);
+      window.removeEventListener('voucher_rejected', handleCustomSync);
+      window.removeEventListener('voucher_created', handleCustomSync);
+      window.removeEventListener('focus', handleFocus);
+      if (channel) channel.close();
+    };
   }, []);
 
+  // Khi activeHomestayId thay đổi: chỉ reset page, KHÔNG gọi loadData lại
+  // vì tất cả vouchers đã được fetch và filter là client-side
   useEffect(() => {
-    loadData();
+    setCurrentPage(1);
+    if (skipNextLoadRef.current) {
+      skipNextLoadRef.current = false;
+    }
   }, [activeHomestayId]);
+
+  // Reset page khi filter / search thay đổi
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filter, searchQuery]);
 
   const handleSwitchHomestay = (newId) => {
     setActiveHomestayId(newId);
@@ -131,9 +265,6 @@ export default function ManageDiscount() {
     window.dispatchEvent(new Event('ownerActiveHomestayChanged'));
   };
 
-  // ─── Filter & Search ──────────────────────────────────────────
-  const [filter, setFilter] = useState('all');
-  const [searchQuery, setSearchQuery] = useState('');
 
   // ─── Toast System ─────────────────────────────────────────────
   const [toast, setToast] = useState(null);
@@ -182,6 +313,14 @@ export default function ManageDiscount() {
 
   // ─── Handlers: Toggle Status ──────────────────────────────────
   const handleToggleStatus = async (voucher) => {
+    if (voucher.status === 'pending') {
+      showToast(`Mã "${voucher.code}" đang chờ Admin phê duyệt, chưa thể bật/tắt!`, 'error');
+      return;
+    }
+    if (voucher.status === 'rejected') {
+      showToast(`Mã "${voucher.code}" đã bị Admin từ chối, vui lòng chỉnh sửa và gửi duyệt lại!`, 'error');
+      return;
+    }
     const current = voucher.status;
     const next = current === 'active' ? 'ended' : 'active';
 
@@ -272,9 +411,13 @@ export default function ManageDiscount() {
       ? 'Homestay'
       : 'Toàn bộ cơ sở YÊN';
 
+    const user = JSON.parse(localStorage.getItem('user') || 'null');
+    const currentOwnerId = user?.id ? Number(user.id) : null;
+
     const payload = {
       ...formData,
       code,
+      ownerId: currentOwnerId,
       homestayId: formData.homestayId ? Number(formData.homestayId) : null,
       homestayName: hsName,
       value: Number(formData.value),
@@ -282,7 +425,9 @@ export default function ManageDiscount() {
       minOrder: Number(formData.minOrder) || 0,
       usageLimit: Number(formData.usageLimit) || 100,
       perUser: Number(formData.perUser) || 1,
-      status: formData.active ? 'active' : 'ended',
+      status: activeModal === 'edit'
+        ? (formData.active ? 'active' : 'ended')
+        : 'pending',
       used: selectedVoucher ? selectedVoucher.used : 0
     };
 
@@ -304,20 +449,26 @@ export default function ManageDiscount() {
           return;
         }
 
-        let createdObj = payload;
+        let createdObj = { ...payload, status: 'pending', id: Date.now(), homestayName: hsName };
         try {
           const res = await ownerVoucherService.createVoucher(payload);
-          if (res && res.id) createdObj = { ...payload, id: res.id };
+          if (res && res.id) createdObj = { ...payload, id: res.id, status: 'pending', homestayName: hsName };
         } catch (err) {
-          if (err.message && err.message.includes('đã tồn tại')) {
-            showToast(err.message, 'error');
-            return;
-          }
-          console.warn('Lưu máy chủ lỗi, cập nhật cục bộ:', err.message);
+          console.warn('Lưu voucher lên máy chủ gặp lỗi, lưu cục bộ:', err.message);
         }
 
-        setVouchers([createdObj, ...vouchers]);
-        setHistory([
+        // Set flag to skip next loadData triggered by setActiveHomestayId('all')
+        skipNextLoadRef.current = true;
+        // Tự động chuyển bộ chọn homestay về 'all' để mã mới tạo chắc chắn được nhìn thấy
+        setActiveHomestayId('all');
+        localStorage.setItem('ownerActiveHomestayId', 'all');
+        window.dispatchEvent(new Event('ownerActiveHomestayChanged'));
+
+        setVouchers((prev) => [createdObj, ...prev.filter((v) => v.code !== code)]);
+        // Chuyển về tab "Tất cả" và trang 1 để mã mới tạo (chờ duyệt) hiện ngay đầu tiên bên trái
+        setFilter('all');
+        setCurrentPage(1);
+        setHistory((prev) => [
           {
             name: payload.name,
             code: payload.code,
@@ -325,11 +476,26 @@ export default function ManageDiscount() {
             used: 0,
             limit: payload.usageLimit,
             revenue: 0,
-            status: payload.status
+            status: 'pending'
           },
-          ...history
+          ...prev
         ]);
-        showToast(`Đã tạo mã giảm giá "${code}" thành công!`);
+
+        // Phát tín hiệu ngay lập tức sang phía Admin để Admin thấy mã xuất hiện liền
+        try {
+          const syncData = { type: 'VOUCHER_CREATED', id: createdObj.id, code: createdObj.code, ts: Date.now(), voucher: createdObj };
+          localStorage.setItem('voucher_sync_event', JSON.stringify(syncData));
+          window.dispatchEvent(new CustomEvent('voucher_created', { detail: syncData }));
+          if ('BroadcastChannel' in window) {
+            const bc = new BroadcastChannel('voucher_channel');
+            bc.postMessage(syncData);
+            bc.close();
+          }
+        } catch (syncErr) {
+          console.warn('Lỗi đồng bộ sync event:', syncErr);
+        }
+
+        showToast(`Đã gửi duyệt mã "${code}" thành công — Xuất hiện trên trang quản trị Admin ngay lập tức!`);
       }
       closeModal();
     } catch (err) {
@@ -355,17 +521,49 @@ export default function ManageDiscount() {
   };
 
   // ─── Filter & Search Logic ────────────────────────────────────
+  // ─── Filter & Search Logic ────────────────────────────────────
   const filteredVouchers = useMemo(() => {
-    return vouchers.filter((v) => {
-      // Homestay filter
-      const matchHs =
-        !activeHomestayId ||
-        activeHomestayId === 'all' ||
-        !v.homestayId ||
-        String(v.homestayId) === String(activeHomestayId);
+    const list = vouchers.filter((v) => {
+      // Status flags
+      const vStatus = (v.status || '').toLowerCase();
+      const vRaw = (v.rawStatus || '').toLowerCase();
+      const isRejected = vStatus === 'rejected' || vRaw === 'rejected';
+      const isPending = vStatus === 'pending' || vRaw === 'pending';
+      const isActive = (vStatus === 'active' || vRaw === 'active') && !isRejected && !isPending;
+      const isEnded = (vStatus === 'ended' || vStatus === 'disabled' || vRaw === 'disabled' || vRaw === 'ended') && !isRejected;
+      const isUpcoming = vStatus === 'upcoming';
 
       // Status filter
-      const matchFilter = filter === 'all' || v.status === filter;
+      let matchFilter = true;
+      if (filter === 'rejected') matchFilter = isRejected;
+      else if (filter === 'pending') matchFilter = isPending;
+      else if (filter === 'active') matchFilter = isActive;
+      else if (filter === 'ended') matchFilter = isEnded;
+      else if (filter === 'upcoming') matchFilter = isUpcoming;
+      else if (filter === 'all') matchFilter = true;
+
+      // Homestay filter:
+      // Tab pending/rejected: LUÔN hiện tất cả bất kể activeHomestayId
+      // (vì đây là trạng thái quan trọng, owner cần thấy dù đang chọn homestay nào)
+      const skipHomestayFilter = isPending || isRejected;
+
+      let matchHs = true;
+      if (!skipHomestayFilter) {
+        const isHomestaySelected =
+          activeHomestayId &&
+          activeHomestayId !== 'all' &&
+          activeHomestayId !== 'null' &&
+          activeHomestayId !== 'undefined';
+
+        const isValidHomestay =
+          isHomestaySelected &&
+          homestaysList.some((h) => String(h.id) === String(activeHomestayId));
+
+        matchHs =
+          !isValidHomestay ||
+          !v.homestayId ||
+          String(v.homestayId) === String(activeHomestayId);
+      }
 
       // Text search
       const q = searchQuery.toLowerCase().trim();
@@ -377,19 +575,76 @@ export default function ManageDiscount() {
 
       return matchHs && matchFilter && matchSearch;
     });
-  }, [vouchers, activeHomestayId, filter, searchQuery]);
+
+    // Tab "Tất cả": pending luôn lên đầu, rejected tiếp theo, rồi active
+    if (filter === 'all') {
+      const pendingList = list.filter((v) => {
+        const s = (v.status || '').toLowerCase();
+        const r = (v.rawStatus || '').toLowerCase();
+        return s === 'pending' || r === 'pending';
+      });
+      const rejectedList = list.filter((v) => {
+        const s = (v.status || '').toLowerCase();
+        const r = (v.rawStatus || '').toLowerCase();
+        return s === 'rejected' || r === 'rejected';
+      });
+      const otherList = list.filter((v) => {
+        const s = (v.status || '').toLowerCase();
+        const r = (v.rawStatus || '').toLowerCase();
+        return s !== 'pending' && r !== 'pending' && s !== 'rejected' && r !== 'rejected';
+      });
+      return [...pendingList, ...rejectedList, ...otherList];
+    }
+    return list;
+  }, [vouchers, activeHomestayId, homestaysList, filter, searchQuery]);
+
+  // ─── Pagination derived values ────────────────────────────────
+  const totalPages = Math.max(1, Math.ceil(filteredVouchers.length / PAGE_SIZE));
+  // Reset về trang 1 khi filter/search/homestay thay đổi
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const safePage = Math.min(currentPage, totalPages);
+  const pagedVouchers = filter === 'all'
+    ? filteredVouchers.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
+    : filteredVouchers; // các tab khác hiện toàn bộ (thường ít mã)
 
   // ─── Dynamic KPI Calculations ─────────────────────────────────
+  const pendingCount = useMemo(
+    () => vouchers.filter((v) => {
+      const s = (v.status || '').toLowerCase();
+      const r = (v.rawStatus || '').toLowerCase();
+      return s === 'pending' || r === 'pending';
+    }).length,
+    [vouchers]
+  );
   const activeCount = useMemo(
-    () => vouchers.filter((v) => v.status === 'active').length,
+    () => vouchers.filter((v) => {
+      const s = (v.status || '').toLowerCase();
+      const r = (v.rawStatus || '').toLowerCase();
+      const isRej = s === 'rejected' || r === 'rejected';
+      const isPend = s === 'pending' || r === 'pending';
+      return (s === 'active' || r === 'active') && !isRej && !isPend;
+    }).length,
     [vouchers]
   );
   const upcomingCount = useMemo(
-    () => vouchers.filter((v) => v.status === 'upcoming').length,
+    () => vouchers.filter((v) => (v.status || '').toLowerCase() === 'upcoming').length,
     [vouchers]
   );
   const endedCount = useMemo(
-    () => vouchers.filter((v) => v.status === 'ended').length,
+    () => vouchers.filter((v) => {
+      const s = (v.status || '').toLowerCase();
+      const r = (v.rawStatus || '').toLowerCase();
+      const isRej = s === 'rejected' || r === 'rejected';
+      return (s === 'ended' || s === 'disabled' || r === 'disabled' || r === 'ended') && !isRej;
+    }).length,
+    [vouchers]
+  );
+  const rejectedCount = useMemo(
+    () => vouchers.filter((v) => {
+      const s = (v.status || '').toLowerCase();
+      const r = (v.rawStatus || '').toLowerCase();
+      return s === 'rejected' || r === 'rejected';
+    }).length,
     [vouchers]
   );
 
@@ -559,26 +814,36 @@ export default function ManageDiscount() {
         </div>
       </div>
 
-      {/* FILTER STRIP WITH HOMESTAY SELECTOR (FULL-WIDTH & BALANCED) */}
+      {/* FILTER STRIP WITH HOMESTAY SELECTOR */}
       <div className="discount-filter-strip">
-        <div className="discount-tabs-list">
-          {[
-            { key: 'all', label: `Tất cả (${vouchers.length})` },
-            { key: 'active', label: `Đang chạy (${activeCount})` },
-            { key: 'upcoming', label: `Sắp diễn ra (${upcomingCount})` },
-            { key: 'ended', label: `Đã kết thúc (${endedCount})` }
-          ].map((tab) => (
-            <button
-              key={tab.key}
-              className={`discount-tab-btn ${filter === tab.key ? 'active' : ''}`}
-              onClick={() => setFilter(tab.key)}
-            >
-              {tab.label}
-            </button>
-          ))}
+        {/* ROW 1: Status Tabs */}
+        <div className="discount-filter-tabs-row">
+          <div className="discount-tabs-list">
+            {[
+              { key: 'all', label: `Tất cả (${vouchers.length})` },
+              { key: 'pending', label: `Chờ duyệt (${pendingCount})`, amber: true },
+              { key: 'active', label: `Đang chạy (${activeCount})` },
+              { key: 'upcoming', label: `Sắp diễn ra (${upcomingCount})` },
+              { key: 'ended', label: `Đã kết thúc (${endedCount})` },
+              { key: 'rejected', label: `Bị từ chối (${rejectedCount})`, red: true }
+            ].map((tab) => (
+              <button
+                key={tab.key}
+                className={`discount-tab-btn ${filter === tab.key ? 'active' : ''} ${
+                  tab.amber ? 'discount-tab-btn--amber' : ''
+                } ${tab.red ? 'discount-tab-btn--red' : ''}`}
+                onClick={() => { setFilter(tab.key); setCurrentPage(1); }}
+              >
+                {tab.label}
+                {tab.amber && pendingCount > 0 && <span className="discount-pending-dot" />}
+                {tab.red && rejectedCount > 0 && <span className="discount-rejected-dot" />}
+              </button>
+            ))}
+          </div>
         </div>
 
-        <div className="discount-controls-group">
+        {/* ROW 2: Filter Controls (Homestay select & Search) */}
+        <div className="discount-filter-controls-row">
           <div className="discount-hs-select-wrap">
             <i className="bi bi-house-door" />
             <select
@@ -599,7 +864,7 @@ export default function ManageDiscount() {
             <i className="bi bi-search" />
             <input
               type="text"
-              placeholder="Tìm mã hoặc tên..."
+              placeholder="Tìm mã hoặc tên voucher..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
@@ -644,9 +909,14 @@ export default function ManageDiscount() {
               </div>
             </div>
           ) : (
-            <div className="voucher-cards-grid">
-              {filteredVouchers.map((voucher) => {
-                const isActive = voucher.status === 'active';
+            <>
+              <div className="voucher-cards-grid">
+              {(filter === 'all' ? pagedVouchers : filteredVouchers).map((voucher) => {
+                const s = (voucher.status || '').toLowerCase();
+                const r = (voucher.rawStatus || '').toLowerCase();
+                const isVoucherRejected = s === 'rejected' || r === 'rejected';
+                const isVoucherPending = s === 'pending' || r === 'pending';
+                const isActive = (s === 'active' || r === 'active') && !isVoucherRejected && !isVoucherPending;
                 const percent = voucher.usageLimit
                   ? Math.min(100, Math.round(((voucher.used || 0) / voucher.usageLimit) * 100))
                   : 0;
@@ -654,18 +924,40 @@ export default function ManageDiscount() {
                 return (
                   <div
                     key={voucher.code}
-                    className={`voucher-ticket-card ${voucher.status !== 'active' ? 'is-ended' : ''}`}
+                    className={`voucher-ticket-card ${
+                      isVoucherPending
+                        ? 'is-pending'
+                        : isVoucherRejected
+                        ? 'is-rejected'
+                        : !isActive
+                        ? 'is-ended'
+                        : ''
+                    }`}
                   >
                     {/* Card Header Gradient */}
                     <div className="ticket-header-gradient">
                       <div className="d-flex align-items-center gap-2">
-                        <span className={`ticket-status-badge ${voucher.status}`}>
-                          {isActive && <span className="status-dot-blink" />}
-                          {voucher.status === 'active'
-                            ? 'Đang hoạt động'
-                            : voucher.status === 'upcoming'
-                            ? 'Sắp diễn ra'
-                            : 'Đã tạm ngưng'}
+                        <span className={`ticket-status-badge ${isVoucherRejected ? 'rejected' : isVoucherPending ? 'pending' : voucher.status}`}>
+                          {isVoucherPending ? (
+                            <>
+                              <i className="bi bi-hourglass-split me-1" />
+                              Chờ Admin duyệt
+                            </>
+                          ) : isVoucherRejected ? (
+                            <>
+                              <i className="bi bi-x-circle-fill me-1" />
+                              Bị Admin từ chối
+                            </>
+                          ) : isActive ? (
+                            <>
+                              <span className="status-dot-blink" />
+                              Đang hoạt động
+                            </>
+                          ) : voucher.status === 'upcoming' ? (
+                            'Sắp diễn ra'
+                          ) : (
+                            'Đã tạm ngưng'
+                          )}
                         </span>
                         {voucher.homestayName && (
                           <span className="ticket-homestay-tag" title={voucher.homestayName}>
@@ -676,8 +968,21 @@ export default function ManageDiscount() {
 
                       <div
                         className="toggle-wrap"
-                        title={isActive ? 'Nhấn để tạm ngưng mã' : 'Nhấn để kích hoạt mã'}
+                        title={
+                          voucher.status === 'pending'
+                            ? 'Mã đang chờ Admin duyệt, chưa thể bật/tắt'
+                            : voucher.status === 'rejected'
+                            ? 'Mã đã bị Admin từ chối phê duyệt'
+                            : isActive
+                            ? 'Nhấn để tạm ngưng mã'
+                            : 'Nhấn để kích hoạt mã'
+                        }
                         onClick={() => handleToggleStatus(voucher)}
+                        style={
+                          voucher.status === 'pending' || voucher.status === 'rejected'
+                            ? { opacity: 0.45, cursor: 'not-allowed' }
+                            : {}
+                        }
                       >
                         <div className={`toggle-switch ${isActive ? 'on' : ''}`}>
                           <div className="toggle-slider" />
@@ -687,6 +992,18 @@ export default function ManageDiscount() {
 
                     {/* Card Body */}
                     <div className="ticket-body-content">
+                      {voucher.status === 'pending' && (
+                        <div className="ticket-pending-alert">
+                          <i className="bi bi-clock-history me-1" />
+                          <span>Mã đang chờ Admin phê duyệt trước khi có thể áp dụng cho du khách.</span>
+                        </div>
+                      )}
+                      {voucher.status === 'rejected' && (
+                        <div className="ticket-rejected-alert">
+                          <i className="bi bi-x-octagon-fill me-1" />
+                          <span>Mã này đã bị Admin từ chối phê duyệt. Bạn có thể chỉnh sửa lại thông tin hoặc xoá mã.</span>
+                        </div>
+                      )}
                       <div className="ticket-discount-row">
                         <div className="ticket-discount-title-group">
                           <div>
@@ -797,8 +1114,48 @@ export default function ManageDiscount() {
                 );
               })}
             </div>
-          )}
-        </div>
+
+            {/* ── PHÂN TRANG (chỉ hiện ở tab Tất cả) ────────────── */}
+            {filter === 'all' && totalPages > 1 && (
+              <div className="discount-pagination">
+                <button
+                  className="discount-page-btn"
+                  disabled={safePage <= 1}
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  title="Trang trước"
+                >
+                  <i className="bi bi-chevron-left" />
+                </button>
+
+                <div className="discount-page-numbers">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((num) => (
+                    <button
+                      key={num}
+                      className={`discount-page-num ${num === safePage ? 'active' : ''}`}
+                      onClick={() => setCurrentPage(num)}
+                    >
+                      {num}
+                    </button>
+                  ))}
+                </div>
+
+                <button
+                  className="discount-page-btn"
+                  disabled={safePage >= totalPages}
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  title="Trang sau"
+                >
+                  <i className="bi bi-chevron-right" />
+                </button>
+
+                <span className="discount-page-info">
+                  {(safePage - 1) * PAGE_SIZE + 1}–{Math.min(safePage * PAGE_SIZE, filteredVouchers.length)} / {filteredVouchers.length} mã
+                </span>
+              </div>
+            )}
+          </>
+        )}
+      </div>
 
         {/* RIGHT COLUMN: TELEMETRY & PRO TIPS */}
         <div className="discount-side-cards">
@@ -914,6 +1271,18 @@ export default function ManageDiscount() {
 
             <form onSubmit={handleSaveVoucher}>
               <div className="bk-body-scrollable">
+                {activeModal === 'add' && (
+                  <div className="discount-modal-pending-notice">
+                    <i className="bi bi-shield-check text-warning fs-5 me-2" />
+                    <div>
+                      <strong style={{ color: '#92400e' }}>Cần phê duyệt từ Quản trị viên (Admin):</strong>
+                      <p className="mb-0 text-muted" style={{ fontSize: 13, marginTop: 2 }}>
+                        Mã giảm giá sau khi tạo sẽ được chuyển sang trạng thái <strong>Chờ duyệt</strong> và gửi tới Admin xét duyệt trước khi chính thức áp dụng cho du khách.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
                 <div className="form-group-item">
                   <label className="form-label-title">Tên chương trình ưu đãi</label>
                   <input
@@ -1103,16 +1472,23 @@ export default function ManageDiscount() {
                   />
                 </div>
 
-                <label className="d-flex align-items-center gap-2 small">
-                  <input
-                    type="checkbox"
-                    checked={formData.active}
-                    onChange={(e) =>
-                      setFormData({ ...formData, active: e.target.checked })
-                    }
-                  />
-                  <span>Kích hoạt mã ngay sau khi lưu</span>
-                </label>
+                {activeModal === 'edit' ? (
+                  <label className="d-flex align-items-center gap-2 small">
+                    <input
+                      type="checkbox"
+                      checked={formData.active}
+                      onChange={(e) =>
+                        setFormData({ ...formData, active: e.target.checked })
+                      }
+                    />
+                    <span>Kích hoạt mã ngay sau khi lưu</span>
+                  </label>
+                ) : (
+                  <div className="d-flex align-items-center gap-2 text-warning small">
+                    <i className="bi bi-clock-history" />
+                    <span>Mã sẽ ở trạng thái Chờ duyệt cho đến khi Admin phê duyệt.</span>
+                  </div>
+                )}
               </div>
 
               <div className="bk-footer-styled">
@@ -1124,7 +1500,8 @@ export default function ManageDiscount() {
                   Hủy
                 </button>
                 <button type="submit" className="btn-primary-action">
-                  <i className="bi bi-save me-1" /> Lưu mã giảm giá
+                  <i className={`bi ${activeModal === 'add' ? 'bi-send-check' : 'bi-save'} me-1`} />
+                  {activeModal === 'add' ? 'Gửi duyệt mã giảm giá' : 'Lưu thay đổi'}
                 </button>
               </div>
             </form>
@@ -1207,6 +1584,18 @@ export default function ManageDiscount() {
               </div>
 
               <div className="p-2 bg-light rounded small mt-2">
+                <div className="d-flex justify-content-between align-items-center mb-1">
+                  <span className="text-muted">Trạng thái:</span>
+                  <span className={`ticket-status-badge ${selectedVoucher.status}`}>
+                    {selectedVoucher.status === 'pending'
+                      ? 'Chờ Admin duyệt'
+                      : selectedVoucher.status === 'active'
+                      ? 'Đang hoạt động'
+                      : selectedVoucher.status === 'upcoming'
+                      ? 'Sắp diễn ra'
+                      : 'Đã tạm ngưng'}
+                  </span>
+                </div>
                 <div className="d-flex justify-content-between mb-1">
                   <span className="text-muted">Cơ sở áp dụng:</span>
                   <strong>{selectedVoucher.homestayName || 'Toàn bộ cơ sở YÊN'}</strong>
