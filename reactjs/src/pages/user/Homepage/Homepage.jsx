@@ -771,15 +771,6 @@ export default function Homepage() {
       const topPicks = scoredList.filter(h => h.matchScore >= 70 || h.matchPercentage >= 94);
       return topPicks.length >= 3 ? topPicks : scoredList.slice(0, 10);
     }
-    if (personalizedFilter === 'popular') {
-      return [...scoredList].sort((a, b) => {
-        const rB = parseFloat(b.rating) || 5;
-        const rA = parseFloat(a.rating) || 5;
-        const revB = Number(b.reviews) || 0;
-        const revA = Number(a.reviews) || 0;
-        return (rB * 100 + revB) - (rA * 100 + revA);
-      });
-    }
     if (personalizedFilter === 'nature') {
       const natureList = scoredList.filter(h => {
         const text = `${h.name || ''} ${h.amenities || ''} ${h.location || ''}`.toLowerCase();
@@ -1761,7 +1752,6 @@ export default function Homepage() {
             {[
               { key: 'all', label: 'Tất cả gợi ý', icon: 'bi-sparkles' },
               { key: 'for-you', label: 'Gợi ý tốt nhất', icon: 'bi-stars' },
-              { key: 'popular', label: 'Được yêu thích nhất', icon: 'bi-fire' },
               { key: 'nature', label: 'Gần gũi thiên nhiên', icon: 'bi-tree' },
               { key: 'budget', label: 'Giá tốt tiết kiệm', icon: 'bi-tag' }
             ].map(chip => (
