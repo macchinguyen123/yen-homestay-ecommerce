@@ -289,12 +289,13 @@ export default function Homepage() {
   const [wishlistIds, setWishlistIds] = useState(new Set());
   const [toast, setToast] = useState({ show: false, msg: '' });
 
-  // Tương tác người dùng (lượt xem, lượt đặt phòng) phục vụ gợi ý cá nhân hóa
+  // Tương tác người dùng (lượt xem, lượt đặt phòng, tìm kiếm) phục vụ gợi ý cá nhân hóa
   const [userInteractions, setUserInteractions] = useState({
     viewedIds: new Set(),
     viewedCities: [],
     bookedIds: new Set(),
-    bookedCities: []
+    bookedCities: [],
+    searchedCities: []
   });
 
   // Tải danh sách homestay yêu thích từ CSDL
@@ -312,14 +313,29 @@ export default function Homepage() {
       }
     });
 
-    if (user?.id) {
-      viewedHistoryService.getViewedHistory(user.id).then(res => {
-        if (res?.data && Array.isArray(res.data)) {
-          const vIds = new Set(res.data.map(item => Number(item.id || item.homestayId)));
-          const vCities = res.data.map(item => getCitySlug(item.city, item.address || item.location)).filter(Boolean);
-          setUserInteractions(prev => ({ ...prev, viewedIds: vIds, viewedCities: vCities }));
+    // Lấy lịch sử xem phòng (cả user đã đăng nhập hoặc khách xem gần đây)
+    const targetUserId = user?.id || 10;
+    viewedHistoryService.getViewedHistory(targetUserId).then(res => {
+      if (res?.data && Array.isArray(res.data)) {
+        const vIds = new Set(res.data.map(item => Number(item.id || item.homestayId)));
+        const vCities = res.data.map(item => getCitySlug(item.city, item.address || item.location)).filter(Boolean);
+        setUserInteractions(prev => ({ ...prev, viewedIds: vIds, viewedCities: vCities }));
+      }
+    });
+
+    // Đọc lịch sử tìm kiếm từ LocalStorage để gợi ý địa điểm tương ứng
+    try {
+      const historyStr = localStorage.getItem('yen_search_history');
+      if (historyStr) {
+        const terms = JSON.parse(historyStr);
+        if (Array.isArray(terms)) {
+          const sCities = terms.map(term => getCitySlug(term, term)).filter(Boolean);
+          setUserInteractions(prev => ({ ...prev, searchedCities: [...new Set(sCities)] }));
         }
-      });
+      }
+    } catch (e) {}
+
+    if (user?.id) {
       try {
         const cachedBookings = bookingService.getCachedUserBookings(user.id);
         if (Array.isArray(cachedBookings) && cachedBookings.length > 0) {
@@ -613,6 +629,11 @@ export default function Homepage() {
     }, 450);
   };
 
+  const handleOpenAiAssistant = (topic = 'gợi ý homestay') => {
+    triggerToast('Đang kết nối với Trợ lý Bé Yến để gợi ý homestay...');
+    window.dispatchEvent(new CustomEvent('toggle-yen-chat', { detail: { topic } }));
+  };
+
   // Danh sách homestay tổng hợp để gợi ý trực tiếp
   const allAvailableHomestays = useMemo(() => {
     const map = new Map();
@@ -659,7 +680,7 @@ export default function Homepage() {
     return list.filter((h) => h.city === favCityFilter);
   }, [homeData.favoritesHomestays, favCityFilter]);
 
-  // Thuật toán gợi ý homestay cá nhân hoá theo lượt thích, đặt, xem
+  // Thuật toán gợi ý homestay cá nhân hoá theo lượt thích, đặt, xem, tìm kiếm
   const personalizedHomestays = useMemo(() => {
     const allHomestays = [
       ...(homeData.hotHomestays || []),
@@ -680,18 +701,20 @@ export default function Homepage() {
       .map(h => h.city);
 
     const preferredCities = new Set([
-      ...userInteractions.viewedCities,
-      ...userInteractions.bookedCities,
+      ...(userInteractions.viewedCities || []),
+      ...(userInteractions.bookedCities || []),
+      ...(userInteractions.searchedCities || []),
       ...wishlistCities
     ]);
 
     const scoredList = pool.map((h, index) => {
-      let score = 50;
+      let score = 55;
       let matchReason = 'Gợi ý từ AI Yên';
       const id = Number(h.id);
       const isLiked = wishlistIds.has(id);
-      const isBooked = userInteractions.bookedIds.has(id);
-      const isViewed = userInteractions.viewedIds.has(id);
+      const isBooked = userInteractions.bookedIds?.has(id);
+      const isViewed = userInteractions.viewedIds?.has(id);
+      const isSearchedCity = userInteractions.searchedCities?.includes(h.city);
       const isPreferredCity = preferredCities.has(h.city);
 
       if (isBooked) {
@@ -702,13 +725,16 @@ export default function Homepage() {
         matchReason = 'Đã lưu trong mục Yêu thích';
       } else if (isViewed) {
         score += 35;
-        matchReason = 'Dựa trên lịch sử xem gần đây';
+        matchReason = 'Dựa trên homestay bạn vừa xem';
+      } else if (isSearchedCity) {
+        score += 30;
+        matchReason = 'Khớp điểm đến bạn vừa tìm';
       } else if (isPreferredCity) {
         score += 25;
         matchReason = 'Cùng điểm đến bạn yêu thích';
       }
 
-      const ratingNum = parseFloat(h.rating) || 4.5;
+      const ratingNum = parseFloat(h.rating) || 4.8;
       score += ratingNum * 4;
 
       let personalTag = h.tag || 'Gợi ý cho bạn';
@@ -718,7 +744,7 @@ export default function Homepage() {
         personalTag = 'Homestay quen thuộc';
       } else if (isViewed) {
         personalTag = 'Bạn vừa xem gần đây';
-      } else if (isPreferredCity) {
+      } else if (isSearchedCity || isPreferredCity) {
         personalTag = 'Hợp gu du lịch';
       } else if (score > 80 || index % 3 === 0) {
         personalTag = 'Khớp 98% sở thích';
@@ -728,9 +754,12 @@ export default function Homepage() {
         personalTag = 'Lựa chọn hoàn hảo';
       }
 
+      const matchPercentage = Math.min(99, Math.max(88, Math.round(score >= 100 ? 98 : (score / 105) * 98) + (index % 3)));
+
       return {
         ...h,
         matchScore: score,
+        matchPercentage,
         matchReason,
         personalTag
       };
@@ -738,30 +767,31 @@ export default function Homepage() {
 
     scoredList.sort((a, b) => b.matchScore - a.matchScore);
 
+    if (personalizedFilter === 'for-you') {
+      const topPicks = scoredList.filter(h => h.matchScore >= 70 || h.matchPercentage >= 94);
+      return topPicks.length >= 3 ? topPicks : scoredList.slice(0, 10);
+    }
+    if (personalizedFilter === 'popular') {
+      return [...scoredList].sort((a, b) => {
+        const rB = parseFloat(b.rating) || 5;
+        const rA = parseFloat(a.rating) || 5;
+        const revB = Number(b.reviews) || 0;
+        const revA = Number(a.reviews) || 0;
+        return (rB * 100 + revB) - (rA * 100 + revA);
+      });
+    }
     if (personalizedFilter === 'nature') {
-      return scoredList.filter(h => 
-        (h.name + ' ' + (h.amenities || '') + ' ' + (h.location || '')).toLowerCase().match(/vườn|núi|rừng|đồi|suối|sinh thái|săn mây/)
-      );
-    }
-    if (personalizedFilter === 'pool') {
-      return scoredList.filter(h => 
-        (h.amenities || '').toLowerCase().includes('hồ bơi') || (h.name || '').toLowerCase().includes('villa')
-      );
-    }
-    if (personalizedFilter === 'cloud') {
-      return scoredList.filter(h => 
-        ['dalat', 'sapa'].includes(h.city) || (h.name + ' ' + (h.amenities || '')).toLowerCase().includes('mây')
-      );
-    }
-    if (personalizedFilter === 'beach') {
-      return scoredList.filter(h => 
-        ['danang', 'phuquoc'].includes(h.city) || (h.location || '').toLowerCase().match(/vũng tàu|biển|đảo|nha trang/)
-      );
+      const natureList = scoredList.filter(h => {
+        const text = `${h.name || ''} ${h.amenities || ''} ${h.location || ''}`.toLowerCase();
+        return /vườn|núi|rừng|đồi|suối|sinh thái|săn mây|biển|thung lũng|hồ|cây|view/.test(text);
+      });
+      return natureList.length > 0 ? natureList : scoredList;
     }
     if (personalizedFilter === 'budget') {
-      return scoredList.filter(h => {
-        const num = parseInt(String(h.price).replace(/\D/g, ''), 10);
-        return num && num <= 1000000;
+      return [...scoredList].sort((a, b) => {
+        const pA = parseInt(String(a.price || '').replace(/\D/g, ''), 10) || 1200000;
+        const pB = parseInt(String(b.price || '').replace(/\D/g, ''), 10) || 1200000;
+        return pA - pB;
       });
     }
 
@@ -1688,166 +1718,164 @@ export default function Homepage() {
       </section>
 
       {/* 5B. PERSONALIZED HOMESTAY RECOMMENDATIONS (GỢI Ý CÁ NHÂN HÓA PHÙ HỢP VỚI TỪNG NGƯỜI) */}
-      <section className="personalized-section" style={{ padding: '48px 0', background: '#F8FAFC', borderTop: '1px solid #E2E8F0', borderBottom: '1px solid #E2E8F0' }}>
+      <section className="personalized-section">
         <div className="hp-container">
-          <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px', marginBottom: '16px' }}>
+          <div className="personalized-header-row">
             <div>
               <span className="section-badge-top" style={{ color: '#059669' }}>
                 <i className="bi bi-stars" /> Dành riêng cho bạn · AI Cá nhân hóa
               </span>
               <h2 className="section-title">Gợi ý homestay phù hợp với bạn</h2>
-              <p className="section-subtitle" style={{ marginBottom: 0 }}>
-                Tuyển chọn theo homestay bạn đã thích, lịch sử xem phòng và xu hướng đặt phòng của riêng bạn
+              <p className="section-subtitle">
+                Được cá nhân hóa theo gu du lịch, lịch sử xem phòng và xu hướng trải nghiệm nghỉ dưỡng của riêng bạn
               </p>
             </div>
-            {currentUser && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#ECFDF5', border: '1px solid #A7F3D0', padding: '6px 14px', borderRadius: '9999px', fontSize: '0.82rem', color: '#047857', fontWeight: 600 }}>
-                <i className="bi bi-person-check-fill" />
-                <span>Chào {currentUser.fullName?.split(' ')[0] || 'bạn'} · Gợi ý theo gu du lịch của bạn</span>
-              </div>
-            )}
+
+            <div className="personalized-header-actions">
+              {currentUser ? (
+                <div className="personalized-user-pill">
+                  <i className="bi bi-person-check-fill" />
+                  <span>Chào <strong>{currentUser.fullName?.split(' ')[0] || 'bạn'}</strong> · Đang cá nhân hóa</span>
+                </div>
+              ) : (
+                <div className="personalized-user-pill guest">
+                  <i className="bi bi-sparkles" />
+                  <span>Gợi ý thông minh cho chuyến đi của bạn</span>
+                </div>
+              )}
+
+              <button
+                type="button"
+                className="btn-ai-consult-pill"
+                onClick={() => handleOpenAiAssistant('Gợi ý homestay phù hợp cho tôi')}
+                title="Mở Bé Yên AI để được gợi ý phòng theo yêu cầu"
+              >
+                <i className="bi bi-robot" />
+                <span>Nhờ Bé Yên tư vấn</span>
+              </button>
+            </div>
           </div>
 
           {/* Quick preference filter chips */}
-          <div className="personalized-filter-chips" style={{ display: 'flex', alignItems: 'center', gap: '8px', overflowX: 'auto', paddingBottom: '12px', scrollbarWidth: 'none', margin: '14px 0 18px 0' }}>
+          <div className="personalized-filter-chips">
             {[
               { key: 'all', label: 'Tất cả gợi ý', icon: 'bi-sparkles' },
+              { key: 'for-you', label: 'Gợi ý tốt nhất', icon: 'bi-stars' },
+              { key: 'popular', label: 'Được yêu thích nhất', icon: 'bi-fire' },
               { key: 'nature', label: 'Gần gũi thiên nhiên', icon: 'bi-tree' },
-              { key: 'pool', label: 'Có hồ bơi riêng', icon: 'bi-water' },
-              { key: 'cloud', label: 'Săn mây view núi', icon: 'bi-cloud-sun' },
-              { key: 'beach', label: 'Nghỉ dưỡng gần biển', icon: 'bi-tsunami' },
-              { key: 'budget', label: 'Giá tốt dưới 1 triệu', icon: 'bi-tag' }
+              { key: 'budget', label: 'Giá tốt tiết kiệm', icon: 'bi-tag' }
             ].map(chip => (
               <button
                 key={chip.key}
                 type="button"
                 className={`city-tab ${personalizedFilter === chip.key ? 'active' : ''}`}
-                style={{ whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem' }}
                 onClick={() => {
                   setPersonalizedFilter(chip.key);
-                  if (personalizedSliderRef.current) personalizedSliderRef.current.scrollLeft = 0;
+                  if (personalizedSliderRef.current) {
+                    personalizedSliderRef.current.scrollTo({ left: 0, behavior: 'smooth' });
+                  }
                 }}
               >
                 <i className={`bi ${chip.icon}`} />
-                {chip.label}
+                <span>{chip.label}</span>
               </button>
             ))}
           </div>
 
           <div className="homestay-slider-wrap" style={{ position: 'relative', width: '100%' }}>
-            <button
-              type="button"
-              className="homestay-slider-arrow arrow-prev"
-              style={{
-                position: 'absolute',
-                top: '50%',
-                left: '-20px',
-                transform: 'translateY(-50%)',
-                zIndex: 35,
-                width: '44px',
-                height: '52px',
-                borderRadius: '12px',
-                background: 'rgba(255, 255, 255, 0.75)',
-                backdropFilter: 'blur(12px)',
-                WebkitBackdropFilter: 'blur(12px)',
-                border: '1.5px solid rgba(255, 255, 255, 0.85)',
-                boxShadow: '0 6px 20px rgba(15, 23, 42, 0.14)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '1.25rem',
-                color: '#1E293B',
-                cursor: 'pointer',
-                outline: 'none',
-                transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
-              }}
-              onClick={() => scrollSlider(personalizedSliderRef, -1)}
-              aria-label="Xem homestay trước"
-            >
-              <i className="bi bi-chevron-left" />
-            </button>
+            {personalizedHomestays && personalizedHomestays.length > 0 ? (
+              <>
+                <button
+                  type="button"
+                  className="homestay-slider-arrow arrow-prev"
+                  onClick={() => scrollSlider(personalizedSliderRef, -1)}
+                  aria-label="Xem homestay trước"
+                >
+                  <i className="bi bi-chevron-left" />
+                </button>
 
-            <div className="homestay-slider-track" ref={personalizedSliderRef}>
-              {(personalizedHomestays || []).map((h) => (
-                <div key={`p-${h.id}`} className="homestay-slider-item">
-                  <div className="homestay-card">
-                    <div className="card-img-wrapper">
-                      <span className="card-top-tag" style={{ background: 'linear-gradient(135deg, #059669 0%, #047857 100%)', color: '#FFF' }}>
-                        <i className="bi bi-stars" /> {h.personalTag}
-                      </span>
-                      <button
-                        type="button"
-                        className={`card-wishlist-btn ${isWishlisted(h.id, h.name) ? 'active' : ''}`}
-                        onClick={(e) => toggleWishlist(h, e)}
-                        title={isWishlisted(h.id, h.name) ? 'Bỏ yêu thích' : 'Lưu vào yêu thích'}
-                      >
-                        <i className={`bi ${isWishlisted(h.id, h.name) ? 'bi-heart-fill' : 'bi-heart'}`} />
-                      </button>
-                      <Link to={`/homestay/${h.id || 'doi'}`} state={{ homestay: h }} style={{ display: 'block', height: '100%' }}>
-                        <img src={h.img || 'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=600&q=80'} alt={h.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                      </Link>
-                    </div>
-                    <div className="card-body">
-                      <div className="card-location-rating">
-                        <span className="card-location"><i className="bi bi-geo-alt-fill text-success" /> {h.location}</span>
-                        <span className="card-rating"><i className="bi bi-star-fill" /> {h.rating} ({h.reviews})</span>
-                      </div>
-                      <h3 className="card-title"><Link to={`/homestay/${h.id}`} state={{ homestay: h }}>{h.name}</Link></h3>
-                      <div className="card-specs"><span>{h.specs}</span></div>
-                      
-                      {/* Lý do gợi ý cá nhân hóa */}
-                      <div style={{ margin: '4px 0 6px', padding: '3px 8px', background: '#ECFDF5', borderRadius: '6px', fontSize: '0.74rem', color: '#065F46', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px', width: 'fit-content' }}>
-                        <i className="bi bi-magic" style={{ color: '#059669' }} /> {h.matchReason}
-                      </div>
+                <div className="homestay-slider-track" ref={personalizedSliderRef}>
+                  {personalizedHomestays.map((h) => (
+                    <div key={`p-${h.id}`} className="homestay-slider-item">
+                      <div className="homestay-card">
+                        <div className="card-img-wrapper">
+                          <span className="card-top-tag tag-ai-personalized">
+                            <i className="bi bi-stars" /> {h.personalTag}
+                          </span>
 
-                      <div className="card-amenities-box">
-                        <span className="amenities-label">Tiện nghi nổi bật:</span>
-                        <p className="amenities-items">{formatAmenities(h.amenities)}</p>
-                      </div>
-                      <div className="card-footer-row">
-                        <div>
-                          <span className="price-label">Giá từ:</span>
-                          <span className="card-price">{h.price}</span>
+                          <span className="card-match-badge" title="Độ phù hợp gợi ý bởi AI">
+                            <i className="bi bi-patch-check-fill" /> {h.matchPercentage}% Phù hợp
+                          </span>
+
+                          <button
+                            type="button"
+                            className={`card-wishlist-btn ${isWishlisted(h.id, h.name) ? 'active' : ''}`}
+                            onClick={(e) => toggleWishlist(h, e)}
+                            title={isWishlisted(h.id, h.name) ? 'Bỏ yêu thích' : 'Lưu vào yêu thích'}
+                          >
+                            <i className={`bi ${isWishlisted(h.id, h.name) ? 'bi-heart-fill' : 'bi-heart'}`} />
+                          </button>
+
+                          <Link to={`/homestay/${h.id || 'doi'}`} state={{ homestay: h }} style={{ display: 'block', height: '100%' }}>
+                            <img src={h.img || 'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=600&q=80'} alt={h.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          </Link>
                         </div>
-                        <Link to={`/homestay/${h.id}`} state={{ homestay: h }} className="btn-view-room">Xem homestay</Link>
+
+                        <div className="card-body">
+                          <div className="card-location-rating">
+                            <span className="card-location"><i className="bi bi-geo-alt-fill text-success" /> {h.location}</span>
+                            <span className="card-rating"><i className="bi bi-star-fill" /> {h.rating} ({h.reviews})</span>
+                          </div>
+                          <h3 className="card-title"><Link to={`/homestay/${h.id}`} state={{ homestay: h }}>{h.name}</Link></h3>
+                          <div className="card-specs"><span>{h.specs}</span></div>
+                          
+                          {/* Lý do gợi ý cá nhân hóa */}
+                          <div className="personalized-match-pill" title="Lý do homestay này được đề xuất cho bạn">
+                            <i className="bi bi-magic" />
+                            <span>{h.matchReason}</span>
+                          </div>
+
+                          <div className="card-amenities-box">
+                            <span className="amenities-label">Tiện nghi nổi bật:</span>
+                            <p className="amenities-items">{formatAmenities(h.amenities)}</p>
+                          </div>
+                          <div className="card-footer-row">
+                            <div>
+                              <span className="price-label">Giá từ:</span>
+                              <span className="card-price">{h.price}</span>
+                            </div>
+                            <Link to={`/homestay/${h.id}`} state={{ homestay: h }} className="btn-view-room">Xem homestay</Link>
+                          </div>
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  ))}
                 </div>
-              ))}
-            </div>
 
-            <button
-              type="button"
-              className="homestay-slider-arrow arrow-next"
-              style={{
-                position: 'absolute',
-                top: '50%',
-                right: '-20px',
-                transform: 'translateY(-50%)',
-                zIndex: 35,
-                width: '44px',
-                height: '52px',
-                borderRadius: '12px',
-                background: 'rgba(255, 255, 255, 0.75)',
-                backdropFilter: 'blur(12px)',
-                WebkitBackdropFilter: 'blur(12px)',
-                border: '1.5px solid rgba(255, 255, 255, 0.85)',
-                boxShadow: '0 6px 20px rgba(15, 23, 42, 0.14)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '1.25rem',
-                color: '#1E293B',
-                cursor: 'pointer',
-                outline: 'none',
-                transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
-              }}
-              onClick={() => scrollSlider(personalizedSliderRef, 1)}
-              aria-label="Xem homestay tiếp theo"
-            >
-              <i className="bi bi-chevron-right" />
-            </button>
+                <button
+                  type="button"
+                  className="homestay-slider-arrow arrow-next"
+                  onClick={() => scrollSlider(personalizedSliderRef, 1)}
+                  aria-label="Xem homestay tiếp theo"
+                >
+                  <i className="bi bi-chevron-right" />
+                </button>
+              </>
+            ) : (
+              <div className="personalized-empty-box">
+                <div className="empty-icon"><i className="bi bi-compass" /></div>
+                <h4>Chưa tìm thấy homestay nào khớp với bộ lọc này</h4>
+                <p>Bạn có thể chuyển sang bộ lọc khác hoặc để Trợ lý AI Bé Yến tư vấn căn homestay theo đúng sở thích của bạn!</p>
+                <div className="empty-actions">
+                  <button type="button" className="btn-empty-reset" onClick={() => setPersonalizedFilter('all')}>
+                    <i className="bi bi-arrow-counterclockwise" /> Xem tất cả gợi ý
+                  </button>
+                  <button type="button" className="btn-empty-ai" onClick={() => handleOpenAiAssistant('Tư vấn homestay theo gu của tôi')}>
+                    <i className="bi bi-robot" /> Nhờ Bé Yến AI tư vấn ngay
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </section>
