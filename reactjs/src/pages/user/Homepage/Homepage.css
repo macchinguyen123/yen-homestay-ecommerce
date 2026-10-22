@@ -2007,3 +2007,282 @@
   }
 }
 
+/* ========================================================
+   5B. PERSONALIZED HOMESTAY RECOMMENDATIONS (AI GỢI Ý)
+   ======================================================== */
+.personalized-section {
+  padding: 56px 0;
+  background: linear-gradient(180deg, #F8FAFC 0%, #F1F5F9 100%);
+  border-top: 1px solid #E2E8F0;
+  border-bottom: 1px solid #E2E8F0;
+  position: relative;
+  overflow: hidden;
+}
+
+.personalized-header-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.personalized-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.personalized-user-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #ECFDF5;
+  border: 1px solid #A7F3D0;
+  color: #047857;
+  padding: 8px 16px;
+  border-radius: 9999px;
+  font-size: 0.84rem;
+  font-weight: 600;
+  box-shadow: 0 2px 6px rgba(16, 185, 129, 0.08);
+}
+
+.personalized-user-pill.guest {
+  background: #EFF6FF;
+  border-color: #BFDBFE;
+  color: #1D4ED8;
+}
+
+.personalized-user-pill i {
+  font-size: 0.95rem;
+  color: #059669;
+}
+
+.personalized-user-pill.guest i {
+  color: #2563EB;
+}
+
+.btn-ai-consult-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 18px;
+  border-radius: 9999px;
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
+  color: #FFFFFF;
+  border: none;
+  font-size: 0.86rem;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(5, 150, 105, 0.25);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.btn-ai-consult-pill:hover {
+  background: linear-gradient(135deg, #047857 0%, #065F46 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(5, 150, 105, 0.35);
+}
+
+.btn-ai-consult-pill i {
+  font-size: 1.05rem;
+}
+
+.personalized-filter-chips {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+  scrollbar-width: none;
+  margin: 16px 0 24px 0;
+}
+
+.personalized-filter-chips::-webkit-scrollbar {
+  display: none;
+}
+
+.personalized-filter-chips .city-tab {
+  white-space: nowrap !important;
+  flex-shrink: 0 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  padding: 10px 22px !important;
+  font-size: 0.9rem !important;
+  font-weight: 700 !important;
+  border-radius: 9999px !important;
+  background: #FFFFFF !important;
+  border: 1.5px solid #CBD5E1 !important;
+  color: #334155 !important;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.04) !important;
+  cursor: pointer !important;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.personalized-filter-chips .city-tab i {
+  font-size: 1rem;
+}
+
+.personalized-filter-chips .city-tab:hover {
+  border-color: #10B981 !important;
+  color: #059669 !important;
+  background: #F0FDF4 !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.15) !important;
+}
+
+.personalized-filter-chips .city-tab.active {
+  background: #15803D !important;
+  color: #FFFFFF !important;
+  border-color: #15803D !important;
+  box-shadow: 0 4px 14px rgba(21, 128, 61, 0.28) !important;
+}
+
+.personalized-filter-chips .city-tab.active i {
+  color: #FFFFFF !important;
+}
+
+.tag-ai-personalized {
+  background: linear-gradient(135deg, #059669 0%, #047857 100%) !important;
+  color: #FFFFFF !important;
+  box-shadow: 0 2px 8px rgba(5, 150, 105, 0.3);
+}
+
+.card-match-badge {
+  position: absolute;
+  top: 14px;
+  right: 56px;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  color: #047857;
+  font-size: 0.74rem;
+  font-weight: 800;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  border: 1px solid rgba(167, 243, 208, 0.8);
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.1);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  z-index: 10;
+}
+
+.card-match-badge i {
+  color: #059669;
+  font-size: 0.8rem;
+}
+
+.personalized-match-pill {
+  margin: 4px 0 8px;
+  padding: 4px 10px;
+  background: #ECFDF5;
+  border: 1px solid #D1FAE5;
+  border-radius: 8px;
+  font-size: 0.75rem;
+  color: #065F46;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+  max-width: 100%;
+}
+
+.personalized-match-pill i {
+  color: #059669;
+  font-size: 0.85rem;
+  flex-shrink: 0;
+}
+
+.personalized-empty-box {
+  background: #FFFFFF;
+  border: 1.5px dashed #CBD5E1;
+  border-radius: 20px;
+  padding: 48px 24px;
+  text-align: center;
+  margin: 10px 0 24px;
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.04);
+}
+
+.personalized-empty-box .empty-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: #F0FDF4;
+  color: #059669;
+  font-size: 1.8rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 16px;
+}
+
+.personalized-empty-box h4 {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #1E293B;
+  margin-bottom: 8px;
+}
+
+.personalized-empty-box p {
+  color: #64748B;
+  font-size: 0.92rem;
+  max-width: 520px;
+  margin: 0 auto 20px;
+  line-height: 1.6;
+}
+
+.personalized-empty-box .empty-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.btn-empty-reset {
+  background: #F1F5F9;
+  color: #334155;
+  border: 1.5px solid #CBD5E1;
+  padding: 9px 20px;
+  border-radius: 10px;
+  font-weight: 700;
+  font-size: 0.88rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+}
+
+.btn-empty-reset:hover {
+  background: #E2E8F0;
+  color: #0F172A;
+}
+
+.btn-empty-ai {
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
+  color: #FFFFFF;
+  border: none;
+  padding: 10px 22px;
+  border-radius: 10px;
+  font-weight: 700;
+  font-size: 0.88rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  box-shadow: 0 4px 14px rgba(5, 150, 105, 0.25);
+  transition: all 0.2s ease;
+}
+
+.btn-empty-ai:hover {
+  background: linear-gradient(135deg, #047857 0%, #065F46 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(5, 150, 105, 0.35);
+}
+
