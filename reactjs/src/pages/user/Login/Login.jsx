@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useGoogleLogin } from '@react-oauth/google';
 import { authService } from '../../../services/authService';
 import { userService } from '../../../services/userService';
+import { initFacebookSdk, loginWithFacebookPopup } from '../../../utils/facebookAuth';
 import './Login.css';
 
 export default function Login() {
@@ -25,10 +26,19 @@ export default function Login() {
   const [resetError, setResetError] = useState('');
   const [resetSuccess, setResetSuccess] = useState('');
 
-  // Modal & Cảnh báo đẹp khi Email Google chưa có trong CSDL
+  // Modal & Cảnh báo đẹp khi Email Google / Facebook chưa có trong CSDL
   const [unregisteredModalOpen, setUnregisteredModalOpen] = useState(false);
-  const [unregisteredData, setUnregisteredData] = useState({ email: '', name: '', avatar: '' });
+  const [unregisteredData, setUnregisteredData] = useState({ email: '', name: '', avatar: '', from: 'google' });
   const [unregisteredAlert, setUnregisteredAlert] = useState('');
+
+  // Loading states cho Social Logins
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const [facebookLoading, setFacebookLoading] = useState(false);
+
+  useEffect(() => {
+    // Khởi tạo trước Facebook SDK
+    initFacebookSdk().catch(() => {});
+  }, []);
 
   const togglePasswordVisibility = () => {
     setShowPassword((prev) => !prev);
@@ -68,11 +78,9 @@ export default function Login() {
     try {
       const res = await authService.forgotPassword(emailToVerify);
       if (res && res.success) {
-        // Tìm thấy email -> Xuất thông báo và chuyển sang bước tiếp theo
         setResetSuccess(res.message || 'Đã tìm thấy tài khoản! Mã xác nhận (OTP) đã được gửi đến email của bạn.');
         setForgotStep(2);
       } else {
-        // Không tìm thấy email -> Xuất thông báo lỗi và giữ nguyên ở bước 1 để nhập lại
         setResetError(res?.message || 'Email này chưa được đăng ký trong hệ thống! Vui lòng kiểm tra lại.');
       }
     } catch (err) {
@@ -130,7 +138,6 @@ export default function Login() {
     }
 
     try {
-      // Gửi yêu cầu xác thực trực tiếp tới CSDL thông qua API
       const result = await authService.login({
         username: username.trim(),
         password: password,
@@ -161,11 +168,8 @@ export default function Login() {
         sessionStorage.setItem('userRole', sessionRole);
         localStorage.setItem('user_role', normalizedRole);
         localStorage.setItem('user', JSON.stringify(dbUser));
-
-        // Kích hoạt cập nhật trạng thái người dùng trên Header & toàn hệ thống
         window.dispatchEvent(new Event('storage'));
 
-        // Phân quyền điều hướng tự động chính xác theo vai trò trong CSDL
         if (normalizedRole === 'ADMIN') {
           navigate('/admin/dashboard');
         } else if (normalizedRole === 'OWNER') {
@@ -179,7 +183,6 @@ export default function Login() {
           }
         }
       } else {
-        // Thông báo lỗi chuẩn từ CSDL nếu tài khoản hoặc mật khẩu sai
         alert(result?.message || 'Tài khoản hoặc mật khẩu không chính xác!');
       }
     } catch (err) {
@@ -187,19 +190,14 @@ export default function Login() {
     }
   };
 
-  const [googleLoading, setGoogleLoading] = useState(false);
-
   /**
-   * Đăng nhập bằng Google: lấy ID Token từ Google rồi gửi lên backend xác thực.
-   * Dùng flow "implicit" để nhận id_token trực tiếp.
+   * Đăng nhập bằng Google
    */
   const handleGoogleLogin = useGoogleLogin({
     flow: 'implicit',
     onSuccess: async (tokenResponse) => {
       setGoogleLoading(true);
       try {
-        // tokenResponse.access_token dùng để lấy userInfo từ Google
-        // Sau đó gửi lên backend thông qua userinfo endpoint
         const userInfoRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
           headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
         });
@@ -211,20 +209,19 @@ export default function Login() {
           return;
         }
 
-        // BƯỚC 1: Bắt buộc kiểm tra trực tiếp vào CSDL Neon xem email đã tồn tại hay chưa
         const existsInDb = await userService.checkEmailExists(googleEmail);
         if (!existsInDb) {
           setUnregisteredData({
             email: userInfo.email,
             name: userInfo.name || '',
             avatar: userInfo.picture || '',
+            from: 'google',
           });
           setUnregisteredAlert(userInfo.email);
           setUnregisteredModalOpen(true);
           return;
         }
 
-        // BƯỚC 2: Nếu email ĐÃ CÓ trong CSDL -> Mới gửi lên backend xác thực phiên đăng nhập
         const result = await authService.loginWithGoogleUserInfo({
           email: userInfo.email,
           fullName: userInfo.name,
@@ -267,6 +264,7 @@ export default function Login() {
               email: userInfo?.email || result?.email || googleEmail,
               name: userInfo?.name || result?.fullName || '',
               avatar: userInfo?.picture || '',
+              from: 'google',
             });
             setUnregisteredAlert(userInfo?.email || result?.email || googleEmail);
             setUnregisteredModalOpen(true);
@@ -285,6 +283,54 @@ export default function Login() {
       setGoogleLoading(false);
     },
   });
+
+  /**
+   * Đăng nhập bằng Facebook
+   */
+  const handleFacebookLogin = async () => {
+    setFacebookLoading(true);
+    try {
+      const fbData = await loginWithFacebookPopup();
+
+      const result = await authService.loginWithFacebook(fbData);
+
+      if (result && result.success && result.user) {
+        const dbUser = result.user;
+        const rawRole = (dbUser.role || 'USER').toUpperCase();
+        let normalizedRole = 'TOURIST';
+        let sessionRole = 'guest';
+        if (rawRole === 'ADMIN') { normalizedRole = 'ADMIN'; sessionRole = 'admin'; }
+        else if (rawRole === 'OWNER' || rawRole === 'HOST') { normalizedRole = 'OWNER'; sessionRole = 'host'; }
+
+        sessionStorage.setItem('isLoggedIn', 'true');
+        sessionStorage.setItem('userName', dbUser.fullName || dbUser.email);
+        sessionStorage.setItem('userId', String(dbUser.id));
+        sessionStorage.setItem('userRole', sessionRole);
+        localStorage.setItem('user_role', normalizedRole);
+        localStorage.setItem('user', JSON.stringify(dbUser));
+        window.dispatchEvent(new Event('storage'));
+
+        if (normalizedRole === 'ADMIN') navigate('/admin/dashboard');
+        else if (normalizedRole === 'OWNER') navigate('/owner/dashboard');
+        else {
+          const redirectUrl = searchParams.get('redirect');
+          navigate(redirectUrl || '/');
+        }
+      } else {
+        alert(result?.message || 'Đăng nhập Facebook thất bại!');
+      }
+    } catch (err) {
+      if (err.message === 'MISSING_APP_ID') {
+        alert(
+          'Chưa cấu hình Facebook App ID trong tệp .env (VITE_FACEBOOK_APP_ID)!\nVui lòng dán App ID Facebook vào tệp .env ở thư mục reactjs để kích hoạt tính năng này.'
+        );
+      } else if (!err.message?.includes('hủy')) {
+        alert('Lỗi đăng nhập Facebook: ' + (err.message || 'Vui lòng thử lại sau!'));
+      }
+    } finally {
+      setFacebookLoading(false);
+    }
+  };
 
   return (
     <div className="login-root">
@@ -340,7 +386,7 @@ export default function Login() {
             <p className="login-card-subtitle">Chào mừng bạn quay trở lại với Homestay Việt Nam</p>
           </div>
 
-          {/* Cảnh báo đẹp khi email Google chưa có trong CSDL */}
+          {/* Cảnh báo khi email chưa có trong CSDL */}
           {unregisteredAlert && (
             <div className="login-card-alert-warning">
               <i className="bi bi-exclamation-triangle-fill" />
@@ -352,7 +398,7 @@ export default function Login() {
                   onClick={() => {
                     const targetEmail = encodeURIComponent(unregisteredAlert || '');
                     const targetName = encodeURIComponent(unregisteredData.name || '');
-                    navigate(`/register?role=guest&email=${targetEmail}&name=${targetName}&from=google`);
+                    navigate(`/register?role=guest&email=${targetEmail}&name=${targetName}&from=${unregisteredData.from || 'google'}`);
                   }}
                   style={{ background: 'none', border: 'none', padding: 0 }}
                 >
@@ -455,7 +501,7 @@ export default function Login() {
               type="button"
               id="google-login-btn"
               onClick={() => handleGoogleLogin()}
-              disabled={googleLoading}
+              disabled={googleLoading || facebookLoading}
             >
               {googleLoading ? (
                 <>
@@ -477,13 +523,21 @@ export default function Login() {
             <button
               className="login-social-btn"
               type="button"
-              onClick={() => {
-                alert('Đăng nhập Facebook thành công!');
-                navigate('/');
-              }}
+              id="facebook-login-btn"
+              onClick={handleFacebookLogin}
+              disabled={facebookLoading || googleLoading}
             >
-              <i className="bi bi-facebook login-fb-icon" />
-              <span>Facebook</span>
+              {facebookLoading ? (
+                <>
+                  <span className="login-social-spinner" />
+                  <span>Đang xử lý...</span>
+                </>
+              ) : (
+                <>
+                  <i className="bi bi-facebook login-fb-icon" />
+                  <span>Facebook</span>
+                </>
+              )}
             </button>
           </div>
 
@@ -547,7 +601,7 @@ export default function Login() {
               </div>
             </div>
 
-            {/* Thông báo lỗi (ví dụ: email chưa tồn tại, mã OTP sai) */}
+            {/* Thông báo lỗi */}
             {resetError && (
               <div className="login-modal-alert error">
                 <i className="bi bi-exclamation-triangle-fill" />
@@ -555,7 +609,7 @@ export default function Login() {
               </div>
             )}
 
-            {/* Thông báo thành công khi tìm thấy email */}
+            {/* Thông báo thành công */}
             {resetSuccess && (
               <div className="login-modal-alert success">
                 <i className="bi bi-check-circle-fill" />
@@ -696,7 +750,7 @@ export default function Login() {
         </div>
       )}
 
-      {/* Modal xác nhận chuyển sang đăng ký khi email Google chưa có tài khoản */}
+      {/* Modal xác nhận chuyển sang đăng ký khi email chưa có tài khoản */}
       {unregisteredModalOpen && (
         <div
           id="unregistered-modal-overlay"
@@ -714,7 +768,7 @@ export default function Login() {
             </div>
 
             <p className="login-unregistered-message">
-              Email <strong>{unregisteredData.email}</strong> chưa được đăng ký với tài khoản nào. Bạn có muốn tạo tài khoản mới ngay bây giờ không?
+              Tài khoản <strong>{unregisteredData.email}</strong> chưa được đăng ký trong hệ thống. Bạn có muốn tạo tài khoản mới ngay bây giờ không?
             </p>
 
             <div className="login-unregistered-btn-row">
@@ -732,7 +786,7 @@ export default function Login() {
                   const targetEmail = encodeURIComponent(unregisteredData.email || '');
                   const targetName = encodeURIComponent(unregisteredData.name || '');
                   setUnregisteredModalOpen(false);
-                  navigate(`/register?role=guest&email=${targetEmail}&name=${targetName}&from=google`);
+                  navigate(`/register?role=guest&email=${targetEmail}&name=${targetName}&from=${unregisteredData.from || 'google'}`);
                 }}
               >
                 Đăng ký ngay

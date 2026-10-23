@@ -43,47 +43,55 @@ public class AuthService {
     @Value("${google.client-id:}")
     private String googleClientId;
 
+    private GoogleIdTokenVerifier googleVerifier;
+
     @PostConstruct
-    public void initDefaultUsers() {
-        // Cơ sở dữ liệu Neon PostgreSQL đã có sẵn 20 tài khoản thực tế
+    public void initGoogleVerifier() {
+        if (googleClientId != null && !googleClientId.isBlank()) {
+            googleVerifier = new GoogleIdTokenVerifier.Builder(
+                    new NetHttpTransport(),
+                    GsonFactory.getDefaultInstance()
+            )
+            .setAudience(Collections.singletonList(googleClientId))
+            .build();
+            log.info("GoogleIdTokenVerifier đã được khởi tạo với Client ID: {}", googleClientId);
+        } else {
+            log.warn("google.client-id chưa được cấu hình. Đăng nhập Google sẽ dùng GoogleUserInfo endpoint thay thế.");
+        }
     }
 
     /**
-     * Đăng nhập / Đăng ký bằng Google ID Token.
-     * - Xác thực token với Google.
-     * - Nếu email đã có → đăng nhập luôn (kể cả tài khoản INACTIVE do chưa xác thực email).
-     * - Nếu email chưa có → tạo tài khoản mới với status ACTIVE.
+     * Đăng nhập bằng Google ID Token (gốc).
      */
     public LoginResponse loginWithGoogle(GoogleLoginRequest request) {
-        String idTokenStr = request.getIdToken();
-        if (idTokenStr == null || idTokenStr.isBlank()) {
-            return LoginResponse.builder().success(false).message("Thiếu Google ID Token!").build();
-        }
-
-        if (googleClientId == null || googleClientId.isBlank()) {
-            return LoginResponse.builder().success(false)
-                    .message("Server chưa cấu hình Google Client ID. Vui lòng liên hệ quản trị viên.").build();
+        if (request.getIdToken() == null || request.getIdToken().isBlank()) {
+            return LoginResponse.builder().success(false).message("ID Token không được để trống!").build();
         }
 
         try {
-            GoogleIdTokenVerifier verifier = new GoogleIdTokenVerifier.Builder(
-                    new NetHttpTransport(), GsonFactory.getDefaultInstance())
-                    .setAudience(Collections.singletonList(googleClientId))
-                    .build();
+            String email;
+            String fullName;
+            String avatar;
 
-            GoogleIdToken idToken = verifier.verify(idTokenStr);
-            if (idToken == null) {
+            if (googleVerifier != null) {
+                GoogleIdToken idToken = googleVerifier.verify(request.getIdToken());
+                if (idToken == null) {
+                    return LoginResponse.builder().success(false).message("Google ID Token không hợp lệ hoặc đã hết hạn!").build();
+                }
+                GoogleIdToken.Payload payload = idToken.getPayload();
+                email = payload.getEmail();
+                fullName = (String) payload.get("name");
+                avatar = (String) payload.get("picture");
+            } else {
                 return LoginResponse.builder().success(false)
-                        .message("Google ID Token không hợp lệ hoặc đã hết hạn!").build();
+                        .message("Chưa cấu hình Google Client ID trên máy chủ! Vui lòng dùng đăng nhập bình thường.").build();
             }
 
-            GoogleIdToken.Payload payload = idToken.getPayload();
-            String email = payload.getEmail().toLowerCase().trim();
-            String fullName = (String) payload.get("name");
-            String avatar  = (String) payload.get("picture");
-            if (fullName == null || fullName.isBlank()) fullName = email.split("@")[0];
+            if (email == null || email.isBlank()) {
+                return LoginResponse.builder().success(false).message("Không lấy được email từ tài khoản Google!").build();
+            }
+            email = email.toLowerCase().trim();
 
-            // Tìm user theo email
             Optional<User> userOpt = userRepository.findByEmail(email);
 
             if (userOpt.isEmpty()) {
@@ -98,19 +106,16 @@ public class AuthService {
             }
 
             User user = userOpt.get();
-            // Cho phép đăng nhập kể cả tài khoản INACTIVE (Google đã xác thực email rồi)
             if ("BLOCKED".equalsIgnoreCase(user.getStatus())
                     || "BANNED".equalsIgnoreCase(user.getStatus())
                     || "SUSPENDED".equalsIgnoreCase(user.getStatus())) {
                 return LoginResponse.builder().success(false)
                         .message("Tài khoản của bạn đã bị khóa!").build();
             }
-            // Kích hoạt tài khoản nếu chưa ACTIVE (đăng ký thường nhưng chưa xác thực email)
             if (!"ACTIVE".equalsIgnoreCase(user.getStatus())) {
                 user.setStatus("ACTIVE");
                 userRepository.save(user);
             }
-            // Cập nhật avatar nếu user chưa có
             if ((user.getAvatar() == null || user.getAvatar().isBlank()) && avatar != null && !avatar.isBlank()) {
                 user.setAvatar(avatar);
                 userRepository.save(user);
@@ -137,8 +142,6 @@ public class AuthService {
 
     /**
      * Đăng nhập bằng Google UserInfo.
-     * Frontend đã lấy userInfo từ Google API (access_token) rồi gửi lên đây.
-     * Kiểm tra CSDL có user chưa: nếu có thì đăng nhập, nếu chưa thì trả về lỗi chưa đăng ký.
      */
     public LoginResponse loginWithGoogleUserInfo(GoogleUserInfoRequest request) {
         String email = request.getEmail();
@@ -172,12 +175,10 @@ public class AuthService {
                 return LoginResponse.builder().success(false)
                         .message("Tài khoản của bạn đã bị khóa!").build();
             }
-            // Kích hoạt nếu chưa active (đã đăng ký thường nhưng chưa xác thực email)
             if (!"ACTIVE".equalsIgnoreCase(user.getStatus())) {
                 user.setStatus("ACTIVE");
                 userRepository.save(user);
             }
-            // Cập nhật avatar nếu chưa có
             if ((user.getAvatar() == null || user.getAvatar().isBlank()) && avatar != null && !avatar.isBlank()) {
                 user.setAvatar(avatar);
                 userRepository.save(user);
@@ -202,9 +203,87 @@ public class AuthService {
         }
     }
 
+    /**
+     * Đăng nhập bằng Facebook:
+     * - Nếu email/tài khoản Facebook đã tồn tại trong CSDL -> Đăng nhập thành công ngay.
+     * - Nếu chưa có -> Tự động tạo mới tài khoản với vai trò USER, mật khẩu ngẫu nhiên an toàn, trạng thái ACTIVE và đăng nhập luôn!
+     */
+    public LoginResponse loginWithFacebook(FacebookLoginRequest request) {
+        String email = request.getEmail();
+        if (email == null || email.isBlank()) {
+            if (request.getFacebookId() != null && !request.getFacebookId().isBlank()) {
+                email = "fb_" + request.getFacebookId() + "@facebook.com";
+            } else {
+                return LoginResponse.builder().success(false).message("Không thể xác định thông tin tài khoản Facebook!").build();
+            }
+        }
+        email = email.toLowerCase().trim();
+
+        String fullName = request.getFullName();
+        if (fullName == null || fullName.isBlank()) {
+            fullName = email.contains("@") ? email.split("@")[0] : "Người dùng Facebook";
+        }
+        String avatar = request.getAvatar();
+
+        try {
+            Optional<User> userOpt = userRepository.findByEmail(email);
+            User user;
+
+            if (userOpt.isEmpty()) {
+                // TỰ ĐỘNG TẠO MỚI TÀI KHOẢN KHI CHƯA CÓ TRONG CSDL
+                log.info("Tài khoản Facebook chưa tồn tại ({}), tự động tạo mới người dùng...", email);
+                String randomPass = UUID.randomUUID().toString();
+                user = User.builder()
+                        .email(email)
+                        .fullName(fullName)
+                        .avatar(avatar)
+                        .password(passwordEncoder.encode(randomPass))
+                        .role("USER")
+                        .status("ACTIVE")
+                        .phoneVerified(false)
+                        .createdAt(LocalDateTime.now())
+                        .build();
+                user = userRepository.save(user);
+                log.info("Đã tự động tạo tài khoản thành công cho Facebook user ID: {}", user.getId());
+            } else {
+                user = userOpt.get();
+                if ("BLOCKED".equalsIgnoreCase(user.getStatus())
+                        || "BANNED".equalsIgnoreCase(user.getStatus())
+                        || "SUSPENDED".equalsIgnoreCase(user.getStatus())) {
+                    return LoginResponse.builder().success(false)
+                            .message("Tài khoản của bạn đã bị khóa!").build();
+                }
+                if (!"ACTIVE".equalsIgnoreCase(user.getStatus())) {
+                    user.setStatus("ACTIVE");
+                    userRepository.save(user);
+                }
+                if ((user.getAvatar() == null || user.getAvatar().isBlank()) && avatar != null && !avatar.isBlank()) {
+                    user.setAvatar(avatar);
+                    userRepository.save(user);
+                }
+            }
+
+            return LoginResponse.builder()
+                    .success(true)
+                    .message("Đăng nhập Facebook thành công!")
+                    .id(user.getId())
+                    .email(user.getEmail())
+                    .phoneNumber(user.getPhoneNumber())
+                    .fullName(user.getFullName())
+                    .role(user.getRole())
+                    .avatar(user.getAvatar())
+                    .token(sessionTokenService.issue(user.getId()))
+                    .build();
+
+        } catch (Exception e) {
+            log.error("Lỗi loginWithFacebook: {}", e.getMessage());
+            return LoginResponse.builder().success(false)
+                    .message("Lỗi xử lý đăng nhập Facebook. Vui lòng thử lại!").build();
+        }
+    }
+
     public LoginResponse login(LoginRequest request) {
         String input = request.getUsername().trim();
-        // Truy vấn trực tiếp từ bảng users trong CSDL
         Optional<User> userOpt = userRepository.findByEmailOrPhoneNumber(input, input);
 
         if (userOpt.isEmpty()) {
@@ -216,7 +295,6 @@ public class AuthService {
 
         User user = userOpt.get();
 
-        // Kiểm tra mật khẩu thực tế trong CSDL
         boolean isMatch = passwordEncoder.matches(request.getPassword(), user.getPassword()) || 
                           request.getPassword().equals(user.getPassword()) ||
                           ("••••••••••••".equals(request.getPassword()) && 
@@ -311,17 +389,15 @@ public class AuthService {
                 .fullName(fullName)
                 .password(passwordEncoder.encode(password))
                 .role(targetRole)
-                .status("INACTIVE") // Account is inactive until email verification
+                .status("INACTIVE")
                 .build();
 
         try {
             userRepository.save(newUser);
 
-            // Generate verification token
             VerificationToken verificationToken = new VerificationToken(newUser);
             tokenRepository.save(verificationToken);
 
-            // Send verification email
             String verifyUrl = frontendUrl.replaceAll("/$", "") + "/verify?token=" + verificationToken.getToken();
             if (!emailService.sendVerificationEmail(newUser.getEmail(), verifyUrl)) {
                 tokenRepository.delete(verificationToken);
@@ -384,11 +460,6 @@ public class AuthService {
                 .build();
     }
 
-    /**
-     * Bước 1: Kiểm tra email có tồn tại không.
-     * Nếu tồn tại -> Sinh mã OTP 6 số, lưu vào password_reset_tokens, gửi email qua Gmail SMTP.
-     * Nếu KHÔNG tồn tại -> Báo lỗi để người dùng kiểm tra lại.
-     */
     public AuthMessageResponse forgotPassword(ForgotPasswordRequest request) {
         String email = request.getEmail() != null ? request.getEmail().trim() : "";
         if (email.isBlank()) {
@@ -398,7 +469,6 @@ public class AuthService {
                     .build();
         }
 
-        // Kiểm tra xem email có tồn tại trong CSDL không
         Optional<User> userOpt = userRepository.findByEmail(email);
         if (userOpt.isEmpty()) {
             return AuthMessageResponse.builder()
@@ -409,11 +479,9 @@ public class AuthService {
 
         User user = userOpt.get();
 
-        // Sinh mã OTP 6 số ngẫu nhiên
         String otp = String.format("%06d", new Random().nextInt(1000000));
         LocalDateTime expiry = LocalDateTime.now().plusMinutes(15);
 
-        // Lưu vào cơ sở dữ liệu
         PasswordResetToken resetToken = PasswordResetToken.builder()
                 .email(user.getEmail())
                 .token(otp)
@@ -422,7 +490,6 @@ public class AuthService {
                 .build();
         passwordResetTokenRepository.save(resetToken);
 
-        // Gửi email chứa mã OTP (qua SMTP Gmail)
         emailService.sendPasswordResetOtp(user.getEmail(), otp, 15);
 
         log.info("Đã tạo mã OTP reset mật khẩu cho email {}: {}", user.getEmail(), otp);
@@ -434,9 +501,6 @@ public class AuthService {
                 .build();
     }
 
-    /**
-     * Xác thực mã OTP
-     */
     public AuthMessageResponse verifyResetOtp(VerifyResetOtpRequest request) {
         String email = request.getEmail() != null ? request.getEmail().trim() : "";
         String otp = request.getOtp() != null ? request.getOtp().trim() : "";
@@ -463,9 +527,6 @@ public class AuthService {
                 .build();
     }
 
-    /**
-     * Bước 2: Đặt lại mật khẩu mới với mã OTP
-     */
     public AuthMessageResponse resetPassword(ResetPasswordRequest request) {
         String email = request.getEmail() != null ? request.getEmail().trim() : "";
         String otp = request.getOtp() != null ? request.getOtp().trim() : "";
