@@ -232,7 +232,13 @@ export const authService = {
 
         return { success: true, message: data.message, user: userData };
       }
-      return { success: false, message: data.message || 'Đăng nhập Google thất bại!' };
+      return {
+        success: false,
+        message: data.message || 'Đăng nhập Google thất bại!',
+        notRegistered: data.notRegistered || false,
+        email: data.email,
+        fullName: data.fullName,
+      };
     } catch (error) {
       console.error('Google login error:', error);
       return { success: false, message: 'Không thể kết nối máy chủ khi đăng nhập Google.' };
@@ -274,7 +280,13 @@ export const authService = {
 
         return { success: true, message: data.message, user: userData };
       }
-      return { success: false, message: data.message || 'Đăng nhập Google thất bại!' };
+      return {
+        success: false,
+        message: data.message || 'Đăng nhập Google thất bại!',
+        notRegistered: data.notRegistered || false,
+        email: data.email,
+        fullName: data.fullName,
+      };
     } catch (error) {
       console.error('Google userinfo login error:', error);
       return { success: false, message: 'Không thể kết nối máy chủ khi đăng nhập Google.' };

@@ -17,4 +17,5 @@ public class LoginResponse {
     private String role;
     private String avatar;
     private String token;
+    private boolean notRegistered;
 }

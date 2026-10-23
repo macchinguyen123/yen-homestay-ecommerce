@@ -85,41 +85,40 @@ public class AuthService {
 
             // Tìm user theo email
             Optional<User> userOpt = userRepository.findByEmail(email);
-            User user;
-            boolean isNew = false;
 
-            if (userOpt.isPresent()) {
-                user = userOpt.get();
-                // Cho phép đăng nhập kể cả tài khoản INACTIVE (Google đã xác thực email rồi)
-                if ("BLOCKED".equalsIgnoreCase(user.getStatus())
-                        || "BANNED".equalsIgnoreCase(user.getStatus())
-                        || "SUSPENDED".equalsIgnoreCase(user.getStatus())) {
-                    return LoginResponse.builder().success(false)
-                            .message("Tài khoản của bạn đã bị khóa!").build();
-                }
-                // Kích hoạt tài khoản nếu chưa ACTIVE (đăng ký thường nhưng chưa xác thực email)
-                if (!"ACTIVE".equalsIgnoreCase(user.getStatus())) {
-                    user.setStatus("ACTIVE");
-                    userRepository.save(user);
-                }
-            } else {
-                // Tạo tài khoản mới từ thông tin Google
-                user = User.builder()
+            if (userOpt.isEmpty()) {
+                log.warn("Đăng nhập Google thất bại - Email chưa tồn tại trong CSDL: {}", email);
+                return LoginResponse.builder()
+                        .success(false)
+                        .notRegistered(true)
                         .email(email)
                         .fullName(fullName)
-                        .avatar(avatar)
-                        .password(passwordEncoder.encode(UUID.randomUUID().toString()))
-                        .role("USER")
-                        .status("ACTIVE")
+                        .message("Email (" + email + ") chưa được đăng ký trong hệ thống! Vui lòng tạo tài khoản mới.")
                         .build();
+            }
+
+            User user = userOpt.get();
+            // Cho phép đăng nhập kể cả tài khoản INACTIVE (Google đã xác thực email rồi)
+            if ("BLOCKED".equalsIgnoreCase(user.getStatus())
+                    || "BANNED".equalsIgnoreCase(user.getStatus())
+                    || "SUSPENDED".equalsIgnoreCase(user.getStatus())) {
+                return LoginResponse.builder().success(false)
+                        .message("Tài khoản của bạn đã bị khóa!").build();
+            }
+            // Kích hoạt tài khoản nếu chưa ACTIVE (đăng ký thường nhưng chưa xác thực email)
+            if (!"ACTIVE".equalsIgnoreCase(user.getStatus())) {
+                user.setStatus("ACTIVE");
                 userRepository.save(user);
-                isNew = true;
-                log.info("Tài khoản mới đăng ký qua Google: {}", email);
+            }
+            // Cập nhật avatar nếu user chưa có
+            if ((user.getAvatar() == null || user.getAvatar().isBlank()) && avatar != null && !avatar.isBlank()) {
+                user.setAvatar(avatar);
+                userRepository.save(user);
             }
 
             return LoginResponse.builder()
                     .success(true)
-                    .message(isNew ? "Đăng ký và đăng nhập Google thành công!" : "Đăng nhập Google thành công!")
+                    .message("Đăng nhập Google thành công!")
                     .id(user.getId())
                     .email(user.getEmail())
                     .phoneNumber(user.getPhoneNumber())
@@ -137,9 +136,9 @@ public class AuthService {
     }
 
     /**
-     * Đăng nhập / Đăng ký bằng Google UserInfo.
+     * Đăng nhập bằng Google UserInfo.
      * Frontend đã lấy userInfo từ Google API (access_token) rồi gửi lên đây.
-     * Backend chỉ cần tìm/tạo user theo email rồi trả LoginResponse.
+     * Kiểm tra CSDL có user chưa: nếu có thì đăng nhập, nếu chưa thì trả về lỗi chưa đăng ký.
      */
     public LoginResponse loginWithGoogleUserInfo(GoogleUserInfoRequest request) {
         String email = request.getEmail();
@@ -154,45 +153,39 @@ public class AuthService {
 
         try {
             Optional<User> userOpt = userRepository.findByEmail(email);
-            User user;
-            boolean isNew = false;
 
-            if (userOpt.isPresent()) {
-                user = userOpt.get();
-                if ("BLOCKED".equalsIgnoreCase(user.getStatus())
-                        || "BANNED".equalsIgnoreCase(user.getStatus())
-                        || "SUSPENDED".equalsIgnoreCase(user.getStatus())) {
-                    return LoginResponse.builder().success(false)
-                            .message("Tài khoản của bạn đã bị khóa!").build();
-                }
-                // Kích hoạt nếu chưa active (đã đăng ký thường nhưng chưa xác thực email)
-                if (!"ACTIVE".equalsIgnoreCase(user.getStatus())) {
-                    user.setStatus("ACTIVE");
-                    userRepository.save(user);
-                }
-                // Cập nhật avatar nếu chưa có
-                if ((user.getAvatar() == null || user.getAvatar().isBlank()) && avatar != null && !avatar.isBlank()) {
-                    user.setAvatar(avatar);
-                    userRepository.save(user);
-                }
-            } else {
-                // Tạo tài khoản mới từ Google
-                user = User.builder()
+            if (userOpt.isEmpty()) {
+                log.warn("Đăng nhập Google UserInfo thất bại - Email chưa tồn tại trong CSDL: {}", email);
+                return LoginResponse.builder()
+                        .success(false)
+                        .notRegistered(true)
                         .email(email)
                         .fullName(fullName)
-                        .avatar(avatar)
-                        .password(passwordEncoder.encode(UUID.randomUUID().toString()))
-                        .role("USER")
-                        .status("ACTIVE")
+                        .message("Email (" + email + ") chưa được đăng ký trong hệ thống! Vui lòng tạo tài khoản mới.")
                         .build();
+            }
+
+            User user = userOpt.get();
+            if ("BLOCKED".equalsIgnoreCase(user.getStatus())
+                    || "BANNED".equalsIgnoreCase(user.getStatus())
+                    || "SUSPENDED".equalsIgnoreCase(user.getStatus())) {
+                return LoginResponse.builder().success(false)
+                        .message("Tài khoản của bạn đã bị khóa!").build();
+            }
+            // Kích hoạt nếu chưa active (đã đăng ký thường nhưng chưa xác thực email)
+            if (!"ACTIVE".equalsIgnoreCase(user.getStatus())) {
+                user.setStatus("ACTIVE");
                 userRepository.save(user);
-                isNew = true;
-                log.info("Tài khoản mới tạo qua Google UserInfo: {}", email);
+            }
+            // Cập nhật avatar nếu chưa có
+            if ((user.getAvatar() == null || user.getAvatar().isBlank()) && avatar != null && !avatar.isBlank()) {
+                user.setAvatar(avatar);
+                userRepository.save(user);
             }
 
             return LoginResponse.builder()
                     .success(true)
-                    .message(isNew ? "Đăng ký và đăng nhập Google thành công!" : "Đăng nhập Google thành công!")
+                    .message("Đăng nhập Google thành công!")
                     .id(user.getId())
                     .email(user.getEmail())
                     .phoneNumber(user.getPhoneNumber())
