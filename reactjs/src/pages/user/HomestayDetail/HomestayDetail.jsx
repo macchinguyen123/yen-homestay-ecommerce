@@ -1163,10 +1163,6 @@ export default function HomestayDetail() {
   const handleChatOwner = async () => {
     const user = authService.getCurrentUser();
     if (!user) { navigate('/login'); return; }
-    if (user?.role === 'OWNER') {
-      showToast('Bạn chính là chủ homestay bạn không thể chat với bản thân');
-      return;
-    }
     const homestayId = Number(homestay?.id || id);
     if (!homestayId) return;
     try {
