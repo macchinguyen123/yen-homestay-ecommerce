@@ -66,34 +66,13 @@ export const bookingService = {
   },
 
   /**
-   * Xóa bộ nhớ đệm danh sách đặt phòng để buộc tải dữ liệu mới nhất
-   */
-  clearCache(userId) {
-    if (userId) {
-      delete memoryCache[userId];
-      try {
-        localStorage.removeItem(`cached_user_bookings_${userId}`);
-      } catch (e) {}
-    } else {
-      memoryCache = {};
-      try {
-        Object.keys(localStorage).forEach((k) => {
-          if (k.startsWith('cached_user_bookings_')) {
-            localStorage.removeItem(k);
-          }
-        });
-      } catch (e) {}
-    }
-  },
-
-  /**
    * Tạo đơn đặt phòng mới lưu trực tiếp vào CSDL thật Neon PostgreSQL
    * @param {Object} bookingData Thông tin đặt phòng
    */
   async createBooking(bookingData) {
     try {
       const user = JSON.parse(localStorage.getItem('user') || 'null');
-      const userId = user?.id || user?.userId || user?.user_id || sessionStorage.getItem('userId') || bookingData.touristId || 21;
+      const userId = user?.id || user?.userId || user?.user_id || sessionStorage.getItem('userId') || bookingData.touristId || 1;
       const headers = {
         'Content-Type': 'application/json',
       };
@@ -112,11 +91,50 @@ export const bookingService = {
         }),
       });
       const data = await response.json();
-      this.clearCache(userId);
+      if (!response.ok || data?.success === false) {
+        const msg = data?.message || 'Lỗi khi tạo đơn đặt phòng';
+        const err = new Error(msg);
+        err.response = data;
+        throw err;
+      }
       return data;
     } catch (error) {
       console.error('Lỗi khi gửi đơn đặt phòng:', error);
       throw error;
+    }
+  },
+
+  /**
+   * Lấy danh sách các khoảng ngày đã kín lịch của một phòng
+   * @param {number|string} roomId
+   */
+  async getRoomBusyDates(roomId) {
+    if (!roomId) return [];
+    try {
+      const response = await fetch(`${API_BASE_URL}/room/${roomId}/busy-dates`);
+      if (!response.ok) return [];
+      const data = await response.json();
+      return Array.isArray(data) ? data : [];
+    } catch (e) {
+      console.warn('Lỗi khi lấy lịch kín của phòng:', e);
+      return [];
+    }
+  },
+
+  /**
+   * Lấy danh sách các khoảng ngày đã kín lịch của cả homestay
+   * @param {number|string} homestayId
+   */
+  async getHomestayBusyDates(homestayId) {
+    if (!homestayId) return [];
+    try {
+      const response = await fetch(`${API_BASE_URL}/homestay/${homestayId}/busy-dates`);
+      if (!response.ok) return [];
+      const data = await response.json();
+      return Array.isArray(data) ? data : [];
+    } catch (e) {
+      console.warn('Lỗi khi lấy lịch kín của homestay:', e);
+      return [];
     }
   },
 

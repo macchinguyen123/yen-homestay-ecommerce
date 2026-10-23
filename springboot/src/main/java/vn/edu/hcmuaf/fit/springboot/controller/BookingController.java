@@ -53,6 +53,22 @@ public class BookingController {
     }
 
     /**
+     * Lấy danh sách các khoảng ngày đã kín lịch của một phòng
+     */
+    @GetMapping("/room/{roomId}/busy-dates")
+    public ResponseEntity<?> getRoomBusyDates(@PathVariable Long roomId) {
+        return ResponseEntity.ok(bookingService.getRoomBusyDates(roomId));
+    }
+
+    /**
+     * Lấy danh sách các khoảng ngày đã kín lịch của cả homestay
+     */
+    @GetMapping("/homestay/{homestayId}/busy-dates")
+    public ResponseEntity<?> getHomestayBusyDates(@PathVariable Long homestayId) {
+        return ResponseEntity.ok(bookingService.getHomestayBusyDates(homestayId));
+    }
+
+    /**
      * Tạo mới đơn đặt phòng vào cơ sở dữ liệu thật Neon PostgreSQL
      */
     @PostMapping
@@ -87,6 +103,12 @@ public class BookingController {
             resp.put("bookingCode", created.getBookingCode());
             resp.put("booking", created);
             return ResponseEntity.ok(resp);
+        } catch (IllegalArgumentException e) {
+            log.warn("Lỗi nghiệp vụ đặt phòng: {}", e.getMessage());
+            Map<String, Object> err = new HashMap<>();
+            err.put("success", false);
+            err.put("message", e.getMessage());
+            return ResponseEntity.badRequest().body(err);
         } catch (Exception e) {
             log.error("Lỗi tạo đặt phòng: {}", e.getMessage(), e);
             Map<String, Object> err = new HashMap<>();

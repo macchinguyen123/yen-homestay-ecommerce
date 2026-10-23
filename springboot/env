@@ -1,1 +1,8 @@
 GOOGLE_CLIENT_ID=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
+# Gmail SMTP (use a Google App Password, not your normal account password)
+MAIL_USERNAME=tuanghiencuu@gmail.com
+MAIL_PASSWORD=wyausegcclyfsmyw
+
+# Frontend URL used in verification emails
+FRONTEND_URL=http://localhost:5173
+SERVER_PORT=8081

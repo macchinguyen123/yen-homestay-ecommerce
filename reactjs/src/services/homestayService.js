@@ -149,5 +149,21 @@ export const homestayService = {
       console.warn(`Lỗi khi tải phòng của homestay ${id} từ database:`, error.message);
       return memoryCache.get(cacheKey) || getFromStorage(cacheKey) || [];
     }
+  },
+
+  /**
+   * Lấy danh sách nhiệm vụ nhận thưởng của homestay từ database
+   */
+  async getHomestayMissions(id) {
+    if (!id) return [];
+    try {
+      const response = await fetch(`${API_BASE_URL}/${id}/missions`);
+      if (!response.ok) return [];
+      const data = await response.json();
+      return Array.isArray(data) ? data : [];
+    } catch (e) {
+      console.warn(`Lỗi khi tải nhiệm vụ của homestay ${id}:`, e);
+      return [];
+    }
   }
 };

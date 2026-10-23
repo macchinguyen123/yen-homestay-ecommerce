@@ -162,9 +162,21 @@ public class RoomService {
                 .homestayId(t.getHomestayId())
                 .title(t.getTitle())
                 .description(t.getDescription())
-                .rewardNote(t.getRewardNote())
+                .rewardNote(t.getRewardNote() != null ? t.getRewardNote() : t.getRewardValue())
+                .icon(t.getIcon() != null && !t.getIcon().isBlank() ? t.getIcon() : "bi-gift-fill")
                 .status(t.getStatus() != null ? t.getStatus() : "ACTIVE")
                 .build();
+    }
+
+    public List<GuestTaskDTO> getTasksByHomestayId(Long homestayId) {
+        if (homestayId == null) return Collections.emptyList();
+        List<GuestTaskDTO> tasks = guestTaskRepository.findByHomestayId(homestayId).stream()
+                .map(this::toGuestTaskDTO)
+                .collect(Collectors.toList());
+        if (tasks.isEmpty()) {
+            tasks = getDefaultTasks(homestayId);
+        }
+        return tasks;
     }
 
     private List<GuestTaskDTO> getDefaultTasks(Long homestayId) {
@@ -175,6 +187,7 @@ public class RoomService {
                 .title("Check-in & Đánh giá trải nghiệm")
                 .description("Chụp lại khoảnh khắc đẹp tại homestay và viết đánh giá chân thực để nhận voucher giảm giá cho lần đặt phòng tiếp theo.")
                 .rewardNote("Voucher giảm 10% cho kỳ nghỉ sau")
+                .icon("bi-camera-fill")
                 .status("ACTIVE")
                 .build(),
             GuestTaskDTO.builder()
@@ -183,6 +196,7 @@ public class RoomService {
                 .title("Bảo vệ môi trường & Tiết kiệm năng lượng")
                 .description("Tắt điều hòa và các thiết bị điện khi ra khỏi phòng, thu gom rác đúng nơi quy định của homestay.")
                 .rewardNote("Tặng set trà thảo mộc / trái cây vườn chào mừng")
+                .icon("bi-tree-fill")
                 .status("ACTIVE")
                 .build()
         );

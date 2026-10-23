@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import './Category.css';
 import { homestayService } from '../../../services/homestayService';
@@ -477,10 +477,32 @@ export default function Category() {
     return filteredHomestays.slice(start, start + ITEMS_PER_PAGE);
   }, [filteredHomestays, currentPage]);
 
+  const scrollToTop = () => {
+    try {
+      window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
+    } catch {
+      window.scrollTo(0, 0);
+    }
+    if (document.documentElement) document.documentElement.scrollTop = 0;
+    if (document.body) document.body.scrollTop = 0;
+    if (document.scrollingElement) document.scrollingElement.scrollTop = 0;
+  };
+
+  const isFirstMount = useRef(true);
+  useEffect(() => {
+    if (isFirstMount.current) {
+      isFirstMount.current = false;
+      return;
+    }
+    scrollToTop();
+    const timer = setTimeout(scrollToTop, 60);
+    return () => clearTimeout(timer);
+  }, [currentPage]);
+
   const handlePageChange = (newPage) => {
     if (newPage >= 1 && newPage <= totalPages) {
       setCurrentPage(newPage);
-      window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
+      scrollToTop();
     }
   };
 
