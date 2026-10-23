@@ -41,24 +41,26 @@
 
 .pl-print {
   margin-top: 10px;
-  background: #fbfaf7;
+  background: #ffffff;
   padding: 12px 12px 0;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.16), 0 22px 36px -12px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 4px 14px rgba(45, 35, 20, 0.1), 0 20px 35px -10px rgba(45, 35, 20, 0.18);
   transition: transform 0.5s cubic-bezier(0.2, 0.7, 0.2, 1), filter 0.5s ease;
-  border-radius: 4px;
+  border-radius: 6px;
+  border: 1px solid rgba(0, 0, 0, 0.05);
 }
 
 .pl-card[data-on='0'] .pl-print {
   transform: scale(0.9);
-  filter: saturate(0.7) brightness(0.96);
+  filter: saturate(0.8) brightness(0.97);
+  opacity: 0.9;
 }
 
 .pl-shot {
   position: relative;
-  aspect-ratio: 1;
+  aspect-ratio: 1.18 / 1;
   overflow: hidden;
-  background: #d9d5cc;
-  border-radius: 2px;
+  background: #f1ede5;
+  border-radius: 4px;
 }
 
 .pl-shot img {
@@ -73,13 +75,13 @@
 }
 
 .pl-note {
-  height: 48px;
+  height: 38px;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 0 8px;
-  font: italic 500 15px/1.2 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
-  color: #3b3833;
+  font: italic 600 13.5px/1.2 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
+  color: #2e2820;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -110,13 +112,21 @@
 
 .pl-bar {
   position: absolute;
-  left: clamp(16px, 4vw, 56px);
-  right: clamp(16px, 4vw, 56px);
-  bottom: clamp(12px, 3vh, 30px);
+  left: clamp(14px, 2.5vw, 24px);
+  right: clamp(14px, 2.5vw, 24px);
+  bottom: 8px;
   display: flex;
   align-items: center;
-  gap: clamp(12px, 2vw, 24px);
+  gap: clamp(10px, 1.5vw, 16px);
   cursor: default;
+  z-index: 40;
+  background: rgba(253, 251, 247, 0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  padding: 6px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: 0 4px 14px rgba(45, 35, 20, 0.05);
 }
 
 .pl-cap {
@@ -158,22 +168,28 @@
 
 .pl-btn {
   appearance: none;
-  width: 38px;
-  height: 38px;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
-  border: 1px solid var(--pl-line);
-  background: rgba(255, 255, 255, 0.8);
-  backdrop-filter: blur(6px);
-  color: inherit;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  background: #ffffff;
+  color: #1e293b;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.08);
   display: grid;
   place-items: center;
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
-.pl-btn:hover {
-  background: var(--pl-ink);
-  color: var(--pl-bg);
+.pl-btn:hover:not(:disabled) {
+  background: #1e293b;
+  color: #ffffff;
+  transform: scale(1.06);
+}
+
+.pl-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
 }
 
 .pl-btn:focus-visible {

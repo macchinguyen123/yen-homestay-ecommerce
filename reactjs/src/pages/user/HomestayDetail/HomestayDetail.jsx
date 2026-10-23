@@ -316,14 +316,14 @@ function RoomModal({ room, homestay, homestayRating = '5.0', homestayReviewCount
             <ErrorBoundary>
               <PolaroidLineCarousel
                 slides={polaroidSlides}
-                height="470px"
-                cardWidth={310}
-                sag={38}
-                swing={1.0}
+                height="415px"
+                cardWidth={320}
+                sag={14}
+                swing={0.2}
                 autoplay={4500}
-                background="radial-gradient(ellipse at 50% 20%, #1e293b 0%, #0b1120 100%)"
-                ink="#ffffff"
-                string="#d4af37"
+                background="linear-gradient(180deg, #fdfbf7 0%, #f4ede3 100%)"
+                ink="#1e293b"
+                string="#9d8157"
                 className="room-polaroid-carousel"
                 ariaLabel={`Bộ sưu tập ảnh phòng ${roomName}`}
               />
@@ -1643,14 +1643,7 @@ export default function HomestayDetail() {
                       <ul className="room-list-tags">
                         {(room.amenities || []).slice(0, 3).map((a, j) => <li key={j}>{a}</li>)}
                       </ul>
-                      <button type="button" className="room-rating-link"
-                        onClick={(e) => { e.stopPropagation(); scrollToReviews(); }}
-                        title="Xem các đánh giá của homestay này">
-                        <i className="bi bi-star-fill star-gold" /> {homestayRating}
-                        <i className="rating-sep" />
-                        <span>{homestayReviewCount} đánh giá homestay</span>
-                        <i className="bi bi-chevron-down rating-arrow" />
-                      </button>
+
                     </div>
                     <div className="room-list-action">
                       <div>
