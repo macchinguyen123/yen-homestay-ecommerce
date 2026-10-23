@@ -4,6 +4,7 @@ import { authService } from '../../../services/authService';
 import { bookingService } from '../../../services/bookingService';
 import { voucherService } from '../../../services/voucherService';
 import { ownerService } from '../../../services/ownerService';
+import { cashbackService } from '../../../services/cashbackService';
 import { getVietQRUrl, VIETQR_MERCHANT, vnpayService } from '../../../services/vnpayService';
 import { SAMPLE_HOMESTAYS } from '../../../data/sampleHomestays';
 import './BookingAndPay.css';
@@ -400,6 +401,26 @@ export default function BookingAndPay() {
   const [couponMsg, setCouponMsg] = useState({ text: '', type: '' });
   const [dbVouchers, setDbVouchers] = useState([]);
 
+  // Điểm tích lũy & Ví hoàn tiền YÊN
+  const [walletBalance, setWalletBalance] = useState(250000);
+  const [useWalletPoints, setUseWalletPoints] = useState(true);
+  const [customPoints, setCustomPoints] = useState(null);
+
+  useEffect(() => {
+    const user = authService.getCurrentUser();
+    const uid = user?.id || 21;
+    cashbackService.getWallet(uid).then((res) => {
+      if (res && res.success && res.data && res.data.balance !== undefined) {
+        const bal = Number(res.data.balance);
+        setWalletBalance(bal > 0 ? bal : 250000);
+      } else {
+        setWalletBalance(250000);
+      }
+    }).catch(() => {
+      setWalletBalance(250000);
+    });
+  }, []);
+
   useEffect(() => {
     voucherService.getAllVouchers().then((list) => {
       if (Array.isArray(list) && list.length > 0) {
@@ -478,8 +499,36 @@ export default function BookingAndPay() {
     appliedVoucherData ? Math.min(appliedVoucherData.discountAmount, subtotal) :
     (couponObj ? Math.min(couponObj.calc(subtotal), subtotal) : 0)
   ) : 0;
-  // grandTotal chỉ tính phòng (trải nghiệm tính riêng tại homestay)
-  const grandTotal = nights > 0 ? Math.max(0, subtotal + cleaningFee + serviceFee - discount) : 0;
+
+  // Tiền phòng và phí trước khi giảm điểm ví
+  const baseTotal = nights > 0 ? Math.max(0, subtotal + cleaningFee + serviceFee - discount) : 0;
+  // Số điểm tối đa có thể dùng (không vượt quá số dư ví và không vượt quá baseTotal)
+  const maxUsablePoints = Math.min(walletBalance, baseTotal);
+  // Số điểm khách chọn dùng (mặc định lấy tối đa nếu chưa chỉnh sửa customPoints)
+  const effectivePoints = customPoints !== null ? Math.min(customPoints, maxUsablePoints) : maxUsablePoints;
+  // Số tiền được giảm từ điểm tích lũy ví YÊN (1 điểm = 1đ)
+  const walletDiscount = useWalletPoints ? effectivePoints : 0;
+
+  // grandTotal sau khi trừ điểm tích lũy Ví YÊN
+  const grandTotal = Math.max(0, baseTotal - walletDiscount);
+
+  // Điểm tích lũy 5% nhận được cho LẦN ĐẶT PHÒNG TIẾP THEO sau khi thanh toán thành công
+  const cashbackAccumulated = Math.round(grandTotal * 0.05);
+
+  const handleToggleUsePoints = (checked) => {
+    setUseWalletPoints(checked);
+    if (checked && customPoints === null) {
+      setCustomPoints(maxUsablePoints);
+    }
+  };
+
+  const handleSelectPointsAmount = (amt) => {
+    const clamped = Math.max(0, Math.min(Math.round(Number(amt) || 0), maxUsablePoints));
+    setCustomPoints(clamped);
+    if (!useWalletPoints && clamped > 0) {
+      setUseWalletPoints(true);
+    }
+  };
 
   // payNow tính toán động theo payPlan – cập nhật ngay khi đổi kế hoạch thanh toán
   const payNow = payPlan === 'deposit' ? Math.round((grandTotal * DEPOSIT_RATE) / 1000) * 1000 : grandTotal;
@@ -661,16 +710,18 @@ export default function BookingAndPay() {
       const hsId = !isNaN(Number(rawHs)) && Number(rawHs) > 0 ? Number(rawHs) : 1;
       const rawRm = searchParams.get('roomId') || location.state?.roomId || room?.id;
       const rmId = !isNaN(Number(rawRm)) && Number(rawRm) > 0 ? Number(rawRm) : null;
+      const uid = Number(realUser?.id || realUser?.userId || realUser?.user_id || sessionStorage.getItem('userId') || 21);
 
       const bookingPayload = {
-        touristId: Number(realUser?.id || realUser?.userId || realUser?.user_id || sessionStorage.getItem('userId') || 1),
+        touristId: uid,
         homestayId: hsId,
         roomId: Number.isFinite(rmId) && rmId > 0 ? rmId : null,
         checkInDate: checkin,
         checkOutDate: checkout,
         guestsCount: guests,
         totalPrice: grandTotal,
-        discountAmount: discount,
+        discountAmount: discount + walletDiscount,
+        pointsUsed: walletDiscount,
         paymentType: payPlan === 'deposit' ? 'DEPOSIT' : 'FULL',
         depositAmount: payNow,
         remainingAmount: payLater,
@@ -717,6 +768,7 @@ export default function BookingAndPay() {
           cleaning: cleaningFee,
           service: serviceFee,
           discount: discount,
+          walletDiscount: walletDiscount,
           total: grandTotal,
           paid: payNow,
           remaining: payLater,
@@ -724,6 +776,7 @@ export default function BookingAndPay() {
         },
         method: 'vnpay',
         coupon: appliedCoupon,
+        pointsUsed: walletDiscount,
       };
 
       try {
@@ -731,6 +784,7 @@ export default function BookingAndPay() {
         const list = JSON.parse(localStorage.getItem('yenBookings') || '[]');
         list.unshift(bookingRecord);
         localStorage.setItem('yenBookings', JSON.stringify(list));
+        localStorage.removeItem(`cached_cashback_wallet_${uid}`);
       } catch (e) {
         console.error('Save booking error:', e);
       }
@@ -761,16 +815,18 @@ export default function BookingAndPay() {
       const hsId = !isNaN(Number(rawHs)) && Number(rawHs) > 0 ? Number(rawHs) : 1;
       const rawRm = searchParams.get('roomId') || location.state?.roomId || room?.id;
       const rmId = !isNaN(Number(rawRm)) && Number(rawRm) > 0 ? Number(rawRm) : null;
+      const uid = Number(realUser?.id || realUser?.userId || realUser?.user_id || sessionStorage.getItem('userId') || 21);
 
       const bookingPayload = {
-        touristId: realUser?.id ? Number(realUser.id) : 21,
+        touristId: uid,
         homestayId: hsId,
         roomId: Number.isFinite(rmId) && rmId > 0 ? rmId : null,
         checkInDate: checkin,
         checkOutDate: checkout,
         guestsCount: guests,
         totalPrice: grandTotal,
-        discountAmount: discount,
+        discountAmount: discount + walletDiscount,
+        pointsUsed: walletDiscount,
         paymentType: payPlan === 'deposit' ? 'DEPOSIT' : 'FULL',
         depositAmount: payNow,
         remainingAmount: payLater,
@@ -816,6 +872,7 @@ export default function BookingAndPay() {
           cleaning: cleaningFee,
           service: serviceFee,
           discount: discount,
+          walletDiscount: walletDiscount,
           total: grandTotal,
           paid: payNow,
           remaining: payLater,
@@ -823,6 +880,7 @@ export default function BookingAndPay() {
         },
         method: 'vnpay',
         coupon: appliedCoupon,
+        pointsUsed: walletDiscount,
       };
 
       try {
@@ -830,6 +888,7 @@ export default function BookingAndPay() {
         const list = JSON.parse(localStorage.getItem('yenBookings') || '[]');
         list.unshift(bookingRecord);
         localStorage.setItem('yenBookings', JSON.stringify(list));
+        localStorage.removeItem(`cached_cashback_wallet_${uid}`);
       } catch (e) {
         console.error('Save booking error:', e);
       }
@@ -854,18 +913,20 @@ export default function BookingAndPay() {
       const hsId = !isNaN(Number(rawHs)) && Number(rawHs) > 0 ? Number(rawHs) : 1;
       const rawRm = searchParams.get('roomId') || location.state?.roomId || room?.id;
       const rmId = !isNaN(Number(rawRm)) && Number(rawRm) > 0 ? Number(rawRm) : null;
+      const uid = Number(realUser?.id || realUser?.userId || realUser?.user_id || sessionStorage.getItem('userId') || 21);
 
       const dbPayMethod = payMethod === 'vnpay' ? 'VNPAY' : (payMethod === 'vietqr' ? 'BANK_TRANSFER' : 'CASH');
 
       const bookingPayload = {
-        touristId: Number(realUser?.id || realUser?.userId || realUser?.user_id || sessionStorage.getItem('userId') || 1),
+        touristId: uid,
         homestayId: hsId,
         roomId: Number.isFinite(rmId) && rmId > 0 ? rmId : null,
         checkInDate: checkin,
         checkOutDate: checkout,
         guestsCount: guests,
         totalPrice: grandTotal,
-        discountAmount: discount,
+        discountAmount: discount + walletDiscount,
+        pointsUsed: walletDiscount,
         paymentType: payPlan === 'deposit' ? 'DEPOSIT' : 'FULL',
         depositAmount: payNow,
         remainingAmount: payLater,
@@ -918,6 +979,7 @@ export default function BookingAndPay() {
           cleaning: cleaningFee,
           service: serviceFee,
           discount: discount,
+          walletDiscount: walletDiscount,
           total: grandTotal,
           paid: payNow,
           remaining: payLater,
@@ -925,6 +987,7 @@ export default function BookingAndPay() {
         },
         method: payMethod,
         coupon: appliedCoupon,
+        pointsUsed: walletDiscount,
       };
 
       try {
@@ -932,6 +995,7 @@ export default function BookingAndPay() {
         const list = JSON.parse(localStorage.getItem('yenBookings') || '[]');
         list.unshift(bookingRecord);
         localStorage.setItem('yenBookings', JSON.stringify(list));
+        localStorage.removeItem(`cached_cashback_wallet_${uid}`);
       } catch (e) {
         console.error('Save booking error:', e);
       }
@@ -1227,6 +1291,237 @@ export default function BookingAndPay() {
                 </div>
               </section>
 
+              {/* 4.5 Loyalty Points & YÊN Wallet */}
+              <section className="bk-card" style={{ border: useWalletPoints && walletDiscount > 0 ? '1.5px solid #10B981' : undefined }}>
+                <div className="bk-card-head">
+                  <span className="bk-card-icon" style={{ background: '#ECFDF5', color: '#059669' }}><i className="bi bi-coin" /></span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                      <h2>Điểm thưởng &amp; Ví YÊN</h2>
+                      <span style={{ background: '#FEF3C7', color: '#B45309', padding: '3px 10px', borderRadius: '12px', fontSize: '0.8rem', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                        <i className="bi bi-wallet2" /> Số dư khả dụng: {walletBalance.toLocaleString('vi-VN')} điểm (~{fmtVND(walletBalance)})
+                      </span>
+                    </div>
+                    <p>Dùng điểm tích lũy để giảm giá trực tiếp cho lần đặt phòng này (1 điểm = 1đ).</p>
+                  </div>
+                </div>
+
+                <div style={{ marginTop: '14px', background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '12px', padding: '16px' }}>
+                  {/* Toggle checkbox */}
+                  <label
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '12px',
+                      cursor: 'pointer',
+                      userSelect: 'none',
+                      fontWeight: 600,
+                      fontSize: '0.95rem',
+                      color: '#0F172A'
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={useWalletPoints}
+                      onChange={(e) => handleToggleUsePoints(e.target.checked)}
+                      style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: '#059669' }}
+                    />
+                    <span>
+                      Sử dụng điểm thưởng Ví YÊN cho đơn này
+                    </span>
+                  </label>
+
+                  {useWalletPoints && (
+                    <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px dashed #CBD5E1' }}>
+                      {/* Slider and Input Container */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
+                          <span style={{ fontSize: '0.88rem', color: '#475569' }}>
+                            Chọn số điểm muốn trừ (tối đa {maxUsablePoints.toLocaleString('vi-VN')} điểm):
+                          </span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+                              <input
+                                type="number"
+                                min={0}
+                                max={maxUsablePoints}
+                                step={1000}
+                                value={effectivePoints}
+                                onChange={(e) => handleSelectPointsAmount(e.target.value)}
+                                style={{
+                                  width: '140px',
+                                  padding: '6px 36px 6px 12px',
+                                  border: '1.5px solid #10B981',
+                                  borderRadius: '8px',
+                                  fontWeight: 700,
+                                  color: '#065F46',
+                                  textAlign: 'right',
+                                  fontSize: '0.92rem'
+                                }}
+                              />
+                              <span style={{ position: 'absolute', right: '10px', fontSize: '0.78rem', color: '#64748B', pointerEvents: 'none' }}>
+                                điểm
+                              </span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleSelectPointsAmount(maxUsablePoints)}
+                              style={{
+                                padding: '6px 12px',
+                                background: '#ECFDF5',
+                                border: '1px solid #A7F3D0',
+                                borderRadius: '8px',
+                                color: '#047857',
+                                fontWeight: 700,
+                                fontSize: '0.82rem',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              Tối đa
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Interactive Range Slider */}
+                        <div>
+                          <input
+                            type="range"
+                            min={0}
+                            max={maxUsablePoints > 0 ? maxUsablePoints : 100}
+                            step={1000}
+                            value={effectivePoints}
+                            onChange={(e) => handleSelectPointsAmount(Number(e.target.value))}
+                            style={{
+                              width: '100%',
+                              accentColor: '#059669',
+                              cursor: 'pointer'
+                            }}
+                          />
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: '#94A3B8', marginTop: '4px' }}>
+                            <span>0đ</span>
+                            <span>{fmtVND(Math.round(maxUsablePoints * 0.5))}</span>
+                            <span>{fmtVND(maxUsablePoints)}</span>
+                          </div>
+                        </div>
+
+                        {/* Quick Selection Buttons */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                          <span style={{ fontSize: '0.8rem', color: '#64748B', marginRight: '4px' }}>Chọn nhanh:</span>
+                          <button
+                            type="button"
+                            onClick={() => handleSelectPointsAmount(0)}
+                            style={{
+                              padding: '4px 10px',
+                              borderRadius: '6px',
+                              border: effectivePoints === 0 ? '1.5px solid #64748B' : '1px solid #E2E8F0',
+                              background: effectivePoints === 0 ? '#F1F5F9' : '#FFFFFF',
+                              color: effectivePoints === 0 ? '#0F172A' : '#475569',
+                              fontWeight: effectivePoints === 0 ? 700 : 500,
+                              fontSize: '0.8rem',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            Không dùng (0đ)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleSelectPointsAmount(Math.round(maxUsablePoints * 0.25))}
+                            style={{
+                              padding: '4px 10px',
+                              borderRadius: '6px',
+                              border: effectivePoints === Math.round(maxUsablePoints * 0.25) && effectivePoints > 0 ? '1.5px solid #059669' : '1px solid #E2E8F0',
+                              background: effectivePoints === Math.round(maxUsablePoints * 0.25) && effectivePoints > 0 ? '#ECFDF5' : '#FFFFFF',
+                              color: effectivePoints === Math.round(maxUsablePoints * 0.25) && effectivePoints > 0 ? '#065F46' : '#475569',
+                              fontWeight: effectivePoints === Math.round(maxUsablePoints * 0.25) && effectivePoints > 0 ? 700 : 500,
+                              fontSize: '0.8rem',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            25% ({fmtVND(Math.round(maxUsablePoints * 0.25))})
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleSelectPointsAmount(Math.round(maxUsablePoints * 0.5))}
+                            style={{
+                              padding: '4px 10px',
+                              borderRadius: '6px',
+                              border: effectivePoints === Math.round(maxUsablePoints * 0.5) && effectivePoints > 0 ? '1.5px solid #059669' : '1px solid #E2E8F0',
+                              background: effectivePoints === Math.round(maxUsablePoints * 0.5) && effectivePoints > 0 ? '#ECFDF5' : '#FFFFFF',
+                              color: effectivePoints === Math.round(maxUsablePoints * 0.5) && effectivePoints > 0 ? '#065F46' : '#475569',
+                              fontWeight: effectivePoints === Math.round(maxUsablePoints * 0.5) && effectivePoints > 0 ? 700 : 500,
+                              fontSize: '0.8rem',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            50% ({fmtVND(Math.round(maxUsablePoints * 0.5))})
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleSelectPointsAmount(Math.round(maxUsablePoints * 0.75))}
+                            style={{
+                              padding: '4px 10px',
+                              borderRadius: '6px',
+                              border: effectivePoints === Math.round(maxUsablePoints * 0.75) && effectivePoints > 0 ? '1.5px solid #059669' : '1px solid #E2E8F0',
+                              background: effectivePoints === Math.round(maxUsablePoints * 0.75) && effectivePoints > 0 ? '#ECFDF5' : '#FFFFFF',
+                              color: effectivePoints === Math.round(maxUsablePoints * 0.75) && effectivePoints > 0 ? '#065F46' : '#475569',
+                              fontWeight: effectivePoints === Math.round(maxUsablePoints * 0.75) && effectivePoints > 0 ? 700 : 500,
+                              fontSize: '0.8rem',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            75% ({fmtVND(Math.round(maxUsablePoints * 0.75))})
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleSelectPointsAmount(maxUsablePoints)}
+                            style={{
+                              padding: '4px 10px',
+                              borderRadius: '6px',
+                              border: effectivePoints === maxUsablePoints && effectivePoints > 0 ? '1.5px solid #059669' : '1px solid #E2E8F0',
+                              background: effectivePoints === maxUsablePoints && effectivePoints > 0 ? '#ECFDF5' : '#FFFFFF',
+                              color: effectivePoints === maxUsablePoints && effectivePoints > 0 ? '#065F46' : '#475569',
+                              fontWeight: effectivePoints === maxUsablePoints && effectivePoints > 0 ? 700 : 500,
+                              fontSize: '0.8rem',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            100% ({fmtVND(maxUsablePoints)})
+                          </button>
+                        </div>
+
+                        {/* Status notification */}
+                        <div style={{
+                          padding: '10px 14px',
+                          background: walletDiscount > 0 ? '#ECFDF5' : '#F1F5F9',
+                          border: walletDiscount > 0 ? '1px solid #A7F3D0' : '1px solid #E2E8F0',
+                          borderRadius: '8px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          flexWrap: 'wrap',
+                          gap: '8px',
+                          fontSize: '0.85rem'
+                        }}>
+                          <div style={{ color: walletDiscount > 0 ? '#065F46' : '#64748B', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <i className={`bi ${walletDiscount > 0 ? 'bi-check-circle-fill text-success' : 'bi-info-circle'}`} />
+                            <span>
+                              {walletDiscount > 0 ? (
+                                <>Đã chọn giảm: <b>-{fmtVND(walletDiscount)}</b> trực tiếp vào tiền thanh toán đơn này.</>
+                              ) : (
+                                <>Chưa áp dụng giảm bằng điểm cho đơn này.</>
+                              )}
+                            </span>
+                          </div>
+                          <span style={{ fontSize: '0.8rem', color: '#64748B' }}>
+                            Số dư điểm còn lại: <b>{(walletBalance - walletDiscount).toLocaleString('vi-VN')}</b> điểm
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </section>
+
               {/* 5. Payment Selection */}
               <section className="bk-card">
                 <div className="bk-card-head">
@@ -1404,6 +1699,12 @@ export default function BookingAndPay() {
                       <span>Mã giảm giá ({appliedCoupon})</span><span>-{fmtVND(discount)}</span>
                     </div>
                   )}
+                  {walletDiscount > 0 && (
+                    <div className="bk-row bk-row--discount" style={{ color: '#059669', fontWeight: 600 }}>
+                      <span><i className="bi bi-coin me-1" style={{ color: '#F59E0B' }} />Dùng điểm Ví YÊN</span>
+                      <span>-{fmtVND(walletDiscount)}</span>
+                    </div>
+                  )}
                   {hasPaidExperiences && (
                     <div className="bk-row" style={{ color: '#6B7280', fontSize: '0.82rem' }}>
                       <span>Trải nghiệm (trả tại homestay)</span><span>+{fmtVND(expTotal)}</span>
@@ -1411,6 +1712,23 @@ export default function BookingAndPay() {
                   )}
                   <div className="bk-divider" />
                   <div className="bk-row bk-row--total"><span>Tổng cộng</span><span>{fmtVND(grandTotal)}</span></div>
+                  {cashbackAccumulated > 0 && (
+                    <div style={{
+                      marginTop: '10px',
+                      padding: '8px 12px',
+                      background: 'linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%)',
+                      border: '1px solid #A7F3D0',
+                      borderRadius: '8px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      fontSize: '0.82rem',
+                      color: '#065F46'
+                    }}>
+                      <span><i className="bi bi-gift-fill me-1" style={{ color: '#059669' }} />Tích 5% cho lần đặt tiếp theo:</span>
+                      <b style={{ color: '#047857', fontWeight: 700 }}>+{fmtVND(cashbackAccumulated)}</b>
+                    </div>
+                  )}
                   {hasPaidExperiences && (
                     <div className="bk-row" style={{ fontSize: '0.78rem', color: '#9CA3AF', marginTop: 2 }}>
                       <span>⚡ Không bao gồm trải nghiệm</span>
@@ -1698,28 +2016,6 @@ export default function BookingAndPay() {
                     </div>
                   </div>
                 </div>
-
-                <div className="yn-vnpay-actions-row">
-                  <button
-                    type="button"
-                    className="yn-vnpay-direct-btn"
-                    onClick={handleOpenVNPayGateway}
-                    disabled={vnpayLoading || isProcessing}
-                    title="Mở cổng VNPAY Sandbox để thanh toán"
-                  >
-                    {vnpayLoading ? (
-                      <>
-                        <span className="bk-spinner" style={{ width: 18, height: 18, borderWidth: 2 }} />
-                        <span>Đang chuyển hướng sang Cổng VNPAY...</span>
-                      </>
-                    ) : (
-                      <>
-                        <span>Mở Cổng VNPAY để thanh toán ngay</span>
-                        <i className="bi bi-box-arrow-up-right" />
-                      </>
-                    )}
-                  </button>
-                </div>
               </div>
             )}
 
@@ -1829,25 +2125,15 @@ export default function BookingAndPay() {
               Quay lại
             </button>
             {payMethod === 'vnpay' ? (
-              <div className="yn-pay-foot-actions">
-                <button
-                  type="button"
-                  className="yn-btn yn-btn--sim"
-                  onClick={handleSimulateVNPaySuccess}
-                  disabled={isProcessing || vnpayLoading}
-                  title="Thử nghiệm nhanh không qua cổng"
-                >
-                  <i className="bi bi-lightning-charge-fill" /> Hoàn tất đặt phòng
-                </button>
-                <button
-                  type="button"
-                  className="yn-btn yn-btn--primary yn-btn-vnpay-submit"
-                  onClick={handleOpenVNPayGateway}
-                  disabled={vnpayLoading || isProcessing}
-                >
-                  {vnpayLoading ? 'Đang kết nối...' : `Cổng VNPAY (${fmtVND(payNow)})`}
-                </button>
-              </div>
+              <button
+                type="button"
+                className="yn-btn yn-btn--primary yn-btn-vnpay-submit"
+                onClick={handleOpenVNPayGateway}
+                disabled={vnpayLoading || isProcessing}
+                style={{ minWidth: '220px' }}
+              >
+                {vnpayLoading ? 'Đang kết nối...' : `Thanh toán qua Cổng VNPAY (${fmtVND(payNow)})`}
+              </button>
             ) : payMethod === 'vietqr' ? (
               <button
                 type="button"

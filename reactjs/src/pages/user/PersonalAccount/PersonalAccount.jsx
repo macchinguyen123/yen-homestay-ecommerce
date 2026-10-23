@@ -546,6 +546,29 @@ export default function PersonalAccount() {
     return formattedTxns.filter((t) => t.status === txnFilter);
   }, [formattedTxns, txnFilter]);
 
+  // Phân trang danh sách giao dịch đặt phòng (Tab 4) - 5 giao dịch / trang
+  const [txnPage, setTxnPage] = useState(1);
+  const TXNS_PER_PAGE = 5;
+  const totalTxnPages = Math.ceil(displayedTxns.length / TXNS_PER_PAGE) || 1;
+  const paginatedTxns = useMemo(() => {
+    const startIndex = (txnPage - 1) * TXNS_PER_PAGE;
+    return displayedTxns.slice(startIndex, startIndex + TXNS_PER_PAGE);
+  }, [displayedTxns, txnPage]);
+
+  // Tự động chuyển về trang 1 khi đổi bộ lọc giao dịch
+  useEffect(() => {
+    setTxnPage(1);
+  }, [txnFilter]);
+
+  // Phân trang danh sách biến động điểm Ví YÊN (Tab 5) - 5 giao dịch / trang
+  const [ledgerPage, setLedgerPage] = useState(1);
+  const LEDGER_PER_PAGE = 5;
+  const totalLedgerPages = Math.ceil(walletLedger.length / LEDGER_PER_PAGE) || 1;
+  const paginatedLedger = useMemo(() => {
+    const startIndex = (ledgerPage - 1) * LEDGER_PER_PAGE;
+    return walletLedger.slice(startIndex, startIndex + LEDGER_PER_PAGE);
+  }, [walletLedger, ledgerPage]);
+
   // Handlers
   const handleProfileSubmit = async (e) => {
     e.preventDefault();
@@ -946,8 +969,8 @@ export default function PersonalAccount() {
                 className={`account-nav-item ${activeTab === "tab-cashback" ? "active" : ""}`}
                 onClick={() => setActiveTab("tab-cashback")}
               >
-                <i className="bi bi-cash-coin nav-item-icon"></i>
-                <span className="nav-item-label">Hoàn tiền</span>
+                <i className="bi bi-coin nav-item-icon"></i>
+                <span className="nav-item-label">Điểm thưởng Ví YÊN</span>
               </button>
 
               <div className="sidebar-divider"></div>
@@ -1786,7 +1809,7 @@ export default function PersonalAccount() {
                       </Link>
                     </div>
                   ) : (
-                    displayedTxns.map((tx) => (
+                    paginatedTxns.map((tx) => (
                       <div key={tx.id} className={`txn-row-card txn-status-${tx.status}`}>
                         <div className="txn-row-left">
                           <div className="txn-order-col">
@@ -1818,11 +1841,66 @@ export default function PersonalAccount() {
                     ))
                   )}
                 </div>
+
+                {/* Phân trang danh sách giao dịch (5 giao dịch / trang) */}
+                {totalTxnPages > 1 && (
+                  <div className="pa-voucher-pagination mt-4 mb-0">
+                    <div className="pa-pagination-info">
+                      Hiển thị <strong>{((txnPage - 1) * TXNS_PER_PAGE) + 1} - {Math.min(txnPage * TXNS_PER_PAGE, displayedTxns.length)}</strong> trên tổng số <strong>{displayedTxns.length}</strong> giao dịch
+                    </div>
+                    <div className="pa-pagination-controls">
+                      <button
+                        type="button"
+                        className="pa-page-btn pa-page-prev"
+                        disabled={txnPage === 1}
+                        onClick={() => setTxnPage((prev) => Math.max(1, prev - 1))}
+                        title="Trang trước"
+                      >
+                        <i className="bi bi-chevron-left me-1"></i> Trước
+                      </button>
+
+                      <div className="pa-page-numbers">
+                        {Array.from({ length: totalTxnPages }, (_, idx) => idx + 1).map((p) => {
+                          if (
+                            p === 1 ||
+                            p === totalTxnPages ||
+                            (p >= txnPage - 1 && p <= txnPage + 1)
+                          ) {
+                            return (
+                              <button
+                                key={p}
+                                type="button"
+                                className={`pa-page-number ${p === txnPage ? "active" : ""}`}
+                                onClick={() => setTxnPage(p)}
+                              >
+                                {p}
+                              </button>
+                            );
+                          }
+                          if (p === txnPage - 2 || p === txnPage + 2) {
+                            return <span key={p} className="pa-page-dots">...</span>;
+                          }
+                          return null;
+                        })}
+                      </div>
+
+                      <button
+                        type="button"
+                        className="pa-page-btn pa-page-next"
+                        disabled={txnPage === totalTxnPages}
+                        onClick={() => setTxnPage((prev) => Math.min(totalTxnPages, prev + 1))}
+                        title="Trang sau"
+                      >
+                        Sau <i className="bi bi-chevron-right ms-1"></i>
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}
 
-          {/* TAB 5: VÍ HOÀN TIỀN */}
+          {/* TAB 5: VÍ ĐIỂM THƯỞNG YÊN */}
           {activeTab === "tab-cashback" && (
             <div className="animate-fade-in">
               {/* Hero Banner Card */}
@@ -1830,99 +1908,79 @@ export default function PersonalAccount() {
                 <div className="wallet-hero-top">
                   <div className="wallet-hero-brand">
                     <div className="wallet-hero-icon-wrapper">
-                      <i className="bi bi-wallet2"></i>
+                      <i className="bi bi-coin"></i>
                     </div>
                     <div>
                       <div className="wallet-verified-badge">
                         <i className="bi bi-shield-check"></i>
-                        <span>Ví YÊN Pay • {walletData?.isLinked ? "Đã xác thực" : "Chưa kích hoạt"}</span>
+                        <span>Thành viên YÊN Loyalty • Đang hoạt động</span>
                       </div>
-                      <h2 className="wallet-hero-title">Ví Hoàn Tiền Cá Nhân</h2>
+                      <h2 className="wallet-hero-title">Ví Điểm Thưởng Đặt Phòng</h2>
                     </div>
                   </div>
-                  <button className="btn-withdraw-action" onClick={() => setShowWithdrawModal(true)}>
-                    <i className="bi bi-bank me-2"></i>
-                    <span>Rút tiền về Ngân hàng</span>
-                  </button>
+                  <Link to="/search" className="btn-withdraw-action" style={{ textDecoration: 'none' }}>
+                    <i className="bi bi-compass me-2"></i>
+                    <span>Đặt phòng dùng điểm ngay</span>
+                  </Link>
                 </div>
 
                 <div className="wallet-hero-body">
                   <div className="wallet-main-stat">
                     <span className="wallet-stat-label">
-                      <i className="bi bi-piggy-bank me-1"></i> SỐ DƯ KHẢ DỤNG
+                      <i className="bi bi-coin me-1"></i> SỐ DƯ ĐIỂM KHẢ DỤNG
                     </span>
                     <div className="wallet-balance-display">
                       <span className="wallet-balance-number">{balance.toLocaleString("vi-VN")}</span>
-                      <span className="wallet-balance-currency">VNĐ</span>
+                      <span className="wallet-balance-currency">điểm (~{balance.toLocaleString("vi-VN")}đ)</span>
                     </div>
                     <p className="wallet-balance-note">
                       <i className="bi bi-info-circle me-1.5"></i>
-                      Dùng để thanh toán đặt phòng hoặc rút tiền trực tiếp về ngân hàng
+                      Tự động tích lũy khi thanh toán đơn phòng · Dùng giảm giá trực tiếp cho lần đặt phòng tiếp theo (1 điểm = 1đ)
                     </p>
                   </div>
 
                   <div className="wallet-sub-stats">
                     <div className="wallet-sub-stat-card">
-                      <span className="sub-stat-title">TỔNG HOÀN LŨY KẾ</span>
+                      <span className="sub-stat-title">TỔNG ĐIỂM ĐÃ TÍCH LŨY</span>
                       <span className="sub-stat-value text-emerald">
-                        {Number(walletData?.totalCashback || 1250000).toLocaleString("vi-VN")}đ
+                        +{Number(walletData?.totalCashback || 1250000).toLocaleString("vi-VN")} điểm
                       </span>
                     </div>
                     <div className="wallet-sub-stat-card">
-                      <span className="sub-stat-title">TỶ LỆ HOÀN TIỀN</span>
-                      <span className="sub-stat-badge">{walletData?.cashbackRate || 5}% / Đơn phòng</span>
+                      <span className="sub-stat-title">TỶ LỆ TÍCH ĐIỂM</span>
+                      <span className="sub-stat-badge">{walletData?.cashbackRate || 5}% / Đơn thanh toán</span>
                     </div>
                   </div>
                 </div>
               </div>
 
-              {/* Bank & PIN Information Cards */}
+              {/* Point Rules Information Cards */}
               <div className="wallet-info-grid">
-                <div
-                  className="wallet-info-card"
-                  style={{ cursor: "pointer", transition: "transform 0.2s ease" }}
-                  onClick={() => setShowBankModal(true)}
-                  title="Nhấn để cập nhật tài khoản ngân hàng liên kết"
-                >
+                <div className="wallet-info-card">
                   <div className="wallet-info-icon bg-emerald-light">
-                    <i className="bi bi-bank2 text-emerald"></i>
+                    <i className="bi bi-percent text-emerald"></i>
                   </div>
                   <div className="wallet-info-content">
-                    <div className="d-flex align-items-center justify-content-between">
-                      <span className="wallet-info-label">Ngân hàng liên kết</span>
-                      <small className="text-emerald fw-semibold text-xs"><i className="bi bi-pencil-square me-1"></i>Thay đổi</small>
-                    </div>
-                    <h6 className="wallet-info-title">
-                      {walletData?.bankName || "Vietcombank"} •••• {walletData?.accountNumber ? (walletData.accountNumber.length > 4 ? walletData.accountNumber.slice(-4) : walletData.accountNumber) : "6868"}
-                    </h6>
-                    <span className="wallet-info-sub">
-                      Chủ tài khoản: <strong>{walletData?.accountHolder || profile.fullName || "Lê Hoàng Mai Chi"}</strong>
-                    </span>
+                    <span className="wallet-info-label">Cơ chế tích điểm</span>
+                    <h6 className="wallet-info-title">Tích 5% giá trị thanh toán</h6>
+                    <span className="wallet-info-sub">Tự động cộng ngay sau khi thanh toán đơn phòng thành công</span>
                   </div>
                   <span className="wallet-status-pill pill-success">
-                    <i className="bi bi-check-circle-fill me-1"></i>Đã liên kết
+                    <i className="bi bi-check-circle-fill me-1"></i>Tự động
                   </span>
                 </div>
 
-                <div
-                  className="wallet-info-card"
-                  style={{ cursor: "pointer", transition: "transform 0.2s ease" }}
-                  onClick={() => setShowPinModal(true)}
-                  title="Nhấn để cài đặt / đổi mã PIN ví"
-                >
+                <div className="wallet-info-card">
                   <div className="wallet-info-icon bg-amber-light">
-                    <i className="bi bi-shield-lock-fill text-amber"></i>
+                    <i className="bi bi-cart-check text-amber"></i>
                   </div>
                   <div className="wallet-info-content">
-                    <div className="d-flex align-items-center justify-content-between">
-                      <span className="wallet-info-label">Bảo mật giao dịch</span>
-                      <small className="text-amber fw-semibold text-xs"><i className="bi bi-key me-1"></i>Cài đặt</small>
-                    </div>
-                    <h6 className="wallet-info-title">Mã PIN Ví 6 chữ số</h6>
-                    <span className="wallet-info-sub">Xác thực nhanh khi hoàn tiền &amp; rút tiền</span>
+                    <span className="wallet-info-label">Sử dụng điểm</span>
+                    <h6 className="wallet-info-title">Giảm giá cho lần đặt tiếp theo</h6>
+                    <span className="wallet-info-sub">Tick chọn tại bước đặt phòng để trừ trực tiếp vào hóa đơn</span>
                   </div>
                   <span className="wallet-status-pill pill-amber">
-                    <i className="bi bi-shield-check me-1"></i>{walletData?.isPinSet ? "Đã kích hoạt" : "Chưa kích hoạt"}
+                    <i className="bi bi-arrow-right-circle-fill me-1"></i>1 điểm = 1đ
                   </span>
                 </div>
               </div>
@@ -1935,8 +1993,8 @@ export default function PersonalAccount() {
                       <i className="bi bi-journal-text"></i>
                     </div>
                     <div>
-                      <h5 className="ledger-title">Lịch sử biến động số dư</h5>
-                      <span className="ledger-subtitle">Các giao dịch nhận hoàn tiền và rút tiền</span>
+                      <h5 className="ledger-title">Lịch sử tích lũy &amp; sử dụng điểm</h5>
+                      <span className="ledger-subtitle">Điểm cộng khi thanh toán thành công và điểm trừ khi đặt phòng mới</span>
                     </div>
                   </div>
                   <span className="ledger-count-badge">{walletLedger.length} giao dịch</span>
@@ -1949,7 +2007,7 @@ export default function PersonalAccount() {
                       Chưa có giao dịch biến động số dư nào
                     </div>
                   ) : (
-                    walletLedger.map((item) => (
+                    paginatedLedger.map((item) => (
                       <div key={item.id} className={`wallet-ledger-item ${item.type}`}>
                         <div className="ledger-item-left">
                           <div className={`ledger-type-circle ${item.type}`}>
@@ -1976,6 +2034,116 @@ export default function PersonalAccount() {
                       </div>
                     ))
                   )}
+                </div>
+
+                {/* Phân trang lịch sử biến động điểm ví (5 giao dịch / trang) */}
+                {totalLedgerPages > 1 && (
+                  <div className="pa-voucher-pagination mt-3 mb-0" style={{ border: 'none', borderTop: '1px solid #F1F5F9', borderRadius: '0 0 16px 16px', background: '#FAFAFA' }}>
+                    <div className="pa-pagination-info">
+                      Hiển thị <strong>{((ledgerPage - 1) * LEDGER_PER_PAGE) + 1} - {Math.min(ledgerPage * LEDGER_PER_PAGE, walletLedger.length)}</strong> trên tổng số <strong>{walletLedger.length}</strong> giao dịch
+                    </div>
+                    <div className="pa-pagination-controls">
+                      <button
+                        type="button"
+                        className="pa-page-btn pa-page-prev"
+                        disabled={ledgerPage === 1}
+                        onClick={() => setLedgerPage((prev) => Math.max(1, prev - 1))}
+                        title="Trang trước"
+                      >
+                        <i className="bi bi-chevron-left me-1"></i> Trước
+                      </button>
+
+                      <div className="pa-page-numbers">
+                        {Array.from({ length: totalLedgerPages }, (_, idx) => idx + 1).map((p) => {
+                          if (
+                            p === 1 ||
+                            p === totalLedgerPages ||
+                            (p >= ledgerPage - 1 && p <= ledgerPage + 1)
+                          ) {
+                            return (
+                              <button
+                                key={p}
+                                type="button"
+                                className={`pa-page-number ${p === ledgerPage ? "active" : ""}`}
+                                onClick={() => setLedgerPage(p)}
+                              >
+                                {p}
+                              </button>
+                            );
+                          }
+                          if (p === ledgerPage - 2 || p === ledgerPage + 2) {
+                            return <span key={p} className="pa-page-dots">...</span>;
+                          }
+                          return null;
+                        })}
+                      </div>
+
+                      <button
+                        type="button"
+                        className="pa-page-btn pa-page-next"
+                        disabled={ledgerPage === totalLedgerPages}
+                        onClick={() => setLedgerPage((prev) => Math.min(totalLedgerPages, prev + 1))}
+                        title="Trang sau"
+                      >
+                        Sau <i className="bi bi-chevron-right ms-1"></i>
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Loyalty & Cashback Guide */}
+              <div className="wallet-guide-card" style={{ marginTop: '24px', background: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: '16px', padding: '24px', boxShadow: '0 4px 12px rgba(15, 23, 42, 0.04)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+                  <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: '#ECFDF5', color: '#059669', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem' }}>
+                    <i className="bi bi-award-fill" />
+                  </div>
+                  <div>
+                    <h5 style={{ margin: 0, fontWeight: 700, color: '#0F172A', fontSize: '1.05rem' }}>Chính Sách Tích Điểm &amp; Tiêu Điểm YÊN Loyalty</h5>
+                    <span style={{ fontSize: '0.82rem', color: '#64748B' }}>Đặc quyền hoàn tiền và tiết kiệm dành riêng cho thành viên YÊN Homestay</span>
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px', marginTop: '16px' }}>
+                  <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '12px', padding: '16px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#059669', fontWeight: 700, marginBottom: '6px' }}>
+                      <i className="bi bi-percent" style={{ fontSize: '1.2rem' }} />
+                      <span>Tích Lũy 5% Tự Động</span>
+                    </div>
+                    <p style={{ margin: 0, fontSize: '0.85rem', color: '#475569', lineHeight: 1.5 }}>
+                      Mỗi đơn đặt phòng thành công qua hệ thống sẽ được tự động cộng 5% tổng thanh toán vào Ví YÊN ngay lập tức.
+                    </p>
+                  </div>
+
+                  <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '12px', padding: '16px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#2563EB', fontWeight: 700, marginBottom: '6px' }}>
+                      <i className="bi bi-arrow-left-right" style={{ fontSize: '1.2rem' }} />
+                      <span>Quy Đổi 1 Điểm = 1 VNĐ</span>
+                    </div>
+                    <p style={{ margin: 0, fontSize: '0.85rem', color: '#475569', lineHeight: 1.5 }}>
+                      Số điểm tích lũy được bảo toàn 100% giá trị thực tế theo VNĐ, không làm tròn số và không phát sinh chi phí ẩn.
+                    </p>
+                  </div>
+
+                  <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '12px', padding: '16px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#D97706', fontWeight: 700, marginBottom: '6px' }}>
+                      <i className="bi bi-cart-check" style={{ fontSize: '1.2rem' }} />
+                      <span>Trừ Trực Tiếp Đặt Phòng</span>
+                    </div>
+                    <p style={{ margin: 0, fontSize: '0.85rem', color: '#475569', lineHeight: 1.5 }}>
+                      Bạn có thể chọn trừ toàn bộ hoặc một phần số dư điểm tích lũy khi thanh toán bất kỳ homestay nào tại bước đặt phòng.
+                    </p>
+                  </div>
+
+                  <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '12px', padding: '16px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#7C3AED', fontWeight: 700, marginBottom: '6px' }}>
+                      <i className="bi bi-bank" style={{ fontSize: '1.2rem' }} />
+                      <span>Rút Tiền Về Ngân Hàng</span>
+                    </div>
+                    <p style={{ margin: 0, fontSize: '0.85rem', color: '#475569', lineHeight: 1.5 }}>
+                      Dễ dàng tạo lệnh rút tiền về tài khoản ngân hàng liên kết mọi lúc với bảo mật mã PIN giao dịch 6 chữ số an toàn.
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>
@@ -2259,92 +2427,179 @@ export default function PersonalAccount() {
         </div>
       )}
 
-      {/* 7. Modal Invoice */}
+      {/* 7. Modal Invoice (Hóa đơn điện tử cao cấp YÊN) */}
       {showInvoiceModal && selectedInvoice && (
-        <div className="modal show d-block" style={{ backgroundColor: "rgba(0,0,0,0.5)" }} tabindex="-1">
-          <div className="modal-dialog modal-dialog-centered modal-lg">
-            <div className="modal-content rounded-4 border-0 shadow-lg">
-              <div className="modal-header bg-light border-bottom p-4">
-                <div className="d-flex align-items-center justify-content-between w-100">
-                  <div className="d-flex align-items-center gap-3">
-                    <div className="bg-success text-white rounded-3 p-2 d-flex align-items-center justify-content-center" style={{ width: "44px", height: "44px" }}>
-                      <i className="bi bi-receipt-cutoff fs-4"></i>
-                    </div>
-                    <div>
-                      <h5 className="fw-extrabold text-dark mb-0">HÓA ĐƠN XÁC NHẬN THANH TOÁN</h5>
-                      <p className="text-xs text-muted mb-0">Mã hóa đơn: <strong className="text-success">#{selectedInvoice.code}</strong> • YÊN Homestay Booking System</p>
-                    </div>
-                  </div>
-                  <button type="button" className="btn-close" onClick={() => setShowInvoiceModal(false)}></button>
+        <div
+          className="pa-invoice-overlay"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowInvoiceModal(false);
+          }}
+        >
+          <div className="pa-invoice-dialog" role="dialog" aria-modal="true">
+            {/* Header */}
+            <div className="pa-invoice-header">
+              <div className="pa-invoice-brand">
+                <div className="pa-invoice-brand-icon">
+                  <i className="bi bi-receipt-cutoff" />
+                </div>
+                <div className="pa-invoice-title-block">
+                  <h3>Hóa Đơn Xác Nhận Thanh Toán</h3>
+                  <p>
+                    <span>Mã hóa đơn:</span>
+                    <span className="pa-invoice-code-tag">#{selectedInvoice.code}</span>
+                    <span>• Hệ thống YÊN Homestay</span>
+                  </p>
                 </div>
               </div>
-              <div className="modal-body p-4">
-                <div className="row g-3 mb-4 pb-3 border-bottom">
-                  <div className="col-6">
-                    <small className="text-muted text-uppercase text-xs fw-bold">Thông tin khách hàng</small>
-                    <h6 className="fw-bold text-dark mb-1 mt-1">{profile.fullName}</h6>
-                    <p className="text-xs text-muted mb-0"><i className="bi bi-telephone me-1"></i>{profile.phone}</p>
-                    <p className="text-xs text-muted mb-0"><i className="bi bi-envelope me-1"></i>{profile.email}</p>
-                  </div>
-                  <div className="col-6 text-end">
-                    <small className="text-muted text-uppercase text-xs fw-bold">Thông tin thanh toán</small>
-                    <p className="text-xs mb-1 mt-1">Phương thức: <strong className="text-dark">{selectedInvoice.method}</strong></p>
-                    <span className="badge bg-success text-white px-2.5 py-1">{selectedInvoice.status}</span>
-                  </div>
-                </div>
+              <button
+                type="button"
+                className="pa-invoice-close-btn"
+                onClick={() => setShowInvoiceModal(false)}
+                title="Đóng hóa đơn"
+              >
+                <i className="bi bi-x-lg" />
+              </button>
+            </div>
 
-                <div className="p-3 rounded-3 bg-light border mb-4">
-                  <small className="text-muted text-uppercase text-xs fw-bold d-block mb-1">Cơ sở lưu trú homestay</small>
-                  <h5 className="fw-extrabold text-dark mb-1">{selectedInvoice.name}</h5>
-                  <p className="text-xs text-muted mb-0">
-                    <i className="bi bi-geo-alt-fill text-danger me-1"></i>{selectedInvoice.loc} • Thời gian: <strong className="text-dark">{selectedInvoice.dates}</strong>
+            {/* Body */}
+            <div className="pa-invoice-body">
+              {/* Info Grid (Khách hàng & Thanh toán) */}
+              <div className="pa-invoice-info-grid">
+                <div className="pa-invoice-info-box">
+                  <span className="pa-invoice-box-label">
+                    <i className="bi bi-person-fill" /> Thông tin khách hàng
+                  </span>
+                  <h4 className="pa-invoice-customer-name">{profile.fullName || "Khách hàng YÊN"}</h4>
+                  <p className="pa-invoice-info-line">
+                    <i className="bi bi-telephone-fill" /> {profile.phone || "Chưa cập nhật SĐT"}
+                  </p>
+                  <p className="pa-invoice-info-line">
+                    <i className="bi bi-envelope-fill" /> {profile.email || "Chưa cập nhật email"}
                   </p>
                 </div>
 
-                <h6 className="fw-bold text-dark mb-2 text-xs text-uppercase">Chi tiết các khoản phí thanh toán</h6>
-                <div className="table-responsive mb-3">
-                  <table className="table table-bordered align-middle text-sm mb-0">
-                    <thead className="table-light">
+                <div className="pa-invoice-info-box">
+                  <span className="pa-invoice-box-label">
+                    <i className="bi bi-credit-card-2-front-fill" /> Thông tin thanh toán
+                  </span>
+                  <p className="pa-invoice-info-line" style={{ fontWeight: 600, color: '#0F172A' }}>
+                    <i className="bi bi-wallet2" /> {selectedInvoice.method}
+                  </p>
+                  <span className={`pa-invoice-status-pill ${selectedInvoice.status === 'Đã hoàn tiền' ? 'refund' : 'success'}`}>
+                    <i className={`bi ${selectedInvoice.status === 'Đã hoàn tiền' ? 'bi-arrow-return-left' : 'bi-check-circle-fill'}`} />
+                    {selectedInvoice.status}
+                  </span>
+                  <span style={{ fontSize: '0.74rem', color: '#64748B', marginTop: '4px' }}>
+                    Mã GD: <strong style={{ color: '#0F172A', fontFamily: 'monospace' }}>{selectedInvoice.txnId}</strong>
+                  </span>
+                </div>
+              </div>
+
+              {/* Stay Summary Box */}
+              <div className="pa-invoice-stay-box">
+                <span className="pa-invoice-box-label" style={{ color: '#059669' }}>
+                  <i className="bi bi-house-door-fill" /> Cơ sở lưu trú homestay
+                </span>
+                <h4 className="pa-invoice-stay-name">{selectedInvoice.name}</h4>
+                <div className="pa-invoice-stay-meta">
+                  <span>
+                    <i className="bi bi-geo-alt-fill text-danger me-1" /> {selectedInvoice.loc}
+                  </span>
+                  <span className="pa-invoice-stay-date-tag">
+                    <i className="bi bi-calendar-event me-1" /> Thời gian: {selectedInvoice.dates}
+                  </span>
+                </div>
+              </div>
+
+              {/* Items Table */}
+              <div>
+                <span className="pa-invoice-box-label" style={{ marginBottom: '8px' }}>
+                  <i className="bi bi-list-check" /> Chi tiết các khoản phí thanh toán
+                </span>
+                <div className="pa-invoice-table-wrap">
+                  <table className="pa-invoice-table">
+                    <thead>
                       <tr>
                         <th>Hạng mục dịch vụ</th>
-                        <th className="text-end">Đơn giá</th>
-                        <th className="text-end">Thành tiền</th>
+                        <th className="text-right">Đơn giá</th>
+                        <th className="text-right">Thành tiền</th>
                       </tr>
                     </thead>
                     <tbody>
                       <tr>
-                        <td>Tiền phòng lưu trú homestay</td>
-                        <td className="text-end">{selectedInvoice.subTotal}</td>
-                        <td className="text-end fw-bold">{selectedInvoice.subTotal}</td>
+                        <td>
+                          <b>Tiền phòng lưu trú homestay</b>
+                          <div style={{ fontSize: '0.74rem', color: '#64748B' }}>Bao gồm tiện nghi phòng tiêu chuẩn</div>
+                        </td>
+                        <td className="text-right">{selectedInvoice.subTotal}</td>
+                        <td className="text-right" style={{ fontWeight: 700 }}>{selectedInvoice.subTotal}</td>
                       </tr>
                       <tr>
-                        <td>Phí bảo vệ &amp; Dịch vụ dọn dẹp vệ sinh</td>
-                        <td className="text-end">Miễn phí</td>
-                        <td className="text-end text-success fw-bold">0đ</td>
+                        <td>
+                          <b>Phí bảo vệ &amp; Dịch vụ dọn dẹp vệ sinh</b>
+                          <div style={{ fontSize: '0.74rem', color: '#059669' }}>Ưu đãi hỗ trợ từ YÊN</div>
+                        </td>
+                        <td className="text-right" style={{ color: '#059669' }}>Miễn phí</td>
+                        <td className="text-right" style={{ color: '#059669', fontWeight: 700 }}>0đ</td>
                       </tr>
-                      <tr>
-                        <td>Áp dụng Mã giảm giá KH</td>
-                        <td className="text-end text-danger">-{selectedInvoice.discount}</td>
-                        <td className="text-end text-danger fw-bold">-{selectedInvoice.discount}</td>
-                      </tr>
-                      <tr className="table-success bg-opacity-10 fw-bold fs-6">
-                        <td colSpan="2" className="text-end text-dark">TỔNG TIỀN THANH TOÁN CHI TRẢ:</td>
-                        <td className="text-end text-success fs-5">{selectedInvoice.paid}</td>
+                      {selectedInvoice.discount && selectedInvoice.discount !== '0đ' && (
+                        <tr>
+                          <td>
+                            <b style={{ color: '#DC2626' }}>Áp dụng ưu đãi giảm giá</b>
+                            <div style={{ fontSize: '0.74rem', color: '#DC2626' }}>Mã khuyến mãi / Điểm thưởng Ví YÊN</div>
+                          </td>
+                          <td className="text-right" style={{ color: '#DC2626' }}>-{selectedInvoice.discount}</td>
+                          <td className="text-right" style={{ color: '#DC2626', fontWeight: 700 }}>-{selectedInvoice.discount}</td>
+                        </tr>
+                      )}
+                      <tr className="row-total">
+                        <td colSpan="2" style={{ textTransform: 'uppercase', letterSpacing: '0.02em' }}>
+                          TỔNG TIỀN THANH TOÁN CHI TRẢ:
+                        </td>
+                        <td className="text-right total-amount">
+                          {selectedInvoice.paid}
+                        </td>
                       </tr>
                     </tbody>
                   </table>
                 </div>
+              </div>
 
-                <div className="p-3 rounded-3 bg-success bg-opacity-10 border border-success border-opacity-25 d-flex align-items-center justify-content-between">
-                  <small className="text-success text-xs"><i className="bi bi-shield-check me-1 fs-6"></i>Hóa đơn điện tử hợp lệ được phát hành bởi Hệ thống Du lịch Homestay YÊN.</small>
-                  <span className="text-xs text-muted">Mã Txn: {selectedInvoice.txnId}</span>
-                </div>
+              {/* Security Note */}
+              <div className="pa-invoice-guarantee-note">
+                <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <i className="bi bi-shield-fill-check" style={{ fontSize: '1rem' }} />
+                  Hóa đơn điện tử hợp lệ được phát hành và bảo chứng bởi Hệ sinh thái Du lịch Homestay YÊN.
+                </span>
+                <span style={{ fontWeight: 700, color: '#065F46' }}>
+                  Mã Txn: {selectedInvoice.txnId}
+                </span>
               </div>
-              <div className="modal-footer bg-light border-top p-3">
-                <button type="button" className="btn btn-outline-secondary fw-semibold" onClick={() => setShowInvoiceModal(false)}>Đóng</button>
-                <button type="button" className="btn btn-outline-success fw-semibold" onClick={() => window.print()}><i className="bi bi-printer me-1"></i> In hóa đơn</button>
-                <button type="button" className="btn btn-eco-save fw-bold" onClick={() => alert('Đã tải file Hóa đơn PDF thành công!')}><i className="bi bi-download me-1"></i> Tải PDF</button>
-              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="pa-invoice-footer">
+              <button
+                type="button"
+                className="pa-invoice-btn-close"
+                onClick={() => setShowInvoiceModal(false)}
+              >
+                Đóng
+              </button>
+              <button
+                type="button"
+                className="pa-invoice-btn-print"
+                onClick={() => window.print()}
+              >
+                <i className="bi bi-printer" /> In hóa đơn
+              </button>
+              <button
+                type="button"
+                className="pa-invoice-btn-download"
+                onClick={() => alert('Đã xuất file Hóa đơn điện tử PDF thành công!')}
+              >
+                <i className="bi bi-file-earmark-pdf-fill" /> Tải PDF
+              </button>
             </div>
           </div>
         </div>

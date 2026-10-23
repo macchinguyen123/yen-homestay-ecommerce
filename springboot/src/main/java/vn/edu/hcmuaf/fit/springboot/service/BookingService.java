@@ -39,6 +39,7 @@ public class BookingService {
     private final NotificationService notificationService;
     private final UserRepository userRepository;
     private final ReviewSentimentService reviewSentimentService;
+    private final CashbackWalletService cashbackWalletService;
 
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
     private static final Locale VI_LOCALE = new Locale("vi", "VN");
@@ -295,6 +296,24 @@ public class BookingService {
                     .paidAt(LocalDateTime.now())
                     .build();
             paymentRepository.save(payment);
+        }
+
+        // Khấu trừ điểm tích lũy ví nếu du khách áp dụng giảm giá
+        if (req.getPointsUsed() != null && req.getPointsUsed().compareTo(BigDecimal.ZERO) > 0) {
+            try {
+                cashbackWalletService.deductCashbackForBooking(savedBooking.getTouristId(), req.getPointsUsed(), savedBooking.getBookingCode());
+            } catch (Exception de) {
+                log.warn("Lỗi khấu trừ điểm tích lũy cho đơn {}: {}", savedBooking.getBookingCode(), de.getMessage());
+            }
+        }
+
+        // Tự động tích lũy 5% vào Ví hoàn tiền YÊN nếu đơn phòng xác nhận thành công
+        if ("CONFIRMED".equalsIgnoreCase(savedBooking.getStatus()) || "PAID".equalsIgnoreCase(savedBooking.getDepositStatus())) {
+            try {
+                cashbackWalletService.creditCashbackForBooking(savedBooking);
+            } catch (Exception ce) {
+                log.warn("Lỗi tích điểm cho đơn đặt phòng {}: {}", savedBooking.getBookingCode(), ce.getMessage());
+            }
         }
 
         return savedBooking;
