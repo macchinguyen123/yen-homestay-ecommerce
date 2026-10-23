@@ -59,6 +59,7 @@ export default function ManageService() {
   const [selectedCat, setSelectedCat] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortOrder, setSortOrder] = useState('');
+  const [timeFilter, setTimeFilter] = useState('all'); // 'all' | '1week' | '1month' | '1year'
 
   // ─── Toast Notification ───────────────────────────────────────
   const [toast, setToast] = useState(null);
@@ -520,7 +521,16 @@ export default function ManageService() {
       const matchCat = selectedCat === 'all' || s.category === selectedCat;
       const q = searchQuery.toLowerCase().trim();
       const matchSearch = !q || (s.name || '').toLowerCase().includes(q) || (s.description || '').toLowerCase().includes(q);
-      return matchCat && matchSearch;
+      const matchTime = (() => {
+        if (timeFilter === 'all') return true;
+        const sDate = s.createdAt ? new Date(s.createdAt) : new Date();
+        const daysDiff = (Date.now() - sDate.getTime()) / (1000 * 60 * 60 * 24);
+        if (timeFilter === '1week') return daysDiff <= 7;
+        if (timeFilter === '1month') return daysDiff <= 30;
+        if (timeFilter === '1year') return daysDiff <= 365;
+        return true;
+      })();
+      return matchCat && matchSearch && matchTime;
     });
 
     if (sortOrder === 'asc') {
@@ -531,7 +541,7 @@ export default function ManageService() {
       list = [...list].sort((a, b) => (a.name || '').localeCompare(b.name || '', 'vi'));
     }
     return list;
-  }, [services, selectedCat, searchQuery, sortOrder]);
+  }, [services, selectedCat, searchQuery, sortOrder, timeFilter]);
 
   // ─── Dynamic Stats Calculation ────────────────────────────────
   const activeCount = services.filter((s) => s.status !== 'Tạm ngưng').length;
@@ -646,23 +656,64 @@ export default function ManageService() {
       </div>
 
       {/* TABS & TÌM KIẾM (CHỮ TO RÕ RÀNG, KHÔNG BỊ CẮT CHỮ) */}
-      <div className="service-filter-bar">
-        <div className="category-tabs-wrap">
-          {CATEGORIES.map((cat) => (
-            <button
-              key={cat.key}
-              className={`cat-tab-btn ${selectedCat === cat.key ? 'active' : ''}`}
-              onClick={() => setSelectedCat(cat.key)}
-            >
-              <i className={`bi ${cat.icon} me-1`} />
-              <span>{cat.label}</span>
-              <span className="cat-count-badge">{categoryCounts[cat.key] || 0}</span>
-            </button>
-          ))}
+      <div className="service-filter-bar" style={{ display: 'flex', flexDirection: 'column', gap: '14px', background: '#ffffff', padding: '16px 20px', borderRadius: '16px', border: '1px solid #eef2f6', boxShadow: '0 2px 10px rgba(21, 67, 50, 0.04)' }}>
+        {/* Dòng 1: Time filter presets + Category tabs */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap', width: '100%' }}>
+          {/* Nhóm bộ lọc thời gian: Tất cả, 1 tuần, 1 tháng, 1 năm */}
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#f1f5f9', padding: '4px', borderRadius: '10px' }}>
+            <span style={{ fontSize: '12px', fontWeight: 700, color: '#475569', padding: '0 6px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+              <span className="material-symbols-outlined" style={{ fontSize: '15px', color: '#154332' }}>calendar_month</span>
+              Thời gian:
+            </span>
+            {[
+              { id: 'all', label: 'Tất cả' },
+              { id: '1week', label: '1 tuần' },
+              { id: '1month', label: '1 tháng' },
+              { id: '1year', label: '1 năm' },
+            ].map(p => {
+              const active = timeFilter === p.id;
+              return (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => setTimeFilter(p.id)}
+                  style={{
+                    padding: '5px 13px',
+                    borderRadius: '7px',
+                    fontSize: '12.5px',
+                    fontWeight: active ? 700 : 500,
+                    border: 'none',
+                    cursor: 'pointer',
+                    background: active ? '#154332' : 'transparent',
+                    color: active ? '#ffffff' : '#64748b',
+                    boxShadow: active ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  {p.label}
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="category-tabs-wrap">
+            {CATEGORIES.map((cat) => (
+              <button
+                key={cat.key}
+                className={`cat-tab-btn ${selectedCat === cat.key ? 'active' : ''}`}
+                onClick={() => setSelectedCat(cat.key)}
+              >
+                <i className={`bi ${cat.icon} me-1`} />
+                <span>{cat.label}</span>
+                <span className="cat-count-badge">{categoryCounts[cat.key] || 0}</span>
+              </button>
+            ))}
+          </div>
         </div>
 
-        <div className="service-search-sort">
-          <div className="search-input-wrap">
+        {/* Dòng 2: Tìm kiếm & Sắp xếp & Đặt lại */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', flexWrap: 'wrap', width: '100%', borderTop: '1px solid #f1f5f9', paddingTop: '10px' }}>
+          <div className="search-input-wrap" style={{ flex: '1 1 240px', minWidth: '220px' }}>
             <i className="bi bi-search search-icon" />
             <input
               type="text"
@@ -682,16 +733,35 @@ export default function ManageService() {
             )}
           </div>
 
-          <select
-            className="sort-select"
-            value={sortOrder}
-            onChange={(e) => setSortOrder(e.target.value)}
-          >
-            <option value="">Sắp xếp theo giá</option>
-            <option value="asc">Giá: Thấp đến Cao</option>
-            <option value="desc">Giá: Cao đến Thấp</option>
-            <option value="name">Tên: A đến Z</option>
-          </select>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <select
+              className="sort-select"
+              value={sortOrder}
+              onChange={(e) => setSortOrder(e.target.value)}
+            >
+              <option value="">Sắp xếp theo giá</option>
+              <option value="asc">Giá: Thấp đến Cao</option>
+              <option value="desc">Giá: Cao đến Thấp</option>
+              <option value="name">Tên: A đến Z</option>
+            </select>
+
+            {(searchQuery.trim() || selectedCat !== 'all' || sortOrder || timeFilter !== 'all') && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchQuery('');
+                  setSelectedCat('all');
+                  setSortOrder('');
+                  setTimeFilter('all');
+                }}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '6px 12px', borderRadius: '8px', border: '1px solid #fecaca', background: '#fee2e2', color: '#dc2626', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}
+                title="Đặt lại bộ lọc về mặc định"
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: '15px' }}>restart_alt</span>
+                Đặt lại
+              </button>
+            )}
+          </div>
         </div>
       </div>
 

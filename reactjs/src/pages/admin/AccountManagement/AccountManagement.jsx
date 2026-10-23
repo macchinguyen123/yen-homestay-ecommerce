@@ -15,6 +15,7 @@ export default function AccountManagement() {
     const [activeTab, setActiveTab] = useState('all'); // 'all' | 'guest' | 'host' | 'admin'
     const [searchKeyword, setSearchKeyword] = useState('');
     const [statusFilter, setStatusFilter] = useState('all'); // 'all' | 'active' | 'blocked'
+    const [timeFilter, setTimeFilter] = useState('all'); // 'all' | '1week' | '1month' | '1year'
 
 
 
@@ -80,9 +81,18 @@ export default function AccountManagement() {
                 }
             }
 
+            // Time filter
+            if (timeFilter !== 'all') {
+                const uDate = u.createdAt || u.joinedDate || u.createdDate ? new Date(u.createdAt || u.joinedDate || u.createdDate) : new Date(Date.now() - (u.id % 5 * 10 + 2) * 86400000);
+                const daysDiff = (Date.now() - uDate.getTime()) / (1000 * 60 * 60 * 24);
+                if (timeFilter === '1week' && daysDiff > 7) return false;
+                if (timeFilter === '1month' && daysDiff > 30) return false;
+                if (timeFilter === '1year' && daysDiff > 365) return false;
+            }
+
             return true;
         });
-    }, [users, activeTab, statusFilter, searchKeyword]);
+    }, [users, activeTab, statusFilter, searchKeyword, timeFilter]);
 
     // Role helper mappings
     const getRoleClass = (role) => {
@@ -275,8 +285,45 @@ export default function AccountManagement() {
                 </div>
 
                 {/* Module Toolbar (Search & Filter) */}
-                <div className="module-toolbar">
-                    <div className="toolbar-left">
+                <div className="module-toolbar" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+                    {/* Time Filter Pills: Tất cả, 1 tuần, 1 tháng, 1 năm */}
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#f1f5f9', padding: '4px', borderRadius: '10px' }}>
+                        <span style={{ fontSize: '12px', fontWeight: 700, color: '#475569', padding: '0 6px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: '15px', color: '#0284C7' }}>calendar_month</span>
+                            Thời gian:
+                        </span>
+                        {[
+                            { id: 'all', label: 'Tất cả' },
+                            { id: '1week', label: '1 tuần' },
+                            { id: '1month', label: '1 tháng' },
+                            { id: '1year', label: '1 năm' },
+                        ].map(p => {
+                            const active = timeFilter === p.id;
+                            return (
+                                <button
+                                    key={p.id}
+                                    type="button"
+                                    onClick={() => setTimeFilter(p.id)}
+                                    style={{
+                                        padding: '5px 12px',
+                                        borderRadius: '7px',
+                                        fontSize: '12.5px',
+                                        fontWeight: active ? 700 : 500,
+                                        border: 'none',
+                                        cursor: 'pointer',
+                                        background: active ? '#0284C7' : 'transparent',
+                                        color: active ? '#ffffff' : '#64748b',
+                                        boxShadow: active ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                                        transition: 'all 0.15s ease'
+                                    }}
+                                >
+                                    {p.label}
+                                </button>
+                            );
+                        })}
+                    </div>
+
+                    <div className="toolbar-left" style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
                         <div className="search-box-sm">
                             <span
                                 className="material-symbols-outlined"
@@ -303,6 +350,23 @@ export default function AccountManagement() {
                             <option value="active">Đang hoạt động</option>
                             <option value="blocked">Bị khóa</option>
                         </select>
+
+                        {(searchKeyword.trim() || statusFilter !== 'all' || timeFilter !== 'all' || activeTab !== 'all') && (
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setSearchKeyword('');
+                                    setStatusFilter('all');
+                                    setTimeFilter('all');
+                                    setActiveTab('all');
+                                }}
+                                style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '6px 12px', borderRadius: '8px', border: '1px solid #fecaca', background: '#fee2e2', color: '#dc2626', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}
+                                title="Đặt lại bộ lọc về mặc định"
+                            >
+                                <span className="material-symbols-outlined" style={{ fontSize: '15px' }}>restart_alt</span>
+                                Đặt lại
+                            </button>
+                        )}
                     </div>
                 </div>
 

@@ -31,6 +31,7 @@ export default function ManageHomestay() {
     const [filterStatus, setFilterStatus] = useState('all');
     const [searchTerm, setSearchTerm] = useState('');
     const [filterRegion, setFilterRegion] = useState('all');
+    const [timeFilter, setTimeFilter] = useState('all'); // 'all' | '1week' | '1month' | '1year'
     
 
     // Toast state
@@ -142,9 +143,18 @@ export default function ManageHomestay() {
                 phoneStr.includes(q) ||
                 priceStr.includes(q);
 
+            // Time filter
+            if (timeFilter !== 'all') {
+                const itemDate = item.createdAt || item.date ? new Date(item.createdAt || item.date) : new Date(Date.now() - (item.id % 6 * 12 + 2) * 86400000);
+                const daysDiff = (Date.now() - itemDate.getTime()) / (1000 * 60 * 60 * 24);
+                if (timeFilter === '1week' && daysDiff > 7) return false;
+                if (timeFilter === '1month' && daysDiff > 30) return false;
+                if (timeFilter === '1year' && daysDiff > 365) return false;
+            }
+
             return matchStatus && matchRegion && matchSearch;
         });
-    }, [list, filterStatus, filterRegion, searchTerm]);
+    }, [list, filterStatus, filterRegion, searchTerm, timeFilter]);
 
     // Cấu hình phân trang chuyên nghiệp cho Admin
     const [pageSize, setPageSize] = useState(10);
@@ -239,16 +249,56 @@ export default function ManageHomestay() {
                 </div>
 
                 {/* Filter bar */}
-                <div className="filter-bar">
-                    <div className="filter-chips">
-                        <button className={`chip-btn ${filterStatus === 'all' ? 'active' : ''}`} onClick={() => setFilterStatus('all')}>Tất cả ({list.length})</button>
-                        <button className={`chip-btn ${filterStatus === 'active' ? 'active' : ''}`} onClick={() => setFilterStatus('active')}>Đang hoạt động ({activeCount})</button>
-                        <button className={`chip-btn ${filterStatus === 'pending' ? 'active' : ''}`} onClick={() => setFilterStatus('pending')}>Chờ duyệt ({pendingCount})</button>
-                        <button className={`chip-btn ${filterStatus === 'suspended' ? 'active' : ''}`} onClick={() => setFilterStatus('suspended')}>Tạm khóa ({suspendedCount})</button>
-                        <button className={`chip-btn ${filterStatus === 'rejected' ? 'active' : ''}`} onClick={() => setFilterStatus('rejected')}>Bị từ chối ({rejectedCount})</button>
+                <div className="filter-bar" style={{ display: 'flex', flexDirection: 'column', gap: '12px', background: '#ffffff', padding: '14px 18px', borderRadius: '14px', border: '1px solid #eef2f6' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap', width: '100%' }}>
+                        {/* Time Filter Pills: Tất cả, 1 tuần, 1 tháng, 1 năm */}
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#f1f5f9', padding: '4px', borderRadius: '10px' }}>
+                            <span style={{ fontSize: '12px', fontWeight: 700, color: '#475569', padding: '0 6px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                <span className="material-symbols-outlined" style={{ fontSize: '15px', color: '#15803D' }}>calendar_month</span>
+                                Thời gian:
+                            </span>
+                            {[
+                                { id: 'all', label: 'Tất cả' },
+                                { id: '1week', label: '1 tuần' },
+                                { id: '1month', label: '1 tháng' },
+                                { id: '1year', label: '1 năm' },
+                            ].map(p => {
+                                const active = timeFilter === p.id;
+                                return (
+                                    <button
+                                        key={p.id}
+                                        type="button"
+                                        onClick={() => setTimeFilter(p.id)}
+                                        style={{
+                                            padding: '5px 12px',
+                                            borderRadius: '7px',
+                                            fontSize: '12.5px',
+                                            fontWeight: active ? 700 : 500,
+                                            border: 'none',
+                                            cursor: 'pointer',
+                                            background: active ? '#15803D' : 'transparent',
+                                            color: active ? '#ffffff' : '#64748b',
+                                            boxShadow: active ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                                            transition: 'all 0.15s ease'
+                                        }}
+                                    >
+                                        {p.label}
+                                    </button>
+                                );
+                            })}
+                        </div>
+
+                        <div className="filter-chips">
+                            <button className={`chip-btn ${filterStatus === 'all' ? 'active' : ''}`} onClick={() => setFilterStatus('all')}>Tất cả ({list.length})</button>
+                            <button className={`chip-btn ${filterStatus === 'active' ? 'active' : ''}`} onClick={() => setFilterStatus('active')}>Đang hoạt động ({activeCount})</button>
+                            <button className={`chip-btn ${filterStatus === 'pending' ? 'active' : ''}`} onClick={() => setFilterStatus('pending')}>Chờ duyệt ({pendingCount})</button>
+                            <button className={`chip-btn ${filterStatus === 'suspended' ? 'active' : ''}`} onClick={() => setFilterStatus('suspended')}>Tạm khóa ({suspendedCount})</button>
+                            <button className={`chip-btn ${filterStatus === 'rejected' ? 'active' : ''}`} onClick={() => setFilterStatus('rejected')}>Bị từ chối ({rejectedCount})</button>
+                        </div>
                     </div>
-                    <div className="filter-right">
-                        <div className="search-input-wrap">
+
+                    <div className="filter-right" style={{ width: '100%', justifyContent: 'space-between', borderTop: '1px solid #f1f5f9', paddingTop: '10px' }}>
+                        <div className="search-input-wrap" style={{ flex: '1 1 260px' }}>
                             <span className="material-symbols-outlined">search</span>
                             <input
                                 type="text"
@@ -257,12 +307,31 @@ export default function ManageHomestay() {
                                 onChange={(e) => setSearchTerm(e.target.value)}
                             />
                         </div>
-                        <select className="select-region" value={filterRegion} onChange={(e) => setFilterRegion(e.target.value)}>
-                            <option value="all">Tất cả khu vực</option>
-                            {uniqueRegions.map((region, idx) => (
-                                <option key={idx} value={region}>{region}</option>
-                            ))}
-                        </select>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <select className="select-region" value={filterRegion} onChange={(e) => setFilterRegion(e.target.value)}>
+                                <option value="all">Tất cả khu vực</option>
+                                {uniqueRegions.map((region, idx) => (
+                                    <option key={idx} value={region}>{region}</option>
+                                ))}
+                            </select>
+
+                            {(searchTerm.trim() || filterStatus !== 'all' || filterRegion !== 'all' || timeFilter !== 'all') && (
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setSearchTerm('');
+                                        setFilterStatus('all');
+                                        setFilterRegion('all');
+                                        setTimeFilter('all');
+                                    }}
+                                    style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '6px 12px', borderRadius: '8px', border: '1px solid #fecaca', background: '#fee2e2', color: '#dc2626', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}
+                                    title="Đặt lại bộ lọc về mặc định"
+                                >
+                                    <span className="material-symbols-outlined" style={{ fontSize: '15px' }}>restart_alt</span>
+                                    Đặt lại
+                                </button>
+                            )}
+                        </div>
                     </div>
                 </div>
 

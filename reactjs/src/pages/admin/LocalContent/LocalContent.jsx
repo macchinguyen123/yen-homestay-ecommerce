@@ -83,6 +83,7 @@ export default function LocalContent() {
     const [filterStatus, setFilterStatus] = useState('all');
     const [searchTerm, setSearchTerm] = useState('');
     const [filterCity, setFilterCity] = useState('all');
+    const [timeFilter, setTimeFilter] = useState('all'); // 'all' | '1week' | '1month' | '1year'
 
     // Modal state
     const [showModal, setShowModal] = useState(false);
@@ -158,8 +159,23 @@ export default function LocalContent() {
             const matchStatus = filterStatus === 'all' || item.status === filterStatus;
             const matchCity = filterCity === 'all' || (item.city || '').toLowerCase() === filterCity.toLowerCase();
 
+            // Time filter
+            let matchTime = true;
+            if (timeFilter !== 'all') {
+                const rawDate = item.startDate || item.createdAt;
+                if (rawDate) {
+                    const d = new Date(rawDate);
+                    if (!isNaN(d.getTime())) {
+                        const diffDays = (new Date() - d) / (1000 * 60 * 60 * 24);
+                        if (timeFilter === '1week')  matchTime = diffDays <= 7;
+                        if (timeFilter === '1month') matchTime = diffDays <= 30;
+                        if (timeFilter === '1year')  matchTime = diffDays <= 365;
+                    }
+                }
+            }
+
             if (!searchTerm.trim()) {
-                return matchStatus && matchCity;
+                return matchStatus && matchCity && matchTime;
             }
 
             const q = searchTerm.toLowerCase().trim();
@@ -176,14 +192,14 @@ export default function LocalContent() {
                 locationNoTone.includes(qNoTone) || (item.location || '').toLowerCase().includes(q) ||
                 badgeNoTone.includes(qNoTone) || (item.badgeInfo || '').toLowerCase().includes(q);
 
-            return matchStatus && matchCity && matchSearch;
+            return matchStatus && matchCity && matchSearch && matchTime;
         });
-    }, [items, filterStatus, filterCity, searchTerm]);
+    }, [items, filterStatus, filterCity, searchTerm, timeFilter]);
 
     // Reset pagination on filter change
     useEffect(() => {
         setCurrentPage(1);
-    }, [searchTerm, filterStatus, filterCity, pageSize]);
+    }, [searchTerm, filterStatus, filterCity, pageSize, timeFilter]);
 
     // Pagination calculations
     const totalItems = filteredData.length;
@@ -431,7 +447,7 @@ export default function LocalContent() {
                             Đã kết thúc ({endedCount})
                         </button>
                     </div>
-                    <div className="filter-right">
+                    <div className="filter-right" style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                         <div className="search-input-wrap">
                             <span className="material-symbols-outlined">search</span>
                             <input
@@ -451,6 +467,61 @@ export default function LocalContent() {
                                 <option key={idx} value={city}>{city}</option>
                             ))}
                         </select>
+                        {/* Time filter pills */}
+                        <div style={{
+                            background: '#f1f5f9',
+                            padding: '4px',
+                            borderRadius: '10px',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            border: '1px solid #e2e8f0'
+                        }}>
+                            <span style={{ fontSize: '12px', fontWeight: 600, color: '#64748b', padding: '0 6px', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                <span className="material-symbols-outlined" style={{ fontSize: '15px' }}>schedule</span>
+                                Thời gian:
+                            </span>
+                            {[
+                                { key: 'all', label: 'Tất cả' },
+                                { key: '1week', label: '1 tuần' },
+                                { key: '1month', label: '1 tháng' },
+                                { key: '1year', label: '1 năm' }
+                            ].map(item => (
+                                <button
+                                    key={item.key}
+                                    type="button"
+                                    onClick={() => setTimeFilter(item.key)}
+                                    style={{
+                                        border: 'none',
+                                        background: timeFilter === item.key ? '#0284c7' : 'transparent',
+                                        color: timeFilter === item.key ? '#ffffff' : '#64748b',
+                                        fontWeight: timeFilter === item.key ? 700 : 500,
+                                        fontSize: '12px',
+                                        padding: '4px 10px',
+                                        borderRadius: '7px',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.15s ease'
+                                    }}
+                                >
+                                    {item.label}
+                                </button>
+                            ))}
+                        </div>
+                        {(timeFilter !== 'all' || filterStatus !== 'all' || filterCity !== 'all' || searchTerm) && (
+                            <button
+                                type="button"
+                                onClick={() => { setTimeFilter('all'); setFilterStatus('all'); setFilterCity('all'); setSearchTerm(''); }}
+                                style={{
+                                    display: 'inline-flex', alignItems: 'center', gap: '4px',
+                                    padding: '5px 10px', borderRadius: '8px',
+                                    border: '1px solid #cbd5e1', background: '#ffffff',
+                                    color: '#475569', fontSize: '12px', fontWeight: 500, cursor: 'pointer'
+                                }}
+                            >
+                                <span className="material-symbols-outlined" style={{ fontSize: '15px' }}>restart_alt</span>
+                                Đặt lại
+                            </button>
+                        )}
                     </div>
                 </div>
 

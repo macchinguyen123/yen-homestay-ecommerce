@@ -22,7 +22,8 @@ export const INITIAL_SUBMISSIONS = [
     photos: 1,
     avatar: "https://lh3.googleusercontent.com/aida-public/AB6AXuDtBD2J0dMb6ui-jzFd-s3WAOrIcULKNiD9XtfnGxQMKSTx355Pf1EjERQXBHDwHrcQ0Rorvh9B6EK8HB6KmTt_y_Vmq08HXH1mv79H5Vu9HA98ZemUl4gMQKLX8UE6D4XyoH4aj98giLTIomA-cZpFPmBtgmFxgoZt0ZKA5x-4LkgkGP-hJ2DyiPrZOmmqIdCcd6okDRUACpFaDNJU99_AMzc9ReyPXk77zeU4Z5vnxIG6w4_nVg8",
     image: "https://lh3.googleusercontent.com/aida-public/AB6AXuAwxRCSb8O0TEvP8qWKkyBWYmOPRU7CAe-lU0L0LMkQVLCWwT-WPYALrACR8Db8vw3_4jArbeXHHO_9d76yf7xm93aRwrudcovcbdkH-3EQrrGzyVg0iJ-Mvu69r8SV1GpbtRs1onXyn8r2zhoo3AUha2-9zCn4Myw7IYvyDRyt2uYN6sGiBB77aieKV_8H49oOFbrdmjYwsetb-x5cKFX4PCfWM-yOuk8sjzC85RU_W3_1EPQSU6E",
-    status: "pending" // 'pending' | 'approved' | 'rejected' | 'retake'
+    status: "pending", // 'pending' | 'approved' | 'rejected' | 'retake'
+    createdAt: new Date(Date.now() - 3 * 86400000).toISOString()
   },
   {
     id: "S002",
@@ -36,7 +37,8 @@ export const INITIAL_SUBMISSIONS = [
     photos: 2,
     avatar: "https://lh3.googleusercontent.com/aida-public/AB6AXuCf_GZrWvs5PbldzGsECiknjV3jiAuHqF3qQ0vTTpwxRImEmzWcmrBQnpJQPLCNdqaSQyoDm9EP7lyCzAelYHSu6XVwxZuLvuR4SmH4_n1_jLQqsked0ttQNeszq6kP3dH8Eg7Q0znPXhxfzPh9u3nJRtVOB9jjoxAwXHammtyBVEsTPjxOl7oC4sF5gCPWoEmUCpzteXKyDXMyoeC4SLHip0BteQKWK18gnncNJ8HpdsRhQh3I9Kk",
     image: "https://lh3.googleusercontent.com/aida-public/AB6AXuDdBW9ILAd7dvQBEAbmNPGGhivvXfCDDDvtJC4zDg-IGR1XGnQHtA4M57KLjUy_o5-9yqHoF2Uw6AzbXIbXr5JqBg7pqGmVdmi9S8BlHDTQdO6pnk9LM39hh_l_uGgmUtz0c2c8-reOCnTG3SQFP-16zq1RahEvEE-quDqEvGgOYS040aA0FBxBWtVpWrgycH8PZGR5baQ2OB7L6FqQiMNaMef1HWMQ97YLH41-3qmRgcbG08VxzIo",
-    status: "pending"
+    status: "pending",
+    createdAt: new Date(Date.now() - 18 * 86400000).toISOString()
   }
 ];
 

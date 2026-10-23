@@ -66,6 +66,7 @@ export default function VoucherManagement() {
     const [activeTab, setActiveTab]     = useState('all');
     const [filterType, setFilterType]   = useState('all');
     const [searchQuery, setSearch]      = useState('');
+    const [timeFilter, setTimeFilter]   = useState('all');
 
     // ── Phân trang ───────────────────────────────────────────────────────
     const [page, setPage]               = useState(1);
@@ -243,7 +244,7 @@ export default function VoucherManagement() {
     // Reset về trang 1 khi thay đổi bộ lọc hoặc số phần tử / trang
     useEffect(() => {
         setPage(1);
-    }, [activeTab, filterType, searchQuery, pageSize]);
+    }, [activeTab, filterType, searchQuery, pageSize, timeFilter]);
 
     // ── Lọc danh sách ───────────────────────────────────────────────────
     const filtered = vouchers.filter(v => {
@@ -253,7 +254,22 @@ export default function VoucherManagement() {
         const matchSearch = !q
             || (v.code || '').toLowerCase().includes(q)
             || (v.homestayName || '').toLowerCase().includes(q);
-        return matchTab && matchType && matchSearch;
+        let matchTime = true;
+        if (timeFilter !== 'all') {
+            const rawDate = v.startDate || v.createdAt;
+            if (rawDate) {
+                const d = Array.isArray(rawDate)
+                    ? new Date(rawDate[0], rawDate[1] - 1, rawDate[2])
+                    : new Date(rawDate);
+                if (!isNaN(d.getTime())) {
+                    const diffDays = (new Date() - d) / (1000 * 60 * 60 * 24);
+                    if (timeFilter === '1week')  matchTime = diffDays <= 7;
+                    if (timeFilter === '1month') matchTime = diffDays <= 30;
+                    if (timeFilter === '1year')  matchTime = diffDays <= 365;
+                }
+            }
+        }
+        return matchTab && matchType && matchSearch && matchTime;
     });
 
     // ── Dữ liệu phân trang ──────────────────────────────────────────────
@@ -511,35 +527,101 @@ export default function VoucherManagement() {
                 )}
 
                 {/* Toolbar */}
-                <div className="vm-toolbar">
-                    <div className="vm-toolbar-left">
-                        <div className="vm-search-box">
-                            <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#94A3B8' }}>search</span>
-                            <input
-                                type="text"
-                                placeholder="Tìm mã voucher, homestay..."
-                                value={searchQuery}
-                                onChange={e => setSearch(e.target.value)}
-                            />
+                <div className="vm-toolbar" style={{ flexDirection: 'column', gap: '10px', alignItems: 'stretch' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+                        <div className="vm-toolbar-left">
+                            <div className="vm-search-box">
+                                <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#94A3B8' }}>search</span>
+                                <input
+                                    type="text"
+                                    placeholder="Tìm mã voucher, homestay..."
+                                    value={searchQuery}
+                                    onChange={e => setSearch(e.target.value)}
+                                />
+                            </div>
+                            <select
+                                className="vm-select"
+                                value={filterType}
+                                onChange={e => setFilterType(e.target.value)}
+                            >
+                                <option value="all">Tất cả hình thức</option>
+                                <option value="percent">Giảm theo % (phần trăm)</option>
+                                <option value="amount">Giảm tiền cố định (VNĐ)</option>
+                            </select>
                         </div>
-                        <select
-                            className="vm-select"
-                            value={filterType}
-                            onChange={e => setFilterType(e.target.value)}
-                        >
-                            <option value="all">Tất cả hình thức</option>
-                            <option value="percent">Giảm theo % (phần trăm)</option>
-                            <option value="amount">Giảm tiền cố định (VNĐ)</option>
-                        </select>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            {/* Time filter pills */}
+                            <div style={{
+                                background: '#f1f5f9',
+                                padding: '4px',
+                                borderRadius: '10px',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                border: '1px solid #e2e8f0'
+                            }}>
+                                <span style={{ fontSize: '13px', fontWeight: 600, color: '#64748b', padding: '0 8px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                    <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>schedule</span>
+                                    Thời gian:
+                                </span>
+                                {[
+                                    { key: 'all', label: 'Tất cả' },
+                                    { key: '1week', label: '1 tuần' },
+                                    { key: '1month', label: '1 tháng' },
+                                    { key: '1year', label: '1 năm' }
+                                ].map(item => (
+                                    <button
+                                        key={item.key}
+                                        type="button"
+                                        onClick={() => setTimeFilter(item.key)}
+                                        style={{
+                                            border: 'none',
+                                            background: timeFilter === item.key ? '#0284c7' : 'transparent',
+                                            color: timeFilter === item.key ? '#ffffff' : '#64748b',
+                                            fontWeight: timeFilter === item.key ? 700 : 500,
+                                            fontSize: '13px',
+                                            padding: '5px 12px',
+                                            borderRadius: '7px',
+                                            cursor: 'pointer',
+                                            transition: 'all 0.15s ease'
+                                        }}
+                                    >
+                                        {item.label}
+                                    </button>
+                                ))}
+                            </div>
+                            <button
+                                className="vm-btn vm-btn--outline vm-btn--sm"
+                                onClick={fetchAll}
+                                title="Làm mới danh sách"
+                            >
+                                <span className="material-symbols-outlined" style={{ fontSize: 18 }}>refresh</span>
+                                Làm mới
+                            </button>
+                            {(timeFilter !== 'all' || filterType !== 'all' || searchQuery) && (
+                                <button
+                                    type="button"
+                                    onClick={() => { setTimeFilter('all'); setFilterType('all'); setSearch(''); }}
+                                    style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '4px',
+                                        padding: '6px 12px',
+                                        borderRadius: '8px',
+                                        border: '1px solid #cbd5e1',
+                                        background: '#ffffff',
+                                        color: '#475569',
+                                        fontSize: '13px',
+                                        fontWeight: 500,
+                                        cursor: 'pointer'
+                                    }}
+                                >
+                                    <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>restart_alt</span>
+                                    Đặt lại
+                                </button>
+                            )}
+                        </div>
                     </div>
-                    <button
-                        className="vm-btn vm-btn--outline vm-btn--sm"
-                        onClick={fetchAll}
-                        title="Làm mới danh sách"
-                    >
-                        <span className="material-symbols-outlined" style={{ fontSize: 18 }}>refresh</span>
-                        Làm mới
-                    </button>
                 </div>
 
                 {/* Pending Panel */}

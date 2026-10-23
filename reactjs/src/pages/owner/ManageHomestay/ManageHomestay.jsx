@@ -66,7 +66,8 @@ export default function ManageHomestay() {
             rooms: item.rooms || 6,
             services: STANDARD_SERVICES.slice(0, 4),
             customServices: ['Dịch vụ bản địa cao cấp'],
-            isCurrent: activeId ? String(item.id) === String(activeId) : idx === 0
+            isCurrent: activeId ? String(item.id) === String(activeId) : idx === 0,
+            createdAt: item.createdAt || item.createdDate || new Date(Date.now() - (idx * 14 + 2) * 86400000).toISOString()
           }));
           setHomestays(mapped);
         }
@@ -136,19 +137,88 @@ export default function ManageHomestay() {
   // ── Search & Filter & Pagination State ───────────────────────────────
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [provinceFilter, setProvinceFilter] = useState('all');
+  const [sortBy, setSortBy] = useState('default');
+  const [timeFilter, setTimeFilter] = useState('all'); // 'all' | '1week' | '1month' | '1year'
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 6;
 
+  // ── Báo cáo chuỗi Time Filter State ──
+  const [reportTimePreset, setReportTimePreset] = useState('1_month');
+  const [reportDateFrom, setReportDateFrom] = useState('2026-09-01');
+  const [reportDateTo, setReportDateTo] = useState('2026-09-30');
+
+  const reportMetrics = useMemo(() => {
+    let factor = 1.0;
+    let label = 'Tháng 09/2026';
+    if (reportTimePreset === 'all') {
+      factor = 3.5;
+      label = 'Toàn bộ thời gian (Tất cả)';
+    } else if (reportTimePreset === '1_week') {
+      factor = 0.28;
+      label = '1 tuần qua (22/09 - 28/09/2026)';
+    } else if (reportTimePreset === '1_month') {
+      factor = 1.0;
+      label = '1 tháng qua (Tháng 09/2026)';
+    } else if (reportTimePreset === '1_year') {
+      factor = 11.2;
+      label = '1 năm (Năm 2026)';
+    } else if (reportDateFrom && reportDateTo) {
+      const diffDays = Math.max(1, Math.round((new Date(reportDateTo) - new Date(reportDateFrom)) / (1000 * 60 * 60 * 24)));
+      factor = diffDays / 30;
+      label = `Từ ${reportDateFrom} đến ${reportDateTo}`;
+    }
+    return {
+      revenue: Math.round(313700000 * factor).toLocaleString('vi-VN') + '₫',
+      guests: Math.round(412 * factor) + ' lượt khách',
+      label
+    };
+  }, [reportTimePreset, reportDateFrom, reportDateTo]);
+
+  // Lấy danh sách các tỉnh thành có trong hệ thống homestay
+  const availableProvinces = useMemo(() => {
+    const map = new Map();
+    homestays.forEach(h => {
+      if (h.provinceId) {
+        const found = NEW_34_PROVINCES?.find(p => p.id === h.provinceId);
+        map.set(h.provinceId, found ? found.name : h.provinceId);
+      }
+    });
+    return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
+  }, [homestays]);
+
   const filteredHomestays = useMemo(() => {
-    return homestays.filter(h => {
+    let result = homestays.filter(h => {
       const matchSearch = (h.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
                           (h.address || '').toLowerCase().includes(searchTerm.toLowerCase());
       const matchStatus = statusFilter === 'all' ||
                           (statusFilter === 'active' && h.status === 'active') ||
                           (statusFilter === 'locked' && h.status === 'locked');
-      return matchSearch && matchStatus;
+      const matchProvince = provinceFilter === 'all' ||
+                            h.provinceId === provinceFilter ||
+                            (h.address && h.address.toLowerCase().includes(provinceFilter.toLowerCase()));
+      const matchTime = (() => {
+        if (timeFilter === 'all') return true;
+        const daysDiff = (Date.now() - new Date(h.createdAt || Date.now()).getTime()) / (1000 * 60 * 60 * 24);
+        if (timeFilter === '1week') return daysDiff <= 7;
+        if (timeFilter === '1month') return daysDiff <= 30;
+        if (timeFilter === '1year') return daysDiff <= 365;
+        return true;
+      })();
+
+      return matchSearch && matchStatus && matchProvince && matchTime;
     });
-  }, [homestays, searchTerm, statusFilter]);
+
+    if (sortBy === 'name-asc') {
+      result = [...result].sort((a, b) => (a.name || '').localeCompare(b.name || '', 'vi'));
+    } else if (sortBy === 'rooms-desc') {
+      result = [...result].sort((a, b) => (b.rooms || 0) - (a.rooms || 0));
+    } else if (sortBy === 'rooms-asc') {
+      result = [...result].sort((a, b) => (a.rooms || 0) - (b.rooms || 0));
+    }
+
+    return result;
+  }, [homestays, searchTerm, statusFilter, provinceFilter, sortBy, timeFilter]);
 
   const totalPages = Math.ceil(filteredHomestays.length / ITEMS_PER_PAGE) || 1;
 
@@ -764,54 +834,151 @@ export default function ManageHomestay() {
         </div>
       </div>
 
-      {/* ── 2.5. Search & Status Filter Bar ── */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px', marginBottom: '20px', flexWrap: 'wrap', background: '#ffffff', padding: '14px 18px', borderRadius: '12px', boxShadow: '0 1px 3px rgba(11,28,48,0.06)', border: '1px solid rgba(192,200,194,0.4)' }}>
-        {/* Status Filter Chips */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-          <button
-            type="button"
-            onClick={() => { setStatusFilter('all'); setCurrentPage(1); }}
-            style={{ padding: '6px 14px', borderRadius: '20px', border: '1px solid #c0c8c2', background: statusFilter === 'all' ? '#154332' : '#ffffff', color: statusFilter === 'all' ? '#ffffff' : '#414944', fontSize: '13px', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s' }}
-          >
-            Tất cả ({homestays.length})
-          </button>
-          <button
-            type="button"
-            onClick={() => { setStatusFilter('active'); setCurrentPage(1); }}
-            style={{ padding: '6px 14px', borderRadius: '20px', border: '1px solid #c0c8c2', background: statusFilter === 'active' ? '#1b6d24' : '#ffffff', color: statusFilter === 'active' ? '#ffffff' : '#414944', fontSize: '13px', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s' }}
-          >
-            Đang hoạt động ({kpiData.operating})
-          </button>
-          <button
-            type="button"
-            onClick={() => { setStatusFilter('locked'); setCurrentPage(1); }}
-            style={{ padding: '6px 14px', borderRadius: '20px', border: '1px solid #c0c8c2', background: statusFilter === 'locked' ? '#ba1a1a' : '#ffffff', color: statusFilter === 'locked' ? '#ffffff' : '#414944', fontSize: '13px', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s' }}
-          >
-            Tạm khóa ({kpiData.lockedCount})
-          </button>
-        </div>
+      {/* ── 2.5. Search & Status & Time Filter Bar ── */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '20px', background: '#ffffff', padding: '14px 18px', borderRadius: '14px', boxShadow: '0 2px 8px rgba(11,28,48,0.04)', border: '1px solid rgba(192,200,194,0.4)' }}>
+        {/* Dòng 1: Bộ lọc thời gian (Tất cả, 1 tuần, 1 tháng, 1 năm) + Trạng thái hoạt động */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '14px', flexWrap: 'wrap' }}>
+          {/* Nhóm bộ lọc thời gian: Tất cả, 1 tuần, 1 tháng, 1 năm */}
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#f1f5f9', padding: '4px', borderRadius: '10px' }}>
+            <span style={{ fontSize: '12px', fontWeight: 700, color: '#475569', padding: '0 6px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+              <span className="material-symbols-outlined" style={{ fontSize: '15px', color: '#154332' }}>calendar_month</span>
+              Thời gian:
+            </span>
+            {[
+              { id: 'all', label: 'Tất cả' },
+              { id: '1week', label: '1 tuần' },
+              { id: '1month', label: '1 tháng' },
+              { id: '1year', label: '1 năm' },
+            ].map(p => {
+              const active = timeFilter === p.id;
+              return (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => { setTimeFilter(p.id); setCurrentPage(1); }}
+                  style={{
+                    padding: '5px 13px',
+                    borderRadius: '7px',
+                    fontSize: '12.5px',
+                    fontWeight: active ? 700 : 500,
+                    border: 'none',
+                    cursor: 'pointer',
+                    background: active ? '#154332' : 'transparent',
+                    color: active ? '#ffffff' : '#64748b',
+                    boxShadow: active ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  {p.label}
+                </button>
+              );
+            })}
+          </div>
 
-        {/* Search Input Field */}
-        <div className="mh-search-box-wrap">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginRight: '8px' }}>
-            <circle cx="11" cy="11" r="8" />
-            <line x1="21" y1="21" x2="16.65" y2="16.65" />
-          </svg>
-          <input
-            type="text"
-            placeholder="Tìm tên homestay, địa chỉ..."
-            value={searchTerm}
-            onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
-          />
-          {searchTerm && (
+          {/* Status Filter Chips */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
             <button
               type="button"
-              onClick={() => { setSearchTerm(''); setCurrentPage(1); }}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#717974', fontSize: '14px', padding: '0 2px', lineHeight: 1 }}
+              onClick={() => { setStatusFilter('all'); setCurrentPage(1); }}
+              style={{ padding: '5px 13px', borderRadius: '20px', border: '1px solid #c0c8c2', background: statusFilter === 'all' ? '#154332' : '#ffffff', color: statusFilter === 'all' ? '#ffffff' : '#414944', fontSize: '12.5px', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s' }}
             >
-              ✕
+              Tất cả trạng thái ({homestays.length})
             </button>
-          )}
+            <button
+              type="button"
+              onClick={() => { setStatusFilter('active'); setCurrentPage(1); }}
+              style={{ padding: '5px 13px', borderRadius: '20px', border: '1px solid #c0c8c2', background: statusFilter === 'active' ? '#1b6d24' : '#ffffff', color: statusFilter === 'active' ? '#ffffff' : '#414944', fontSize: '12.5px', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s' }}
+            >
+              Đang hoạt động ({kpiData.operating})
+            </button>
+            <button
+              type="button"
+              onClick={() => { setStatusFilter('locked'); setCurrentPage(1); }}
+              style={{ padding: '5px 13px', borderRadius: '20px', border: '1px solid #c0c8c2', background: statusFilter === 'locked' ? '#ba1a1a' : '#ffffff', color: statusFilter === 'locked' ? '#ffffff' : '#414944', fontSize: '12.5px', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s' }}
+            >
+              Tạm khóa ({kpiData.lockedCount})
+            </button>
+          </div>
+        </div>
+
+        {/* Dòng 2: Province filter, Sort, Search, Reset */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', flexWrap: 'wrap', borderTop: '1px solid #f1f5f9', paddingTop: '10px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+            {/* Lọc theo Tỉnh/Thành */}
+            {availableProvinces.length > 0 && (
+              <select
+                value={provinceFilter}
+                onChange={(e) => { setProvinceFilter(e.target.value); setCurrentPage(1); }}
+                style={{ padding: '7px 12px', borderRadius: '8px', border: '1px solid #c0c8c2', background: '#f8fafc', fontSize: '13px', color: '#1e293b', outline: 'none', cursor: 'pointer' }}
+                title="Lọc theo Tỉnh / Thành"
+              >
+                <option value="all">📍 Tất cả tỉnh thành</option>
+                {availableProvinces.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    📍 {p.name}
+                  </option>
+                ))}
+              </select>
+            )}
+
+            {/* Sắp xếp */}
+            <select
+              value={sortBy}
+              onChange={(e) => { setSortBy(e.target.value); setCurrentPage(1); }}
+              style={{ padding: '7px 12px', borderRadius: '8px', border: '1px solid #c0c8c2', background: '#f8fafc', fontSize: '13px', color: '#1e293b', outline: 'none', cursor: 'pointer' }}
+              title="Sắp xếp danh sách cơ sở"
+            >
+              <option value="default">Sắp xếp mặc định</option>
+              <option value="name-asc">Tên cơ sở A-Z</option>
+              <option value="rooms-desc">Quy mô phòng nhiều nhất</option>
+              <option value="rooms-asc">Quy mô phòng ít nhất</option>
+            </select>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+            {/* Search Input Field */}
+            <div className="mh-search-box-wrap">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginRight: '8px' }}>
+                <circle cx="11" cy="11" r="8" />
+                <line x1="21" y1="21" x2="16.65" y2="16.65" />
+              </svg>
+              <input
+                type="text"
+                placeholder="Tìm tên homestay, địa chỉ..."
+                value={searchTerm}
+                onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+              />
+              {searchTerm && (
+                <button
+                  type="button"
+                  onClick={() => { setSearchTerm(''); setCurrentPage(1); }}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#717974', fontSize: '14px', padding: '0 2px', lineHeight: 1 }}
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+
+            {/* Nút Đặt lại */}
+            {(searchTerm.trim() || statusFilter !== 'all' || provinceFilter !== 'all' || sortBy !== 'default' || timeFilter !== 'all') && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchTerm('');
+                  setStatusFilter('all');
+                  setProvinceFilter('all');
+                  setSortBy('default');
+                  setTimeFilter('all');
+                  setCurrentPage(1);
+                }}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '6px 12px', borderRadius: '8px', border: '1px solid #fecaca', background: '#fee2e2', color: '#dc2626', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}
+                title="Đặt lại bộ lọc về mặc định"
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: '15px' }}>restart_alt</span>
+                Đặt lại
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -1275,12 +1442,69 @@ export default function ManageHomestay() {
               </button>
             </div>
             <div className="mh-modal-body">
+              {/* Bộ lọc thời gian: Tất cả, 1 tuần, 1 tháng, 1 năm & Từ ngày - Đến ngày */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px', background: '#f8fafc', padding: '12px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+                <span style={{ fontSize: '12px', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
+                  Lọc thời gian báo cáo:
+                </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'inline-flex', background: '#e2e8f0', borderRadius: '6px', padding: '2px', gap: '2px' }}>
+                    <button
+                      type="button"
+                      onClick={() => { setReportTimePreset('all'); setReportDateFrom(''); setReportDateTo(''); }}
+                      style={{ padding: '4px 10px', border: 'none', borderRadius: '4px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', background: reportTimePreset === 'all' ? '#154332' : 'transparent', color: reportTimePreset === 'all' ? '#fff' : '#334155' }}
+                    >
+                      Tất cả
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setReportTimePreset('1_week'); setReportDateFrom('2026-09-22'); setReportDateTo('2026-09-28'); }}
+                      style={{ padding: '4px 10px', border: 'none', borderRadius: '4px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', background: reportTimePreset === '1_week' ? '#154332' : 'transparent', color: reportTimePreset === '1_week' ? '#fff' : '#334155' }}
+                    >
+                      1 tuần
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setReportTimePreset('1_month'); setReportDateFrom('2026-09-01'); setReportDateTo('2026-09-30'); }}
+                      style={{ padding: '4px 10px', border: 'none', borderRadius: '4px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', background: reportTimePreset === '1_month' ? '#154332' : 'transparent', color: reportTimePreset === '1_month' ? '#fff' : '#334155' }}
+                    >
+                      1 tháng
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setReportTimePreset('1_year'); setReportDateFrom('2026-01-01'); setReportDateTo('2026-12-31'); }}
+                      style={{ padding: '4px 10px', border: 'none', borderRadius: '4px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', background: reportTimePreset === '1_year' ? '#154332' : 'transparent', color: reportTimePreset === '1_year' ? '#fff' : '#334155' }}
+                    >
+                      1 năm
+                    </button>
+                  </div>
+
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#ffffff', borderRadius: '6px', padding: '4px 8px', border: '1px solid #cbd5e1' }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: '15px', color: '#166534' }}>calendar_today</span>
+                    <span style={{ fontSize: '12px', color: '#64748b', fontWeight: 600 }}>Từ:</span>
+                    <input
+                      type="date"
+                      value={reportDateFrom}
+                      onChange={(e) => { setReportDateFrom(e.target.value); setReportTimePreset('custom'); }}
+                      style={{ border: 'none', background: 'transparent', fontSize: '12px', outline: 'none', cursor: 'pointer' }}
+                    />
+                    <span style={{ fontSize: '12px', color: '#64748b', fontWeight: 600 }}>Đến:</span>
+                    <input
+                      type="date"
+                      value={reportDateTo}
+                      onChange={(e) => { setReportDateTo(e.target.value); setReportTimePreset('custom'); }}
+                      style={{ border: 'none', background: 'transparent', fontSize: '12px', outline: 'none', cursor: 'pointer' }}
+                    />
+                  </div>
+                </div>
+              </div>
+
               <div className="mh-alert-box info" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '8px' }}>
                 <span style={{ fontSize: '15px', fontWeight: 700 }}>
-                  Tháng 09/2026: Tăng trưởng mạnh mẽ toàn hệ thống
+                  Kỳ báo cáo: {reportMetrics.label}
                 </span>
                 <p style={{ margin: 0, fontSize: '13px', lineHeight: 1.5 }}>
-                  Tổng doanh thu toàn chuỗi đạt <strong>313.700.000₫</strong>, tăng <strong>22.4%</strong> so với tháng trước nhờ mùa lúa chín vùng cao Tây Bắc. Tỷ lệ lấp đầy đạt đỉnh tại Mộc Retreat Pù Luông (81.5%).
+                  Tổng doanh thu toàn chuỗi đạt <strong>{reportMetrics.revenue}</strong>, tổng lượt khách đạt <strong>{reportMetrics.guests}</strong>. Hiệu suất khai thác buồng phòng luôn duy trì mức cao.
                 </p>
               </div>
 

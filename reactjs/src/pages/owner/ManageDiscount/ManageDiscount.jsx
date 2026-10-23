@@ -55,6 +55,9 @@ export default function ManageDiscount() {
   // ─── Filter & Search ──────────────────────────────────────────
   const [filter, setFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [sortBy, setSortBy] = useState('default');
 
   // ─── Pagination ───────────────────────────────────────────────
   const [currentPage, setCurrentPage] = useState(1);
@@ -573,11 +576,35 @@ export default function ManageDiscount() {
         (v.name && v.name.toLowerCase().includes(q)) ||
         (v.homestayName && v.homestayName.toLowerCase().includes(q));
 
-      return matchHs && matchFilter && matchSearch;
+      // Date range filter
+      let matchDate = true;
+      if (dateFrom || dateTo) {
+        const vStart = v.start ? new Date(v.start) : null;
+        const vEnd = v.end ? new Date(v.end) : null;
+        if (dateFrom && vEnd && vEnd < new Date(dateFrom)) matchDate = false;
+        if (dateTo && vStart && vStart > new Date(dateTo + 'T23:59:59')) matchDate = false;
+      }
+
+      return matchHs && matchFilter && matchSearch && matchDate;
     });
 
+    // Sắp xếp voucher
+    if (sortBy === 'value-desc') {
+      list.sort((a, b) => (Number(b.value) || 0) - (Number(a.value) || 0));
+    } else if (sortBy === 'value-asc') {
+      list.sort((a, b) => (Number(a.value) || 0) - (Number(b.value) || 0));
+    } else if (sortBy === 'end-asc') {
+      list.sort((a, b) => {
+        const da = a.end ? new Date(a.end) : new Date(9999, 11, 31);
+        const db = b.end ? new Date(b.end) : new Date(9999, 11, 31);
+        return da - db;
+      });
+    } else if (sortBy === 'name-asc') {
+      list.sort((a, b) => (a.name || '').localeCompare(b.name || '', 'vi'));
+    }
+
     // Tab "Tất cả": pending luôn lên đầu, rejected tiếp theo, rồi active
-    if (filter === 'all') {
+    if (filter === 'all' && sortBy === 'default') {
       const pendingList = list.filter((v) => {
         const s = (v.status || '').toLowerCase();
         const r = (v.rawStatus || '').toLowerCase();
@@ -596,7 +623,7 @@ export default function ManageDiscount() {
       return [...pendingList, ...rejectedList, ...otherList];
     }
     return list;
-  }, [vouchers, activeHomestayId, homestaysList, filter, searchQuery]);
+  }, [vouchers, activeHomestayId, homestaysList, filter, searchQuery, dateFrom, dateTo, sortBy]);
 
   // ─── Pagination derived values ────────────────────────────────
   const totalPages = Math.max(1, Math.ceil(filteredVouchers.length / PAGE_SIZE));
@@ -842,8 +869,8 @@ export default function ManageDiscount() {
           </div>
         </div>
 
-        {/* ROW 2: Filter Controls (Homestay select & Search) */}
-        <div className="discount-filter-controls-row">
+        {/* ROW 2: Filter Controls (Homestay select, Search, Date range, Sort & Reset) */}
+        <div className="discount-filter-controls-row" style={{ flexWrap: 'wrap', gap: '10px' }}>
           <div className="discount-hs-select-wrap">
             <i className="bi bi-house-door" />
             <select
@@ -878,6 +905,153 @@ export default function ManageDiscount() {
               </button>
             )}
           </div>
+
+          {/* Presets: Tất cả, 1 tuần, 1 tháng, 1 năm */}
+          <div style={{ display: 'inline-flex', background: '#f1f5f9', borderRadius: '8px', padding: '2px', gap: '2px' }}>
+            <button
+              type="button"
+              className="discount-tab-btn"
+              style={{
+                padding: '4px 10px',
+                fontSize: '12px',
+                background: !dateFrom && !dateTo ? '#166534' : 'transparent',
+                color: !dateFrom && !dateTo ? '#fff' : '#475569',
+                borderRadius: '6px'
+              }}
+              onClick={() => { setDateFrom(''); setDateTo(''); setCurrentPage(1); }}
+            >
+              Tất cả
+            </button>
+            <button
+              type="button"
+              className="discount-tab-btn"
+              style={{
+                padding: '4px 10px',
+                fontSize: '12px',
+                background: dateFrom && dateTo && Math.round((new Date(dateTo) - new Date(dateFrom)) / 86400000) <= 8 ? '#166534' : 'transparent',
+                color: dateFrom && dateTo && Math.round((new Date(dateTo) - new Date(dateFrom)) / 86400000) <= 8 ? '#fff' : '#475569',
+                borderRadius: '6px'
+              }}
+              onClick={() => {
+                const end = new Date();
+                const start = new Date(Date.now() - 7 * 86400000);
+                setDateFrom(start.toISOString().split('T')[0]);
+                setDateTo(end.toISOString().split('T')[0]);
+                setCurrentPage(1);
+              }}
+            >
+              1 tuần
+            </button>
+            <button
+              type="button"
+              className="discount-tab-btn"
+              style={{
+                padding: '4px 10px',
+                fontSize: '12px',
+                background: dateFrom && dateTo && Math.round((new Date(dateTo) - new Date(dateFrom)) / 86400000) > 8 && Math.round((new Date(dateTo) - new Date(dateFrom)) / 86400000) <= 35 ? '#166534' : 'transparent',
+                color: dateFrom && dateTo && Math.round((new Date(dateTo) - new Date(dateFrom)) / 86400000) > 8 && Math.round((new Date(dateTo) - new Date(dateFrom)) / 86400000) <= 35 ? '#fff' : '#475569',
+                borderRadius: '6px'
+              }}
+              onClick={() => {
+                const end = new Date();
+                const start = new Date(Date.now() - 30 * 86400000);
+                setDateFrom(start.toISOString().split('T')[0]);
+                setDateTo(end.toISOString().split('T')[0]);
+                setCurrentPage(1);
+              }}
+            >
+              1 tháng
+            </button>
+            <button
+              type="button"
+              className="discount-tab-btn"
+              style={{
+                padding: '4px 10px',
+                fontSize: '12px',
+                background: dateFrom && dateTo && Math.round((new Date(dateTo) - new Date(dateFrom)) / 86400000) > 35 ? '#166534' : 'transparent',
+                color: dateFrom && dateTo && Math.round((new Date(dateTo) - new Date(dateFrom)) / 86400000) > 35 ? '#fff' : '#475569',
+                borderRadius: '6px'
+              }}
+              onClick={() => {
+                const end = new Date();
+                const start = new Date(Date.now() - 365 * 86400000);
+                setDateFrom(start.toISOString().split('T')[0]);
+                setDateTo(end.toISOString().split('T')[0]);
+                setCurrentPage(1);
+              }}
+            >
+              1 năm
+            </button>
+          </div>
+
+          {/* Lọc theo khoảng ngày hiệu lực */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#fff', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '4px 10px' }}>
+            <i className="bi bi-calendar-event" style={{ color: '#166534', fontSize: '13px' }} />
+            <span style={{ fontSize: '12px', color: '#64748b', fontWeight: 600 }}>Từ:</span>
+            <input
+              type="date"
+              style={{ border: 'none', background: 'transparent', fontSize: '12px', color: '#1e293b', outline: 'none' }}
+              value={dateFrom}
+              onChange={(e) => { setDateFrom(e.target.value); setCurrentPage(1); }}
+            />
+            <span style={{ fontSize: '12px', color: '#64748b', fontWeight: 600 }}>Đến:</span>
+            <input
+              type="date"
+              style={{ border: 'none', background: 'transparent', fontSize: '12px', color: '#1e293b', outline: 'none' }}
+              value={dateTo}
+              onChange={(e) => { setDateTo(e.target.value); setCurrentPage(1); }}
+            />
+          </div>
+
+          {/* Sắp xếp */}
+          <div className="discount-hs-select-wrap">
+            <i className="bi bi-sort-down" />
+            <select
+              className="discount-hs-select"
+              value={sortBy}
+              onChange={(e) => { setSortBy(e.target.value); setCurrentPage(1); }}
+              title="Sắp xếp danh sách voucher"
+            >
+              <option value="default">Sắp xếp mặc định</option>
+              <option value="value-desc">Giảm nhiều nhất</option>
+              <option value="value-asc">Giảm ít nhất</option>
+              <option value="end-asc">Sắp hết hạn trước</option>
+              <option value="name-asc">Tên voucher A-Z</option>
+            </select>
+          </div>
+
+          {/* Nút Đặt lại */}
+          {(searchQuery || dateFrom || dateTo || sortBy !== 'default' || filter !== 'all' || (activeHomestayId && activeHomestayId !== 'all')) && (
+            <button
+              type="button"
+              onClick={() => {
+                setSearchQuery('');
+                setDateFrom('');
+                setDateTo('');
+                setSortBy('default');
+                setFilter('all');
+                handleSwitchHomestay('all');
+                setCurrentPage(1);
+              }}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px',
+                padding: '6px 14px',
+                borderRadius: '8px',
+                border: '1px solid #fecaca',
+                background: '#fee2e2',
+                color: '#dc2626',
+                fontSize: '12px',
+                fontWeight: 600,
+                cursor: 'pointer'
+              }}
+              title="Đặt lại bộ lọc về mặc định"
+            >
+              <i className="bi bi-arrow-counterclockwise" />
+              Đặt lại
+            </button>
+          )}
         </div>
       </div>
 

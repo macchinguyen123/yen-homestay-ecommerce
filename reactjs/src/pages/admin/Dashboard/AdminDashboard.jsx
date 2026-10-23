@@ -397,11 +397,11 @@ export default function AdminDashboard() {
     const getPeriodLabel = () => {
         if (dashboardData?.periodLabel) return dashboardData.periodLabel;
         switch (dateFilter) {
-            case 'today': return 'Hôm nay';
-            case '7days': return '7 ngày qua';
-            case 'month': return 'Tháng này (Tháng 10/2026)';
-            case 'year': return 'Năm 2026';
-            default: return 'Tháng này';
+            case 'all': return 'Toàn bộ thời gian (Tất cả)';
+            case '7days': return '1 tuần qua';
+            case 'month': return '1 tháng qua (Tháng 10/2026)';
+            case 'year': return '1 năm (Năm 2026)';
+            default: return '1 tháng qua';
         }
     };
 
@@ -430,10 +430,10 @@ export default function AdminDashboard() {
 
                 <div className="dashboard-toolbar">
                     <div className="date-filter-group">
-                        <button className={`date-filter-btn ${dateFilter === 'today' ? 'active' : ''}`} onClick={() => setDateFilter('today')}>Hôm nay</button>
-                        <button className={`date-filter-btn ${dateFilter === '7days' ? 'active' : ''}`} onClick={() => setDateFilter('7days')}>7 ngày</button>
-                        <button className={`date-filter-btn ${dateFilter === 'month' ? 'active' : ''}`} onClick={() => setDateFilter('month')}>Tháng này</button>
-                        <button className={`date-filter-btn ${dateFilter === 'year' ? 'active' : ''}`} onClick={() => setDateFilter('year')}>Năm 2026</button>
+                        <button className={`date-filter-btn ${dateFilter === 'all' ? 'active' : ''}`} onClick={() => setDateFilter('all')}>Tất cả</button>
+                        <button className={`date-filter-btn ${dateFilter === '7days' ? 'active' : ''}`} onClick={() => setDateFilter('7days')}>1 tuần</button>
+                        <button className={`date-filter-btn ${dateFilter === 'month' ? 'active' : ''}`} onClick={() => setDateFilter('month')}>1 tháng</button>
+                        <button className={`date-filter-btn ${dateFilter === 'year' ? 'active' : ''}`} onClick={() => setDateFilter('year')}>1 năm</button>
                     </div>
 
                     <button

@@ -107,7 +107,8 @@ function RevenueChart({ data = [] }) {
 // ─── Main Dashboard ────────────────────────────────────────────────────────────
 export default function OwnerDashboard() {
   const [period, setPeriod] = useState('7days');
-  const [dateFilter, setDateFilter] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   const [page, setPage] = useState(1);
   const [notifications, setNotifications] = useState([]);
   const [dashboard, setDashboard] = useState(null);
@@ -168,15 +169,25 @@ export default function OwnerDashboard() {
     return () => socket.close();
   }, []);
 
-  // Lọc các booking thật theo ngày
+  // Lọc các booking thật theo khoảng ngày (Từ ngày nào tới ngày nào)
   const bookings = dashboard?.recentBookings || [];
-  const filteredBookings = dateFilter
+  const filteredBookings = (dateFrom || dateTo)
     ? bookings.filter(b => {
-        const cin  = new Date(b.checkIn);
-        const cout = new Date(b.checkOut);
-        const sel  = new Date(dateFilter);
-        cin.setHours(0,0,0,0); cout.setHours(0,0,0,0); sel.setHours(0,0,0,0);
-        return sel >= cin && sel <= cout;
+        const cin  = b.checkIn ? new Date(b.checkIn) : null;
+        const cout = b.checkOut ? new Date(b.checkOut) : null;
+        if (dateFrom && cout) {
+          const from = new Date(dateFrom);
+          from.setHours(0, 0, 0, 0);
+          cout.setHours(0, 0, 0, 0);
+          if (cout < from) return false;
+        }
+        if (dateTo && cin) {
+          const to = new Date(dateTo);
+          to.setHours(23, 59, 59, 999);
+          cin.setHours(0, 0, 0, 0);
+          if (cin > to) return false;
+        }
+        return true;
       })
     : bookings;
 
@@ -279,17 +290,39 @@ export default function OwnerDashboard() {
             <section className="dashboard-card">
               <div className="dashboard-card-header">
                 <h2>Đơn đặt phòng gần đây</h2>
-                <div className="table-filter-bar">
-                  <input
-                    type="date"
-                    className="dashboard-select"
-                    value={dateFilter}
-                    onChange={e => { setDateFilter(e.target.value); setPage(1); }}
-                    title="Lọc theo ngày"
-                  />
+                <div className="table-filter-bar" style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#ffffff', borderRadius: '8px', padding: '4px 10px', border: '1px solid #cbd5e1' }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: '15px', color: '#166534' }}>calendar_today</span>
+                    <span style={{ fontSize: '12px', color: '#64748b', fontWeight: 600 }}>Từ:</span>
+                    <input
+                      type="date"
+                      value={dateFrom}
+                      onChange={e => { setDateFrom(e.target.value); setPage(1); }}
+                      style={{ border: 'none', background: 'transparent', fontSize: '12.5px', color: '#1e293b', outline: 'none', cursor: 'pointer' }}
+                      title="Lọc từ ngày"
+                    />
+                    <span style={{ fontSize: '12px', color: '#64748b', fontWeight: 600 }}>Đến:</span>
+                    <input
+                      type="date"
+                      value={dateTo}
+                      onChange={e => { setDateTo(e.target.value); setPage(1); }}
+                      style={{ border: 'none', background: 'transparent', fontSize: '12.5px', color: '#1e293b', outline: 'none', cursor: 'pointer' }}
+                      title="Lọc đến ngày"
+                    />
+                    {(dateFrom || dateTo) && (
+                      <button
+                        type="button"
+                        onClick={() => { setDateFrom(''); setDateTo(''); setPage(1); }}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: '14px', padding: '0 2px', lineHeight: 1 }}
+                        title="Xóa khoảng ngày"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
                   <button
                     className="view-all-button"
-                    onClick={() => { setDateFilter(''); setPage(1); }}
+                    onClick={() => { setDateFrom(''); setDateTo(''); setPage(1); }}
                   >
                     Tất cả <i className="bi bi-arrow-right" />
                   </button>
