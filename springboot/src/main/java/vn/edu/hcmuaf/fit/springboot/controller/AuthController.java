@@ -103,4 +103,16 @@ public class AuthController {
         }
         return ResponseEntity.ok(response);
     }
+
+    /**
+     * API Đăng nhập bằng Facebook
+     */
+    @PostMapping("/facebook")
+    public ResponseEntity<LoginResponse> loginWithFacebook(@RequestBody FacebookLoginRequest request) {
+        LoginResponse response = authService.loginWithFacebook(request);
+        if (!response.isSuccess()) {
+            return ResponseEntity.badRequest().body(response);
+        }
+        return ResponseEntity.ok(response);
+    }
 }

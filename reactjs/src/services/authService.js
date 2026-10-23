@@ -292,4 +292,51 @@ export const authService = {
       return { success: false, message: 'Không thể kết nối máy chủ khi đăng nhập Google.' };
     }
   },
+
+  /**
+   * Đăng nhập bằng Facebook.
+   */
+  async loginWithFacebook({ email, fullName, avatar, facebookId, accessToken }) {
+    try {
+      const response = await fetchAuth('/facebook', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, fullName, avatar, facebookId, accessToken }),
+      });
+      const data = await response.json();
+      if (response.ok && data.success) {
+        const userData = {
+          id: data.id,
+          email: data.email,
+          phoneNumber: data.phoneNumber,
+          fullName: data.fullName,
+          role: data.role,
+          avatar: data.avatar,
+          token: data.token,
+        };
+        const rawRole = (data.role || 'USER').toUpperCase();
+        const normalizedRole = rawRole === 'ADMIN' ? 'ADMIN' : (rawRole === 'OWNER' || rawRole === 'HOST') ? 'OWNER' : 'TOURIST';
+        const sessionRole = rawRole === 'ADMIN' ? 'admin' : (rawRole === 'OWNER' || rawRole === 'HOST') ? 'host' : 'guest';
+
+        localStorage.setItem('user', JSON.stringify(userData));
+        localStorage.setItem('user_role', normalizedRole);
+        sessionStorage.setItem('isLoggedIn', 'true');
+        sessionStorage.setItem('userName', data.fullName || data.email);
+        sessionStorage.setItem('userRole', sessionRole);
+        sessionStorage.setItem('userId', String(data.id));
+
+        return { success: true, message: data.message, user: userData };
+      }
+      return {
+        success: false,
+        message: data.message || 'Đăng nhập Facebook thất bại!',
+        notRegistered: data.notRegistered || false,
+        email: data.email,
+        fullName: data.fullName,
+      };
+    } catch (error) {
+      console.error('Facebook login error:', error);
+      return { success: false, message: 'Không thể kết nối máy chủ khi đăng nhập Facebook.' };
+    }
+  },
 };
