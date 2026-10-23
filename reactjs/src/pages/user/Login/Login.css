@@ -768,3 +768,24 @@
   opacity: 0.6;
   cursor: not-allowed !important;
 }
+
+/* Google Login Loading Spinner */
+.login-social-spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(0, 0, 0, 0.2);
+  border-top-color: #4285F4;
+  border-radius: 50%;
+  animation: spin-google 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes spin-google {
+  to { transform: rotate(360deg); }
+}
+
+.login-social-btn:disabled {
+  opacity: 0.75;
+  cursor: not-allowed !important;
+}

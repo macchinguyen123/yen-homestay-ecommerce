@@ -195,5 +195,89 @@ export const authService = {
     sessionStorage.removeItem('isLoggedIn');
     sessionStorage.removeItem('userName');
     sessionStorage.removeItem('userRole');
-  }
+    sessionStorage.removeItem('userId');
+  },
+
+  /**
+   * Đăng nhập bằng Google - gửi ID Token lên backend để xác thực
+   */
+  async loginWithGoogle(idToken) {
+    try {
+      const response = await fetchAuth('/google', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idToken }),
+      });
+      const data = await response.json();
+      if (response.ok && data.success) {
+        const userData = {
+          id: data.id,
+          email: data.email,
+          phoneNumber: data.phoneNumber,
+          fullName: data.fullName,
+          role: data.role,
+          avatar: data.avatar,
+          token: data.token,
+        };
+        const rawRole = (data.role || 'USER').toUpperCase();
+        const normalizedRole = rawRole === 'ADMIN' ? 'ADMIN' : (rawRole === 'OWNER' || rawRole === 'HOST') ? 'OWNER' : 'TOURIST';
+        const sessionRole = rawRole === 'ADMIN' ? 'admin' : (rawRole === 'OWNER' || rawRole === 'HOST') ? 'host' : 'guest';
+
+        localStorage.setItem('user', JSON.stringify(userData));
+        localStorage.setItem('user_role', normalizedRole);
+        sessionStorage.setItem('isLoggedIn', 'true');
+        sessionStorage.setItem('userName', data.fullName || data.email);
+        sessionStorage.setItem('userRole', sessionRole);
+        sessionStorage.setItem('userId', String(data.id));
+
+        return { success: true, message: data.message, user: userData };
+      }
+      return { success: false, message: data.message || 'Đăng nhập Google thất bại!' };
+    } catch (error) {
+      console.error('Google login error:', error);
+      return { success: false, message: 'Không thể kết nối máy chủ khi đăng nhập Google.' };
+    }
+  },
+
+  /**
+   * Đăng nhập bằng Google UserInfo (access_token flow).
+   * Frontend lấy userInfo từ Google rồi gửi email, fullName, avatar, googleId lên đây.
+   */
+  async loginWithGoogleUserInfo({ email, fullName, avatar, googleId }) {
+    try {
+      const response = await fetchAuth('/google-userinfo', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, fullName, avatar, googleId }),
+      });
+      const data = await response.json();
+      if (response.ok && data.success) {
+        const userData = {
+          id: data.id,
+          email: data.email,
+          phoneNumber: data.phoneNumber,
+          fullName: data.fullName,
+          role: data.role,
+          avatar: data.avatar,
+          token: data.token,
+        };
+        const rawRole = (data.role || 'USER').toUpperCase();
+        const normalizedRole = rawRole === 'ADMIN' ? 'ADMIN' : (rawRole === 'OWNER' || rawRole === 'HOST') ? 'OWNER' : 'TOURIST';
+        const sessionRole = rawRole === 'ADMIN' ? 'admin' : (rawRole === 'OWNER' || rawRole === 'HOST') ? 'host' : 'guest';
+
+        localStorage.setItem('user', JSON.stringify(userData));
+        localStorage.setItem('user_role', normalizedRole);
+        sessionStorage.setItem('isLoggedIn', 'true');
+        sessionStorage.setItem('userName', data.fullName || data.email);
+        sessionStorage.setItem('userRole', sessionRole);
+        sessionStorage.setItem('userId', String(data.id));
+
+        return { success: true, message: data.message, user: userData };
+      }
+      return { success: false, message: data.message || 'Đăng nhập Google thất bại!' };
+    } catch (error) {
+      console.error('Google userinfo login error:', error);
+      return { success: false, message: 'Không thể kết nối máy chủ khi đăng nhập Google.' };
+    }
+  },
 };

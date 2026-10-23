@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { useGoogleLogin } from '@react-oauth/google';
 import { authService } from '../../../services/authService';
 import './Login.css';
 
@@ -180,6 +181,69 @@ export default function Login() {
     }
   };
 
+  const [googleLoading, setGoogleLoading] = useState(false);
+
+  /**
+   * Đăng nhập bằng Google: lấy ID Token từ Google rồi gửi lên backend xác thực.
+   * Dùng flow "implicit" để nhận id_token trực tiếp.
+   */
+  const handleGoogleLogin = useGoogleLogin({
+    flow: 'implicit',
+    onSuccess: async (tokenResponse) => {
+      setGoogleLoading(true);
+      try {
+        // tokenResponse.access_token dùng để lấy userInfo từ Google
+        // Sau đó gửi lên backend thông qua userinfo endpoint
+        const userInfoRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+          headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
+        });
+        const userInfo = await userInfoRes.json();
+
+        // Gửi email + thông tin lên backend của mình (không cần ID Token nữa)
+        const result = await authService.loginWithGoogleUserInfo({
+          email: userInfo.email,
+          fullName: userInfo.name,
+          avatar: userInfo.picture,
+          googleId: userInfo.sub,
+        });
+
+        if (result && result.success && result.user) {
+          const dbUser = result.user;
+          const rawRole = (dbUser.role || 'USER').toUpperCase();
+          let normalizedRole = 'TOURIST';
+          let sessionRole = 'guest';
+          if (rawRole === 'ADMIN') { normalizedRole = 'ADMIN'; sessionRole = 'admin'; }
+          else if (rawRole === 'OWNER' || rawRole === 'HOST') { normalizedRole = 'OWNER'; sessionRole = 'host'; }
+
+          sessionStorage.setItem('isLoggedIn', 'true');
+          sessionStorage.setItem('userName', dbUser.fullName || dbUser.email);
+          sessionStorage.setItem('userId', String(dbUser.id));
+          sessionStorage.setItem('userRole', sessionRole);
+          localStorage.setItem('user_role', normalizedRole);
+          localStorage.setItem('user', JSON.stringify(dbUser));
+          window.dispatchEvent(new Event('storage'));
+
+          if (normalizedRole === 'ADMIN') navigate('/admin/dashboard');
+          else if (normalizedRole === 'OWNER') navigate('/owner/dashboard');
+          else {
+            const redirectUrl = searchParams.get('redirect');
+            navigate(redirectUrl || '/');
+          }
+        } else {
+          alert(result?.message || 'Đăng nhập Google thất bại!');
+        }
+      } catch (err) {
+        alert('Có lỗi xảy ra khi đăng nhập bằng Google. Vui lòng thử lại!');
+      } finally {
+        setGoogleLoading(false);
+      }
+    },
+    onError: () => {
+      alert('Đăng nhập Google bị hủy hoặc gặp lỗi. Vui lòng thử lại!');
+      setGoogleLoading(false);
+    },
+  });
+
   return (
     <div className="login-root">
       {/* Full Screen Background Video (1080p HD Native & Crystal Clear) */}
@@ -316,30 +380,26 @@ export default function Login() {
             <button
               className="login-social-btn"
               type="button"
-              onClick={() => {
-                alert('Đăng nhập Google thành công!');
-                navigate('/');
-              }}
+              id="google-login-btn"
+              onClick={() => handleGoogleLogin()}
+              disabled={googleLoading}
             >
-              <svg className="login-social-svg" width="16" height="16" viewBox="0 0 24 24">
-                <path
-                  d="M12 5c1.6 0 3 .6 4.1 1.6l3.1-3.1C17.3 1.7 14.8 1 12 1 7.5 1 3.7 3.6 1.9 7.3l3.7 2.9C6.5 7.4 9 5 12 5z"
-                  fill="#EA4335"
-                />
-                <path
-                  d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.8z"
-                  fill="#4285F4"
-                />
-                <path
-                  d="M5.6 14.8c-.2-.7-.4-1.5-.4-2.8s.2-2.1.4-2.8L1.9 6.3C.7 8.7 0 10.3 0 12s.7 3.3 1.9 5.7l3.7-2.9z"
-                  fill="#FBBC05"
-                />
-                <path
-                  d="M12 23c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2.4-6.4-5.2L1.9 16C3.7 19.7 7.5 23 12 23z"
-                  fill="#34A853"
-                />
-              </svg>
-              <span>Google</span>
+              {googleLoading ? (
+                <>
+                  <span className="login-social-spinner" />
+                  <span>Đang xử lý...</span>
+                </>
+              ) : (
+                <>
+                  <svg className="login-social-svg" width="16" height="16" viewBox="0 0 24 24">
+                    <path d="M12 5c1.6 0 3 .6 4.1 1.6l3.1-3.1C17.3 1.7 14.8 1 12 1 7.5 1 3.7 3.6 1.9 7.3l3.7 2.9C6.5 7.4 9 5 12 5z" fill="#EA4335" />
+                    <path d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.8z" fill="#4285F4" />
+                    <path d="M5.6 14.8c-.2-.7-.4-1.5-.4-2.8s.2-2.1.4-2.8L1.9 6.3C.7 8.7 0 10.3 0 12s.7 3.3 1.9 5.7l3.7-2.9z" fill="#FBBC05" />
+                    <path d="M12 23c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2.4-6.4-5.2L1.9 16C3.7 19.7 7.5 23 12 23z" fill="#34A853" />
+                  </svg>
+                  <span>Google</span>
+                </>
+              )}
             </button>
             <button
               className="login-social-btn"

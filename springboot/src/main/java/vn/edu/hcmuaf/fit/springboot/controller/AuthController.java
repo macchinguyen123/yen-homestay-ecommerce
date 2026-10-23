@@ -76,4 +76,31 @@ public class AuthController {
         }
         return ResponseEntity.ok(response);
     }
+
+    /**
+     * API Đăng nhập bằng Google OAuth2
+     * Frontend gửi Google ID Token → backend xác thực với Google → trả về LoginResponse
+     */
+    @PostMapping("/google")
+    public ResponseEntity<LoginResponse> loginWithGoogle(@RequestBody GoogleLoginRequest request) {
+        LoginResponse response = authService.loginWithGoogle(request);
+        if (!response.isSuccess()) {
+            return ResponseEntity.badRequest().body(response);
+        }
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * API Đăng nhập bằng Google UserInfo.
+     * Frontend đã lấy userInfo từ Google (bằng access_token) rồi gửi lên đây.
+     * Endpoint này tạo/tìm user và trả LoginResponse chuẩn.
+     */
+    @PostMapping("/google-userinfo")
+    public ResponseEntity<LoginResponse> loginWithGoogleUserInfo(@RequestBody GoogleUserInfoRequest request) {
+        LoginResponse response = authService.loginWithGoogleUserInfo(request);
+        if (!response.isSuccess()) {
+            return ResponseEntity.badRequest().body(response);
+        }
+        return ResponseEntity.ok(response);
+    }
 }
