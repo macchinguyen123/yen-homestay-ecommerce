@@ -1793,10 +1793,6 @@ export default function Homepage() {
                             <i className="bi bi-stars" /> {h.personalTag}
                           </span>
 
-                          <span className="card-match-badge" title="Độ phù hợp gợi ý bởi AI">
-                            <i className="bi bi-patch-check-fill" /> {h.matchPercentage}% Phù hợp
-                          </span>
-
                           <button
                             type="button"
                             className={`card-wishlist-btn ${isWishlisted(h.id, h.name) ? 'active' : ''}`}

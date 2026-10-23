@@ -283,7 +283,7 @@ export default function PolaroidLineCarousel({
     const ro = new ResizeObserver(() => {
       const r = root.getBoundingClientRect()
       if (r.width === 0 && r.height === 0) return
-      const cw = Math.round(Math.max(150, Math.min(cardWidth, r.width * 0.42, r.height * 0.42)))
+      const cw = Math.round(Math.max(160, Math.min(cardWidth, r.width * 0.55, r.height * 0.78)))
       setSize((prev) => {
         if (Math.abs(prev.w - r.width) < 2 && Math.abs(prev.h - r.height) < 2 && prev.cw === cw) {
           return prev
@@ -320,7 +320,7 @@ export default function PolaroidLineCarousel({
       const dt = Math.min(0.033, (now - prev) / 1000)
       prev = now
       const { w, h, cw } = size
-      const y0 = Math.max(40, h * 0.2)
+      const y0 = Math.max(16, Math.min(26, h * 0.05))
       const d = drag.current
       let lineVel: number
       if (d && d.moved) {

@@ -1289,7 +1289,7 @@ body {
 .room-modal-overlay.active { opacity: 1; visibility: visible; }
 
 .room-modal-container {
-    background: var(--white); border-radius: 24px; width: 100%; max-width: 860px; max-height: 92vh;
+    background: var(--white); border-radius: 24px; width: 100%; max-width: 920px; max-height: 94vh;
     overflow: hidden; box-shadow: 0 25px 60px -15px rgba(15, 23, 42, 0.35); transform: scale(0.96); transition: var(--transition-normal);
     display: flex; flex-direction: column; position: relative; border: 1px solid rgba(255, 255, 255, 0.4);
 }
@@ -1337,16 +1337,16 @@ body {
 /* ══ BỘ SƯU TẬP ẢNH TƯƠNG TÁC CAO CẤP CỦA POPUP PHÒNG ══ */
 .room-modal-gallery-box {
     position: relative;
-    background: #0f172a;
+    background: #f8fafc;
     display: flex;
     flex-direction: column;
 }
 .room-modal-gallery-box--polaroid {
     position: relative;
-    background: #0b1120;
+    background: #fdfbf7;
     overflow: hidden;
-    min-height: 470px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    min-height: 415px;
+    border-bottom: 1px solid #ebe5dc;
 }
 .room-modal-gallery-box--polaroid .pl-root {
     width: 100%;
