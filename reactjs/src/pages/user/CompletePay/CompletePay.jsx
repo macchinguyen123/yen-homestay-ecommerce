@@ -114,20 +114,41 @@ export default function CompletePay() {
                 status: vnpResponseCode === '00' ? 'CONFIRMED' : (dbData.status || 'PENDING'),
               };
 
-              if (localFound && localFound.pricing) {
-                setBooking({
-                  ...adapted,
-                  ...localFound,
-                  code: dbData.bookingCode,
-                  homestay: dbData.homestayName || localFound.homestay,
-                  room: {
-                    name: dbData.roomName || localFound.room?.name,
-                    thumb: dbData.roomImage || localFound.room?.thumb,
-                  },
+              const finalBooking = (localFound && localFound.pricing) ? {
+                ...adapted,
+                ...localFound,
+                code: dbData.bookingCode,
+                homestay: dbData.homestayName || localFound.homestay,
+                depositStatus: vnpResponseCode === '00' ? 'PAID' : (dbData.depositStatus || 'PENDING'),
+                status: vnpResponseCode === '00' ? 'CONFIRMED' : (dbData.status || 'PENDING'),
+                room: {
+                  name: dbData.roomName || localFound.room?.name,
+                  thumb: dbData.roomImage || localFound.room?.thumb,
+                },
+              } : adapted;
+
+              // Đồng bộ cập nhật vào localStorage và xóa cache để danh sách giao dịch cập nhật ngay tức thì
+              try {
+                bookingService.clearCache();
+                // Xóa cache ví hoàn tiền để PersonalAccount tải số dư và giao dịch mới nhất
+                Object.keys(localStorage).forEach((k) => {
+                  if (k.startsWith('cached_cashback_wallet_')) localStorage.removeItem(k);
                 });
-              } else {
-                setBooking(adapted);
+
+                const rawList = JSON.parse(localStorage.getItem(BOOKINGS_KEY) || '[]');
+                const idx = rawList.findIndex((b) => b.code === finalBooking.code);
+                if (idx >= 0) {
+                  rawList[idx] = { ...rawList[idx], ...finalBooking };
+                } else {
+                  rawList.unshift(finalBooking);
+                }
+                localStorage.setItem(BOOKINGS_KEY, JSON.stringify(rawList));
+                sessionStorage.setItem(LAST_KEY, JSON.stringify(finalBooking));
+              } catch (storageErr) {
+                console.warn('Lỗi đồng bộ localStorage đặt phòng:', storageErr);
               }
+
+              setBooking(finalBooking);
               setLoading(false);
               return;
             }
@@ -137,6 +158,20 @@ export default function CompletePay() {
         }
 
         if (isMounted) {
+          if (localFound) {
+            if (vnpResponseCode === '00') {
+              localFound.depositStatus = 'PAID';
+              localFound.status = 'CONFIRMED';
+              bookingService.clearCache();
+              try {
+                sessionStorage.setItem(LAST_KEY, JSON.stringify(localFound));
+                const rawList = JSON.parse(localStorage.getItem(BOOKINGS_KEY) || '[]');
+                const idx = rawList.findIndex((b) => b.code === localFound.code);
+                if (idx >= 0) rawList[idx] = { ...rawList[idx], ...localFound };
+                localStorage.setItem(BOOKINGS_KEY, JSON.stringify(rawList));
+              } catch (e) {}
+            }
+          }
           setBooking(localFound || null);
         }
       } catch (e) {
@@ -254,6 +289,24 @@ export default function CompletePay() {
               }}>
                 <i className="bi bi-exclamation-triangle-fill" />
                 Giao dịch VNPAY đã bị hủy hoặc chưa hoàn tất (Mã: {vnpResponseCode}) · Đơn được giữ ở trạng thái Chờ thanh toán.
+              </div>
+            )}
+            {Math.round((pr.total || 0) * 0.05) > 0 && (
+              <div style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+                padding: '10px 18px', background: '#ECFDF5', border: '1px solid #A7F3D0',
+                borderRadius: '12px', color: '#047857', fontSize: '0.92rem', fontWeight: 600,
+                margin: '10px auto 16px', maxWidth: '640px'
+              }}>
+                <i className="bi bi-coin" style={{ fontSize: '1.25rem', color: '#059669' }} />
+                <span>
+                  🎉 Bạn vừa được tự động tích lũy <strong style={{ color: '#065F46', fontSize: '1rem' }}>+{fmtVND(Math.round((pr.total || 0) * 0.05))}</strong> (5%) vào Ví Hoàn Tiền YÊN!
+                </span>
+                <Link to="/personal-account" style={{
+                  color: '#047857', textDecoration: 'underline', fontWeight: 700, marginLeft: 6, fontSize: '0.85rem'
+                }}>
+                  Xem ví
+                </Link>
               </div>
             )}
             <p className="cp-hero-sub">

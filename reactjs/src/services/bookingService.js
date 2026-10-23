@@ -66,13 +66,34 @@ export const bookingService = {
   },
 
   /**
+   * Xóa bộ nhớ đệm danh sách đặt phòng để buộc tải dữ liệu mới nhất
+   */
+  clearCache(userId) {
+    if (userId) {
+      delete memoryCache[userId];
+      try {
+        localStorage.removeItem(`cached_user_bookings_${userId}`);
+      } catch (e) {}
+    } else {
+      memoryCache = {};
+      try {
+        Object.keys(localStorage).forEach((k) => {
+          if (k.startsWith('cached_user_bookings_')) {
+            localStorage.removeItem(k);
+          }
+        });
+      } catch (e) {}
+    }
+  },
+
+  /**
    * Tạo đơn đặt phòng mới lưu trực tiếp vào CSDL thật Neon PostgreSQL
    * @param {Object} bookingData Thông tin đặt phòng
    */
   async createBooking(bookingData) {
     try {
       const user = JSON.parse(localStorage.getItem('user') || 'null');
-      const userId = user?.id || user?.userId || user?.user_id || sessionStorage.getItem('userId') || bookingData.touristId || 1;
+      const userId = user?.id || user?.userId || user?.user_id || sessionStorage.getItem('userId') || bookingData.touristId || 21;
       const headers = {
         'Content-Type': 'application/json',
       };
@@ -90,7 +111,9 @@ export const bookingService = {
           touristId: Number(userId),
         }),
       });
-      return await response.json();
+      const data = await response.json();
+      this.clearCache(userId);
+      return data;
     } catch (error) {
       console.error('Lỗi khi gửi đơn đặt phòng:', error);
       throw error;

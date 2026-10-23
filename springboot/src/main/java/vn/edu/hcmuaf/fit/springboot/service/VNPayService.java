@@ -27,6 +27,7 @@ public class VNPayService {
 
     private final BookingRepository bookingRepository;
     private final PaymentRepository paymentRepository;
+    private final CashbackWalletService cashbackWalletService;
 
     @Value("${vnpay.tmn-code:UUDTD194}")
     private String vnpTmnCode;
@@ -189,6 +190,13 @@ public class VNPayService {
                     booking.setDepositStatus("PAID");
                     booking.setStatus("CONFIRMED");
                     bookingRepository.save(booking);
+
+                    // Tự động tích lũy 5% hoàn tiền / điểm thưởng vào Ví YÊN
+                    try {
+                        cashbackWalletService.creditCashbackForBooking(booking);
+                    } catch (Exception ce) {
+                        log.warn("Lỗi tích điểm cho đơn đặt phòng {}: {}", txnRef, ce.getMessage());
+                    }
 
                     // Thêm bản ghi Payment
                     try {

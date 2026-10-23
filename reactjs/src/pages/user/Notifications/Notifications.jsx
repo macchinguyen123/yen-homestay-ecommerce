@@ -2,128 +2,100 @@ import { useState, useMemo, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import './Notifications.css';
 
-/* Legacy sample data removed: notifications are loaded from the database. */
-/* const INITIAL_NOTIFICATIONS = [
+const DEFAULT_NOTIFICATIONS = [
   {
     id: 'noti-101',
     category: 'trip',
-    title: 'Nhắc lịch check-in: Sapa Cloud Forest Lodge ngày mai',
-    desc: 'Chuyến đi Sapa của bạn sắp bắt đầu! Thời gian nhận phòng là 14:00 ngày mai (21/09/2026). Phòng Bungalow view thung lũng Mường Hoa & bồn tắm lá thuốc Dao Đỏ đã sẵn sàng đón bạn.',
+    title: 'Xác nhận đặt phòng & bảo đảm cọc an toàn #YEN-2026-9042',
+    desc: 'Đơn đặt phòng tại Rừng Sương Glamping & Cabin đã được hệ thống YÊN xác nhận. Tiền cọc được giữ an toàn theo chính sách Bảo Vệ Du Khách.',
     timestamp: '5 phút trước',
-    unread: true,
-    iconClass: 'trip',
-    icon: 'bi-calendar-event-fill',
-    meta: [
-      { icon: 'bi-geo-alt-fill', text: 'Bản Tả Van, Sapa' },
-      { icon: 'bi-hash', text: 'Mã booking #BK-8102' },
-      { icon: 'bi-clock-fill', text: 'Nhận phòng: 14:00 (21/09)' }
-    ],
-    details: [
-      { label: 'Homestay:', val: 'Sapa Cloud Forest Lodge' },
-      { label: 'Địa chỉ:', val: 'Bản Tả Van, Huyện Sa Pa, Lào Cai' },
-      { label: 'Mã đặt phòng:', val: '#BK-8102', copyable: true },
-      { label: 'Thời gian ở:', val: '21/09/2026 - 23/09/2026 (2 đêm)' },
-      { label: 'Trạng thái cọc:', val: 'Đã thanh toán cọc 100%' }
-    ],
-    mainActionText: 'Xem lịch trình chuyến đi',
-    mainActionUrl: '/bookings'
-  },
-  {
-    id: 'noti-102',
-    category: 'booking',
-    title: 'Xác nhận đặt phòng & giữ cọc thành công #BK-9042',
-    desc: 'Đơn đặt phòng tại Pù Luông Eco Lodge cho 2 đêm (24/09 - 26/09/2026) đã được xác nhận thành công. Số tiền cọc 850.000đ được sàn YÊN giữ an toàn theo chính sách Bảo Vệ Khách Hàng.',
-    timestamp: '30 phút trước',
     unread: true,
     iconClass: 'booking',
     icon: 'bi-check-circle-fill',
     meta: [
-      { icon: 'bi-house-heart-fill', text: 'Pù Luông Eco Lodge' },
-      { icon: 'bi-shield-check', text: 'Cọc YÊN bảo đảm 50%' },
-      { icon: 'bi-credit-card-2-front', text: 'VNPay QR (850.000đ)' }
+      { icon: 'bi-house-heart-fill', text: 'Rừng Sương Glamping & Cabin' },
+      { icon: 'bi-shield-check', text: 'Cọc YÊN bảo đảm 100%' },
+      { icon: 'bi-credit-card-2-front', text: 'VNPAY Sandbox' }
     ],
     details: [
-      { label: 'Tên Homestay:', val: 'Pù Luông Eco Lodge' },
-      { label: 'Khu vực:', val: 'Bản Đôn, Thanh Hóa' },
-      { label: 'Mã Booking:', val: '#BK-9042', copyable: true },
-      { label: 'Tiền cọc đã giữ:', val: '850.000đ (50% giá phòng)' },
-      { label: 'Tiền thanh toán tại nơi:', val: '850.000đ (Trả khi check-in)' }
+      { label: 'Tên Homestay:', val: 'Rừng Sương Glamping & Cabin' },
+      { label: 'Khu vực:', val: 'Hồ Tuyền Lâm, Đà Lạt' },
+      { label: 'Mã Booking:', val: '#YEN-2026-9042', copyable: true },
+      { label: 'Trạng thái cọc:', val: 'Đã thanh toán an toàn qua VNPAY' },
+      { label: 'Thanh toán tại nơi:', val: 'Trả phần còn lại khi nhận phòng' }
     ],
     mainActionText: 'Xem phiếu đặt phòng',
     mainActionUrl: '/bookings'
   },
   {
-    id: 'noti-103',
+    id: 'noti-102',
     category: 'promo',
     title: 'Tặng riêng bạn voucher YENAUTUMN2026 giảm 15%',
-    desc: 'Sắc thu Đà Lạt rực rỡ đang chờ đón bạn! Tặng riêng bạn mã giảm giá 15% (tối đa 200.000đ) khi đặt phòng tại các biệt thự & bungalow đồi thông Đà Lạt.',
+    desc: 'Sắc thu Đà Lạt & Sa Pa rực rỡ đang chờ đón bạn! Tặng riêng bạn mã giảm giá 15% (tối đa 200.000đ) khi đặt phòng tại các bungalow và homestay trên hệ thống.',
     timestamp: '2 giờ trước',
     unread: true,
     iconClass: 'promo',
     icon: 'bi-gift-fill',
     meta: [
       { icon: 'bi-tag-fill', text: 'Mã: YENAUTUMN2026' },
-      { icon: 'bi-clock-history', text: 'Hạn dùng: 31/10/2026' },
+      { icon: 'bi-clock-history', text: 'Hạn dùng: 31/12/2026' },
       { icon: 'bi-ticket-perforated', text: 'Áp dụng đơn từ 800k' }
     ],
     details: [
       { label: 'Mã ưu đãi:', val: 'YENAUTUMN2026', copyable: true },
       { label: 'Mức giảm:', val: 'Giảm 15% (Tối đa 200.000đ)' },
-      { label: 'Điều kiện áp dụng:', val: 'Đơn từ 800.000đ tại Homestay Đà Lạt' },
-      { label: 'Hạn sử dụng:', val: '31/10/2026 (Còn 40 ngày)' }
+      { label: 'Điều kiện áp dụng:', val: 'Áp dụng cho mọi homestay trên YÊN' },
+      { label: 'Hạn sử dụng:', val: '31/12/2026' }
     ],
-    mainActionText: 'Áp dụng mã & Đặt Đà Lạt',
-    mainActionUrl: '/bookings'
+    mainActionText: 'Áp dụng mã & Đặt phòng ngay',
+    mainActionUrl: '/search'
   },
   {
-    id: 'noti-104',
+    id: 'noti-103',
     category: 'payment',
-    title: 'Hoàn tiền thành công 1.500.000đ về Ví MoMo',
-    desc: 'Giao dịch hoàn tiền #GD-88198 đã hoàn tất thành công. Số tiền 1.500.000đ đã được chuyển trực tiếp về ví MoMo của bạn do đơn hủy phòng Mộc Châu đáp ứng đúng điều kiện hủy trước 48h.',
+    title: 'Tự động tích lũy 5% vào Ví Hoàn Tiền YÊN',
+    desc: 'Mỗi khi đặt phòng thành công, 5% giá trị đơn phòng sẽ được tự động hoàn vào Ví YÊN của bạn để rút về ngân hàng liên kết hoặc trừ tiền lần đặt sau.',
     timestamp: 'Hôm qua',
     unread: false,
     iconClass: 'payment',
     icon: 'bi-wallet2',
     meta: [
-      { icon: 'bi-receipt', text: 'Mã GD: #GD-88198' },
-      { icon: 'bi-currency-exchange', text: 'Số tiền: 1.500.000đ' },
-      { icon: 'bi-patch-check', text: 'MoMo Trace ID: MOMO-77281049' }
+      { icon: 'bi-cash-coin', text: 'Tỷ lệ hoàn: 5%' },
+      { icon: 'bi-currency-exchange', text: 'Rút về mọi ngân hàng 24/7' },
+      { icon: 'bi-patch-check', text: 'Tích lũy tự động' }
     ],
     details: [
-      { label: 'Loại giao dịch:', val: 'Hoàn tiền cọc hủy phòng' },
-      { label: 'Mã Giao Dịch:', val: '#GD-88198', copyable: true },
-      { label: 'Số tiền hoàn lại:', val: '1.500.000đ' },
-      { label: 'Kênh nhận tiền:', val: 'Ví Điện Tử MoMo' },
-      { label: 'Trace Reference ID:', val: 'MOMO-77281049' }
+      { label: 'Chương trình:', val: 'YÊN Cashback & Loyalty Rewards' },
+      { label: 'Kênh tích lũy:', val: 'Ví hoàn tiền cá nhân' },
+      { label: 'Hạn mức rút tối thiểu:', val: '50.000 VNĐ' }
     ],
-    mainActionText: 'Xem chi tiết đơn hàng',
-    mainActionUrl: '/bookings'
+    mainActionText: 'Kiểm tra Ví hoàn tiền',
+    mainActionUrl: '/personal-account'
   },
   {
-    id: 'noti-105',
-    category: 'promo',
-    title: 'Tặng 50.000 YÊN Point khi viết đánh giá chuyến đi',
-    desc: 'Bạn vừa hoàn thành chuyến đi 3N2Đ tại Nhà Sàn Mộc Mai Châu! Hãy chia sẻ cảm nhận & 1 bức ảnh trải nghiệm thực tế để nhận ngay 50.000 YÊN Point tích lũy.',
-    timestamp: '3 ngày trước',
+    id: 'noti-104',
+    category: 'trip',
+    title: 'Nhắc lịch check-in: Trải nghiệm ẩm thực & văn hóa bản địa',
+    desc: 'Đừng quên chuẩn bị hành lý và xem qua các hướng dẫn check-in xanh để nhận voucher thưởng từ chủ nhà homestay nhé!',
+    timestamp: '2 ngày trước',
     unread: false,
-    iconClass: 'review',
-    icon: 'bi-star-fill',
+    iconClass: 'trip',
+    icon: 'bi-calendar-event-fill',
     meta: [
-      { icon: 'bi-house-check', text: 'Nhà Sàn Mộc Mai Châu' },
-      { icon: 'bi-coin', text: '+50.000 YÊN Point' }
+      { icon: 'bi-geo-alt-fill', text: 'Đà Lạt, Lâm Đồng' },
+      { icon: 'bi-clock-fill', text: 'Giờ check-in: 14:00' }
     ],
     details: [
-      { label: 'Chuyến đi vừa qua:', val: 'Nhà Sàn Mộc Mai Châu (3N2Đ)' },
-      { label: 'Quà tặng đánh giá:', val: '+50.000 YÊN Point (Đổi 50k khi đặt đơn sau)' },
-      { label: 'Yêu cầu:', val: 'Viết từ 20 từ & Kèm 1 ảnh thực tế' }
+      { label: 'Thời gian nhận phòng:', val: 'Từ 14:00 ngày nhận phòng' },
+      { label: 'Hỗ trợ du khách:', val: 'Hotline YÊN 1900 6868 hoạt động 24/7' }
     ],
-    mainActionText: 'Viết đánh giá ngay',
+    mainActionText: 'Xem hướng dẫn chuyến đi',
     mainActionUrl: '/bookings'
   }
-]; */
+];
 
 export default function Notifications() {
-  const [notifications, setNotifications] = useState([]);
+  const [notifications, setNotifications] = useState(DEFAULT_NOTIFICATIONS);
   const [activeCategory, setActiveCategory] = useState('all');
 
   // Modal Detail State
@@ -134,31 +106,70 @@ export default function Notifications() {
 
   const currentUser = JSON.parse(localStorage.getItem('user') || 'null');
   const apiBase = import.meta.env.VITE_API_BASE_URL?.replace(/\/auth\/?$/, '') || 'http://localhost:8081/api';
-  const headers = { Authorization: `Bearer ${currentUser?.token || ''}`, 'Content-Type': 'application/json' };
+  const headers = {
+    Authorization: `Bearer ${currentUser?.token || ''}`,
+    'X-User-Id': String(currentUser?.id || '1'),
+    'Content-Type': 'application/json'
+  };
 
-  const mapNotification = (n) => ({
-    ...n,
-    id: n.id,
-    category: ['BOOKING', 'TRIP'].includes((n.type || '').toUpperCase()) ? 'trip' : (n.type || 'system').toLowerCase(),
-    desc: n.message,
-    unread: !n.read,
-    timestamp: n.createdAt ? new Date(n.createdAt).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' }) : '',
-    iconClass: (n.type || 'system').toLowerCase(),
-    icon: 'bi-bell-fill',
-    meta: [], details: [], mainActionUrl: n.link || '/notifications'
-  });
+  const mapNotification = (n) => {
+    const rawType = (n.type || 'SYSTEM').toUpperCase();
+    const isTrip = ['BOOKING', 'TRIP'].includes(rawType);
+    const isPromo = ['PROMO', 'VOUCHER'].includes(rawType);
+    const isPayment = ['PAYMENT', 'CASHBACK', 'WALLET'].includes(rawType);
+
+    const category = isTrip ? 'trip' : (isPromo ? 'promo' : (isPayment ? 'payment' : 'system'));
+    const iconClass = isTrip ? 'booking' : (isPromo ? 'promo' : (isPayment ? 'payment' : 'trip'));
+    const icon = isTrip ? 'bi-check-circle-fill' : (isPromo ? 'bi-gift-fill' : (isPayment ? 'bi-wallet2' : 'bi-bell-fill'));
+
+    return {
+      ...n,
+      id: n.id,
+      category,
+      desc: n.message || n.desc,
+      unread: !n.read,
+      timestamp: n.createdAt ? new Date(n.createdAt).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' }) : 'Gần đây',
+      iconClass,
+      icon,
+      meta: n.meta && n.meta.length > 0 ? n.meta : [
+        { icon: isTrip ? 'bi-house-heart-fill' : (isPromo ? 'bi-tag-fill' : 'bi-patch-check'), text: isTrip ? 'Đặt phòng an toàn' : (isPromo ? 'Ưu đãi YÊN' : 'Ví Hoàn Tiền') }
+      ],
+      details: n.details && n.details.length > 0 ? n.details : [
+        { label: 'Tiêu đề:', val: n.title },
+        { label: 'Nội dung:', val: n.message || n.desc },
+        { label: 'Thời gian:', val: n.createdAt ? new Date(n.createdAt).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' }) : 'Hôm nay' }
+      ],
+      mainActionText: isTrip ? 'Xem đơn đặt phòng' : (isPromo ? 'Sử dụng ngay' : (isPayment ? 'Xem Ví hoàn tiền' : 'Xem chi tiết')),
+      mainActionUrl: n.link || (isTrip ? '/bookings' : (isPromo ? '/search' : (isPayment ? '/personal-account' : '/notifications')))
+    };
+  };
 
   useEffect(() => {
-    if (!currentUser?.id) return;
-    const loadNotifications = () => fetch(`${apiBase}/notifications`, { headers })
-      .then((r) => r.ok ? r.json() : [])
-      .then((data) => setNotifications(Array.isArray(data) ? data.map(mapNotification) : []))
-      .catch(() => setNotifications([]));
+    const loadNotifications = () => {
+      fetch(`${apiBase}/notifications`, { headers })
+        .then((r) => r.ok ? r.json() : [])
+        .then((data) => {
+          if (Array.isArray(data) && data.length > 0) {
+            setNotifications(data.map(mapNotification));
+          } else {
+            setNotifications(DEFAULT_NOTIFICATIONS);
+          }
+        })
+        .catch(() => {
+          setNotifications(DEFAULT_NOTIFICATIONS);
+        });
+    };
+
     loadNotifications();
-    const socketBase = (import.meta.env.VITE_WS_BASE_URL || apiBase.replace(/^http/, 'ws').replace(/\/api$/, ''));
-    const socket = new WebSocket(`${socketBase}/ws/notifications?token=${encodeURIComponent(currentUser.token || '')}`);
-    socket.onmessage = () => loadNotifications();
-    return () => socket.close();
+
+    if (currentUser?.id) {
+      const socketBase = (import.meta.env.VITE_WS_BASE_URL || apiBase.replace(/^http/, 'ws').replace(/\/api$/, ''));
+      try {
+        const socket = new WebSocket(`${socketBase}/ws/notifications?token=${encodeURIComponent(currentUser.token || '')}`);
+        socket.onmessage = () => loadNotifications();
+        return () => socket.close();
+      } catch (e) {}
+    }
   }, [currentUser?.id]);
 
   const triggerToast = (msg) => {
