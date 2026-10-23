@@ -142,7 +142,7 @@ export default function Notifications() {
     category: ['BOOKING', 'TRIP'].includes((n.type || '').toUpperCase()) ? 'trip' : (n.type || 'system').toLowerCase(),
     desc: n.message,
     unread: !n.read,
-    timestamp: n.createdAt ? new Date(n.createdAt).toLocaleString('vi-VN') : '',
+    timestamp: n.createdAt ? new Date(n.createdAt).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' }) : '',
     iconClass: (n.type || 'system').toLowerCase(),
     icon: 'bi-bell-fill',
     meta: [], details: [], mainActionUrl: n.link || '/notifications'

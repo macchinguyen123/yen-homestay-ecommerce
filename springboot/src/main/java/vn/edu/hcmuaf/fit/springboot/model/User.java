@@ -83,7 +83,7 @@ public class User {
     @Builder.Default
     private Boolean active = true;
 
-    @Column(name = "created_at")
+    @Column(name = "created_at", columnDefinition = "TIMESTAMP WITH TIME ZONE")
     private LocalDateTime createdAt;
 
     @PrePersist

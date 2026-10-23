@@ -30,6 +30,10 @@ export const chatService = {
   list: () => call('/conversations'),
   open: (homestayId) => call('/conversations', { method: 'POST', body: JSON.stringify({ homestayId }) }),
   messages: (id) => call(`/conversations/${id}/messages`),
-  send: (id, content) => call(`/conversations/${id}/messages`, { method: 'POST', body: JSON.stringify({ content }) }),
+  send: (id, content, imageUrl = null) =>
+    call(`/conversations/${id}/messages`, {
+      method: 'POST',
+      body: JSON.stringify(typeof content === 'object' ? content : { content, imageUrl })
+    }),
   read: (id) => call(`/conversations/${id}/read`, { method: 'PATCH' })
 };

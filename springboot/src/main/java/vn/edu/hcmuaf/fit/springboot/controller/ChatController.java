@@ -39,11 +39,15 @@ public class ChatController {
                     "conversation_id BIGINT NOT NULL REFERENCES chat_conversations(conversation_id) ON DELETE CASCADE, " +
                     "sender_id BIGINT NOT NULL, " +
                     "content TEXT NOT NULL, " +
+                    "image_url TEXT, " +
                     "is_read BOOLEAN DEFAULT FALSE, " +
                     "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP" +
                     ")");
 
             jdbc.execute("CREATE INDEX IF NOT EXISTS idx_chat_messages_conv ON chat_messages(conversation_id)");
+            try {
+                jdbc.execute("ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS image_url TEXT");
+            } catch (Exception ignored) {}
         } catch (Exception e) {
             log.warn("Lưu ý cấu trúc bảng chat: {}", e.getMessage());
         }
@@ -184,7 +188,7 @@ public class ChatController {
         long u = me(a, xUserId);
         conversation(id, u);
         return jdbc.queryForList(
-                "SELECT m.message_id, m.conversation_id, m.sender_id, m.content, m.is_read, " +
+                "SELECT m.message_id, m.conversation_id, m.sender_id, m.content, m.image_url, m.is_read, " +
                 "TO_CHAR((m.created_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Ho_Chi_Minh', 'YYYY-MM-DD\"T\"HH24:MI:SS+07:00') AS created_at, " +
                 "u.full_name AS sender_name, u.avatar AS sender_avatar " +
                 "FROM chat_messages m " +
@@ -203,13 +207,25 @@ public class ChatController {
         long u = me(a, xUserId);
         conversation(id, u);
         String text = String.valueOf(body.getOrDefault("content", "")).trim();
-        if (text.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Nội dung không được để trống");
+        String imageUrl = body.get("imageUrl") != null ? String.valueOf(body.get("imageUrl")).trim() : null;
+        if (imageUrl != null && imageUrl.isEmpty()) imageUrl = null;
+
+        if (text.isEmpty() && imageUrl == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Nội dung hoặc hình ảnh không được để trống");
         }
-        jdbc.update("INSERT INTO chat_messages(conversation_id, sender_id, content, created_at) VALUES(?,?,?, CURRENT_TIMESTAMP)", id, u, text);
-        jdbc.update("UPDATE chat_conversations SET last_message=?, last_message_at=CURRENT_TIMESTAMP WHERE conversation_id=?", text, id);
+
+        String lastMsg = !text.isEmpty() ? text : "[Hình ảnh]";
+
+        try {
+            jdbc.update("INSERT INTO chat_messages(conversation_id, sender_id, content, image_url, created_at) VALUES(?,?,?,?, CURRENT_TIMESTAMP)", id, u, text, imageUrl);
+        } catch (Exception ex) {
+            jdbc.update("INSERT INTO chat_messages(conversation_id, sender_id, content, created_at) VALUES(?,?,?, CURRENT_TIMESTAMP)", id, u, !text.isEmpty() ? text : (imageUrl != null ? "[Hình ảnh]" : ""));
+        }
+
+        jdbc.update("UPDATE chat_conversations SET last_message=?, last_message_at=CURRENT_TIMESTAMP WHERE conversation_id=?", lastMsg, id);
+        
         List<Map<String, Object>> last = jdbc.queryForList(
-                "SELECT m.message_id, m.conversation_id, m.sender_id, m.content, m.is_read, " +
+                "SELECT m.message_id, m.conversation_id, m.sender_id, m.content, m.image_url, m.is_read, " +
                 "TO_CHAR((m.created_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Ho_Chi_Minh', 'YYYY-MM-DD\"T\"HH24:MI:SS+07:00') AS created_at, " +
                 "u.full_name AS sender_name, u.avatar AS sender_avatar " +
                 "FROM chat_messages m " +
