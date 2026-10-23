@@ -7,6 +7,8 @@ import org.springframework.transaction.annotation.Transactional;
 import vn.edu.hcmuaf.fit.springboot.dto.ViewedHistoryDTO;
 import vn.edu.hcmuaf.fit.springboot.model.Homestay;
 import vn.edu.hcmuaf.fit.springboot.model.ViewedHistory;
+import vn.edu.hcmuaf.fit.springboot.model.HomestayImage;
+import vn.edu.hcmuaf.fit.springboot.repository.HomestayImageRepository;
 import vn.edu.hcmuaf.fit.springboot.repository.HomestayRepository;
 import vn.edu.hcmuaf.fit.springboot.repository.ViewedHistoryRepository;
 import vn.edu.hcmuaf.fit.springboot.repository.WishlistRepository;
@@ -24,7 +26,9 @@ public class ViewedHistoryService {
 
     private final ViewedHistoryRepository viewedHistoryRepository;
     private final HomestayRepository homestayRepository;
+    private final HomestayImageRepository homestayImageRepository;
     private final WishlistRepository wishlistRepository;
+    private final org.springframework.jdbc.core.JdbcTemplate jdbc;
 
     // Preset metadata lookup for rich details
     private static final Map<Long, ViewedHistoryDTO> PRESET_HOMESTAYS = new HashMap<>();
@@ -113,24 +117,25 @@ public class ViewedHistoryService {
             throw new IllegalArgumentException("User ID và Homestay ID không được để trống");
         }
 
-        Optional<ViewedHistory> existing = viewedHistoryRepository.findByUserIdAndHomestayId(userId, homestayId);
-        ViewedHistory history;
-
-        if (existing.isPresent()) {
-            history = existing.get();
-            history.setViewedAt(LocalDateTime.now());
-            log.info("Cập nhật thời gian xem sản phẩm cho User ID: {}, Homestay ID: {}", userId, homestayId);
-        } else {
-            history = ViewedHistory.builder()
-                    .userId(userId)
-                    .homestayId(homestayId)
-                    .viewedAt(LocalDateTime.now())
-                    .build();
-            log.info("Tạo mới lịch sử xem sản phẩm cho User ID: {}, Homestay ID: {}", userId, homestayId);
+        try {
+            jdbc.update(
+                "INSERT INTO viewed_histories (user_id, homestay_id, viewed_at) VALUES (?, ?, CURRENT_TIMESTAMP) " +
+                "ON CONFLICT (user_id, homestay_id) DO UPDATE SET viewed_at = CURRENT_TIMESTAMP",
+                userId, homestayId);
+            Optional<ViewedHistory> updated = viewedHistoryRepository.findByUserIdAndHomestayId(userId, homestayId);
+            if (updated.isPresent()) {
+                return mapToDTO(updated.get(), userId);
+            }
+        } catch (Exception e) {
+            log.warn("Lỗi khi ghi nhận lịch sử xem (upsert): {}", e.getMessage());
         }
 
-        ViewedHistory saved = viewedHistoryRepository.save(history);
-        return mapToDTO(saved, userId);
+        ViewedHistory fallback = ViewedHistory.builder()
+                .userId(userId)
+                .homestayId(homestayId)
+                .viewedAt(LocalDateTime.now())
+                .build();
+        return mapToDTO(fallback, userId);
     }
 
     /**
@@ -167,48 +172,52 @@ public class ViewedHistoryService {
 
     private ViewedHistoryDTO mapToDTO(ViewedHistory entity, Long userId) {
         Long hId = entity.getHomestayId();
-        ViewedHistoryDTO preset = PRESET_HOMESTAYS.get(hId);
 
-        String name = preset != null ? preset.getName() : "Homestay #" + hId;
-        String location = preset != null ? preset.getLocation() : "Việt Nam";
-        String rating = preset != null ? preset.getRating() : "4.95";
-        String reviews = preset != null ? preset.getReviews() : "120";
-        String specs = preset != null ? preset.getSpecs() : "2 phòng ngủ • 4 khách";
-        String amenities = preset != null ? preset.getAmenities() : "Đầy đủ tiện nghi · WiFi miễn phí";
-        String price = preset != null ? preset.getPrice() : "1.200.000đ";
-        String img = preset != null ? preset.getImg() : "https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=600&q=80";
+        Homestay h = entity.getHomestay();
+        if (h == null) {
+            h = homestayRepository.findById(hId).orElse(null);
+        }
 
-        // Try override from Homestay database table if present
-        if (entity.getHomestay() != null) {
-            Homestay h = entity.getHomestay();
-            if (h.getName() != null) name = h.getName();
-            if (h.getCity() != null) location = h.getCity();
-            if (h.getRating() != null) rating = String.format(Locale.US, "%.2f", h.getRating());
-            if (h.getBasePrice() != null) {
-                DecimalFormat df = new DecimalFormat("#,###");
-                price = df.format(h.getBasePrice()) + "đ";
-            }
-            if (h.getAmenities() != null && !h.getAmenities().isEmpty()) {
-                amenities = h.getAmenities();
-            }
-        } else {
-            Optional<Homestay> homestayOpt = homestayRepository.findById(hId);
-            if (homestayOpt.isPresent()) {
-                Homestay h = homestayOpt.get();
-                if (h.getName() != null) name = h.getName();
-                if (h.getCity() != null) location = h.getCity();
-                if (h.getRating() != null) rating = String.format(Locale.US, "%.2f", h.getRating());
-                if (h.getBasePrice() != null) {
-                    DecimalFormat df = new DecimalFormat("#,###");
-                    price = df.format(h.getBasePrice()) + "đ";
+        String name = (h != null && h.getName() != null) ? h.getName() : "Homestay #" + hId;
+        String location = (h != null && h.getCity() != null) ? h.getCity() : ((h != null && h.getAddress() != null) ? h.getAddress() : "Việt Nam");
+        String rating = (h != null && h.getRating() != null) ? String.format(Locale.US, "%.1f", h.getRating()) : "5.0";
+        String reviews = "120";
+
+        String numRoomsStr = (h != null && h.getNumRooms() != null) ? h.getNumRooms() + " phòng ngủ" : "2 phòng ngủ";
+        String maxGuestsStr = (h != null && h.getMaxGuests() != null) ? h.getMaxGuests() + " khách" : "4 khách";
+        String specs = numRoomsStr + " • " + maxGuestsStr;
+
+        String amenities = (h != null && h.getAmenities() != null && !h.getAmenities().isEmpty())
+                ? h.getAmenities()
+                : "Đầy đủ tiện nghi · WiFi miễn phí";
+
+        DecimalFormat df = new DecimalFormat("#,###");
+        String price = (h != null && h.getBasePrice() != null)
+                ? df.format(h.getBasePrice()) + "đ"
+                : "1.200.000đ";
+
+        // Query real image from homestay_images table
+        String img = "https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=600&q=80";
+        try {
+            List<HomestayImage> imgs = homestayImageRepository.findByHomestayId(hId);
+            if (imgs != null && !imgs.isEmpty()) {
+                for (HomestayImage hi : imgs) {
+                    if (hi.getImageUrl() != null && !hi.getImageUrl().isBlank()) {
+                        img = hi.getImageUrl();
+                        break;
+                    }
                 }
             }
+        } catch (Exception e) {
+            log.warn("Lỗi khi tải ảnh cho homestay {}: {}", hId, e.getMessage());
         }
 
         // Wishlist status check
         boolean isFav = false;
         if (userId != null) {
-            isFav = wishlistRepository.existsByTouristIdAndHomestayId(userId, hId);
+            try {
+                isFav = wishlistRepository.existsByTouristIdAndHomestayId(userId, hId);
+            } catch (Exception ignored) {}
         }
 
         return ViewedHistoryDTO.builder()

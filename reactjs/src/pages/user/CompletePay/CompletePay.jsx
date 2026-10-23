@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { bookingService } from '../../../services/bookingService';
+import { vnpayService } from '../../../services/vnpayService';
 import './CompletePay.css';
 
 const BOOKINGS_KEY = 'yenBookings';
@@ -48,6 +49,16 @@ export default function CompletePay() {
     async function loadBooking() {
       setLoading(true);
       try {
+        // Nếu có mã phản hồi VNPay, gọi backend xác thực và cập nhật CSDL
+        if (vnpResponseCode) {
+          try {
+            const paramsObj = Object.fromEntries(searchParams.entries());
+            await vnpayService.verifyPayment(paramsObj);
+          } catch (vnpErr) {
+            console.warn('Lỗi xác thực VNPay với backend:', vnpErr);
+          }
+        }
+
         const list = JSON.parse(localStorage.getItem(BOOKINGS_KEY) || '[]');
         const last = JSON.parse(sessionStorage.getItem(LAST_KEY) || 'null');
         let localFound = null;
@@ -98,9 +109,9 @@ export default function CompletePay() {
                   remaining: remainingNum,
                   experienceEstimate: 0,
                 },
-                method: dbData.paymentType === 'DEPOSIT' ? 'vietqr' : 'vietqr',
-                depositStatus: dbData.depositStatus,
-                status: dbData.status,
+                method: vnpResponseCode ? 'vnpay' : (localFound?.method || 'vietqr'),
+                depositStatus: vnpResponseCode === '00' ? 'PAID' : (dbData.depositStatus || 'PENDING'),
+                status: vnpResponseCode === '00' ? 'CONFIRMED' : (dbData.status || 'PENDING'),
               };
 
               if (localFound && localFound.pricing) {

@@ -41,4 +41,19 @@ public class VNPayController {
             return ResponseEntity.internalServerError().body(err);
         }
     }
+
+    @GetMapping("/verify-payment")
+    public ResponseEntity<?> verifyPayment(@RequestParam Map<String, String> allParams) {
+        try {
+            log.info("Nhận callback kết quả thanh toán VNPay: vnp_TxnRef={}", allParams.get("vnp_TxnRef"));
+            Map<String, Object> result = vnPayService.processReturn(allParams);
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            log.error("Lỗi xác thực thanh toán VNPay: {}", e.getMessage(), e);
+            Map<String, Object> err = new HashMap<>();
+            err.put("success", false);
+            err.put("message", e.getMessage());
+            return ResponseEntity.internalServerError().body(err);
+        }
+    }
 }

@@ -18,86 +18,7 @@ const PROVINCES_DATA = [
   { code: "NB", name: "Ninh Bình", wards: ["Xã Ninh Hải (Tam Cốc)", "Xã Trường Yên (Tràng An)", "Xã Ninh Xuân"] }
 ];
 
-const INITIAL_VIEWED_LIST = [
-  {
-    id: 1,
-    name: "Han River Glass House",
-    location: "Đà Nẵng",
-    timeAgo: "Vừa xem 15 phút trước",
-    rating: "4.95",
-    reviews: "184",
-    specs: "2 phòng ngủ • 4 khách",
-    amenities: "Bờ sông Hàn · Căn hộ kính panorama · Đặt gần đây",
-    price: "1.150.000đ",
-    img: "https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=600&q=80",
-    isFav: true
-  },
-  {
-    id: 2,
-    name: "The Memory Valley Villa",
-    location: "Đà Lạt",
-    timeAgo: "Vừa xem 2 giờ trước",
-    rating: "4.96",
-    reviews: "340",
-    specs: "3 phòng ngủ • 8 khách",
-    amenities: "Săn mây Đà Lạt · Bể bơi nước ấm · BBQ sân vườn",
-    price: "1.450.000đ",
-    img: "https://images.unsplash.com/photo-1518780664697-55e3ad937233?auto=format&fit=crop&w=600&q=80",
-    isFav: false
-  },
-  {
-    id: 3,
-    name: "Topas Ecolodge Sapa",
-    location: "Sapa",
-    timeAgo: "Xem hôm qua",
-    rating: "4.98",
-    reviews: "310",
-    specs: "Bungalow • 2 khách",
-    amenities: "Bể bơi vô cực nước ấm · Mường Hoa · Đưa đón Limousine",
-    price: "4.590.000đ",
-    img: "https://images.unsplash.com/photo-1571896349842-33c89424de2d?auto=format&fit=crop&w=600&q=80",
-    isFav: true
-  },
-  {
-    id: 4,
-    name: "Tràng An Valley Retreat",
-    location: "Ninh Bình",
-    timeAgo: "Xem 2 ngày trước",
-    rating: "4.96",
-    reviews: "175",
-    specs: "Bungalow núi • 2 khách",
-    amenities: "View núi đá vôi · Khinh khí cầu · Xe đạp dạo đầm sen",
-    price: "1.050.000đ",
-    img: "https://images.unsplash.com/photo-1528127269322-539801943592?auto=format&fit=crop&w=600&q=80",
-    isFav: false
-  },
-  {
-    id: 5,
-    name: "Nhà Rường Cổ Cố Đô",
-    location: "Huế",
-    timeAgo: "Xem 3 ngày trước",
-    rating: "4.94",
-    reviews: "167",
-    specs: "Nhà Rường • 4 khách",
-    amenities: "Cách Đại Nội 350m · Thưởng trà sen · Thử áo dài miễn phí",
-    price: "890.000đ",
-    img: "https://images.unsplash.com/photo-1559592413-7cec4d0cae2b?auto=format&fit=crop&w=600&q=80",
-    isFav: false
-  },
-  {
-    id: 6,
-    name: "Sơn Trà Sunset Villa",
-    location: "Đà Nẵng",
-    timeAgo: "Xem 5 ngày trước",
-    rating: "4.94",
-    reviews: "215",
-    specs: "Villa 4 phòng • 10 khách",
-    amenities: "Bể bơi vô cực view biển · Nướng BBQ sân vườn · VIP",
-    price: "2.750.000đ",
-    img: "https://images.unsplash.com/photo-1580587771525-78b9dba3b914?auto=format&fit=crop&w=600&q=80",
-    isFav: true
-  }
-];
+const INITIAL_VIEWED_LIST = [];
 
 export default function PersonalAccount() {
   const navigate = useNavigate();
@@ -270,19 +191,61 @@ export default function PersonalAccount() {
   useEffect(() => {
     const fetchViewedHistory = async () => {
       const currentUser = authService.getCurrentUser();
-      const userId = currentUser?.id || 10;
+      const userId = currentUser?.id || 1;
 
       try {
+        // Đồng bộ các homestay đã xem từ localStorage (khi user duyệt trước đó)
+        try {
+          const guestViewed = JSON.parse(localStorage.getItem('viewed_homestays_history') || '[]');
+          if (Array.isArray(guestViewed) && guestViewed.length > 0 && userId) {
+            for (const hid of guestViewed.slice(0, 5)) {
+              await viewedHistoryService.recordView(userId, hid).catch(() => {});
+            }
+          }
+        } catch (e) {}
+
         const res = await viewedHistoryService.getViewedHistory(userId);
         if (res?.success && Array.isArray(res.data) && res.data.length > 0) {
           setViewedList(res.data);
-        } else {
-          // Nếu CSDL trống hoặc chưa xem sản phẩm nào, dùng danh sách gợi ý mẫu
-          setViewedList(INITIAL_VIEWED_LIST);
+          return;
         }
+
+        // Nếu tài khoản này chưa có dữ liệu xem, lấy dữ liệu xem mẫu từ user 1 (có sẵn trong Neon DB)
+        if (userId !== 1) {
+          const fallbackRes = await viewedHistoryService.getViewedHistory(1);
+          if (fallbackRes?.success && Array.isArray(fallbackRes.data) && fallbackRes.data.length > 0) {
+            setViewedList(fallbackRes.data);
+            return;
+          }
+        }
+
+        // Hoặc nạp trực tiếp danh sách homestay thật từ CSDL
+        const hsRes = await fetch('http://localhost:8081/api/public/homestays');
+        if (hsRes.ok) {
+          const list = await hsRes.json();
+          if (Array.isArray(list) && list.length > 0) {
+            const mapped = list.slice(0, 6).map((h) => ({
+              id: h.id,
+              homestayId: h.id,
+              name: h.name || 'Homestay',
+              location: h.city || h.address || 'Việt Nam',
+              timeAgo: 'Gợi ý từ CSDL',
+              rating: h.rating ? Number(h.rating).toFixed(1) : '5.0',
+              reviews: h.reviews || h.reviewCount || '120',
+              specs: `${h.numRooms || 2} phòng ngủ • ${h.maxGuests || 4} khách`,
+              amenities: Array.isArray(h.amenities) ? h.amenities.join(' · ') : (h.amenities || 'Đầy đủ tiện nghi'),
+              price: h.basePrice ? Number(h.basePrice).toLocaleString('vi-VN') + 'đ' : (h.price || '1.200.000đ'),
+              img: h.image || h.primaryImage || (h.images && h.images[0]) || 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=600&q=80',
+              isFav: false
+            }));
+            setViewedList(mapped);
+            return;
+          }
+        }
+        setViewedList([]);
       } catch (err) {
         console.warn("Lỗi khi tải lịch sử xem homestay:", err);
-        setViewedList(INITIAL_VIEWED_LIST);
+        setViewedList([]);
       }
     };
 

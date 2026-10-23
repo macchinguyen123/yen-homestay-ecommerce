@@ -71,13 +71,24 @@ export const bookingService = {
    */
   async createBooking(bookingData) {
     try {
+      const user = JSON.parse(localStorage.getItem('user') || 'null');
+      const userId = user?.id || user?.userId || user?.user_id || sessionStorage.getItem('userId') || bookingData.touristId || 1;
+      const headers = {
+        'Content-Type': 'application/json',
+      };
+      if (user?.token) {
+        headers['Authorization'] = `Bearer ${user.token}`;
+      }
+      if (userId) {
+        headers['X-User-Id'] = String(userId);
+      }
       const response = await fetch(API_BASE_URL, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${JSON.parse(localStorage.getItem('user') || 'null')?.token || ''}`,
-        },
-        body: JSON.stringify(bookingData),
+        headers,
+        body: JSON.stringify({
+          ...bookingData,
+          touristId: Number(userId),
+        }),
       });
       return await response.json();
     } catch (error) {
@@ -94,9 +105,17 @@ export const bookingService = {
   async cancelBooking(bookingId, touristId) {
     try {
       const currentUser = JSON.parse(localStorage.getItem('user') || 'null');
+      const userId = touristId || currentUser?.id || currentUser?.userId || currentUser?.user_id || sessionStorage.getItem('userId') || 1;
+      const headers = {};
+      if (currentUser?.token) {
+        headers['Authorization'] = `Bearer ${currentUser.token}`;
+      }
+      if (userId) {
+        headers['X-User-Id'] = String(userId);
+      }
       const response = await fetch(`${API_BASE_URL}/${bookingId}/cancel`, {
         method: 'PUT',
-        headers: { Authorization: `Bearer ${currentUser?.token || ''}` },
+        headers,
       });
       return await response.json();
     } catch (error) {
