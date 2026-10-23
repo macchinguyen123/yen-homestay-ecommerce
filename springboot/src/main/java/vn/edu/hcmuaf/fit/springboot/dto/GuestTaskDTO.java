@@ -13,5 +13,6 @@ public class GuestTaskDTO {
     private String title;
     private String description;
     private String rewardNote;
+    private String icon;
     private String status;
 }

@@ -22,6 +22,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -38,7 +39,6 @@ public class BookingService {
     private final NotificationService notificationService;
     private final UserRepository userRepository;
     private final ReviewSentimentService reviewSentimentService;
-    private final CashbackWalletService cashbackWalletService;
 
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
     private static final Locale VI_LOCALE = new Locale("vi", "VN");
@@ -210,6 +210,22 @@ public class BookingService {
         if (req.getTouristId() == null || req.getHomestayId() == null || req.getCheckInDate() == null || req.getCheckOutDate() == null) {
             throw new IllegalArgumentException("Thiếu người đặt, homestay hoặc ngày nhận/trả phòng.");
         }
+        if (!req.getCheckOutDate().isAfter(req.getCheckInDate())) {
+            throw new IllegalArgumentException("Ngày trả phòng phải sau ngày nhận phòng ít nhất 1 đêm.");
+        }
+
+        // KIỂM TRA CHỐNG TRÙNG LỊCH ĐẶT PHÒNG (DOUBLE-BOOKING)
+        if (req.getRoomId() != null) {
+            List<Booking> conflicts = bookingRepository.findConflictsByRoom(
+                    req.getRoomId(), req.getCheckInDate(), req.getCheckOutDate());
+            if (!conflicts.isEmpty()) {
+                Booking firstConflict = conflicts.get(0);
+                String startStr = firstConflict.getCheckInDate() != null ? firstConflict.getCheckInDate().format(DATE_FMT) : "N/A";
+                String endStr = firstConflict.getCheckOutDate() != null ? firstConflict.getCheckOutDate().format(DATE_FMT) : "N/A";
+                throw new IllegalArgumentException("Phòng này đã có khách đặt trong khoảng thời gian từ " + startStr + " đến " + endStr + ". Vui lòng chọn khoảng thời gian khác hoặc chọn phòng khác.");
+            }
+        }
+
         Homestay targetHomestay = homestayRepository.findById(req.getHomestayId())
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy homestay được đặt."));
         String code = "YEN-" + LocalDate.now().getYear() + "-" + (1000 + new SecureRandom().nextInt(9000));
@@ -279,15 +295,6 @@ public class BookingService {
                     .paidAt(LocalDateTime.now())
                     .build();
             paymentRepository.save(payment);
-        }
-
-        // Tự động tích lũy 5% vào Ví hoàn tiền YÊN nếu đơn phòng xác nhận thành công
-        if ("CONFIRMED".equalsIgnoreCase(savedBooking.getStatus()) || "PAID".equalsIgnoreCase(savedBooking.getDepositStatus())) {
-            try {
-                cashbackWalletService.creditCashbackForBooking(savedBooking);
-            } catch (Exception ce) {
-                log.warn("Lỗi tích điểm cho đơn đặt phòng {}: {}", savedBooking.getBookingCode(), ce.getMessage());
-            }
         }
 
         return savedBooking;
@@ -772,5 +779,46 @@ public class BookingService {
                 .statusRaw(raw.status())
                 .createdAt(raw.createdAt())
                 .build();
+    }
+
+    /**
+     * Lấy danh sách các khoảng ngày đã kín lịch của một phòng
+     */
+    public List<Map<String, Object>> getRoomBusyDates(Long roomId) {
+        if (roomId == null) return List.of();
+        LocalDate today = LocalDate.now();
+        List<Booking> list = bookingRepository.findBusyBookingsByRoom(roomId, today);
+        DateTimeFormatter dtf = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+        return list.stream().map(b -> {
+            Map<String, Object> item = new HashMap<>();
+            item.put("bookingId", b.getId());
+            item.put("checkInDate", b.getCheckInDate() != null ? b.getCheckInDate().format(dtf) : null);
+            item.put("checkOutDate", b.getCheckOutDate() != null ? b.getCheckOutDate().format(dtf) : null);
+            item.put("displayRange", (b.getCheckInDate() != null ? b.getCheckInDate().format(DATE_FMT) : "") 
+                    + " - " + (b.getCheckOutDate() != null ? b.getCheckOutDate().format(DATE_FMT) : ""));
+            item.put("status", b.getStatus());
+            return item;
+        }).collect(Collectors.toList());
+    }
+
+    /**
+     * Lấy danh sách các khoảng ngày đã kín lịch của cả homestay
+     */
+    public List<Map<String, Object>> getHomestayBusyDates(Long homestayId) {
+        if (homestayId == null) return List.of();
+        LocalDate today = LocalDate.now();
+        List<Booking> list = bookingRepository.findBusyBookingsByHomestay(homestayId, today);
+        DateTimeFormatter dtf = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+        return list.stream().map(b -> {
+            Map<String, Object> item = new HashMap<>();
+            item.put("bookingId", b.getId());
+            item.put("roomId", b.getRoomId());
+            item.put("checkInDate", b.getCheckInDate() != null ? b.getCheckInDate().format(dtf) : null);
+            item.put("checkOutDate", b.getCheckOutDate() != null ? b.getCheckOutDate().format(dtf) : null);
+            item.put("displayRange", (b.getCheckInDate() != null ? b.getCheckInDate().format(DATE_FMT) : "") 
+                    + " - " + (b.getCheckOutDate() != null ? b.getCheckOutDate().format(DATE_FMT) : ""));
+            item.put("status", b.getStatus());
+            return item;
+        }).collect(Collectors.toList());
     }
 }

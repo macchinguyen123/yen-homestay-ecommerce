@@ -59,9 +59,7 @@ export const SAMPLE_HOMESTAYS = [
         primaryImage: '/images/categories/10_kham_pha_lang_que.jpg',
         gallery: ['/images/categories/10_kham_pha_lang_que.jpg', '/images/categories/7_thien_nhien_sinh_thai.jpg'],
         amenities: ['Máy sưởi dầu', 'Ban công ngắm rừng', 'Phòng tắm bồn ngâm', 'Wifi tốc độ cao'],
-        specs: { area: '48m²', guests: 4, beds: '2 giường Queen' },
-        rating: 4.95,
-        reviewCount: 36
+        specs: { area: '48m²', guests: 4, beds: '2 giường Queen' }
       }
     ]
   },

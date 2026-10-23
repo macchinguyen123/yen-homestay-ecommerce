@@ -3,6 +3,7 @@ package vn.edu.hcmuaf.fit.springboot.controller;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import vn.edu.hcmuaf.fit.springboot.dto.GuestTaskDTO;
 import vn.edu.hcmuaf.fit.springboot.dto.HomestayDTO;
 import vn.edu.hcmuaf.fit.springboot.dto.RoomDTO;
 import vn.edu.hcmuaf.fit.springboot.service.RoomService;
@@ -48,5 +49,10 @@ public class HomestayController {
     @GetMapping("/{id}/rooms")
     public ResponseEntity<List<RoomDTO>> getRoomsByHomestay(@PathVariable Long id) {
         return ResponseEntity.ok(roomService.getRoomsByHomestayId(id));
+    }
+
+    @GetMapping("/{id}/missions")
+    public ResponseEntity<List<GuestTaskDTO>> getHomestayMissions(@PathVariable Long id) {
+        return ResponseEntity.ok(roomService.getTasksByHomestayId(id));
     }
 }

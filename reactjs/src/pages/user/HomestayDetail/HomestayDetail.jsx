@@ -8,6 +8,7 @@ import { homestayService } from '../../../services/homestayService';
 import { reviewService } from '../../../services/reviewService';
 import { ownerService } from '../../../services/ownerService';
 import { chatService } from '../../../services/chatService';
+import { bookingService } from '../../../services/bookingService';
 import { SAMPLE_HOMESTAYS } from '../../../data/sampleHomestays';
 import {
   roomsData, galleryImages, amenitiesData, AMENITY_GROUPS,
@@ -154,6 +155,26 @@ function Lightbox({ images, index, onClose, onNav }) {
   );
 }
 
+// Dữ liệu nhiệm vụ mặc định gắn kết trải nghiệm văn hóa & bảo vệ môi trường
+const DEFAULT_GUEST_MISSIONS = [
+  {
+    id: 1,
+    title: 'Check-in & Đánh giá trải nghiệm',
+    description: 'Chụp lại khoảnh khắc đẹp tại homestay và viết đánh giá chân thực để nhận voucher ưu đãi cho chuyến đi tiếp theo.',
+    rewardNote: 'Voucher giảm 10% cho kỳ nghỉ sau',
+    icon: 'bi-camera-fill',
+    status: 'ACTIVE'
+  },
+  {
+    id: 2,
+    title: 'Bảo vệ môi trường & Tiết kiệm năng lượng',
+    description: 'Tắt điều hòa và các thiết bị điện khi ra khỏi phòng, cùng chung tay giữ gìn cảnh quan thiên nhiên trong lành.',
+    rewardNote: 'Tặng set trà thảo mộc / trái cây vườn chào mừng',
+    icon: 'bi-tree-fill',
+    status: 'ACTIVE'
+  }
+];
+
 /** Room Modal */
 function RoomModal({ room, homestay, homestayRating = '5.0', homestayReviewCount = 0, onClose, onScrollToReviews, showToast }) {
   const [galleryIdx, setGalleryIdx] = useState(0);
@@ -220,6 +241,90 @@ function RoomModal({ room, homestay, homestayRating = '5.0', homestayReviewCount
   const [checkout, setCheckout] = useState(toInputDate(defaultCheckout));
   const [guests, setGuests] = useState(Math.min(2, maxGuests));
   const [warning, setWarning] = useState('');
+  const [busyRanges, setBusyRanges] = useState([]);
+  const [loadingBusy, setLoadingBusy] = useState(false);
+  const [dateConflictMsg, setDateConflictMsg] = useState('');
+  const [missions, setMissions] = useState(() => {
+    if (Array.isArray(room?.tasks) && room.tasks.length > 0) return room.tasks;
+    if (Array.isArray(homestay?.tasks) && homestay.tasks.length > 0) return homestay.tasks;
+    return DEFAULT_GUEST_MISSIONS;
+  });
+
+  // Tải danh sách nhiệm vụ từ CSDL thật (Neon PostgreSQL) nếu có
+  useEffect(() => {
+    if (Array.isArray(room?.tasks) && room.tasks.length > 0) {
+      setMissions(room.tasks);
+      return;
+    }
+    if (Array.isArray(homestay?.tasks) && homestay.tasks.length > 0) {
+      setMissions(homestay.tasks);
+      return;
+    }
+
+    const targetHsId = homestay?.id || room?.homestayId;
+    if (targetHsId) {
+      let isMounted = true;
+      homestayService.getHomestayMissions(targetHsId)
+        .then((data) => {
+          if (isMounted && Array.isArray(data) && data.length > 0) {
+            setMissions(data);
+          }
+        })
+        .catch(() => {});
+      return () => { isMounted = false; };
+    }
+  }, [room, homestay]);
+
+  // Tải danh sách các ngày đã kín lịch của phòng từ CSDL thật
+  useEffect(() => {
+    if (!room?.id) return;
+    let isMounted = true;
+    setLoadingBusy(true);
+    bookingService.getRoomBusyDates(room.id)
+      .then((ranges) => {
+        if (isMounted) {
+          setBusyRanges(Array.isArray(ranges) ? ranges : []);
+          setLoadingBusy(false);
+        }
+      })
+      .catch(() => {
+        if (isMounted) setLoadingBusy(false);
+      });
+    return () => { isMounted = false; };
+  }, [room?.id]);
+
+  // Kiểm tra chống trùng lịch đặt phòng (Double-Booking Check)
+  useEffect(() => {
+    if (!checkin || !checkout || !busyRanges || busyRanges.length === 0) {
+      setDateConflictMsg('');
+      return;
+    }
+    const cin = new Date(checkin + 'T00:00:00');
+    const cout = new Date(checkout + 'T00:00:00');
+    if (cin >= cout) {
+      setDateConflictMsg('');
+      return;
+    }
+
+    const conflict = busyRanges.find((r) => {
+      if (!r.checkInDate || !r.checkOutDate) return false;
+      const bCin = new Date(r.checkInDate + 'T00:00:00');
+      const bCout = new Date(r.checkOutDate + 'T00:00:00');
+      // Quy tắc giao thoa khách sạn: cin < bCout VÀ cout > bCin
+      return cin < bCout && cout > bCin;
+    });
+
+    if (conflict) {
+      const padZero = (n) => String(n).padStart(2, '0');
+      const fmt = (dStr) => {
+        const d = new Date(dStr + 'T00:00:00');
+        return isNaN(d.getTime()) ? dStr : `${padZero(d.getDate())}/${padZero(d.getMonth() + 1)}/${d.getFullYear()}`;
+      };
+      setDateConflictMsg(`Phòng này đã có khách đặt từ ${fmt(conflict.checkInDate)} đến ${fmt(conflict.checkOutDate)}. Vui lòng chọn khoảng ngày khác!`);
+    } else {
+      setDateConflictMsg('');
+    }
+  }, [checkin, checkout, busyRanges]);
 
   const calcNights = useCallback(() => {
     if (!checkin || !checkout) return 2;
@@ -249,7 +354,14 @@ function RoomModal({ room, homestay, homestayRating = '5.0', homestayReviewCount
 
   const navigate = useNavigate();
   const handleBook = () => {
-    if (!nights || nights <= 0) { showToast('Vui lòng chọn lại ngày nhận - trả phòng hợp lệ!'); return; }
+    if (!nights || nights <= 0) { 
+      showToast('Vui lòng chọn lại ngày nhận - trả phòng hợp lệ!'); 
+      return; 
+    }
+    if (dateConflictMsg) {
+      showToast(dateConflictMsg);
+      return;
+    }
     showToast(`Đang chuyển đến trang xác nhận đặt "${roomName}"...`);
     onClose();
     const hId = homestay?.id || room.homestayId || '';
@@ -266,28 +378,6 @@ function RoomModal({ room, homestay, homestayRating = '5.0', homestayReviewCount
     });
   };
 
-  const roomTasks = useMemo(() => {
-    if (room?.tasks && room.tasks.length > 0) return room.tasks;
-    if (homestay?.tasks && homestay.tasks.length > 0) return homestay.tasks;
-    return [
-      {
-        id: 1,
-        title: 'Check-in xanh & Giữ gìn năng lượng',
-        description: 'Chụp hình kỷ niệm góc phòng yêu thích và tắt thiết bị điện khi ra ngoài.',
-        rewardNote: 'Tặng 1 ly trà thảo mộc hoặc cà phê nguyên chất mỗi buổi sáng',
-        icon: 'bi-cup-hot-fill',
-        status: 'OPEN'
-      },
-      {
-        id: 2,
-        title: 'Khám phá văn hoá bản địa & Đồi thông',
-        description: 'Tham gia đi dạo khám phá thiên nhiên hoặc trò chuyện văn hóa bản địa cùng chủ phòng.',
-        rewardNote: 'Giảm 10% dịch vụ thuê xe máy hoặc tặng gói quà đặc sản khi trả phòng',
-        icon: 'bi-tree-fill',
-        status: 'OPEN'
-      }
-    ];
-  }, [room?.tasks, homestay?.tasks]);
 
   return (
     <div className="room-modal-overlay active" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
@@ -341,9 +431,10 @@ function RoomModal({ room, homestay, homestayRating = '5.0', homestayReviewCount
                 </span>
                 <h2 className="room-modal-title">{roomName}</h2>
                 <div className="room-modal-meta-row">
-                  <span className="room-meta-rating">
+                  <span className="room-meta-rating-badge">
                     <i className="bi bi-star-fill text-warning me-1" />
-                    <b>{room.rating || homestayRating}</b> ({room.reviewCount || homestayReviewCount} đánh giá)
+                    <span className="room-rating-score">{homestayRating || '5.0'}</span>
+                    <span className="room-rating-count">({homestayReviewCount || 0} đánh giá)</span>
                   </span>
                   <span className="room-meta-sep">•</span>
                   <span className="room-meta-avail">
@@ -420,43 +511,48 @@ function RoomModal({ room, homestay, homestayRating = '5.0', homestayReviewCount
               </div>
             </div>
 
-            {/* Nhiệm vụ từ chủ phòng / host tasks */}
-            {roomTasks && roomTasks.length > 0 && (
-              <div className="room-tasks-section">
-                <div className="room-tasks-head">
-                  <span className="room-tasks-badge">
-                    <i className="bi bi-gift-fill" /> Nhiệm vụ từ chủ phòng
+            {/* ══ NHIỆM VỤ NHẬN THƯỞNG KHI LƯU TRÚ (GUEST MISSIONS - TỪ CSDL) ══ */}
+            {missions && missions.length > 0 && (
+              <div className="room-missions-modern-box">
+                <div className="missions-modern-header">
+                  <div className="missions-header-left">
+                    <span className="missions-pill-tag">
+                      <i className="bi bi-gift-fill me-1" /> Nhiệm vụ từ chủ phòng
+                    </span>
+                    <h4 className="missions-modern-title">Hoạt động trải nghiệm &amp; Nhận thưởng</h4>
+                  </div>
+                  <span className="missions-count-badge">
+                    <i className="bi bi-stars text-warning me-1" /> {missions.length} nhiệm vụ
                   </span>
-                  <h4 className="room-modal-sec-title" style={{ margin: '8px 0 4px', color: '#166534' }}>
-                    Nhiệm vụ nhận thưởng khi lưu trú
-                  </h4>
-                  <p className="room-tasks-intro">
-                    Hoàn thành các hoạt động trải nghiệm do chủ homestay thiết kế để nhận quà tặng đặc sản và voucher độc quyền!
-                  </p>
                 </div>
-                <div className="room-tasks-list">
-                  {roomTasks.map((t, idx) => (
-                    <div key={t.id || idx} className="room-task-card">
-                      <div className="room-task-icon-col">
-                        <div className="room-task-icon">
-                          <i className={`bi ${t.icon || 'bi-trophy-fill'}`} />
+                <p className="missions-modern-subtitle">
+                  Hoàn thành các hoạt động do chủ homestay thiết kế để nhận quà tặng đặc sản và voucher độc quyền khi lưu trú!
+                </p>
+
+                <div className="missions-cards-grid">
+                  {missions.map((m, idx) => (
+                    <div key={m.id || idx} className="mission-item-card">
+                      <div className="mission-card-top">
+                        <div className="mission-icon-box">
+                          <i className={`bi ${m.icon || (idx === 0 ? 'bi-camera-fill' : 'bi-tree-fill')}`} />
                         </div>
-                      </div>
-                      <div className="room-task-content">
-                        <div className="room-task-title-row">
-                          <span className="room-task-title">{t.title}</span>
-                          <span className="room-task-status-tag">
-                            <i className="bi bi-lightning-charge-fill" /> Đang mở
+                        <div className="mission-title-wrap">
+                          <h5 className="mission-name">{m.title}</h5>
+                          <span className="mission-active-badge">
+                            <span className="active-dot" /> Đang mở
                           </span>
                         </div>
-                        {t.description && <p className="room-task-desc">{t.description}</p>}
-                        {t.rewardNote && (
-                          <div className="room-task-reward">
-                            <i className="bi bi-gift-fill" />
-                            <span><strong>Phần thưởng:</strong> {t.rewardNote}</span>
-                          </div>
-                        )}
                       </div>
+                      {m.description && <p className="mission-desc-text">{m.description}</p>}
+                      {m.rewardNote && (
+                        <div className="mission-reward-callout">
+                          <i className="bi bi-gift-fill reward-icon" />
+                          <div className="reward-content">
+                            <span className="reward-label">Phần thưởng:</span>
+                            <strong className="reward-value">{m.rewardNote}</strong>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -469,14 +565,14 @@ function RoomModal({ room, homestay, homestayRating = '5.0', homestayReviewCount
                 <i className="bi bi-calendar3 me-1" /> Chọn thời gian lưu trú &amp; số khách
               </h4>
               <div className="room-booking-form-grid">
-                <div className="room-booking-field-modern">
+                <div className={`room-booking-field-modern ${dateConflictMsg ? 'has-conflict' : ''}`}>
                   <label htmlFor="roomCheckin"><i className="bi bi-calendar-check text-success me-1" /> Ngày nhận phòng</label>
                   <input type="date" id="roomCheckin" value={checkin} min={toInputDate(today)}
                     onChange={(e) => setCheckin(e.target.value)} />
                 </div>
-                <div className="room-booking-field-modern">
+                <div className={`room-booking-field-modern ${dateConflictMsg ? 'has-conflict' : ''}`}>
                   <label htmlFor="roomCheckout"><i className="bi bi-calendar-x text-success me-1" /> Ngày trả phòng</label>
-                  <input type="date" id="roomCheckout" value={checkout}
+                  <input type="date" id="roomCheckout" value={checkout} min={checkin || toInputDate(today)}
                     onChange={(e) => setCheckout(e.target.value)} />
                 </div>
                 <div className="room-booking-field-modern">
@@ -488,7 +584,36 @@ function RoomModal({ room, homestay, homestayRating = '5.0', homestayReviewCount
                   </select>
                 </div>
               </div>
-              {warning && <p className="room-booking-warning"><i className="bi bi-exclamation-triangle-fill me-1" />{warning}</p>}
+
+              {/* Danh sách ngày phòng đã kín lịch thực tế */}
+              {busyRanges.length > 0 && (
+                <div className="room-busy-dates-notice">
+                  <div className="busy-notice-header">
+                    <i className="bi bi-calendar-x-fill me-1" />
+                    <span>Lịch phòng đã kín ({busyRanges.length} đợt đặt):</span>
+                  </div>
+                  <div className="busy-tags-list">
+                    {busyRanges.map((r, i) => (
+                      <span key={i} className="busy-date-tag">
+                        🔒 {r.displayRange || `${r.checkInDate} → ${r.checkOutDate}`}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Thông báo cảnh báo trùng lịch nổi bật */}
+              {dateConflictMsg && (
+                <div className="room-booking-conflict-alert">
+                  <i className="bi bi-exclamation-octagon-fill" />
+                  <div>
+                    <strong>Phòng không khả dụng: </strong>
+                    <span>{dateConflictMsg}</span>
+                  </div>
+                </div>
+              )}
+
+              {warning && !dateConflictMsg && <p className="room-booking-warning"><i className="bi bi-exclamation-triangle-fill me-1" />{warning}</p>}
 
               {/* Bảng chi tiết giá rõ ràng */}
               <div className="room-price-breakdown-card">
@@ -549,8 +674,15 @@ function RoomModal({ room, homestay, homestayRating = '5.0', homestayReviewCount
               <span className="room-footer-nights">/ {nights} đêm · {guests} khách</span>
             </div>
           </div>
-          <button type="button" className="yn-btn yn-btn--primary yn-btn--lg yn-btn-modal-book" onClick={handleBook}>
-            <i className="bi bi-calendar-check-fill me-2" /> Đặt phòng ngay
+          <button 
+            type="button" 
+            className="yn-btn yn-btn--primary yn-btn--lg yn-btn-modal-book" 
+            onClick={handleBook}
+            disabled={!!dateConflictMsg || nights <= 0}
+            style={dateConflictMsg ? { opacity: 0.65, cursor: 'not-allowed', background: '#dc2626', borderColor: '#b91c1c' } : {}}
+          >
+            <i className={`bi ${dateConflictMsg ? 'bi-shield-slash' : 'bi-calendar-check-fill'} me-2`} /> 
+            {dateConflictMsg ? 'Trùng lịch - Vui lòng chọn ngày khác' : 'Đặt phòng ngay'}
           </button>
         </div>
       </div>
@@ -960,6 +1092,7 @@ export default function HomestayDetail() {
   // Trải nghiệm (dịch vụ) của homestay từ CSDL
   const [dbExperiences, setDbExperiences] = useState([]);
   const [loadingExperiences, setLoadingExperiences] = useState(false);
+  const [mainMissions, setMainMissions] = useState(DEFAULT_GUEST_MISSIONS);
 
   // Danh sách toàn bộ homestay thực tế từ CSDL để gợi ý homestay tương tự phong phú
   const [allHomestays, setAllHomestays] = useState([]);
@@ -1043,10 +1176,12 @@ export default function HomestayDetail() {
             reviewService.getReviewsByHomestayId(targetHsId),
             reviewService.getReviewStats(targetHsId),
             ownerService.getServices(targetHsId).catch(() => null),
-          ]).then(([revs, stats, services]) => {
+            homestayService.getHomestayMissions(targetHsId).catch(() => []),
+          ]).then(([revs, stats, services, missionsList]) => {
             if (isMounted) {
               if (revs && revs.length > 0) setDbReviews(revs);
               if (stats) setReviewStats(stats);
+              if (Array.isArray(missionsList) && missionsList.length > 0) setMainMissions(missionsList);
               if (Array.isArray(services) && services.length > 0) {
                 // Chuyển dịch vụ sang định dạng trải nghiệm hiển thị
                 const expMapped = services.map((svc) => {
@@ -1613,6 +1748,54 @@ export default function HomestayDetail() {
                 Hiển thị tất cả {(dbExperiences.length > 0 ? dbExperiences : experiencesData).length} trải nghiệm
               </button>
             </div>
+            <div className="detail-divider" />
+
+            {/* 4.4c NHIỆM VỤ NHẬN THƯỞNG KHI LƯU TRÚ (HIỂN THỊ TRỰC TIẾP TRÊN TRANG HOMESTAY) */}
+            {mainMissions && mainMissions.length > 0 && (
+              <div className="detail-block missions-main-block" id="missionsSection">
+                <div className="experience-head">
+                  <div>
+                    <h3 className="experience-title" style={{ color: '#065f46' }}>
+                      <i className="bi bi-gift-fill text-success" /> Nhiệm vụ nhận thưởng khi lưu trú
+                    </h3>
+                    <p className="experience-sub">
+                      Hoàn thành các hoạt động trải nghiệm do chủ homestay thiết kế để nhận quà tặng đặc sản và voucher độc quyền!
+                    </p>
+                  </div>
+                  <span className="missions-count-badge">
+                    <i className="bi bi-stars text-warning me-1" /> {mainMissions.length} nhiệm vụ sẵn có
+                  </span>
+                </div>
+
+                <div className="missions-cards-grid">
+                  {mainMissions.map((m, idx) => (
+                    <div key={m.id || idx} className="mission-item-card">
+                      <div className="mission-card-top">
+                        <div className="mission-icon-box">
+                          <i className={`bi ${m.icon || (idx === 0 ? 'bi-camera-fill' : 'bi-tree-fill')}`} />
+                        </div>
+                        <div className="mission-title-wrap">
+                          <h5 className="mission-name">{m.title}</h5>
+                          <span className="mission-active-badge">
+                            <span className="active-dot" /> Đang mở cho khách
+                          </span>
+                        </div>
+                      </div>
+                      {m.description && <p className="mission-desc-text">{m.description}</p>}
+                      {m.rewardNote && (
+                        <div className="mission-reward-callout">
+                          <i className="bi bi-gift-fill reward-icon" />
+                          <div className="reward-content">
+                            <span className="reward-label">Phần thưởng:</span>
+                            <strong className="reward-value">{m.rewardNote}</strong>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
             <div className="detail-divider" />
 
             <div className="detail-block" id="roomsSection" ref={roomsSectionRef}>

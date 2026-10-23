@@ -663,7 +663,7 @@ export default function BookingAndPay() {
       const rmId = !isNaN(Number(rawRm)) && Number(rawRm) > 0 ? Number(rawRm) : null;
 
       const bookingPayload = {
-        touristId: Number(realUser?.id || realUser?.userId || realUser?.user_id || sessionStorage.getItem('userId') || 21),
+        touristId: Number(realUser?.id || realUser?.userId || realUser?.user_id || sessionStorage.getItem('userId') || 1),
         homestayId: hsId,
         roomId: Number.isFinite(rmId) && rmId > 0 ? rmId : null,
         checkInDate: checkin,
@@ -689,7 +689,11 @@ export default function BookingAndPay() {
           finalCode = result.bookingCode;
         }
       } catch (err) {
-        console.warn('Tạo đặt phòng qua API gặp lỗi, tiếp tục với mã dự phòng:', err);
+        console.error('Lỗi khi tạo đơn đặt phòng VNPay:', err);
+        alert(err.message || 'Lỗi đặt phòng: Khoảng thời gian này đã có người đặt trước.');
+        setVnpayLoading(false);
+        setIsProcessing(false);
+        return;
       }
 
       const bookingRecord = {
@@ -785,7 +789,10 @@ export default function BookingAndPay() {
           finalCode = result.bookingCode;
         }
       } catch (err) {
-        console.warn('Tạo đặt phòng qua API gặp lỗi, tiếp tục với mã dự phòng:', err);
+        console.error('Lỗi khi tạo đơn đặt phòng giả lập:', err);
+        alert(err.message || 'Lỗi đặt phòng: Khoảng thời gian này đã có người đặt trước.');
+        setIsProcessing(false);
+        return;
       }
 
       const bookingRecord = {
@@ -851,7 +858,7 @@ export default function BookingAndPay() {
       const dbPayMethod = payMethod === 'vnpay' ? 'VNPAY' : (payMethod === 'vietqr' ? 'BANK_TRANSFER' : 'CASH');
 
       const bookingPayload = {
-        touristId: Number(realUser?.id || realUser?.userId || realUser?.user_id || sessionStorage.getItem('userId') || 21),
+        touristId: Number(realUser?.id || realUser?.userId || realUser?.user_id || sessionStorage.getItem('userId') || 1),
         homestayId: hsId,
         roomId: Number.isFinite(rmId) && rmId > 0 ? rmId : null,
         checkInDate: checkin,
@@ -877,7 +884,10 @@ export default function BookingAndPay() {
           finalCode = result.bookingCode;
         }
       } catch (err) {
-        console.warn('Tạo đặt phòng qua API gặp lỗi, tiếp tục với mã dự phòng:', err);
+        console.error('Lỗi khi tạo đơn đặt phòng:', err);
+        alert(err.message || 'Lỗi đặt phòng: Khoảng thời gian này đã có người đặt trước.');
+        setIsProcessing(false);
+        return;
       }
 
       const bookingRecord = {
@@ -1688,6 +1698,28 @@ export default function BookingAndPay() {
                     </div>
                   </div>
                 </div>
+
+                <div className="yn-vnpay-actions-row">
+                  <button
+                    type="button"
+                    className="yn-vnpay-direct-btn"
+                    onClick={handleOpenVNPayGateway}
+                    disabled={vnpayLoading || isProcessing}
+                    title="Mở cổng VNPAY Sandbox để thanh toán"
+                  >
+                    {vnpayLoading ? (
+                      <>
+                        <span className="bk-spinner" style={{ width: 18, height: 18, borderWidth: 2 }} />
+                        <span>Đang chuyển hướng sang Cổng VNPAY...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>Mở Cổng VNPAY để thanh toán ngay</span>
+                        <i className="bi bi-box-arrow-up-right" />
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
             )}
 
@@ -1797,24 +1829,25 @@ export default function BookingAndPay() {
               Quay lại
             </button>
             {payMethod === 'vnpay' ? (
-              <button
-                type="button"
-                className="yn-btn yn-btn--primary yn-btn-vnpay-submit"
-                onClick={handleOpenVNPayGateway}
-                disabled={vnpayLoading || isProcessing}
-              >
-                {vnpayLoading ? (
-                  <>
-                    <span className="bk-spinner me-2" style={{ width: 16, height: 16, borderWidth: 2 }} />
-                    <span>Đang chuyển hướng sang Cổng VNPAY...</span>
-                  </>
-                ) : (
-                  <>
-                    <i className="bi bi-shield-check me-1.5" />
-                    <span>Thanh toán qua VNPAY ({fmtVND(payNow)})</span>
-                  </>
-                )}
-              </button>
+              <div className="yn-pay-foot-actions">
+                <button
+                  type="button"
+                  className="yn-btn yn-btn--sim"
+                  onClick={handleSimulateVNPaySuccess}
+                  disabled={isProcessing || vnpayLoading}
+                  title="Thử nghiệm nhanh không qua cổng"
+                >
+                  <i className="bi bi-lightning-charge-fill" /> Hoàn tất đặt phòng
+                </button>
+                <button
+                  type="button"
+                  className="yn-btn yn-btn--primary yn-btn-vnpay-submit"
+                  onClick={handleOpenVNPayGateway}
+                  disabled={vnpayLoading || isProcessing}
+                >
+                  {vnpayLoading ? 'Đang kết nối...' : `Cổng VNPAY (${fmtVND(payNow)})`}
+                </button>
+              </div>
             ) : payMethod === 'vietqr' ? (
               <button
                 type="button"
