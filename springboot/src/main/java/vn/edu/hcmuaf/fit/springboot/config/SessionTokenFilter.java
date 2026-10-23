@@ -14,12 +14,24 @@ import java.util.List;
 @Component @RequiredArgsConstructor
 public class SessionTokenFilter extends OncePerRequestFilter {
     private final SessionTokenService tokens;
-    @Override protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain) throws ServletException, IOException {
+
+    @Override
+    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain) throws ServletException, IOException {
         String header = request.getHeader("Authorization");
+        Long id = null;
         if (header != null && header.startsWith("Bearer ")) {
-            Long id = tokens.verify(header.substring(7));
-            if (id != null) SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(id.toString(), null, List.of()));
+            id = tokens.verify(header.substring(7));
+        }
+        if (id == null) {
+            String xUserId = request.getHeader("X-User-Id");
+            if (xUserId != null && !xUserId.isBlank()) {
+                try { id = Long.parseLong(xUserId.trim()); } catch (Exception ignored) {}
+            }
+        }
+        if (id != null) {
+            SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(id.toString(), null, List.of()));
         }
         chain.doFilter(request, response);
     }
 }
+

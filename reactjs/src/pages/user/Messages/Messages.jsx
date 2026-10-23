@@ -1,241 +1,183 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { useLocation } from 'react-router-dom';
+import React, { useEffect, useState, useRef } from 'react';
+import { useLocation, useNavigate, Link } from 'react-router-dom';
 import { chatService } from '../../../services/chatService';
 import './Messages.css';
 
-// Chuyển đổi timestamp ISO / string sang giờ Việt Nam (UTC+7) chuẩn xác
-const formatVNTime = (timeStr) => {
-  if (!timeStr) return '';
-  try {
-    let dateStr = String(timeStr).trim();
-    if (!dateStr.endsWith('Z') && !dateStr.includes('+') && !dateStr.includes('-')) {
-      dateStr += 'Z';
-    } else if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?$/.test(dateStr)) {
-      dateStr += 'Z';
-    }
-    const d = new Date(dateStr);
-    if (isNaN(d.getTime())) {
-      return new Date(timeStr).toLocaleTimeString('vi-VN', {
-        timeZone: 'Asia/Ho_Chi_Minh',
-        hour: '2-digit',
-        minute: '2-digit'
-      });
-    }
-    return d.toLocaleTimeString('vi-VN', {
-      timeZone: 'Asia/Ho_Chi_Minh',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  } catch {
-    return '';
-  }
-};
-
-const formatVNDate = (timeStr) => {
-  if (!timeStr) return '';
-  try {
-    let dateStr = String(timeStr).trim();
-    if (/^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}/.test(dateStr) && !dateStr.endsWith('Z') && !dateStr.includes('+')) {
-      dateStr = dateStr.replace(' ', 'T') + 'Z';
-    }
-    const d = new Date(dateStr);
-    return isNaN(d.getTime()) ? '' : d.toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
-  } catch {
-    return '';
-  }
+const formatMsgTime = (timestamp) => {
+  if (!timestamp) return '';
+  const d = new Date(timestamp);
+  if (isNaN(d.getTime())) return '';
+  const now = new Date();
+  const isToday = d.toDateString() === now.toDateString();
+  const timeStr = d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+  if (isToday) return timeStr;
+  return `${timeStr} · ${d.getDate()}/${d.getMonth() + 1}`;
 };
 
 export default function Messages() {
   const loc = useLocation();
-  const u = JSON.parse(localStorage.getItem('user') || '{}');
+  const navigate = useNavigate();
+  const u = JSON.parse(localStorage.getItem('user') || 'null');
+
   const [list, setList] = useState([]);
   const [active, setActive] = useState(loc.state?.conversation || null);
   const [msgs, setMsgs] = useState([]);
   const [text, setText] = useState('');
-  
-  // Danh sách các ảnh đang ở hàng đợi (pending queue trước khi gửi)
-  // Mỗi item: { id: string, dataUrl: string, name: string }
-  const [pendingImages, setPendingImages] = useState([]);
-  
   const [search, setSearch] = useState('');
   const [error, setError] = useState('');
   const [sending, setSending] = useState(false);
-  const [lightboxImg, setLightboxImg] = useState(null);
-  
-  const fileInputRef = useRef(null);
-  const messageListRef = useRef(null);
-  const isInitialLoadRef = useRef(true);
+
+  const listRef = useRef(null);
+  const isAtBottomRef = useRef(true);
   const prevMsgCountRef = useRef(0);
+  const prevConvIdRef = useRef(null);
+
+  const handleScroll = () => {
+    if (!listRef.current) return;
+    const { scrollTop, scrollHeight, clientHeight } = listRef.current;
+    // Người dùng được coi là ở đáy nếu cách đáy < 60px
+    isAtBottomRef.current = scrollHeight - scrollTop - clientHeight < 60;
+  };
+
+  const scrollToBottom = (smooth = true) => {
+    if (!listRef.current) return;
+    try {
+      listRef.current.scrollTo({
+        top: listRef.current.scrollHeight,
+        behavior: smooth ? 'smooth' : 'auto',
+      });
+    } catch {
+      listRef.current.scrollTop = listRef.current.scrollHeight;
+    }
+  };
+
+  // Tự xóa thông báo lỗi sau 4 giây
+  useEffect(() => {
+    if (error) {
+      const timer = setTimeout(() => setError(''), 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [error]);
 
   const load = async () => {
+    if (!u?.id) return;
     try {
       const d = await chatService.list();
-      setList(d);
-      if (!active && d[0]) setActive(d[0]);
+      if (Array.isArray(d)) {
+        let combined = [...d];
+        if (active?.conversation_id && !combined.some((x) => x.conversation_id === active.conversation_id)) {
+          combined.unshift(active);
+        }
+        setList(combined);
+        if (!active && combined[0]) {
+          setActive(combined[0]);
+        }
+      }
     } catch (e) {
-      setError(e.message);
+      console.warn('Lỗi tải danh sách chat:', e);
+      setError(e.message || 'Không thể tải danh sách cuộc trò chuyện');
     }
   };
 
   useEffect(() => {
+    if (!u?.id) {
+      navigate('/login', { state: { from: loc.pathname } });
+      return;
+    }
     load();
   }, []);
 
-  const scrollToBottom = (behavior = 'smooth') => {
-    if (messageListRef.current) {
-      messageListRef.current.scrollTo({
-        top: messageListRef.current.scrollHeight,
-        behavior
-      });
-    }
-  };
-
+  // Lắng nghe và cập nhật tin nhắn định kỳ
   useEffect(() => {
-    if (!active) return;
-    isInitialLoadRef.current = true;
-    prevMsgCountRef.current = 0;
+    if (!active?.conversation_id) return;
+    let isSubscribed = true;
 
-    const fetchMsgs = async (isPolling = false) => {
-      try {
-        const data = await chatService.messages(active.conversation_id);
-        setMsgs((prev) => {
-          const isFirstTime = isInitialLoadRef.current;
-          const hasNewMessages = data.length > prevMsgCountRef.current;
-
-          if (isFirstTime) {
-            isInitialLoadRef.current = false;
-            setTimeout(() => scrollToBottom('auto'), 50);
-          } else if (hasNewMessages) {
-            setTimeout(() => scrollToBottom('smooth'), 50);
-          }
-
-          prevMsgCountRef.current = data.length;
-          return data;
+    const fetchMsgs = () => {
+      chatService
+        .messages(active.conversation_id)
+        .then((data) => {
+          if (!isSubscribed || !Array.isArray(data)) return;
+          setMsgs((prev) => {
+            if (prev.length === data.length) {
+              const isUnchanged = prev.every(
+                (m, idx) => m.message_id === data[idx].message_id && m.is_read === data[idx].is_read
+              );
+              if (isUnchanged) return prev; // Giữ nguyên tham chiếu để KHÔNG kéo cuộn của user
+            }
+            return data;
+          });
+        })
+        .catch((e) => {
+          if (isSubscribed) setError(e.message);
         });
-      } catch (e) {
-        if (!isPolling) setError(e.message);
-      }
     };
 
-    fetchMsgs(false);
-    chatService.read(active.conversation_id);
-    const timer = setInterval(() => fetchMsgs(true), 4000);
-    return () => clearInterval(timer);
+    fetchMsgs();
+    chatService.read(active.conversation_id).catch(() => {});
+    const interval = setInterval(fetchMsgs, 4000);
+
+    return () => {
+      isSubscribed = false;
+      clearInterval(interval);
+    };
   }, [active?.conversation_id]);
 
-  // Xử lý chọn nhiều ảnh cùng một lúc từ máy
-  const handleImagesSelect = (e) => {
-    const files = Array.from(e.target.files || []);
-    if (files.length === 0) return;
-
-    // Giới hạn số lượng ảnh trong hàng đợi (tối đa 10 ảnh một lượt)
-    if (pendingImages.length + files.length > 10) {
-      alert('Bạn chỉ có thể đính kèm tối đa 10 ảnh trong một lần gửi!');
-      return;
+  // Cuộn ngay xuống đáy khi đổi cuộc trò chuyện
+  useEffect(() => {
+    if (active?.conversation_id && active.conversation_id !== prevConvIdRef.current) {
+      prevConvIdRef.current = active.conversation_id;
+      isAtBottomRef.current = true;
+      setTimeout(() => scrollToBottom(false), 30);
     }
+  }, [active?.conversation_id]);
 
-    files.forEach((file) => {
-      if (!file.type.startsWith('image/')) {
-        alert(`Tệp "${file.name}" không phải là ảnh hợp lệ!`);
-        return;
-      }
-      if (file.size > 8 * 1024 * 1024) {
-        alert(`Ảnh "${file.name}" vượt quá dung lượng tối đa 8MB!`);
-        return;
-      }
+  // CHỈ cuộn khi có tin nhắn mới VÀ người dùng đang ở đáy
+  useEffect(() => {
+    if (msgs.length === 0) return;
+    const hasNewMessage = msgs.length > prevMsgCountRef.current;
+    prevMsgCountRef.current = msgs.length;
 
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const dataUrl = event.target.result;
-        setPendingImages((prev) => [
-          ...prev,
-          {
-            id: `pending_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-            dataUrl,
-            name: file.name
-          }
-        ]);
-      };
-      reader.readAsDataURL(file);
-    });
+    if (hasNewMessage && isAtBottomRef.current) {
+      setTimeout(() => scrollToBottom(true), 30);
+    }
+  }, [msgs.length]);
 
-    // Reset input để người dùng có thể bấm chọn tiếp
-    e.target.value = '';
-  };
-
-  // Xóa 1 ảnh cụ thể khỏi hàng đợi chờ gửi
-  const handleRemovePendingImage = (imgId) => {
-    setPendingImages((prev) => prev.filter((img) => img.id !== imgId));
-  };
-
-  // Xóa toàn bộ ảnh đang chờ
-  const handleClearAllPending = () => {
-    setPendingImages([]);
-  };
-
-  // Gửi tin nhắn và các hình ảnh trong hàng đợi
   const send = async () => {
-    if ((!text.trim() && pendingImages.length === 0) || !active || sending) return;
-    
+    if (!text.trim() || !active?.conversation_id || sending) return;
+    const content = text.trim();
+    setText('');
+    setSending(true);
+    setError('');
+
     try {
-      setSending(true);
-      const sentText = text.trim();
-      const imagesToSend = [...pendingImages];
-
-      // Dọn ô input và hàng đợi ngay lập tức cho trải nghiệm nhanh nhạy
-      setText('');
-      setPendingImages([]);
-
-      // 1. Nếu có kèm văn bản text
-      if (sentText) {
-        // Nếu chỉ có text hoặc text gửi kèm ảnh đầu tiên
-        const firstImg = imagesToSend.length > 0 ? imagesToSend[0].dataUrl : null;
-        const m = await chatService.send(active.conversation_id, sentText, firstImg);
-        setMsgs((prev) => [...prev, m]);
-        
-        // Gửi các ảnh còn lại (nếu có từ ảnh thứ 2 trở đi)
-        for (let i = 1; i < imagesToSend.length; i++) {
-          const nextImg = imagesToSend[i].dataUrl;
-          const imgMsg = await chatService.send(active.conversation_id, '', nextImg);
-          setMsgs((prev) => [...prev, imgMsg]);
-        }
-      } else {
-        // Chỉ gửi ảnh (không có văn bản text)
-        for (let i = 0; i < imagesToSend.length; i++) {
-          const imgUrl = imagesToSend[i].dataUrl;
-          const imgMsg = await chatService.send(active.conversation_id, '', imgUrl);
-          setMsgs((prev) => [...prev, imgMsg]);
-        }
-      }
-
-      setTimeout(() => scrollToBottom('smooth'), 80);
+      const m = await chatService.send(active.conversation_id, content);
+      isAtBottomRef.current = true;
+      setMsgs((prev) => [...prev, m]);
+      prevMsgCountRef.current += 1;
+      setTimeout(() => scrollToBottom(true), 30);
       load();
     } catch (e) {
-      setError(e.message);
+      setError(e.message || 'Không thể gửi tin nhắn.');
     } finally {
       setSending(false);
     }
   };
 
   const shown = list.filter((x) =>
-    (x.homestay_name || '').toLowerCase().includes(search.toLowerCase())
+    (x.homestay_name || '').toLowerCase().includes(search.toLowerCase()) ||
+    (x.other_party_name || '').toLowerCase().includes(search.toLowerCase())
   );
 
   return (
     <div className="messages-shell">
       <div className="messages-page">
-        {/* SIDEBAR DANH SÁCH CUỘC TRÒ CHUYỆN */}
         <aside className="messages-sidebar">
           <div className="messages-sidebar-head">
-            <div className="messages-brand-col">
-              <span className="messages-badge-tag">
-                <i className="bi bi-chat-dots-fill me-1"></i> TRÒ CHUYỆN TRỰC TIẾP
-              </span>
-              <h1 className="messages-title">Hộp thư</h1>
+            <div>
+              <small>HỘP THƯ YÊN HOMESTAY</small>
+              <h1>Tin nhắn</h1>
             </div>
-            <div className="messages-count-pill" title="Tổng số cuộc trò chuyện">
-              <b>{list.length}</b>
-            </div>
+            <b>{list.length}</b>
           </div>
 
           <div className="messages-search">
@@ -243,260 +185,155 @@ export default function Messages() {
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Tìm homestay hoặc khách hàng..."
+              placeholder="Tìm cuộc trò chuyện, homestay..."
             />
-            {search && (
-              <button
-                type="button"
-                className="btn-clear-search"
-                onClick={() => setSearch('')}
-                title="Xóa tìm kiếm"
-              >
-                <i className="bi bi-x-circle-fill" />
-              </button>
-            )}
           </div>
 
-          <div className="conversation-list-scroll">
-            {shown.length > 0 ? (
+          <div className="conversations-scrollable">
+            {shown.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '30px 15px', color: '#889891', fontSize: '13px' }}>
+                <i className="bi bi-chat-dots" style={{ fontSize: '24px', display: 'block', marginBottom: '8px', opacity: 0.5 }} />
+                {search ? 'Không tìm thấy cuộc trò chuyện phù hợp' : 'Chưa có cuộc trò chuyện nào'}
+              </div>
+            ) : (
               shown.map((c) => (
                 <button
-                  type="button"
                   className={`conversation-item ${active?.conversation_id === c.conversation_id ? 'selected' : ''}`}
-                  onClick={() => setActive(c)}
+                  onClick={() => {
+                    setActive(c);
+                    setError('');
+                  }}
                   key={c.conversation_id}
                 >
-                  <div className="conversation-avatar">
-                    <i className="bi bi-house-door-fill" />
-                  </div>
-                  <div className="conversation-info">
-                    <div className="conversation-header-row">
-                      <b className="conversation-name">{c.homestay_name}</b>
-                      {c.last_message_at && (
-                        <span className="conversation-time">
-                          {formatVNTime(c.last_message_at)}
-                        </span>
-                      )}
-                    </div>
-                    <small className="conversation-preview">
-                      {c.last_message || 'Bắt đầu trò chuyện...'}
+                  <span className="conversation-avatar">
+                    <i className="bi bi-house-heart" />
+                  </span>
+                  <span>
+                    <b>{c.homestay_name || 'Homestay'}</b>
+                    <small>
+                      {c.other_party_name ? `${c.other_party_name}: ` : ''}
+                      {c.last_message || 'Bắt đầu trò chuyện'}
                     </small>
-                  </div>
+                  </span>
+                  {c.unread_count > 0 && <span className="unread-badge">{c.unread_count}</span>}
+                  <i className="bi bi-chevron-right" />
                 </button>
               ))
-            ) : (
-              <div className="conversation-empty-state">
-                <i className="bi bi-chat-left-dots text-muted fs-3 mb-2" />
-                <p>Không tìm thấy cuộc trò chuyện nào</p>
-              </div>
             )}
           </div>
         </aside>
 
-        {/* KHUNG NỘI DUNG TIN NHẮN */}
         <main className="messages-main">
           {active ? (
             <>
-              <header className="messages-chat-header">
-                <div className="conversation-avatar large">
-                  <i className="bi bi-house-door-fill" />
-                </div>
-                <div className="messages-header-info">
-                  <h2>{active.homestay_name}</h2>
-                  <div className="messages-online-status">
-                    <span className="online-indicator"></span>
-                    <span>Đang kết nối cùng Homestay • Giờ Việt Nam (GMT+7)</span>
+              <header>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <button
+                    type="button"
+                    onClick={() => navigate(-1)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: '#16845b',
+                      cursor: 'pointer',
+                      fontSize: '18px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      padding: '4px'
+                    }}
+                    title="Quay lại"
+                  >
+                    <i className="bi bi-arrow-left" />
+                  </button>
+                  <span className="conversation-avatar large">
+                    <i className="bi bi-house-heart" />
+                  </span>
+                  <div>
+                    <h2>{active.homestay_name || 'Homestay'}</h2>
+                    <small>
+                      <i className="bi bi-circle-fill online-dot" />{' '}
+                      {active.other_party_name ? `Trò chuyện với ${active.other_party_name}` : 'Đang hoạt động'}
+                    </small>
                   </div>
                 </div>
+
+                {active.homestay_id && (
+                  <Link
+                    to={`/homestay/${active.homestay_id}`}
+                    style={{
+                      fontSize: '12px',
+                      color: '#16845b',
+                      textDecoration: 'none',
+                      fontWeight: 600,
+                      padding: '6px 12px',
+                      borderRadius: '8px',
+                      background: '#eef8f3',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '5px'
+                    }}
+                  >
+                    <i className="bi bi-eye" /> Xem homestay
+                  </Link>
+                )}
               </header>
 
-              <section className="message-list" ref={messageListRef}>
-                {msgs.length > 0 ? (
+              <section className="message-list" ref={listRef} onScroll={handleScroll}>
+                {msgs.length ? (
                   msgs.map((m) => {
-                    const isMine = String(m.sender_id) === String(u.id);
+                    const isMine = String(m.sender_id) === String(u?.id);
                     return (
-                      <div
-                        className={`message-row ${isMine ? 'mine' : ''}`}
-                        key={m.message_id}
-                      >
-                        {!isMine && (
-                          <div className="message-sender-avatar" title={active.homestay_name}>
-                            <i className="bi bi-house-heart-fill" />
-                          </div>
-                        )}
-                        <div className="message-bubble-container">
-                          <div className="message-bubble">
-                            {/* Hiển thị hình ảnh đã gửi (bảo lưu minh bạch, không xóa hay thu hồi sau khi gửi) */}
-                            {m.image_url && (
-                              <div className="message-image-wrapper">
-                                <img
-                                  src={m.image_url}
-                                  alt="Hình ảnh trò chuyện"
-                                  className="chat-msg-image"
-                                  onClick={() => setLightboxImg(m.image_url)}
-                                  title="Nhấp để xem kích thước lớn"
-                                />
-                              </div>
-                            )}
-
-                            {/* Nội dung văn bản */}
-                            {m.content && m.content !== '[Hình ảnh]' && (
-                              <span className="message-text">{m.content}</span>
-                            )}
-
-                            <time
-                              className="message-time"
-                              title={formatVNDate(m.created_at)}
-                            >
-                              <i className="bi bi-clock me-1"></i>
-                              {formatVNTime(m.created_at)}
-                            </time>
-                          </div>
+                      <div className={`message-row ${isMine ? 'mine' : ''}`} key={m.message_id}>
+                        <div className="message-bubble">
+                          {!isMine && m.sender_name && (
+                            <span style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#16845b', marginBottom: '3px' }}>
+                              {m.sender_name}
+                            </span>
+                          )}
+                          <div style={{ wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}>{m.content}</div>
+                          <time>{formatMsgTime(m.created_at)}</time>
                         </div>
                       </div>
                     );
                   })
                 ) : (
                   <div className="message-empty">
-                    <div className="empty-chat-icon">
-                      <i className="bi bi-chat-quote-fill" />
-                    </div>
+                    <i className="bi bi-chat-heart" />
                     <h3>Bắt đầu cuộc trò chuyện</h3>
-                    <p>Hãy gửi lời chào hoặc hình ảnh trao đổi trực tiếp nhé!</p>
+                    <p>Hãy gửi lời chào đến chủ homestay để được hỗ trợ tốt nhất.</p>
                   </div>
                 )}
               </section>
 
-              {/* HÀNG ĐỢI XEM TRƯỚC NHIỀU ẢNH TRƯỚC KHI GỬI (PENDING QUEUE) */}
-              {pendingImages.length > 0 && (
-                <div className="chat-images-queue-panel">
-                  <div className="queue-panel-header">
-                    <span className="queue-count-tag">
-                      <i className="bi bi-images me-1.5" />
-                      Đang chờ gửi ({pendingImages.length}/10 ảnh)
-                    </span>
-                    <button
-                      type="button"
-                      className="btn-clear-queue"
-                      onClick={handleClearAllPending}
-                      title="Xóa toàn bộ ảnh đang chờ"
-                    >
-                      <i className="bi bi-trash3 me-1" /> Hủy tất cả
-                    </button>
-                  </div>
-
-                  <div className="queue-thumbnails-strip">
-                    {pendingImages.map((img) => (
-                      <div className="queue-thumb-item" key={img.id}>
-                        <img src={img.dataUrl} alt={img.name} />
-                        <span className="queue-status-badge" title="Đang ở hàng đợi gửi">
-                          Chờ gửi
-                        </span>
-                        {/* Nút X xóa ảnh khỏi hàng đợi khi đổi ý */}
-                        <button
-                          type="button"
-                          className="btn-remove-queue-item"
-                          onClick={() => handleRemovePendingImage(img.id)}
-                          title="Xóa ảnh này khỏi hàng đợi"
-                        >
-                          <i className="bi bi-x-lg" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* FOOTER NHẬP TIN NHẮN & NÚT TẢI NHIỀU ẢNH */}
-              <footer className="messages-chat-footer">
+              <footer>
                 <input
-                  type="file"
-                  ref={fileInputRef}
-                  style={{ display: 'none' }}
-                  multiple
-                  accept="image/png, image/jpeg, image/jpg, image/webp, image/gif"
-                  onChange={handleImagesSelect}
-                />
-
-                <button
-                  type="button"
-                  className={`btn-attach-image ${pendingImages.length > 0 ? 'has-pending' : ''}`}
-                  onClick={() => fileInputRef.current?.click()}
-                  title="Chọn một hoặc nhiều hình ảnh để gửi"
-                  disabled={sending}
-                >
-                  <i className="bi bi-images" />
-                  {pendingImages.length > 0 && (
-                    <span className="attach-count-badge">{pendingImages.length}</span>
-                  )}
-                </button>
-
-                <div className="input-field-wrapper">
-                  <input
-                    value={text}
-                    onChange={(e) => setText(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && send()}
-                    placeholder={
-                      pendingImages.length > 0
-                        ? `Đã chọn ${pendingImages.length} ảnh. Thêm lời nhắn và bấm Gửi...`
-                        : "Nhập tin nhắn trao đổi hoặc đính kèm nhiều ảnh..."
+                  value={text}
+                  onChange={(e) => setText(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      send();
                     }
-                    disabled={sending}
-                  />
-                  <button
-                    type="button"
-                    onClick={send}
-                    disabled={(!text.trim() && pendingImages.length === 0) || sending}
-                    className="btn-send-message"
-                    title="Gửi tin nhắn & hình ảnh"
-                  >
-                    {sending ? (
-                      <span className="spinner-border spinner-border-sm" role="status" />
-                    ) : (
-                      <i className="bi bi-send-fill" />
-                    )}
-                  </button>
-                </div>
+                  }}
+                  placeholder="Nhập tin nhắn..."
+                  disabled={sending}
+                />
+                <button onClick={send} disabled={!text.trim() || sending}>
+                  <i className="bi bi-send-fill" />
+                </button>
               </footer>
             </>
           ) : (
             <div className="message-welcome">
-              <div className="welcome-chat-icon">
-                <i className="bi bi-chat-square-text-fill" />
-              </div>
+              <i className="bi bi-chat-square-heart" />
               <h2>Chọn một cuộc trò chuyện</h2>
-              <p>Tin nhắn và hình ảnh giữa bạn và homestay sẽ hiển thị tại đây.</p>
+              <p>Tin nhắn giữa bạn và chủ homestay sẽ hiển thị tại đây.</p>
             </div>
           )}
 
-          {error && (
-            <div className="chat-error">
-              <i className="bi bi-exclamation-triangle-fill me-2" />
-              {error}
-            </div>
-          )}
+          {error && <div className="chat-error">{error}</div>}
         </main>
       </div>
-
-      {/* LIGHTBOX XEM ẢNH FULLSCREEN */}
-      {lightboxImg && (
-        <div className="chat-lightbox-overlay" onClick={() => setLightboxImg(null)}>
-          <button
-            type="button"
-            className="chat-lightbox-close"
-            onClick={() => setLightboxImg(null)}
-            title="Đóng (Esc)"
-          >
-            <i className="bi bi-x-lg" />
-          </button>
-          <img
-            src={lightboxImg}
-            alt="Phóng to ảnh trò chuyện"
-            className="chat-lightbox-img"
-            onClick={(e) => e.stopPropagation()}
-          />
-        </div>
-      )}
     </div>
   );
 }

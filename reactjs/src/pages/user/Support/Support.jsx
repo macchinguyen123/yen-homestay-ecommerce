@@ -108,17 +108,7 @@ export default function Support() {
     fileName: ''
   });
 
-  // Live Chat State
-  const [isChatOpen, setIsChatOpen] = useState(false);
-  const [chatMessages, setChatMessages] = useState([
-    {
-      id: 1,
-      sender: 'bot',
-      text: 'Xin chào! 👋 Rất vui được đón tiếp bạn tại YÊN Homestay. Bạn cần hỗ trợ thông tin gì cho chuyến đi sắp tới?'
-    }
-  ]);
-  const [chatInput, setChatInput] = useState('');
-  const chatMsgsEndRef = useRef(null);
+
 
   const showToast = (msg) => {
     setToast({ show: true, msg });
@@ -192,29 +182,7 @@ export default function Support() {
     }, 1200);
   };
 
-  const handleSendChat = () => {
-    const text = chatInput.trim();
-    if (!text) return;
 
-    const userMsg = { id: Date.now(), sender: 'user', text };
-    setChatMessages((prev) => [...prev, userMsg]);
-    setChatInput('');
-
-    setTimeout(() => {
-      const botMsg = {
-        id: Date.now() + 1,
-        sender: 'bot',
-        text: `Cảm ơn bạn! Chuyên viên tư vấn YÊN Homestay đã nhận được tin nhắn: "${text}". Chúng tôi đang hỗ trợ bạn ngay đây!`
-      };
-      setChatMessages((prev) => [...prev, botMsg]);
-    }, 1000);
-  };
-
-  useEffect(() => {
-    if (isChatOpen && chatMsgsEndRef.current) {
-      chatMsgsEndRef.current.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, [chatMessages, isChatOpen]);
 
   const filteredFaqs = FAQ_ITEMS.filter((item) => {
     if (activeFaqCategory === 'all') return true;
@@ -767,61 +735,7 @@ export default function Support() {
         </section>
       </main>
 
-      {/* Floating Chat Button */}
-      <button className="sp-chat-fab" onClick={() => setIsChatOpen(true)} title="Chat với CSKH YÊN" type="button">
-        <span className="fab-dot"></span>
-        <i className="bi bi-chat-heart-fill" style={{ fontSize: '1.1rem' }}></i>
-        Chat trực tuyến
-      </button>
 
-      {/* Live Chat Modal */}
-      <div className={`sp-chat-overlay ${isChatOpen ? 'active' : ''}`} id="liveChatModal">
-        <div className="sp-chat-window">
-          <div className="sp-chat-head">
-            <div className="sp-chat-head-info">
-              <div className="sp-chat-avatar">YÊN</div>
-              <div>
-                <h5>CSKH YÊN Homestay</h5>
-                <span>
-                  <span className="sp-online-dot"></span> Đang trực tuyến
-                </span>
-              </div>
-            </div>
-            <button className="sp-chat-close" onClick={() => setIsChatOpen(false)} type="button">
-              <i className="bi bi-x-lg"></i>
-            </button>
-          </div>
-
-          <div className="sp-chat-msgs" id="chatMsgs">
-            {chatMessages.map((msg) => (
-              <div
-                key={msg.id}
-                className={`sp-msg ${msg.sender === 'user' ? 'sp-msg--user' : 'sp-msg--bot'}`}
-              >
-                {msg.text}
-              </div>
-            ))}
-            <div ref={chatMsgsEndRef} />
-          </div>
-
-          <div className="sp-chat-input-area">
-            <input
-              type="text"
-              id="chatInput"
-              className="sp-chat-input"
-              placeholder="Nhập tin nhắn..."
-              value={chatInput}
-              onChange={(e) => setChatInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') handleSendChat();
-              }}
-            />
-            <button className="sp-chat-send" onClick={handleSendChat} type="button">
-              <i className="bi bi-send-fill"></i>
-            </button>
-          </div>
-        </div>
-      </div>
 
       {/* Toast Notification */}
       <div className={`sp-toast ${toast.show ? 'show' : ''}`} id="spToast">

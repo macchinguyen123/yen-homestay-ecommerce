@@ -39,7 +39,8 @@ export const ownerService = {
    */
   async getServices(homestayId) {
     try {
-      const query = homestayId ? `?homestayId=${homestayId}` : '';
+      const validId = homestayId && !isNaN(Number(homestayId)) && Number(homestayId) > 0 ? Number(homestayId) : null;
+      const query = validId ? `?homestayId=${validId}` : '';
       let res = await fetch(`${PUBLIC_API_BASE_URL}${query}`);
       if (!res.ok) {
         res = await safeFetch(`${API_BASE_URL}${query}`);
