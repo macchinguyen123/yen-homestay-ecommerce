@@ -331,8 +331,18 @@ export default function ManageTransactions() {
                                     </td>
                                     <td>
                                         <div className="action-btn-group">
-                                            <button className="tx-btn tx-btn-secondary" onClick={() => openModal('detail', item)}>
-                                                <span className="material-symbols-outlined" style={{ fontSize: '15px' }}>visibility</span> Xem
+                                            <button
+                                                className="tx-btn tx-btn-secondary"
+                                                style={{
+                                                    background: '#F0FDF4',
+                                                    color: '#15803D',
+                                                    border: '1px solid #86EFAC',
+                                                    fontWeight: 700
+                                                }}
+                                                onClick={() => openModal('detail', item)}
+                                            >
+                                                <span className="material-symbols-outlined" style={{ fontSize: '15px', color: '#15803D' }}>visibility</span>
+                                                <span style={{ color: '#15803D' }}>Xem</span>
                                             </button>
                                             {(item.status === 'refund-pending' || item.status === 'refund') && (
                                                 <button className="tx-btn tx-btn-refund" onClick={() => openModal('refund', item)}>

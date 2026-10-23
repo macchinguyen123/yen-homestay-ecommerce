@@ -235,10 +235,19 @@
 }
 
 .tx-btn-secondary {
-    background: #F1F5F9;
-    color: #334155;
+    background: #F0FDF4;
+    color: #15803D !important;
+    border: 1px solid #86EFAC;
+    font-weight: 700;
 }
-.tx-btn-secondary:hover { background: #E2E8F0; }
+.tx-btn-secondary:hover {
+    background: #15803D;
+    color: #FFFFFF !important;
+    border-color: #15803D;
+}
+.tx-btn-secondary:hover * {
+    color: #FFFFFF !important;
+}
 
 .tx-btn-refund {
     background: #FFF7ED;

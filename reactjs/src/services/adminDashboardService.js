@@ -274,12 +274,16 @@ export const adminDashboardService = {
      * Lấy dữ liệu tổng quan Admin Dashboard (Metrics, Biểu đồ, Phân bổ)
      * @param {string} period 'today' | '7days' | 'month' | 'year'
      */
-    async getOverview(period = 'month') {
+    async getOverview(period = 'month', startDate = '', endDate = '') {
         try {
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 4000); // 4s timeout
 
-            const res = await fetch(`${API_BASE_URL}/overview?period=${encodeURIComponent(period)}`, {
+            let query = `period=${encodeURIComponent(period)}`;
+            if (startDate) query += `&startDate=${encodeURIComponent(startDate)}`;
+            if (endDate) query += `&endDate=${encodeURIComponent(endDate)}`;
+
+            const res = await fetch(`${API_BASE_URL}/overview?${query}`, {
                 signal: controller.signal
             });
             clearTimeout(timeoutId);
