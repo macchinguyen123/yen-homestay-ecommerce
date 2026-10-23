@@ -10,6 +10,9 @@ import vn.edu.hcmuaf.fit.springboot.repository.HomestayImageRepository;
 import vn.edu.hcmuaf.fit.springboot.repository.HomestayRepository;
 import vn.edu.hcmuaf.fit.springboot.repository.UserRepository;
 
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+
 import java.text.NumberFormat;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
@@ -38,6 +41,22 @@ public class AdminHomestayController {
     @Autowired
     private vn.edu.hcmuaf.fit.springboot.service.NotificationService notificationService;
 
+    private String resolveCityFallback(String city) {
+        if (city != null) {
+            String c = city.toLowerCase();
+            if (c.contains("đà lạt") || c.contains("da lat")) {
+                return "https://images.unsplash.com/photo-1518780664697-55e3ad937233?auto=format&fit=crop&w=800&q=80";
+            } else if (c.contains("đà nẵng") || c.contains("da nang")) {
+                return "https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=800&q=80";
+            } else if (c.contains("sapa") || c.contains("sa pa")) {
+                return "https://images.unsplash.com/photo-1571896349842-33c89424de2d?auto=format&fit=crop&w=800&q=80";
+            } else if (c.contains("hồ chí minh") || c.contains("hcm") || c.contains("sài gòn")) {
+                return "https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=800&q=80";
+            }
+        }
+        return "https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=800&q=80";
+    }
+
     private String resolveHomestayImage(Long homestayId, String city) {
         List<HomestayImage> images = homestayImageRepository.findByHomestayId(homestayId);
         if (images != null && !images.isEmpty()) {
@@ -58,22 +77,11 @@ public class AdminHomestayController {
             }
         } catch (Exception e) {}
 
-        if (city != null) {
-            String c = city.toLowerCase();
-            if (c.contains("đà lạt") || c.contains("da lat")) {
-                return "https://images.unsplash.com/photo-1518780664697-55e3ad937233?auto=format&fit=crop&w=800&q=80";
-            } else if (c.contains("đà nẵng") || c.contains("da nang")) {
-                return "https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=800&q=80";
-            } else if (c.contains("sapa") || c.contains("sa pa")) {
-                return "https://images.unsplash.com/photo-1571896349842-33c89424de2d?auto=format&fit=crop&w=800&q=80";
-            } else if (c.contains("hồ chí minh") || c.contains("hcm") || c.contains("sài gòn")) {
-                return "https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=800&q=80";
-            }
-        }
-        return "https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=800&q=80";
+        return resolveCityFallback(city);
     }
 
     @GetMapping
+    @Cacheable(value = "adminHomestays", key = "#ownerId != null ? #ownerId : 'all'")
     public ResponseEntity<?> getAllHomestays(@RequestParam(value = "ownerId", required = false) Long ownerId) {
         List<Homestay> homestays;
         if (ownerId != null && ownerId > 0) {
@@ -81,10 +89,14 @@ public class AdminHomestayController {
         } else {
             homestays = homestayRepository.findAll();
         }
-        List<User> allUsers = userRepository.findAll();
-        List<HomestayImage> allImages = homestayImageRepository.findAll();
+        if (homestays.isEmpty()) {
+            return ResponseEntity.ok(Collections.emptyList());
+        }
 
+        List<User> allUsers = userRepository.findAll();
         Map<Long, User> userMap = allUsers.stream().collect(Collectors.toMap(User::getId, u -> u, (a, b) -> a));
+
+        List<HomestayImage> allImages = homestayImageRepository.findAll();
         Map<Long, String> imageMap = allImages.stream().collect(Collectors.groupingBy(HomestayImage::getHomestayId))
                 .entrySet().stream().collect(Collectors.toMap(
                         Map.Entry::getKey,
@@ -98,6 +110,38 @@ public class AdminHomestayController {
                         },
                         (a, b) -> a
                 ));
+
+        // Batch prefetch fallback room images for homestays without homestay_images (zero N+1 queries)
+        Set<Long> missingImgHomeIds = homestays.stream()
+                .map(Homestay::getId)
+                .filter(id -> !imageMap.containsKey(id))
+                .collect(Collectors.toSet());
+
+        Map<Long, String> fallbackRoomImageMap = new HashMap<>();
+        if (!missingImgHomeIds.isEmpty()) {
+            List<vn.edu.hcmuaf.fit.springboot.model.Room> allRooms = roomRepository.findAll();
+            Map<Long, Long> firstRoomByHomestay = new HashMap<>();
+            for (vn.edu.hcmuaf.fit.springboot.model.Room room : allRooms) {
+                if (room.getHomestayId() != null && missingImgHomeIds.contains(room.getHomestayId())) {
+                    firstRoomByHomestay.putIfAbsent(room.getHomestayId(), room.getId());
+                }
+            }
+            if (!firstRoomByHomestay.isEmpty()) {
+                List<vn.edu.hcmuaf.fit.springboot.model.RoomImage> allRoomImgs = roomImageRepository.findAll();
+                Map<Long, String> firstRoomImg = new HashMap<>();
+                for (vn.edu.hcmuaf.fit.springboot.model.RoomImage rImg : allRoomImgs) {
+                    if (rImg.getRoomId() != null) {
+                        firstRoomImg.putIfAbsent(rImg.getRoomId(), rImg.getImageUrl());
+                    }
+                }
+                for (Map.Entry<Long, Long> entry : firstRoomByHomestay.entrySet()) {
+                    String url = firstRoomImg.get(entry.getValue());
+                    if (url != null) {
+                        fallbackRoomImageMap.put(entry.getKey(), url);
+                    }
+                }
+            }
+        }
 
         DateTimeFormatter dtf = DateTimeFormatter.ofPattern("dd/MM/yyyy");
         NumberFormat nf = NumberFormat.getInstance(new Locale("vi", "VN"));
@@ -129,7 +173,7 @@ public class AdminHomestayController {
             String rawStatus = h.getStatus() != null ? h.getStatus().trim().toLowerCase() : "pending";
             String status = "pending";
             if (rawStatus.equals("active") || rawStatus.equals("approved") || rawStatus.equals("available")) status = "active";
-            else if (rawStatus.equals("suspended") || rawStatus.equals("inactive") || rawStatus.equals("maintenance") || rawStatus.equals("locked")) status = "suspended";
+            else if (rawStatus.equals("suspended") || rawStatus.equals("inactive") || rawStatus.equals("maintenance") || rawStatus.equals("locked") || rawStatus.equals("tam_khoa") || rawStatus.equals("tạm khóa")) status = "suspended";
             else if (rawStatus.equals("rejected") || rawStatus.equals("denied") || rawStatus.equals("deleted") || rawStatus.equals("canceled")) status = "rejected";
             
             map.put("status", status);
@@ -144,7 +188,10 @@ public class AdminHomestayController {
             
             String imgUrl = imageMap.get(h.getId());
             if (imgUrl == null) {
-                imgUrl = resolveHomestayImage(h.getId(), h.getCity());
+                imgUrl = fallbackRoomImageMap.get(h.getId());
+            }
+            if (imgUrl == null) {
+                imgUrl = resolveCityFallback(h.getCity());
             }
             map.put("img", imgUrl);
             
@@ -201,6 +248,7 @@ public class AdminHomestayController {
     }
 
     @PutMapping("/{id}/status")
+    @CacheEvict(value = {"adminHomestays", "allHomestays", "homePageData", "adminFestivalHomestays"}, allEntries = true)
     public ResponseEntity<?> updateHomestayStatus(@PathVariable Long id, @RequestBody Map<String, String> payload) {
         String newStatus = payload.get("status");
         if (newStatus == null) {
@@ -231,6 +279,7 @@ public class AdminHomestayController {
     }
 
     @PutMapping("/{id}")
+    @CacheEvict(value = {"adminHomestays", "allHomestays", "homePageData", "adminFestivalHomestays"}, allEntries = true)
     public ResponseEntity<?> updateHomestayDetails(@PathVariable Long id, @RequestBody Map<String, Object> payload) {
         Optional<Homestay> opt = homestayRepository.findById(id);
         if (opt.isPresent()) {
@@ -288,6 +337,7 @@ public class AdminHomestayController {
     }
 
     @PostMapping
+    @CacheEvict(value = {"adminHomestays", "allHomestays", "homePageData", "adminFestivalHomestays"}, allEntries = true)
     public ResponseEntity<?> createHomestay(@RequestBody Map<String, Object> payload) {
         try {
             Homestay h = new Homestay();
@@ -359,6 +409,7 @@ public class AdminHomestayController {
     }
 
     @DeleteMapping("/{id}")
+    @CacheEvict(value = {"adminHomestays", "allHomestays", "homePageData", "adminFestivalHomestays"}, allEntries = true)
     public ResponseEntity<?> deleteHomestay(@PathVariable Long id) {
         Optional<Homestay> opt = homestayRepository.findById(id);
         if (opt.isPresent()) {

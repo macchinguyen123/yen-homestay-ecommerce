@@ -35,11 +35,63 @@ public class AdminFestivalController {
     private final HomestayImageRepository homestayImageRepository;
 
     @GetMapping("/admin/local-content/festivals")
+    @Cacheable("adminFestivals")
     public List<Map<String, Object>> getFestivals() {
-        return festivalRepository.findAll().stream().map(f -> toResponse(f, true)).toList();
+        List<Festival> festivals = festivalRepository.findAll();
+        if (festivals.isEmpty()) return Collections.emptyList();
+
+        List<FestivalHomestay> allLinks = festivalHomestayRepository.findAll();
+        Map<Long, List<FestivalHomestay>> linksByFestival = allLinks.stream()
+                .sorted(Comparator.comparing(FestivalHomestay::getDisplayOrder, Comparator.nullsLast(Comparator.naturalOrder()))
+                        .thenComparing(FestivalHomestay::getId, Comparator.nullsLast(Comparator.naturalOrder())))
+                .collect(Collectors.groupingBy(FestivalHomestay::getFestivalId));
+
+        Set<Long> neededHomeIds = allLinks.stream()
+                .map(FestivalHomestay::getHomestayId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+
+        Map<Long, Homestay> homesMap = neededHomeIds.isEmpty() ? Collections.emptyMap()
+                : homestayRepository.findAllById(neededHomeIds).stream()
+                .collect(Collectors.toMap(Homestay::getId, h -> h, (a, b) -> a));
+
+        Map<Long, String> imagesMap = neededHomeIds.isEmpty() ? Collections.emptyMap()
+                : primaryImages(new ArrayList<>(homesMap.values()));
+
+        return festivals.stream().map(f -> {
+            Map<String, Object> result = new LinkedHashMap<>();
+            result.put("id", f.getId());
+            result.put("name", f.getName());
+            result.put("city", f.getCity());
+            result.put("location", f.getLocation());
+            String img = f.getImageUrl();
+            if (img == null || img.isBlank()) {
+                img = "https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?auto=format&fit=crop&w=1200&q=80";
+            }
+            result.put("imageUrl", img);
+            result.put("description", f.getDescription());
+            result.put("startDate", f.getStartDate());
+            result.put("endDate", f.getEndDate());
+            result.put("badgeInfo", f.getBadgeInfo());
+            result.put("status", status(f));
+
+            List<FestivalHomestay> links = linksByFestival.getOrDefault(f.getId(), List.of());
+            List<Map<String, Object>> recommended = links.stream().map(link -> {
+                Homestay h = homesMap.get(link.getHomestayId());
+                return h != null ? homestayResponse(h, imagesMap.get(h.getId()), link.getDistanceLabel()) : null;
+            }).filter(Objects::nonNull).toList();
+
+            result.put("nearbyHomestays", recommended.size());
+            result.put("homestayIds", links.stream().map(FestivalHomestay::getHomestayId).toList());
+            result.put("distanceLabels", links.stream().map(FestivalHomestay::getDistanceLabel).toList());
+            result.put("homestays", recommended);
+
+            return result;
+        }).toList();
     }
 
     @GetMapping("/admin/local-content/homestays")
+    @Cacheable(value = "adminFestivalHomestays", key = "#city == null ? 'ALL' : #city.trim().toLowerCase()")
     public List<Map<String, Object>> getHomestays(@RequestParam(required = false) String city) {
         List<Homestay> homestays = city == null || city.isBlank()
                 ? homestayRepository.findAll()
@@ -50,7 +102,7 @@ public class AdminFestivalController {
 
     @PostMapping("/admin/local-content/festivals")
     @Transactional
-    @CacheEvict(value = "publicFestivals", allEntries = true)
+    @CacheEvict(value = {"adminFestivals", "publicFestivals"}, allEntries = true)
     public ResponseEntity<?> create(@RequestBody FestivalRequest request) {
         String validation = validate(request);
         if (validation != null) return ResponseEntity.badRequest().body(Map.of("message", validation));
@@ -63,7 +115,7 @@ public class AdminFestivalController {
 
     @PutMapping("/admin/local-content/festivals/{id}")
     @Transactional
-    @CacheEvict(value = "publicFestivals", allEntries = true)
+    @CacheEvict(value = {"adminFestivals", "publicFestivals"}, allEntries = true)
     public ResponseEntity<?> update(@PathVariable Long id, @RequestBody FestivalRequest request) {
         String validation = validate(request);
         if (validation != null) return ResponseEntity.badRequest().body(Map.of("message", validation));
@@ -77,7 +129,7 @@ public class AdminFestivalController {
 
     @DeleteMapping("/admin/local-content/festivals/{id}")
     @Transactional
-    @CacheEvict(value = "publicFestivals", allEntries = true)
+    @CacheEvict(value = {"adminFestivals", "publicFestivals"}, allEntries = true)
     public ResponseEntity<?> delete(@PathVariable Long id) {
         if (!festivalRepository.existsById(id)) return ResponseEntity.notFound().build();
         festivalHomestayRepository.deleteAllForFestival(id);

@@ -6,10 +6,12 @@
 // Official VNPay Sandbox Configuration
 export const VNPAY_CONFIG = {
   get tmnCode() {
-    return localStorage.getItem('yen_vnp_tmnCode') || 'DEMOV210';
+    const custom = localStorage.getItem('yen_vnp_tmnCode');
+    return (custom && custom !== 'QSTW5GHF') ? custom : 'UUDTD194';
   },
   get hashSecret() {
-    return localStorage.getItem('yen_vnp_hashSecret') || 'RAOEXHYVSDDIIENYWSLDIIZTANXUXZFJ';
+    const custom = localStorage.getItem('yen_vnp_hashSecret');
+    return (custom && custom !== '9U8YJT1OP3SKA1O4WCSFDW2Q4FHH44HA') ? custom : 'LYJHAENUIDAXWTKZDXXTJDPGGUGDNLOT';
   },
   url: 'https://sandbox.vnpayment.vn/paymentv2/vpcpay.html',
 };
@@ -156,6 +158,22 @@ export const vnpayService = {
     const finalUrl = `${VNPAY_CONFIG.url}?${queryParts.join('&')}&vnp_SecureHash=${secureHash}`;
 
     return finalUrl;
+  },
+
+  /**
+   * Xác thực kết quả thanh toán từ VNPay qua backend Spring Boot
+   */
+  async verifyPayment(searchParamsObj) {
+    try {
+      const params = new URLSearchParams(searchParamsObj);
+      const resp = await fetch(`http://localhost:8081/api/public/vnpay/verify-payment?${params.toString()}`);
+      if (resp.ok) {
+        return await resp.json();
+      }
+    } catch (e) {
+      console.warn('Lỗi gọi API verify VNPay:', e);
+    }
+    return null;
   },
 
   /**
