@@ -13,10 +13,17 @@ import vn.edu.hcmuaf.fit.springboot.repository.PasswordResetTokenRepository;
 import vn.edu.hcmuaf.fit.springboot.repository.UserRepository;
 import vn.edu.hcmuaf.fit.springboot.repository.VerificationTokenRepository;
 
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
+import com.google.api.client.http.javanet.NetHttpTransport;
+import com.google.api.client.json.gson.GsonFactory;
+
 import jakarta.annotation.PostConstruct;
 import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.Optional;
 import java.util.Random;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -33,9 +40,173 @@ public class AuthService {
     @Value("${app.frontend-url:http://localhost:5173}")
     private String frontendUrl;
 
+    @Value("${google.client-id:}")
+    private String googleClientId;
+
     @PostConstruct
     public void initDefaultUsers() {
         // Cơ sở dữ liệu Neon PostgreSQL đã có sẵn 20 tài khoản thực tế
+    }
+
+    /**
+     * Đăng nhập / Đăng ký bằng Google ID Token.
+     * - Xác thực token với Google.
+     * - Nếu email đã có → đăng nhập luôn (kể cả tài khoản INACTIVE do chưa xác thực email).
+     * - Nếu email chưa có → tạo tài khoản mới với status ACTIVE.
+     */
+    public LoginResponse loginWithGoogle(GoogleLoginRequest request) {
+        String idTokenStr = request.getIdToken();
+        if (idTokenStr == null || idTokenStr.isBlank()) {
+            return LoginResponse.builder().success(false).message("Thiếu Google ID Token!").build();
+        }
+
+        if (googleClientId == null || googleClientId.isBlank()) {
+            return LoginResponse.builder().success(false)
+                    .message("Server chưa cấu hình Google Client ID. Vui lòng liên hệ quản trị viên.").build();
+        }
+
+        try {
+            GoogleIdTokenVerifier verifier = new GoogleIdTokenVerifier.Builder(
+                    new NetHttpTransport(), GsonFactory.getDefaultInstance())
+                    .setAudience(Collections.singletonList(googleClientId))
+                    .build();
+
+            GoogleIdToken idToken = verifier.verify(idTokenStr);
+            if (idToken == null) {
+                return LoginResponse.builder().success(false)
+                        .message("Google ID Token không hợp lệ hoặc đã hết hạn!").build();
+            }
+
+            GoogleIdToken.Payload payload = idToken.getPayload();
+            String email = payload.getEmail().toLowerCase().trim();
+            String fullName = (String) payload.get("name");
+            String avatar  = (String) payload.get("picture");
+            if (fullName == null || fullName.isBlank()) fullName = email.split("@")[0];
+
+            // Tìm user theo email
+            Optional<User> userOpt = userRepository.findByEmail(email);
+            User user;
+            boolean isNew = false;
+
+            if (userOpt.isPresent()) {
+                user = userOpt.get();
+                // Cho phép đăng nhập kể cả tài khoản INACTIVE (Google đã xác thực email rồi)
+                if ("BLOCKED".equalsIgnoreCase(user.getStatus())
+                        || "BANNED".equalsIgnoreCase(user.getStatus())
+                        || "SUSPENDED".equalsIgnoreCase(user.getStatus())) {
+                    return LoginResponse.builder().success(false)
+                            .message("Tài khoản của bạn đã bị khóa!").build();
+                }
+                // Kích hoạt tài khoản nếu chưa ACTIVE (đăng ký thường nhưng chưa xác thực email)
+                if (!"ACTIVE".equalsIgnoreCase(user.getStatus())) {
+                    user.setStatus("ACTIVE");
+                    userRepository.save(user);
+                }
+            } else {
+                // Tạo tài khoản mới từ thông tin Google
+                user = User.builder()
+                        .email(email)
+                        .fullName(fullName)
+                        .avatar(avatar)
+                        .password(passwordEncoder.encode(UUID.randomUUID().toString()))
+                        .role("USER")
+                        .status("ACTIVE")
+                        .build();
+                userRepository.save(user);
+                isNew = true;
+                log.info("Tài khoản mới đăng ký qua Google: {}", email);
+            }
+
+            return LoginResponse.builder()
+                    .success(true)
+                    .message(isNew ? "Đăng ký và đăng nhập Google thành công!" : "Đăng nhập Google thành công!")
+                    .id(user.getId())
+                    .email(user.getEmail())
+                    .phoneNumber(user.getPhoneNumber())
+                    .fullName(user.getFullName())
+                    .role(user.getRole())
+                    .avatar(user.getAvatar())
+                    .token(sessionTokenService.issue(user.getId()))
+                    .build();
+
+        } catch (Exception e) {
+            log.error("Lỗi xác thực Google ID Token: {}", e.getMessage());
+            return LoginResponse.builder().success(false)
+                    .message("Xác thực Google thất bại. Vui lòng thử lại!").build();
+        }
+    }
+
+    /**
+     * Đăng nhập / Đăng ký bằng Google UserInfo.
+     * Frontend đã lấy userInfo từ Google API (access_token) rồi gửi lên đây.
+     * Backend chỉ cần tìm/tạo user theo email rồi trả LoginResponse.
+     */
+    public LoginResponse loginWithGoogleUserInfo(GoogleUserInfoRequest request) {
+        String email = request.getEmail();
+        if (email == null || email.isBlank()) {
+            return LoginResponse.builder().success(false).message("Không lấy được email từ Google!").build();
+        }
+        email = email.toLowerCase().trim();
+
+        String fullName = request.getFullName();
+        if (fullName == null || fullName.isBlank()) fullName = email.split("@")[0];
+        String avatar = request.getAvatar();
+
+        try {
+            Optional<User> userOpt = userRepository.findByEmail(email);
+            User user;
+            boolean isNew = false;
+
+            if (userOpt.isPresent()) {
+                user = userOpt.get();
+                if ("BLOCKED".equalsIgnoreCase(user.getStatus())
+                        || "BANNED".equalsIgnoreCase(user.getStatus())
+                        || "SUSPENDED".equalsIgnoreCase(user.getStatus())) {
+                    return LoginResponse.builder().success(false)
+                            .message("Tài khoản của bạn đã bị khóa!").build();
+                }
+                // Kích hoạt nếu chưa active (đã đăng ký thường nhưng chưa xác thực email)
+                if (!"ACTIVE".equalsIgnoreCase(user.getStatus())) {
+                    user.setStatus("ACTIVE");
+                    userRepository.save(user);
+                }
+                // Cập nhật avatar nếu chưa có
+                if ((user.getAvatar() == null || user.getAvatar().isBlank()) && avatar != null && !avatar.isBlank()) {
+                    user.setAvatar(avatar);
+                    userRepository.save(user);
+                }
+            } else {
+                // Tạo tài khoản mới từ Google
+                user = User.builder()
+                        .email(email)
+                        .fullName(fullName)
+                        .avatar(avatar)
+                        .password(passwordEncoder.encode(UUID.randomUUID().toString()))
+                        .role("USER")
+                        .status("ACTIVE")
+                        .build();
+                userRepository.save(user);
+                isNew = true;
+                log.info("Tài khoản mới tạo qua Google UserInfo: {}", email);
+            }
+
+            return LoginResponse.builder()
+                    .success(true)
+                    .message(isNew ? "Đăng ký và đăng nhập Google thành công!" : "Đăng nhập Google thành công!")
+                    .id(user.getId())
+                    .email(user.getEmail())
+                    .phoneNumber(user.getPhoneNumber())
+                    .fullName(user.getFullName())
+                    .role(user.getRole())
+                    .avatar(user.getAvatar())
+                    .token(sessionTokenService.issue(user.getId()))
+                    .build();
+
+        } catch (Exception e) {
+            log.error("Lỗi loginWithGoogleUserInfo: {}", e.getMessage());
+            return LoginResponse.builder().success(false)
+                    .message("Lỗi xử lý đăng nhập Google. Vui lòng thử lại!").build();
+        }
     }
 
     public LoginResponse login(LoginRequest request) {
