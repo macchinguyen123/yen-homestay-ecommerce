@@ -19,6 +19,21 @@ export const userService = {
   },
 
   /**
+   * Kiểm tra email đã có trong CSDL Neon hay chưa
+   */
+  async checkEmailExists(email) {
+    try {
+      const cleanEmail = (email || '').trim().toLowerCase();
+      if (!cleanEmail) return false;
+      const response = await fetch(`${API_BASE_URL}/email/${encodeURIComponent(cleanEmail)}`);
+      return response.ok;
+    } catch (error) {
+      console.warn('Lỗi kiểm tra email tồn tại:', error);
+      return false;
+    }
+  },
+
+  /**
    * Cập nhật thông tin cá nhân của user lên Spring Boot API (Neon DB)
    */
   async updateUserProfile(userId, profileData) {

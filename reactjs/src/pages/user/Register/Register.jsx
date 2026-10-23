@@ -39,6 +39,21 @@ export default function Register() {
     } else if (roleParam === 'guest' || roleParam === 'tourist') {
       setRole('guest');
     }
+
+    const emailParam = searchParams.get('email');
+    const nameParam = searchParams.get('name');
+    if (emailParam || nameParam) {
+      setGuestForm((prev) => ({
+        ...prev,
+        ...(emailParam ? { email: emailParam } : {}),
+        ...(nameParam ? { name: nameParam } : {}),
+      }));
+      setHostForm((prev) => ({
+        ...prev,
+        ...(emailParam ? { email: emailParam } : {}),
+        ...(nameParam ? { name: nameParam } : {}),
+      }));
+    }
   }, [searchParams]);
 
   // Step: 1 | 2 | 3
@@ -209,6 +224,15 @@ export default function Register() {
               <span className="step-label">Hoàn tất</span>
             </div>
           </div>
+
+          {step === 1 && searchParams.get('from') === 'google' && (
+            <div className="alert alert-warning d-flex align-items-center mb-4 py-2 px-3 rounded-3" style={{ fontSize: '0.9rem', backgroundColor: '#fff8e6', borderColor: '#ffe58f', color: '#874d00' }}>
+              <i className="bi bi-info-circle-fill me-2 fs-5 text-warning"></i>
+              <div>
+                Email <strong>{searchParams.get('email')}</strong> chưa được đăng ký. Vui lòng hoàn tất thông tin bên dưới để tạo tài khoản.
+              </div>
+            </div>
+          )}
 
           {/* ==================== BƯỚC 1: FORM ==================== */}
           {step === 1 && role === 'guest' && (

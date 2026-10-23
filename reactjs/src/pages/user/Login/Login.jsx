@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useGoogleLogin } from '@react-oauth/google';
 import { authService } from '../../../services/authService';
+import { userService } from '../../../services/userService';
 import './Login.css';
 
 export default function Login() {
@@ -23,6 +24,11 @@ export default function Login() {
   const [resetLoading, setResetLoading] = useState(false);
   const [resetError, setResetError] = useState('');
   const [resetSuccess, setResetSuccess] = useState('');
+
+  // Modal & Cảnh báo đẹp khi Email Google chưa có trong CSDL
+  const [unregisteredModalOpen, setUnregisteredModalOpen] = useState(false);
+  const [unregisteredData, setUnregisteredData] = useState({ email: '', name: '', avatar: '' });
+  const [unregisteredAlert, setUnregisteredAlert] = useState('');
 
   const togglePasswordVisibility = () => {
     setShowPassword((prev) => !prev);
@@ -198,8 +204,27 @@ export default function Login() {
           headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
         });
         const userInfo = await userInfoRes.json();
+        const googleEmail = userInfo?.email?.toLowerCase()?.trim();
 
-        // Gửi email + thông tin lên backend của mình (không cần ID Token nữa)
+        if (!googleEmail) {
+          alert('Không tìm thấy địa chỉ email từ tài khoản Google của bạn. Vui lòng thử lại!');
+          return;
+        }
+
+        // BƯỚC 1: Bắt buộc kiểm tra trực tiếp vào CSDL Neon xem email đã tồn tại hay chưa
+        const existsInDb = await userService.checkEmailExists(googleEmail);
+        if (!existsInDb) {
+          setUnregisteredData({
+            email: userInfo.email,
+            name: userInfo.name || '',
+            avatar: userInfo.picture || '',
+          });
+          setUnregisteredAlert(userInfo.email);
+          setUnregisteredModalOpen(true);
+          return;
+        }
+
+        // BƯỚC 2: Nếu email ĐÃ CÓ trong CSDL -> Mới gửi lên backend xác thực phiên đăng nhập
         const result = await authService.loginWithGoogleUserInfo({
           email: userInfo.email,
           fullName: userInfo.name,
@@ -230,7 +255,24 @@ export default function Login() {
             navigate(redirectUrl || '/');
           }
         } else {
-          alert(result?.message || 'Đăng nhập Google thất bại!');
+          const isNotRegistered = result?.notRegistered || (
+            result?.message && (
+              result.message.toLowerCase().includes('chưa được đăng ký') ||
+              result.message.toLowerCase().includes('chưa tồn tại')
+            )
+          );
+
+          if (isNotRegistered) {
+            setUnregisteredData({
+              email: userInfo?.email || result?.email || googleEmail,
+              name: userInfo?.name || result?.fullName || '',
+              avatar: userInfo?.picture || '',
+            });
+            setUnregisteredAlert(userInfo?.email || result?.email || googleEmail);
+            setUnregisteredModalOpen(true);
+          } else {
+            alert(result?.message || 'Đăng nhập Google thất bại!');
+          }
         }
       } catch (err) {
         alert('Có lỗi xảy ra khi đăng nhập bằng Google. Vui lòng thử lại!');
@@ -297,6 +339,37 @@ export default function Login() {
             </h2>
             <p className="login-card-subtitle">Chào mừng bạn quay trở lại với Homestay Việt Nam</p>
           </div>
+
+          {/* Cảnh báo đẹp khi email Google chưa có trong CSDL */}
+          {unregisteredAlert && (
+            <div className="login-card-alert-warning">
+              <i className="bi bi-exclamation-triangle-fill" />
+              <div style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                Email <strong>{unregisteredAlert}</strong> chưa có trong hệ thống.
+                <button
+                  type="button"
+                  className="login-card-alert-link"
+                  onClick={() => {
+                    const targetEmail = encodeURIComponent(unregisteredAlert || '');
+                    const targetName = encodeURIComponent(unregisteredData.name || '');
+                    navigate(`/register?role=guest&email=${targetEmail}&name=${targetName}&from=google`);
+                  }}
+                  style={{ background: 'none', border: 'none', padding: 0 }}
+                >
+                  Đăng ký ngay
+                </button>
+              </div>
+              <button
+                type="button"
+                onClick={() => setUnregisteredAlert('')}
+                className="login-card-alert-close"
+                aria-label="Đóng cảnh báo"
+                title="Đóng"
+              >
+                <i className="bi bi-x" />
+              </button>
+            </div>
+          )}
 
           {/* Form Inputs */}
           <form id="login-form" className="login-form" onSubmit={handleLogin}>
@@ -619,6 +692,52 @@ export default function Login() {
                 </div>
               </form>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Modal xác nhận chuyển sang đăng ký khi email Google chưa có tài khoản */}
+      {unregisteredModalOpen && (
+        <div
+          id="unregistered-modal-overlay"
+          className="login-modal-overlay"
+          onClick={(e) => {
+            if (e.target.id === 'unregistered-modal-overlay') setUnregisteredModalOpen(false);
+          }}
+        >
+          <div className="login-unregistered-dialog" onClick={(e) => e.stopPropagation()}>
+            <div className="login-unregistered-header">
+              <div className="login-unregistered-icon">
+                <i className="bi bi-info-circle-fill" />
+              </div>
+              <h3 className="login-unregistered-title">Tài khoản chưa tồn tại</h3>
+            </div>
+
+            <p className="login-unregistered-message">
+              Email <strong>{unregisteredData.email}</strong> chưa được đăng ký với tài khoản nào. Bạn có muốn tạo tài khoản mới ngay bây giờ không?
+            </p>
+
+            <div className="login-unregistered-btn-row">
+              <button
+                type="button"
+                className="login-unregistered-cancel"
+                onClick={() => setUnregisteredModalOpen(false)}
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                className="login-unregistered-confirm"
+                onClick={() => {
+                  const targetEmail = encodeURIComponent(unregisteredData.email || '');
+                  const targetName = encodeURIComponent(unregisteredData.name || '');
+                  setUnregisteredModalOpen(false);
+                  navigate(`/register?role=guest&email=${targetEmail}&name=${targetName}&from=google`);
+                }}
+              >
+                Đăng ký ngay
+              </button>
+            </div>
           </div>
         </div>
       )}
