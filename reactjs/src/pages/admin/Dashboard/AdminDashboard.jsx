@@ -153,6 +153,8 @@ const metricDetailsMeta = {
 
 export default function AdminDashboard() {
     const [dateFilter, setDateFilter] = useState('month');
+    const [fromDate, setFromDate] = useState('');
+    const [toDate, setToDate] = useState('');
     const [activityTab, setActivityTab] = useState('all');
 
     // Dynamic State ("Code mềm" - Khởi tạo tức thì để không bao giờ bị trắng màn hình)
@@ -167,7 +169,7 @@ export default function AdminDashboard() {
     const [modalType, setModalType] = useState(''); // 'metric' or 'activity'
 
     // Fetch dynamic data in PARALLEL
-    const fetchDashboard = useCallback(async (period, showSpin = false) => {
+    const fetchDashboard = useCallback(async (period, showSpin = false, customFrom = fromDate, customTo = toDate) => {
         if (showSpin) {
             setIsRefreshing(true);
             try {
@@ -176,7 +178,7 @@ export default function AdminDashboard() {
         }
         try {
             const [overviewRes, activitiesRes] = await Promise.all([
-                adminDashboardService.getOverview(period),
+                adminDashboardService.getOverview(period, customFrom, customTo),
                 adminDashboardService.getRecentActivities('all')
             ]);
 
@@ -198,11 +200,17 @@ export default function AdminDashboard() {
                 setTimeout(() => setIsRefreshing(false), 300);
             }
         }
-    }, []);
+    }, [fromDate, toDate]);
 
     useEffect(() => {
-        fetchDashboard(dateFilter);
-    }, [dateFilter, fetchDashboard]);
+        if (dateFilter === 'custom') {
+            if (fromDate || toDate) {
+                fetchDashboard('custom', false, fromDate, toDate);
+            }
+        } else {
+            fetchDashboard(dateFilter);
+        }
+    }, [dateFilter, fromDate, toDate, fetchDashboard]);
 
     // Metrics object with safe fallback matching database
     const metrics = dashboardData?.metrics || {
@@ -359,13 +367,39 @@ export default function AdminDashboard() {
         }
     };
 
+    const parseItemDate = (timeStr) => {
+        if (!timeStr) return null;
+        const parts = timeStr.trim().split(' ')[0].split('/');
+        if (parts.length === 3) {
+            return new Date(parseInt(parts[2], 10), parseInt(parts[1], 10) - 1, parseInt(parts[0], 10));
+        }
+        const parsed = new Date(timeStr);
+        return isNaN(parsed.getTime()) ? null : parsed;
+    };
+
     // Filter Activities
     const filteredActivities = activities.filter(item => {
-        if (activityTab === 'all') return true;
-        if (activityTab === 'paid') return item.status === 'paid' || item.status === 'completed' || item.status === 'success';
-        if (activityTab === 'pending') return item.status === 'pending' || item.status === 'confirmed';
-        if (activityTab === 'refunded') return item.status === 'refunded' || item.status === 'cancelled';
-        return item.status === activityTab;
+        if (activityTab === 'paid' && !(item.status === 'paid' || item.status === 'completed' || item.status === 'success')) return false;
+        if (activityTab === 'pending' && !(item.status === 'pending' || item.status === 'confirmed')) return false;
+        if (activityTab === 'refunded' && !(item.status === 'refunded' || item.status === 'cancelled')) return false;
+        if (activityTab !== 'all' && activityTab !== 'paid' && activityTab !== 'pending' && activityTab !== 'refunded' && item.status !== activityTab) return false;
+
+        if (fromDate || toDate) {
+            const itemDate = parseItemDate(item.time || item.createdAt);
+            if (itemDate) {
+                if (fromDate) {
+                    const start = new Date(fromDate);
+                    start.setHours(0, 0, 0, 0);
+                    if (itemDate < start) return false;
+                }
+                if (toDate) {
+                    const end = new Date(toDate);
+                    end.setHours(23, 59, 59, 999);
+                    if (itemDate > end) return false;
+                }
+            }
+        }
+        return true;
     });
 
     const openMetricModal = async (key) => {
@@ -395,6 +429,13 @@ export default function AdminDashboard() {
     };
 
     const getPeriodLabel = () => {
+        if (dateFilter === 'custom' || fromDate || toDate) {
+            if (fromDate && toDate) {
+                return `Từ ${fromDate.split('-').reverse().join('/')} đến ${toDate.split('-').reverse().join('/')}`;
+            }
+            if (fromDate) return `Từ ngày ${fromDate.split('-').reverse().join('/')}`;
+            if (toDate) return `Đến ngày ${toDate.split('-').reverse().join('/')}`;
+        }
         if (dashboardData?.periodLabel) return dashboardData.periodLabel;
         switch (dateFilter) {
             case 'all': return 'Toàn bộ thời gian (Tất cả)';
@@ -410,14 +451,6 @@ export default function AdminDashboard() {
             {/* Welcome Header & Time Range Filter */}
             <div className="dashboard-header">
                 <div className="dashboard-title-wrap">
-                    <div className={`dashboard-badge-live ${!isLiveDb ? 'offline' : ''}`}>
-                        <span className="live-pulse-dot"></span>
-                        <span>
-                            {isLiveDb
-                                ? `CSDL Neon PostgreSQL • Trực tuyến (${dashboardData?.systemStatus?.uptime || '99.98%'})`
-                                : 'Chế độ Dữ liệu linh hoạt • Cập nhật thời gian thực'}
-                        </span>
-                    </div>
                     <h1 className="dashboard-title">
                         <span className="material-symbols-outlined title-icon">grid_view</span>
                         <span>Tổng quan Quản trị YÊN Homestay</span>
@@ -430,15 +463,57 @@ export default function AdminDashboard() {
 
                 <div className="dashboard-toolbar">
                     <div className="date-filter-group">
-                        <button className={`date-filter-btn ${dateFilter === 'all' ? 'active' : ''}`} onClick={() => setDateFilter('all')}>Tất cả</button>
-                        <button className={`date-filter-btn ${dateFilter === '7days' ? 'active' : ''}`} onClick={() => setDateFilter('7days')}>1 tuần</button>
-                        <button className={`date-filter-btn ${dateFilter === 'month' ? 'active' : ''}`} onClick={() => setDateFilter('month')}>1 tháng</button>
-                        <button className={`date-filter-btn ${dateFilter === 'year' ? 'active' : ''}`} onClick={() => setDateFilter('year')}>1 năm</button>
+                        <button className={`date-filter-btn ${dateFilter === 'all' && !fromDate && !toDate ? 'active' : ''}`} onClick={() => { setDateFilter('all'); setFromDate(''); setToDate(''); }}>Tất cả</button>
+                        <button className={`date-filter-btn ${dateFilter === '7days' && !fromDate && !toDate ? 'active' : ''}`} onClick={() => { setDateFilter('7days'); setFromDate(''); setToDate(''); }}>1 tuần</button>
+                        <button className={`date-filter-btn ${dateFilter === 'month' && !fromDate && !toDate ? 'active' : ''}`} onClick={() => { setDateFilter('month'); setFromDate(''); setToDate(''); }}>1 tháng</button>
+                        <button className={`date-filter-btn ${dateFilter === 'year' && !fromDate && !toDate ? 'active' : ''}`} onClick={() => { setDateFilter('year'); setFromDate(''); setToDate(''); }}>1 năm</button>
+                    </div>
+
+                    {/* Bộ lọc theo khoảng thời gian từ ngày nào tới ngày nào */}
+                    <div className="dashboard-date-range">
+                        <div className="date-range-field">
+                            <span className="date-range-label">Từ:</span>
+                            <input
+                                type="date"
+                                className="date-range-input"
+                                value={fromDate}
+                                onChange={(e) => {
+                                    setFromDate(e.target.value);
+                                    setDateFilter('custom');
+                                }}
+                            />
+                        </div>
+                        <div className="date-range-field">
+                            <span className="date-range-label">Đến:</span>
+                            <input
+                                type="date"
+                                className="date-range-input"
+                                value={toDate}
+                                onChange={(e) => {
+                                    setToDate(e.target.value);
+                                    setDateFilter('custom');
+                                }}
+                            />
+                        </div>
+                        {(fromDate || toDate) && (
+                            <button
+                                className="date-range-reset-btn"
+                                onClick={() => {
+                                    setFromDate('');
+                                    setToDate('');
+                                    setDateFilter('month');
+                                }}
+                                title="Xóa lọc khoảng ngày, về 1 tháng"
+                            >
+                                <span className="material-symbols-outlined" style={{ fontSize: '15px' }}>close</span>
+                                <span>Đặt lại</span>
+                            </button>
+                        )}
                     </div>
 
                     <button
                         className="btn-dash-refresh"
-                        onClick={() => fetchDashboard(dateFilter, true)}
+                        onClick={() => fetchDashboard(dateFilter, true, fromDate, toDate)}
                         title="Đồng bộ dữ liệu mới nhất từ CSDL"
                         disabled={isRefreshing}
                     >
@@ -448,9 +523,22 @@ export default function AdminDashboard() {
                         <span>{isRefreshing ? 'Đang tải...' : 'Làm mới'}</span>
                     </button>
 
-                    <Link to="/admin/reports" className="btn-dash-action btn-dash-primary">
-                        <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>download</span>
-                        <span>Báo cáo chi tiết</span>
+                    <Link
+                        to="/admin/reports"
+                        className="btn-dash-action btn-dash-report"
+                        style={{
+                            background: '#F0FDF4',
+                            color: '#15803D',
+                            border: '1.5px solid #15803D',
+                            fontWeight: 700,
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            textDecoration: 'none'
+                        }}
+                    >
+                        <span className="material-symbols-outlined" style={{ fontSize: '16px', color: '#15803D' }}>download</span>
+                        <span style={{ color: '#15803D' }}>Báo cáo chi tiết</span>
                     </Link>
                 </div>
             </div>
@@ -973,15 +1061,43 @@ export default function AdminDashboard() {
                     <div className="dash-modal-footer">
                         <button className="btn-dash-action" onClick={closeModal}>Đóng</button>
                         {modalType === 'metric' && modalData && (
-                            <Link to={modalData.actionLink} className="btn-dash-action btn-dash-primary" style={{ display: 'inline-flex' }} onClick={closeModal}>
-                                <span>{modalData.actionText}</span>
-                                <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>arrow_forward</span>
+                            <Link
+                                to={modalData.actionLink}
+                                className="btn-dash-action btn-dash-modal-link"
+                                style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                    background: '#F0FDF4',
+                                    color: '#15803D',
+                                    border: '1.5px solid #15803D',
+                                    fontWeight: 700,
+                                    textDecoration: 'none'
+                                }}
+                                onClick={closeModal}
+                            >
+                                <span style={{ color: '#15803D' }}>{modalData.actionText}</span>
+                                <span className="material-symbols-outlined" style={{ fontSize: '16px', color: '#15803D' }}>arrow_forward</span>
                             </Link>
                         )}
                         {modalType === 'activity' && modalData && (
-                            <Link to="/admin/transactions" className="btn-dash-action btn-dash-primary" style={{ display: 'inline-flex' }} onClick={closeModal}>
-                                <span>Xem trong Quản lý giao dịch</span>
-                                <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>arrow_forward</span>
+                            <Link
+                                to="/admin/transactions"
+                                className="btn-dash-action btn-dash-modal-link"
+                                style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                    background: '#F0FDF4',
+                                    color: '#15803D',
+                                    border: '1.5px solid #15803D',
+                                    fontWeight: 700,
+                                    textDecoration: 'none'
+                                }}
+                                onClick={closeModal}
+                            >
+                                <span style={{ color: '#15803D' }}>Xem trong Quản lý giao dịch</span>
+                                <span className="material-symbols-outlined" style={{ fontSize: '16px', color: '#15803D' }}>arrow_forward</span>
                             </Link>
                         )}
                     </div>
