@@ -9,7 +9,11 @@ const formatMsgTime = (timestamp) => {
   if (isNaN(d.getTime())) return '';
   const now = new Date();
   const isToday = d.toDateString() === now.toDateString();
-  const timeStr = d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+  const timeStr = d.toLocaleTimeString('vi-VN', {
+    timeZone: 'Asia/Ho_Chi_Minh',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
   if (isToday) return timeStr;
   return `${timeStr} · ${d.getDate()}/${d.getMonth() + 1}`;
 };
@@ -27,6 +31,12 @@ export default function Messages() {
   const [error, setError] = useState('');
   const [sending, setSending] = useState(false);
 
+  // Danh sách ảnh đang chờ gửi (Pending queue)
+  const [pendingImages, setPendingImages] = useState([]);
+  // Lightbox xem ảnh lớn
+  const [lightboxImg, setLightboxImg] = useState(null);
+
+  const fileInputRef = useRef(null);
   const listRef = useRef(null);
   const isAtBottomRef = useRef(true);
   const prevMsgCountRef = useRef(0);
@@ -100,7 +110,10 @@ export default function Messages() {
           setMsgs((prev) => {
             if (prev.length === data.length) {
               const isUnchanged = prev.every(
-                (m, idx) => m.message_id === data[idx].message_id && m.is_read === data[idx].is_read
+                (m, idx) =>
+                  m.message_id === data[idx].message_id &&
+                  m.is_read === data[idx].is_read &&
+                  m.image_url === data[idx].image_url
               );
               if (isUnchanged) return prev; // Giữ nguyên tham chiếu để KHÔNG kéo cuộn của user
             }
@@ -142,18 +155,82 @@ export default function Messages() {
     }
   }, [msgs.length]);
 
+  // Xử lý chọn nhiều hình ảnh
+  const handleImagesSelect = (e) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    if (pendingImages.length + files.length > 10) {
+      alert('Bạn chỉ có thể đính kèm tối đa 10 ảnh trong một lần gửi!');
+      return;
+    }
+
+    files.forEach((file) => {
+      if (!file.type.startsWith('image/')) {
+        alert(`Tệp "${file.name}" không phải là ảnh hợp lệ!`);
+        return;
+      }
+      if (file.size > 8 * 1024 * 1024) {
+        alert(`Ảnh "${file.name}" vượt quá dung lượng tối đa 8MB!`);
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const dataUrl = event.target.result;
+        setPendingImages((prev) => [
+          ...prev,
+          {
+            id: `pending_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            dataUrl,
+            name: file.name,
+          },
+        ]);
+      };
+      reader.readAsDataURL(file);
+    });
+
+    e.target.value = '';
+  };
+
+  // Nút X xóa từng ảnh khỏi hàng đợi chờ gửi
+  const handleRemovePendingImage = (imgId) => {
+    setPendingImages((prev) => prev.filter((img) => img.id !== imgId));
+  };
+
+  const handleClearAllPending = () => {
+    setPendingImages([]);
+  };
+
   const send = async () => {
-    if (!text.trim() || !active?.conversation_id || sending) return;
+    if ((!text.trim() && pendingImages.length === 0) || !active?.conversation_id || sending) return;
     const content = text.trim();
+    const imagesToSend = [...pendingImages];
+
     setText('');
+    setPendingImages([]);
     setSending(true);
     setError('');
 
     try {
-      const m = await chatService.send(active.conversation_id, content);
+      if (content) {
+        const firstImg = imagesToSend.length > 0 ? imagesToSend[0].dataUrl : null;
+        const m = await chatService.send(active.conversation_id, content, firstImg);
+        isAtBottomRef.current = true;
+        setMsgs((prev) => [...prev, m]);
+
+        for (let i = 1; i < imagesToSend.length; i++) {
+          const imgMsg = await chatService.send(active.conversation_id, '', imagesToSend[i].dataUrl);
+          setMsgs((prev) => [...prev, imgMsg]);
+        }
+      } else {
+        for (let i = 0; i < imagesToSend.length; i++) {
+          const imgMsg = await chatService.send(active.conversation_id, '', imagesToSend[i].dataUrl);
+          setMsgs((prev) => [...prev, imgMsg]);
+        }
+      }
+
       isAtBottomRef.current = true;
-      setMsgs((prev) => [...prev, m]);
-      prevMsgCountRef.current += 1;
       setTimeout(() => scrollToBottom(true), 30);
       load();
     } catch (e) {
@@ -286,11 +363,27 @@ export default function Messages() {
                       <div className={`message-row ${isMine ? 'mine' : ''}`} key={m.message_id}>
                         <div className="message-bubble">
                           {!isMine && m.sender_name && (
-                            <span style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#16845b', marginBottom: '3px' }}>
+                            <span style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: isMine ? '#fff' : '#16845b', marginBottom: '3px' }}>
                               {m.sender_name}
                             </span>
                           )}
-                          <div style={{ wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}>{m.content}</div>
+
+                          {/* Hiển thị hình ảnh nếu có */}
+                          {m.image_url && (
+                            <div className="message-image-wrapper">
+                              <img
+                                src={m.image_url}
+                                alt="Ảnh trò chuyện"
+                                className="chat-msg-image"
+                                onClick={() => setLightboxImg(m.image_url)}
+                                title="Nhấp để phóng to"
+                              />
+                            </div>
+                          )}
+
+                          {m.content && m.content !== '[Hình ảnh]' && (
+                            <div style={{ wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}>{m.content}</div>
+                          )}
                           <time>{formatMsgTime(m.created_at)}</time>
                         </div>
                       </div>
@@ -300,12 +393,72 @@ export default function Messages() {
                   <div className="message-empty">
                     <i className="bi bi-chat-heart" />
                     <h3>Bắt đầu cuộc trò chuyện</h3>
-                    <p>Hãy gửi lời chào đến chủ homestay để được hỗ trợ tốt nhất.</p>
+                    <p>Hãy gửi lời chào hoặc hình ảnh đến chủ homestay để được hỗ trợ tốt nhất.</p>
                   </div>
                 )}
               </section>
 
+              {/* HÀNG ĐỢI XEM TRƯỚC NHIỀU ẢNH TRƯỚC KHI GỬI (PENDING QUEUE) */}
+              {pendingImages.length > 0 && (
+                <div className="chat-images-queue-panel">
+                  <div className="queue-panel-header">
+                    <span className="queue-count-tag">
+                      <i className="bi bi-images" style={{ marginRight: '6px' }} />
+                      Đang chờ gửi ({pendingImages.length}/10 ảnh)
+                    </span>
+                    <button
+                      type="button"
+                      className="btn-clear-queue"
+                      onClick={handleClearAllPending}
+                      title="Hủy toàn bộ ảnh đang chờ"
+                    >
+                      <i className="bi bi-trash3" style={{ marginRight: '4px' }} /> Hủy tất cả
+                    </button>
+                  </div>
+
+                  <div className="queue-thumbnails-strip">
+                    {pendingImages.map((img) => (
+                      <div className="queue-thumb-item" key={img.id}>
+                        <img src={img.dataUrl} alt={img.name} />
+                        <span className="queue-status-badge">Chờ gửi</span>
+                        {/* Nút X xóa ảnh khỏi hàng đợi khi đổi ý */}
+                        <button
+                          type="button"
+                          className="btn-remove-queue-item"
+                          onClick={() => handleRemovePendingImage(img.id)}
+                          title="Xóa ảnh này"
+                        >
+                          <i className="bi bi-x-lg" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <footer>
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  style={{ display: 'none' }}
+                  multiple
+                  accept="image/png, image/jpeg, image/jpg, image/webp, image/gif"
+                  onChange={handleImagesSelect}
+                />
+
+                <button
+                  type="button"
+                  className={`btn-attach-image ${pendingImages.length > 0 ? 'has-pending' : ''}`}
+                  onClick={() => fileInputRef.current?.click()}
+                  title="Đính kèm một hoặc nhiều hình ảnh"
+                  disabled={sending}
+                >
+                  <i className="bi bi-images" />
+                  {pendingImages.length > 0 && (
+                    <span className="attach-count-badge">{pendingImages.length}</span>
+                  )}
+                </button>
+
                 <input
                   value={text}
                   onChange={(e) => setText(e.target.value)}
@@ -315,11 +468,19 @@ export default function Messages() {
                       send();
                     }
                   }}
-                  placeholder="Nhập tin nhắn..."
+                  placeholder={
+                    pendingImages.length > 0
+                      ? `Đã chọn ${pendingImages.length} ảnh. Thêm tin nhắn và nhấn Gửi...`
+                      : "Nhập tin nhắn..."
+                  }
                   disabled={sending}
                 />
-                <button onClick={send} disabled={!text.trim() || sending}>
-                  <i className="bi bi-send-fill" />
+                <button onClick={send} disabled={(!text.trim() && pendingImages.length === 0) || sending}>
+                  {sending ? (
+                    <span className="spinner-border spinner-border-sm" role="status" />
+                  ) : (
+                    <i className="bi bi-send-fill" />
+                  )}
                 </button>
               </footer>
             </>
@@ -334,6 +495,26 @@ export default function Messages() {
           {error && <div className="chat-error">{error}</div>}
         </main>
       </div>
+
+      {/* LIGHTBOX XEM ẢNH FULLSCREEN */}
+      {lightboxImg && (
+        <div className="chat-lightbox-overlay" onClick={() => setLightboxImg(null)}>
+          <button
+            type="button"
+            className="chat-lightbox-close"
+            onClick={() => setLightboxImg(null)}
+            title="Đóng (Esc)"
+          >
+            <i className="bi bi-x-lg" />
+          </button>
+          <img
+            src={lightboxImg}
+            alt="Phóng to ảnh trò chuyện"
+            className="chat-lightbox-img"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
     </div>
   );
 }
