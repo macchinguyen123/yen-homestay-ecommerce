@@ -398,4 +398,46 @@ public class CashbackWalletService {
             log.warn("Không thể gửi thông báo tích điểm: {}", e.getMessage());
         }
     }
+
+    /**
+     * Khấu trừ điểm / tiền tích lũy khi du khách dùng để thanh toán đơn đặt phòng
+     */
+    @Transactional
+    public void deductCashbackForBooking(Long userId, BigDecimal amount, String bookingCode) {
+        if (userId == null || amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            return;
+        }
+
+        UserWallet wallet = walletRepository.findByUserId(userId)
+                .orElseGet(() -> initializeUserWallet(userId));
+        if (wallet == null || wallet.getBalance() == null || wallet.getBalance().compareTo(BigDecimal.ZERO) <= 0) {
+            return;
+        }
+
+        BigDecimal deductAmount = amount.min(wallet.getBalance()).setScale(0, java.math.RoundingMode.HALF_UP);
+        if (deductAmount.compareTo(BigDecimal.ZERO) <= 0) {
+            return;
+        }
+
+        wallet.setBalance(wallet.getBalance().subtract(deductAmount));
+        wallet.setUpdatedAt(LocalDateTime.now());
+        walletRepository.save(wallet);
+
+        String dateStr = LocalDateTime.now().format(DATE_FORMATTER) + " • Đơn phòng #" + bookingCode;
+
+        WalletTransaction txn = WalletTransaction.builder()
+                .userId(userId)
+                .title("Dùng điểm tích lũy thanh toán đơn #" + bookingCode)
+                .dateDisplay(dateStr)
+                .amount(deductAmount)
+                .amountDisplay("-" + formatVnd(deductAmount) + " VNĐ")
+                .type("minus")
+                .status("Thành công")
+                .referenceCode(bookingCode)
+                .createdAt(LocalDateTime.now())
+                .build();
+
+        transactionRepository.save(txn);
+        log.info("Đã trừ {} VNĐ điểm tích lũy của du khách {} cho đơn {}", deductAmount, userId, bookingCode);
+    }
 }

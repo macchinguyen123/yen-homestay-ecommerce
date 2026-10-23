@@ -638,6 +638,10 @@ function RoomModal({ room, homestay, homestayRating = '5.0', homestayReviewCount
                   <span>Tổng thanh toán dự tính:</span>
                   <b className="breakdown-total-price">{fmtVND(total)}</b>
                 </div>
+                <div style={{ marginTop: '8px', background: '#ECFDF5', border: '1px dashed #10B981', borderRadius: '8px', padding: '6px 10px', fontSize: '0.82rem', color: '#065F46', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span><i className="bi bi-coin me-1" style={{ color: '#059669' }} />Tích 5% cho lần đặt tiếp theo:</span>
+                  <b>+{fmtVND(Math.round(total * 0.05))}</b>
+                </div>
               </div>
             </div>
 
@@ -672,6 +676,9 @@ function RoomModal({ room, homestay, homestayRating = '5.0', homestayReviewCount
             <div className="room-footer-amount-row">
               <b className="room-footer-total">{fmtVND(total)}</b>
               <span className="room-footer-nights">/ {nights} đêm · {guests} khách</span>
+            </div>
+            <div style={{ fontSize: '0.8rem', color: '#059669', fontWeight: 600, display: 'flex', alignItems: 'center', marginTop: '2px' }}>
+              <i className="bi bi-coin me-1" />Tích 5% (~{fmtVND(Math.round(total * 0.05))}) giảm giá cho lần đặt sau
             </div>
           </div>
           <button 
@@ -2083,6 +2090,9 @@ export default function HomestayDetail() {
             <div className="summary-card">
               <span className="summary-from-label">Giá chỉ từ</span>
               <div className="summary-price"><b>{fmtVND(minPrice)}</b> / đêm</div>
+              <div style={{ margin: '4px 0 10px 0', background: '#ECFDF5', border: '1px solid #A7F3D0', borderRadius: '8px', padding: '6px 10px', fontSize: '0.82rem', color: '#065F46', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <i className="bi bi-coin" style={{ color: '#059669', fontSize: '1rem' }} /> Tích 5% điểm thưởng giảm giá lần sau
+              </div>
               <div className="summary-rating"><i className="bi bi-star-fill" /> {homestayRating} · {homestayReviewCount} đánh giá</div>
               <button type="button" className="yn-btn yn-btn--primary yn-btn--lg yn-btn--block" onClick={scrollToRooms}>
                 Xem các loại phòng
