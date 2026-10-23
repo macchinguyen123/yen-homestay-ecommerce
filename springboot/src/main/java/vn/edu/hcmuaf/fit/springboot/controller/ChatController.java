@@ -8,12 +8,21 @@ import org.springframework.web.server.ResponseStatusException;
 import org.springframework.security.core.Authentication;
 import java.util.*;
 
+import jakarta.annotation.PostConstruct;
+
 @RestController
 @RequestMapping("/api/chat")
 @CrossOrigin(origins = "*")
 @RequiredArgsConstructor
 public class ChatController {
     private final JdbcTemplate jdbc;
+
+    @PostConstruct
+    public void init() {
+        try {
+            jdbc.execute("ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS image_url TEXT");
+        } catch (Exception ignored) {}
+    }
 
     private long me(Authentication a) {
         try { if (a == null || !a.isAuthenticated()) throw new Exception(); return Long.parseLong(a.getName()); }
@@ -44,7 +53,29 @@ public class ChatController {
     public List<Map<String,Object>> messages(@PathVariable long id, Authentication a){long u=me(a);conversation(id,u);return jdbc.queryForList("SELECT * FROM chat_messages WHERE conversation_id=? ORDER BY created_at ASC",id);}
 
     @PostMapping("/conversations/{id}/messages")
-    public Map<String,Object> send(@PathVariable long id,@RequestBody Map<String,Object> body,Authentication a){long u=me(a);Map<String,Object> c=conversation(id,u);String text=String.valueOf(body.getOrDefault("content","")).trim();if(text.isEmpty())throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Nội dung không được để trống");jdbc.update("INSERT INTO chat_messages(conversation_id,sender_id,content) VALUES(?,?,?)",id,u,text);jdbc.update("UPDATE chat_conversations SET last_message=?,last_message_at=CURRENT_TIMESTAMP WHERE conversation_id=?",text,id);return jdbc.queryForMap("SELECT * FROM chat_messages WHERE conversation_id=? ORDER BY message_id DESC LIMIT 1",id);}
+    public Map<String,Object> send(@PathVariable long id,@RequestBody Map<String,Object> body,Authentication a){
+        long u=me(a);
+        Map<String,Object> c=conversation(id,u);
+        String text=String.valueOf(body.getOrDefault("content","")).trim();
+        String imageUrl=body.get("imageUrl") != null ? String.valueOf(body.get("imageUrl")).trim() : null;
+        if(imageUrl != null && imageUrl.isEmpty()) imageUrl = null;
+        
+        if(text.isEmpty() && imageUrl == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Nội dung tin nhắn hoặc hình ảnh không được để trống");
+        }
+
+        String lastMsg = !text.isEmpty() ? text : "[Hình ảnh]";
+
+        try {
+            jdbc.update("INSERT INTO chat_messages(conversation_id,sender_id,content,image_url) VALUES(?,?,?,?)",id,u,text,imageUrl);
+        } catch (Exception ex) {
+            // Fallback nếu cột image_url chưa có
+            jdbc.update("INSERT INTO chat_messages(conversation_id,sender_id,content) VALUES(?,?,?)",id,u,!text.isEmpty() ? text : (imageUrl != null ? "[Hình ảnh]" : ""));
+        }
+
+        jdbc.update("UPDATE chat_conversations SET last_message=?,last_message_at=CURRENT_TIMESTAMP WHERE conversation_id=?",lastMsg,id);
+        return jdbc.queryForMap("SELECT * FROM chat_messages WHERE conversation_id=? ORDER BY message_id DESC LIMIT 1",id);
+    }
 
     @PatchMapping("/conversations/{id}/read")
     public Map<String,Object> read(@PathVariable long id,Authentication a){long u=me(a);Map<String,Object> c=conversation(id,u);jdbc.update("UPDATE chat_messages SET is_read=TRUE WHERE conversation_id=? AND sender_id<>?",id,u);return Map.of("success",true);}
