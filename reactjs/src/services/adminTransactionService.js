@@ -27,10 +27,10 @@ const DEFAULT_STATS = {
 };
 
 export const adminTransactionService = {
-    // 1. Lấy danh sách giao dịch kèm bộ lọc, tìm kiếm và phân trang (với Timeout 2.5s)
+    // 1. Lấy danh sách giao dịch kèm bộ lọc, tìm kiếm và phân trang (với Timeout 8s)
     async getTransactions(statusFilter = 'all', search = '', gatewayFilter = 'all', page = 1, limit = 10) {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 2500);
+        const timeoutId = setTimeout(() => controller.abort(), 8000);
 
         try {
             const params = new URLSearchParams();

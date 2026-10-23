@@ -6,6 +6,7 @@ import { authService } from "../../../services/authService";
 import { viewedHistoryService } from "../../../services/viewedHistoryService";
 import { cashbackService } from "../../../services/cashbackService";
 import { voucherService } from "../../../services/voucherService";
+import { bookingService } from "../../../services/bookingService";
 import { formatAmenities } from "../Category/Category";
 
 const PROVINCES_DATA = [
@@ -57,6 +58,24 @@ export default function PersonalAccount() {
 
   // Transactions Filter
   const [txnFilter, setTxnFilter] = useState("all");
+  const [userTxns, setUserTxns] = useState(() => {
+    try {
+      const localList = JSON.parse(localStorage.getItem('yenBookings') || '[]');
+      const currentUser = authService.getCurrentUser();
+      const userId = currentUser?.id || 21;
+      const cached = bookingService.getCachedUserBookings(userId);
+      const map = new Map();
+      localList.forEach((b) => { if (b?.code) map.set(b.code, b); });
+      cached.forEach((b) => {
+        const code = b.bookingCode || b.code;
+        if (code && !map.has(code)) map.set(code, b);
+      });
+      return Array.from(map.values());
+    } catch (e) {
+      return [];
+    }
+  });
+  const [loadingTxns, setLoadingTxns] = useState(false);
 
   // Cashback Wallet Balance & Transactions (Khởi tạo từ cache cho tốc độ 0ms)
   const [walletData, setWalletData] = useState(() => {
@@ -337,6 +356,195 @@ export default function PersonalAccount() {
 
     fetchWallet();
   }, [activeTab]);
+
+  // Load real booking transactions from Neon PostgreSQL and LocalStorage
+  useEffect(() => {
+    let isMounted = true;
+    const fetchUserTransactions = async () => {
+      const currentUser = authService.getCurrentUser();
+      const userId = currentUser?.id || 21;
+      setLoadingTxns(true);
+      try {
+        const dbBookings = await bookingService.getUserBookings(userId);
+        const localList = JSON.parse(localStorage.getItem('yenBookings') || '[]');
+        
+        const map = new Map();
+        if (Array.isArray(dbBookings)) {
+          dbBookings.forEach((b) => {
+            const code = b.bookingCode || b.code;
+            if (code) map.set(code, b);
+          });
+        }
+        if (Array.isArray(localList)) {
+          localList.forEach((b) => {
+            if (b?.code) {
+              const existing = map.get(b.code);
+              map.set(b.code, { ...existing, ...b });
+            }
+          });
+        }
+        const merged = Array.from(map.values());
+        if (isMounted && merged.length > 0) {
+          setUserTxns(merged);
+        }
+      } catch (err) {
+        console.warn("Lỗi tải danh sách giao dịch đặt phòng:", err);
+      } finally {
+        if (isMounted) setLoadingTxns(false);
+      }
+    };
+
+    fetchUserTransactions();
+    return () => { isMounted = false; };
+  }, [activeTab]);
+
+  // Định dạng và chuẩn hóa danh sách giao dịch thực tế
+  const formattedTxns = useMemo(() => {
+    if (!userTxns || userTxns.length === 0) {
+      return [
+        {
+          id: 'HS-98234',
+          code: 'HS-98234',
+          date: '12/08/2026',
+          name: 'Pù Luông Eco Garden',
+          loc: 'Bá Thước, Thanh Hóa',
+          method: 'Chuyển khoản QR',
+          methodIcon: 'bi-qr-code-scan text-success',
+          amount: '1.300.000đ',
+          subTotal: '1.500.000đ',
+          discount: '200.000đ',
+          dates: '12/08/2026 - 14/08/2026 (2 đêm)',
+          status: 'success',
+          statusText: 'Thành công',
+          txnId: 'VCB9823412'
+        },
+        {
+          id: 'HS-87112',
+          code: 'HS-87112',
+          date: '24/05/2026',
+          name: 'The Memory Villa',
+          loc: 'Hồ Tuyền Lâm, Đà Lạt',
+          method: 'Thẻ Visa / Master',
+          methodIcon: 'bi-credit-card-2-front text-primary',
+          amount: '1.450.000đ',
+          subTotal: '1.630.000đ',
+          discount: '180.000đ',
+          dates: '24/05/2026 - 26/05/2026 (2 đêm)',
+          status: 'success',
+          statusText: 'Thành công',
+          txnId: 'VISA8711200'
+        },
+        {
+          id: 'HS-76501',
+          code: 'HS-76501',
+          date: '10/01/2026',
+          name: 'Tràng An Retreat',
+          loc: 'Tràng An, Ninh Bình',
+          method: 'Ví e-Wallet',
+          methodIcon: 'bi-wallet2 text-warning',
+          amount: '1.050.000đ',
+          subTotal: '1.170.000đ',
+          discount: '120.000đ',
+          dates: '10/01/2026 - 11/01/2026 (1 đêm)',
+          status: 'refund',
+          statusText: 'Đã hoàn tiền',
+          txnId: 'REF7650199'
+        }
+      ];
+    }
+
+    return userTxns.map((b, idx) => {
+      const code = b.bookingCode || b.code || `YEN-2026-${1000 + idx}`;
+      const name = b.homestayName || b.homestay || 'Homestay YÊN';
+      const loc = b.location || 'Việt Nam';
+      
+      let dateDisplay = 'Hôm nay';
+      if (b.createdAt) {
+        try {
+          const d = new Date(b.createdAt);
+          if (!isNaN(d.getTime())) {
+            dateDisplay = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+          }
+        } catch (e) {}
+      } else if (b.checkInDate || b.checkIn || b.checkin) {
+        dateDisplay = b.checkInDate || b.checkIn || b.checkin;
+      }
+
+      const checkinStr = b.checkInDate || b.checkIn || b.checkin || '-';
+      const checkoutStr = b.checkOutDate || b.checkOut || b.checkout || '-';
+      const nights = b.nights || 1;
+      const datesDisplay = `${checkinStr} - ${checkoutStr} (${nights} đêm)`;
+
+      let amtNum = 0;
+      if (typeof b.totalPriceRaw === 'number') amtNum = b.totalPriceRaw;
+      else if (typeof b.totalPrice === 'number') amtNum = b.totalPrice;
+      else if (b.pricing?.total) amtNum = b.pricing.total;
+      else if (typeof b.totalPrice === 'string') {
+        const clean = b.totalPrice.replace(/[^\d]/g, '');
+        amtNum = Number(clean) || 0;
+      }
+      const amountStr = amtNum > 0 ? `${amtNum.toLocaleString('vi-VN')}đ` : (typeof b.totalPrice === 'string' ? b.totalPrice : '1.500.000đ');
+
+      const rawMethod = (b.paymentMethod || b.method || b.paymentType || '').toUpperCase();
+      let methodText = 'Chuyển khoản QR';
+      let methodIcon = 'bi-qr-code-scan text-success';
+      if (rawMethod.includes('VNPAY')) {
+        methodText = 'Cổng VNPAY (Sandbox)';
+        methodIcon = 'bi-shield-check text-primary';
+      } else if (rawMethod.includes('MOMO')) {
+        methodText = 'Ví MoMo';
+        methodIcon = 'bi-wallet2 text-danger';
+      } else if (rawMethod.includes('CASH')) {
+        methodText = 'Tiền mặt';
+        methodIcon = 'bi-cash-coin text-warning';
+      } else if (rawMethod.includes('CARD') || rawMethod.includes('VISA')) {
+        methodText = 'Thẻ Visa / Master';
+        methodIcon = 'bi-credit-card-2-front text-primary';
+      }
+
+      const rawStatus = (b.status || b.statusRaw || '').toUpperCase();
+      const depStatus = (b.depositStatus || '').toUpperCase();
+      let status = 'success';
+      let statusText = 'Thành công';
+
+      if (rawStatus.includes('CANCEL') || rawStatus.includes('REFUND') || depStatus.includes('REFUND')) {
+        status = 'refund';
+        statusText = 'Đã hoàn tiền';
+      } else {
+        status = 'success';
+        statusText = 'Thành công';
+      }
+
+      return {
+        id: b.id || code,
+        code: code.replace(/^#/, ''),
+        date: dateDisplay,
+        name,
+        loc,
+        method: methodText,
+        methodIcon,
+        amount: amountStr,
+        subTotal: amountStr,
+        discount: b.discountAmount ? `${Number(b.discountAmount).toLocaleString('vi-VN')}đ` : '0đ',
+        dates: datesDisplay,
+        status,
+        statusText,
+        txnId: `TXN-${code.replace(/^#/, '')}`
+      };
+    });
+  }, [userTxns]);
+
+  const txnCountSummary = useMemo(() => {
+    const total = formattedTxns.length;
+    const success = formattedTxns.filter((t) => t.status === 'success').length;
+    const refund = formattedTxns.filter((t) => t.status === 'refund').length;
+    return { total, success, refund };
+  }, [formattedTxns]);
+
+  const displayedTxns = useMemo(() => {
+    if (txnFilter === 'all') return formattedTxns;
+    return formattedTxns.filter((t) => t.status === txnFilter);
+  }, [formattedTxns, txnFilter]);
 
   // Handlers
   const handleProfileSubmit = async (e) => {
@@ -1519,17 +1727,19 @@ export default function PersonalAccount() {
                       <i className="bi bi-receipt me-1"></i> Lịch sử đặt phòng
                     </span>
                     <h2 className="h4 fw-bold text-white mb-1">Danh Sách Giao Dịch</h2>
-                    <p className="text-xs mb-0" style={{color:"#DCFCE7"}}>Toàn bộ lịch sử đặt phòng và thanh toán của bạn</p>
+                    <p className="text-xs mb-0" style={{ color: "#DCFCE7" }}>Toàn bộ lịch sử đặt phòng và thanh toán của bạn</p>
                   </div>
                   <div className="txn-summary-chips">
                     <div className="txn-chip txn-chip-success">
                       <i className="bi bi-check-circle-fill"></i>
-                      <span>2 Thành công</span>
+                      <span>{txnCountSummary.success} Thành công</span>
                     </div>
-                    <div className="txn-chip txn-chip-refund">
-                      <i className="bi bi-arrow-return-left"></i>
-                      <span>1 Hoàn tiền</span>
-                    </div>
+                    {txnCountSummary.refund > 0 && (
+                      <div className="txn-chip txn-chip-refund">
+                        <i className="bi bi-arrow-return-left"></i>
+                        <span>{txnCountSummary.refund} Hoàn tiền</span>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1537,7 +1747,7 @@ export default function PersonalAccount() {
               <div className="eco-card">
                 <div className="eco-card-title">
                   <span><i className="bi bi-card-list text-success me-2"></i>Lịch sử giao dịch &amp; Đặt phòng</span>
-                  <span className="txn-count-badge">3 Giao dịch</span>
+                  <span className="txn-count-badge">{txnCountSummary.total} Giao dịch</span>
                 </div>
 
                 {/* Filter Bar */}
@@ -1546,97 +1756,66 @@ export default function PersonalAccount() {
                     className={`txn-filter-btn ${txnFilter === "all" ? "active" : ""}`}
                     onClick={() => setTxnFilter("all")}
                   >
-                    <i className="bi bi-grid-3x2-gap-fill me-1"></i> Tất cả (3)
+                    <i className="bi bi-grid-3x2-gap-fill me-1"></i> Tất cả ({txnCountSummary.total})
                   </button>
                   <button
                     className={`txn-filter-btn ${txnFilter === "success" ? "active" : ""}`}
                     onClick={() => setTxnFilter("success")}
                   >
-                    <i className="bi bi-check-circle-fill me-1"></i> Thành công (2)
+                    <i className="bi bi-check-circle-fill me-1"></i> Thành công ({txnCountSummary.success})
                   </button>
                   <button
                     className={`txn-filter-btn ${txnFilter === "refund" ? "active" : ""}`}
                     onClick={() => setTxnFilter("refund")}
                   >
-                    <i className="bi bi-arrow-return-left me-1"></i> Đã hoàn hủy (1)
+                    <i className="bi bi-arrow-return-left me-1"></i> Đã hoàn hủy ({txnCountSummary.refund})
                   </button>
                 </div>
 
                 {/* Transaction Cards */}
                 <div className="txn-list">
-                  {(txnFilter === "all" || txnFilter === "success") && (
-                    <div className="txn-row-card txn-status-success">
-                      <div className="txn-row-left">
-                        <div className="txn-order-col">
-                          <span className="txn-order-id">#HS-98234</span>
-                          <span className="txn-date-pill"><i className="bi bi-calendar3 me-1"></i>12/08/2026</span>
-                        </div>
-                        <div className="txn-info-col">
-                          <span className="txn-name">Pù Luông Eco Garden</span>
-                          <span className="txn-loc"><i className="bi bi-geo-alt-fill me-1 text-danger"></i>Bá Thước, Thanh Hóa</span>
-                        </div>
-                        <div className="txn-method-col">
-                          <span className="txn-method-badge"><i className="bi bi-qr-code-scan me-1 text-success"></i>Chuyển khoản QR</span>
-                        </div>
+                  {displayedTxns.length === 0 ? (
+                    <div className="text-center py-5">
+                      <div className="empty-icon-wrap mx-auto mb-3" style={{ width: 64, height: 64, borderRadius: '50%', background: '#F1F5F9', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <i className="bi bi-receipt text-secondary fs-2"></i>
                       </div>
-                      <div className="txn-row-right">
-                        <span className="txn-amount txn-amount-success">1.300.000đ</span>
-                        <span className="txn-status-badge status-success"><i className="bi bi-check-circle-fill me-1"></i>Thành công</span>
-                        <button className="btn-txn-invoice" onClick={() => openInvoice("HS-98234", "Pù Luông Eco Garden Homestay", "Bá Thước, Thanh Hóa", "12/08/2026 - 14/08/2026 (2 đêm)", "1.300.000đ", "1.500.000đ", "200.000đ", "Chuyển khoản QR Vietcombank", "Đã xác nhận thanh toán", "VCB9823412")}>
-                          <i className="bi bi-receipt me-1"></i> Xem hóa đơn
-                        </button>
-                      </div>
+                      <h5 className="fw-bold text-dark mb-1">Chưa có giao dịch phù hợp</h5>
+                      <p className="text-muted text-xs mb-3">Bạn chưa có đơn đặt phòng nào trong mục này.</p>
+                      <Link to="/search" className="btn btn-success btn-sm rounded-pill px-3 py-1.5 fw-bold">
+                        Khám phá homestay ngay
+                      </Link>
                     </div>
-                  )}
-
-                  {(txnFilter === "all" || txnFilter === "success") && (
-                    <div className="txn-row-card txn-status-success">
-                      <div className="txn-row-left">
-                        <div className="txn-order-col">
-                          <span className="txn-order-id">#HS-87112</span>
-                          <span className="txn-date-pill"><i className="bi bi-calendar3 me-1"></i>24/05/2026</span>
+                  ) : (
+                    displayedTxns.map((tx) => (
+                      <div key={tx.id} className={`txn-row-card txn-status-${tx.status}`}>
+                        <div className="txn-row-left">
+                          <div className="txn-order-col">
+                            <span className="txn-order-id">#{tx.code}</span>
+                            <span className="txn-date-pill"><i className="bi bi-calendar3 me-1"></i>{tx.date}</span>
+                          </div>
+                          <div className="txn-info-col">
+                            <span className="txn-name">{tx.name}</span>
+                            <span className="txn-loc"><i className="bi bi-geo-alt-fill me-1 text-danger"></i>{tx.loc}</span>
+                          </div>
+                          <div className="txn-method-col">
+                            <span className="txn-method-badge"><i className={`bi ${tx.methodIcon} me-1`}></i>{tx.method}</span>
+                          </div>
                         </div>
-                        <div className="txn-info-col">
-                          <span className="txn-name">The Memory Villa</span>
-                          <span className="txn-loc"><i className="bi bi-geo-alt-fill me-1 text-danger"></i>Hồ Tuyền Lâm, Đà Lạt</span>
-                        </div>
-                        <div className="txn-method-col">
-                          <span className="txn-method-badge"><i className="bi bi-credit-card-2-front me-1 text-primary"></i>Thẻ Visa / Master</span>
-                        </div>
-                      </div>
-                      <div className="txn-row-right">
-                        <span className="txn-amount txn-amount-success">1.450.000đ</span>
-                        <span className="txn-status-badge status-success"><i className="bi bi-check-circle-fill me-1"></i>Thành công</span>
-                        <button className="btn-txn-invoice" onClick={() => openInvoice("HS-87112", "The Memory Valley Villa", "Hồ Tuyền Lâm, Đà Lạt", "24/05/2026 - 26/05/2026 (2 đêm)", "1.450.000đ", "1.630.000đ", "180.000đ", "Thẻ Visa Quốc tế (*8899)", "Đã xác nhận thanh toán", "VISA8711200")}>
-                          <i className="bi bi-receipt me-1"></i> Xem hóa đơn
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  {(txnFilter === "all" || txnFilter === "refund") && (
-                    <div className="txn-row-card txn-status-refund">
-                      <div className="txn-row-left">
-                        <div className="txn-order-col">
-                          <span className="txn-order-id txn-order-muted">#HS-76501</span>
-                          <span className="txn-date-pill"><i className="bi bi-calendar3 me-1"></i>10/01/2026</span>
-                        </div>
-                        <div className="txn-info-col">
-                          <span className="txn-name">Tràng An Retreat</span>
-                          <span className="txn-loc"><i className="bi bi-geo-alt-fill me-1 text-danger"></i>Tràng An, Ninh Bình</span>
-                        </div>
-                        <div className="txn-method-col">
-                          <span className="txn-method-badge"><i className="bi bi-wallet2 me-1 text-warning"></i>Ví e-Wallet</span>
+                        <div className="txn-row-right">
+                          <span className={`txn-amount txn-amount-${tx.status}`}>{tx.amount}</span>
+                          <span className={`txn-status-badge status-${tx.status}`}>
+                            <i className={`bi ${tx.status === 'success' ? 'bi-check-circle-fill' : 'bi-arrow-return-left'} me-1`}></i>
+                            {tx.statusText}
+                          </span>
+                          <button
+                            className={`btn-txn-invoice ${tx.status === 'refund' ? 'btn-txn-invoice-muted' : ''}`}
+                            onClick={() => openInvoice(tx.code, tx.name, tx.loc, tx.dates, tx.amount, tx.subTotal, tx.discount, tx.method, tx.statusText, tx.txnId)}
+                          >
+                            <i className="bi bi-receipt me-1"></i> Xem hóa đơn
+                          </button>
                         </div>
                       </div>
-                      <div className="txn-row-right">
-                        <span className="txn-amount txn-amount-refund">1.050.000đ</span>
-                        <span className="txn-status-badge status-refund"><i className="bi bi-arrow-return-left me-1"></i>Đã hoàn tiền</span>
-                        <button className="btn-txn-invoice btn-txn-invoice-muted" onClick={() => openInvoice("HS-76501", "Tràng An Valley Retreat", "Tràng An, Ninh Bình", "10/01/2026 - 11/01/2026 (1 đêm)", "1.050.000đ", "1.170.000đ", "120.000đ", "Ví e-Wallet YÊN", "Đã hủy & Hoàn trả 100% tiền", "REF7650199")}>
-                          <i className="bi bi-receipt me-1"></i> Xem hóa đơn
-                        </button>
-                      </div>
-                    </div>
+                    ))
                   )}
                 </div>
               </div>

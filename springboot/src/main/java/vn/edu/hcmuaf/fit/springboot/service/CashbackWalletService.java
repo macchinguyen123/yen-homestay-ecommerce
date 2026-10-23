@@ -37,6 +37,7 @@ public class CashbackWalletService {
     private final BookingRepository bookingRepository;
     private final HomestayRepository homestayRepository;
     private final UserRepository userRepository;
+    private final NotificationService notificationService;
 
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
     private static final DecimalFormat VND_FORMAT;
@@ -314,5 +315,87 @@ public class CashbackWalletService {
                 .isPinSet(wallet.getIsPinSet())
                 .transactions(txnDTOs)
                 .build();
+    }
+
+    /**
+     * Tự động tích lũy 5% hoàn tiền / điểm thưởng cho du khách khi đặt phòng thành công
+     */
+    @Transactional
+    public void creditCashbackForBooking(Booking booking) {
+        if (booking == null || booking.getTouristId() == null) {
+            return;
+        }
+
+        BigDecimal totalPrice = booking.getTotalPrice();
+        if (totalPrice == null || totalPrice.compareTo(BigDecimal.ZERO) <= 0) {
+            return;
+        }
+
+        // Tỷ lệ hoàn tiền mặc định: 5%
+        BigDecimal rate = BigDecimal.valueOf(0.05);
+        BigDecimal cashback = totalPrice.multiply(rate).setScale(0, java.math.RoundingMode.HALF_UP);
+        if (cashback.compareTo(BigDecimal.ZERO) <= 0) {
+            return;
+        }
+
+        String bookingCode = booking.getBookingCode() != null ? booking.getBookingCode() : ("YEN-" + booking.getId());
+
+        // Kiểm tra xem đơn này đã được tích điểm chưa (Idempotency - tránh cộng trùng lặp)
+        List<WalletTransaction> existing = transactionRepository.findByUserIdOrderByCreatedAtDesc(booking.getTouristId());
+        boolean alreadyCredited = existing.stream()
+                .anyMatch(t -> bookingCode.equals(t.getReferenceCode()) && "plus".equalsIgnoreCase(t.getType()));
+        if (alreadyCredited) {
+            log.info("Đơn đặt phòng {} đã được tích điểm trước đó, bỏ qua.", bookingCode);
+            return;
+        }
+
+        // Lấy hoặc tự động khởi tạo ví cho du khách
+        UserWallet wallet = walletRepository.findByUserId(booking.getTouristId())
+                .orElseGet(() -> initializeUserWallet(booking.getTouristId()));
+
+        BigDecimal curBalance = wallet.getBalance() != null ? wallet.getBalance() : BigDecimal.ZERO;
+        BigDecimal curTotal = wallet.getTotalCashback() != null ? wallet.getTotalCashback() : BigDecimal.ZERO;
+
+        wallet.setBalance(curBalance.add(cashback));
+        wallet.setTotalCashback(curTotal.add(cashback));
+        wallet.setUpdatedAt(LocalDateTime.now());
+        walletRepository.save(wallet);
+
+        String homestayName = "Homestay YÊN";
+        if (booking.getHomestayId() != null) {
+            homestayName = homestayRepository.findById(booking.getHomestayId())
+                    .map(Homestay::getName).orElse("Homestay YÊN");
+        }
+
+        String dateStr = LocalDateTime.now().format(DATE_FORMATTER) + " • " + homestayName;
+
+        WalletTransaction txn = WalletTransaction.builder()
+                .userId(booking.getTouristId())
+                .title("Tích lũy 5% đơn đặt phòng #" + bookingCode)
+                .dateDisplay(dateStr)
+                .amount(cashback)
+                .amountDisplay("+" + formatVnd(cashback) + " VNĐ")
+                .type("plus")
+                .status("Thành công")
+                .referenceCode(bookingCode)
+                .createdAt(LocalDateTime.now())
+                .build();
+
+        transactionRepository.save(txn);
+        log.info("Đã tự động tích lũy {} VNĐ cho du khách {} từ đơn đặt phòng {}", cashback, booking.getTouristId(), bookingCode);
+
+        // Gửi thông báo trực tiếp đến du khách
+        try {
+            notificationService.create(
+                    booking.getTouristId(),
+                    "Tích điểm Ví YÊN thành công! (+" + formatVnd(cashback) + "đ)",
+                    "Bạn vừa nhận được " + formatVnd(cashback) + "đ vào Ví hoàn tiền từ đơn đặt phòng #" + bookingCode + " tại " + homestayName + ".",
+                    "CASHBACK",
+                    booking.getId(),
+                    "/personal-account"
+            );
+        } catch (Exception e) {
+            log.warn("Không thể gửi thông báo tích điểm: {}", e.getMessage());
+        }
     }
 }

@@ -38,6 +38,7 @@ public class BookingService {
     private final NotificationService notificationService;
     private final UserRepository userRepository;
     private final ReviewSentimentService reviewSentimentService;
+    private final CashbackWalletService cashbackWalletService;
 
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
     private static final Locale VI_LOCALE = new Locale("vi", "VN");
@@ -278,6 +279,15 @@ public class BookingService {
                     .paidAt(LocalDateTime.now())
                     .build();
             paymentRepository.save(payment);
+        }
+
+        // Tự động tích lũy 5% vào Ví hoàn tiền YÊN nếu đơn phòng xác nhận thành công
+        if ("CONFIRMED".equalsIgnoreCase(savedBooking.getStatus()) || "PAID".equalsIgnoreCase(savedBooking.getDepositStatus())) {
+            try {
+                cashbackWalletService.creditCashbackForBooking(savedBooking);
+            } catch (Exception ce) {
+                log.warn("Lỗi tích điểm cho đơn đặt phòng {}: {}", savedBooking.getBookingCode(), ce.getMessage());
+            }
         }
 
         return savedBooking;

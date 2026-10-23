@@ -40,7 +40,12 @@ export default function Header() {
 
     if (current?.id) {
       const apiBase = import.meta.env.VITE_API_BASE_URL?.replace(/\/auth\/?$/, '') || 'http://localhost:8081/api';
-      const loadUnread = () => fetch(`${apiBase}/notifications/unread-count`, { headers: { Authorization: `Bearer ${current.token || ''}` } })
+      const loadUnread = () => fetch(`${apiBase}/notifications/unread-count`, { 
+        headers: { 
+          Authorization: `Bearer ${current.token || ''}`,
+          'X-User-Id': String(current.id || '1')
+        } 
+      })
         .then((r) => r.ok ? r.json() : { count: 0 })
         .then((data) => setUnreadCount(Number(data.count || 0)))
         .catch(() => setUnreadCount(0));
