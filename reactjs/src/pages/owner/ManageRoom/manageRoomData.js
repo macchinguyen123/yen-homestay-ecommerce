@@ -22,7 +22,8 @@ export const initialRoomsData = {
       description: 'Phòng hướng vườn bưởi, ban công gỗ, phù hợp cho gia đình nhỏ.',
       amenities: ['View vườn bưởi', 'Ban công gỗ', 'Điều hòa Inverter', 'Bồn thảo dược Mai Châu'],
       image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuA92VX9N0UDeWwWCIKjLehBZXqx8o90G5vq3LcG_Tv0TlKZ9rEJ77YoL_ic27GRSnIMBYyV_hPitG43lJozoYkKMt4F4Y7wzS4YPVqq_MN6AAReFtqmQ_Qu-xdxFAFbZ9xj_AL3rI1Hv1uCJLz-BKK40SYyXjnkf6G_WKzgCm_eBrS-GHlu3kwoI38m9ujg_5UmlnI_FmInPuwLvZuARdlOIv0nmTsucIfBFKIImzuftsaBcKWW9n8',
-      videos: []
+      videos: [],
+      createdAt: new Date(Date.now() - 2 * 86400000).toISOString()
     },
     {
       code: 'P.201',
@@ -39,7 +40,8 @@ export const initialRoomsData = {
       description: 'Phòng view thung lũng lúa, 2 giường Queen gỗ pơmu, dành cho gia đình.',
       amenities: ['View thung lũng lúa', 'Giường King Pơmu', 'Trà Shan tuyết cổ thụ', 'Wifi vệ tinh tốc độ cao'],
       image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDvwt_LAypkngMfvKDDOYdct2L-JFaJmze6APU8kMIvzwODRa_h5_ep_EukGGhnOY86dp_l0loMQxsXTFSa5NzplVG4c9jBSX5SUO8fF7GkyfaoEGuMtJL-cpZ5uR1ASJBlmOnSaCVFsBD9kKoRE1OiTImP7OK7u27yodqXuT-4vnkRyWt5EZ7OSWBxZck046_lx5GOSdM43jQoLlU4RtloR61HbMgHu1DU13-aYGLO-TAAYSe95HI',
-      videos: []
+      videos: [],
+      createdAt: new Date(Date.now() - 5 * 86400000).toISOString()
     },
     {
       code: 'BUNG.102',
@@ -56,7 +58,8 @@ export const initialRoomsData = {
       description: 'Không gian tĩnh lặng đúng nghĩa healing, ban công sát suối nghe nước chảy róc rách.',
       amenities: ['View suối tự nhiên', 'Bồn tắm lộ thiên', 'Bữa sáng tại phòng', 'Loa Bluetooth'],
       image: 'https://images.unsplash.com/photo-1587061949409-02df41d5e562?auto=format&fit=crop&w=800&q=80',
-      videos: []
+      videos: [],
+      createdAt: new Date(Date.now() - 14 * 86400000).toISOString()
     },
     {
       code: 'DORM.01',
@@ -73,7 +76,8 @@ export const initialRoomsData = {
       description: 'Nhà sàn tập thể, bếp củi giao lưu, không gian BBQ, nhận đoàn tour và trekking.',
       amenities: ['Bếp củi giao lưu', 'Không gian tiệc BBQ sàn gỗ', '4 Buồng tắm riêng biệt', 'Đệm thổ cẩm Thái'],
       image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBG_MU48hzMQCyOhQjXMvJGqzt-Py1zvLIKdJxQSDTxbSE7QFP2vJjB9mDbcUYJLJqaC3JtSepgaFuDuU4fq9isiJfqTU8A3vE2yVcYPpMMb6VjetGR6nDaojf8gVynYqRPemLgYKJQxuP-dLld77rT4avkl2Nybfhcf8SMnDh39PJFgUbN8E0t5PfUHgP9RLlTL1RAJzlVia4IsO_kMnl9HllAv9kj71hnmBxXa6Mw1n38jFb7zQM',
-      videos: []
+      videos: [],
+      createdAt: new Date(Date.now() - 20 * 86400000).toISOString()
     },
     {
       code: 'P.103',
@@ -90,7 +94,8 @@ export const initialRoomsData = {
       description: 'Phòng có ban công hướng trực tiếp ra thác nước nhân tạo và tiểu cảnh hoa rừng.',
       amenities: ['Ban công thác nước', 'Máy pha trà hữu cơ', 'Điều hòa 2 chiều', 'Smart TV'],
       image: 'https://images.unsplash.com/photo-1590490360182-c33d57733427?auto=format&fit=crop&w=800&q=80',
-      videos: []
+      videos: [],
+      createdAt: new Date(Date.now() - 40 * 86400000).toISOString()
     },
     {
       code: 'P.202',
@@ -107,7 +112,8 @@ export const initialRoomsData = {
       description: 'Cửa sổ lớn hướng tây đón trọn hoàng hôn thung lũng Bản Lác cực kỳ ấn tượng.',
       amenities: ['View hoàng hôn', 'Sàn gỗ pơmu tự nhiên', 'Bình nóng lạnh', 'Bàn trà gỗ lũa'],
       image: 'https://images.unsplash.com/photo-1566665797739-1674de7a421a?auto=format&fit=crop&w=800&q=80',
-      videos: []
+      videos: [],
+      createdAt: new Date(Date.now() - 60 * 86400000).toISOString()
     },
     {
       code: 'P.104',
@@ -124,7 +130,8 @@ export const initialRoomsData = {
       description: 'Không gian nhà sàn cổ của người Thái Trắng, thoáng mát, giữ nguyên vẹn cột gỗ nguyên khối.',
       amenities: ['Kiến trúc cổ', 'Quạt trần cổ điển', 'Hiên ngắm cảnh', 'Bếp nướng ngoài trời'],
       image: 'https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?auto=format&fit=crop&w=800&q=80',
-      videos: []
+      videos: [],
+      createdAt: new Date(Date.now() - 120 * 86400000).toISOString()
     },
     {
       code: 'BUNG.105',
@@ -141,7 +148,8 @@ export const initialRoomsData = {
       description: 'Thiết kế tổ chim độc bản trên triền đồi, bao quát 360 độ thiên nhiên Mai Châu.',
       amenities: ['View 360 độ', 'Lưới ngắm mây ban công', 'Minibar miễn phí', 'Xe đạp địa hình'],
       image: 'https://images.unsplash.com/photo-1618773928121-c32242e63f39?auto=format&fit=crop&w=800&q=80',
-      videos: []
+      videos: [],
+      createdAt: new Date(Date.now() - 200 * 86400000).toISOString()
     }
   ],
 

@@ -17,6 +17,9 @@ export default function ManageBooking() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [roomFilter, setRoomFilter] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [sortBy, setSortBy] = useState('newest'); // 'newest' | 'oldest' | 'checkin-asc' | 'checkin-desc' | 'amount-desc' | 'amount-asc'
 
   // ─── Toast System ─────────────────────────────────────────────
   const [toast, setToast] = useState(null);
@@ -202,9 +205,9 @@ export default function ManageBooking() {
     }
   };
 
-  // ─── Filtered Bookings List ───────────────────────────────────
+  // ─── Filtered & Sorted Bookings List ────────────────────────────
   const filteredBookings = useMemo(() => {
-    return bookings.filter((b) => {
+    let result = bookings.filter((b) => {
       // Filter by status
       if (statusFilter !== 'all') {
         const norm = normalizeStatus(b.status);
@@ -213,6 +216,17 @@ export default function ManageBooking() {
       // Filter by room
       if (roomFilter && !(b.roomName || b.roomCode || '').toLowerCase().includes(roomFilter.toLowerCase())) {
         return false;
+      }
+      // Filter by date range (checkIn / checkOut overlap)
+      if (dateFrom || dateTo) {
+        const checkIn = b.checkInDate ? new Date(b.checkInDate) : null;
+        const checkOut = b.checkOutDate ? new Date(b.checkOutDate) : null;
+        if (dateFrom && checkOut) {
+          if (checkOut < new Date(dateFrom)) return false;
+        }
+        if (dateTo && checkIn) {
+          if (checkIn > new Date(dateTo)) return false;
+        }
       }
       // Filter by search keyword
       if (searchQuery.trim()) {
@@ -227,7 +241,25 @@ export default function ManageBooking() {
       }
       return true;
     });
-  }, [bookings, statusFilter, roomFilter, searchQuery]);
+
+    // Sort
+    result = [...result];
+    if (sortBy === 'newest') {
+      result.sort((a, b) => new Date(b.createdAt || b.checkInDate || 0) - new Date(a.createdAt || a.checkInDate || 0));
+    } else if (sortBy === 'oldest') {
+      result.sort((a, b) => new Date(a.createdAt || a.checkInDate || 0) - new Date(b.createdAt || b.checkInDate || 0));
+    } else if (sortBy === 'checkin-asc') {
+      result.sort((a, b) => new Date(a.checkInDate || 0) - new Date(b.checkInDate || 0));
+    } else if (sortBy === 'checkin-desc') {
+      result.sort((a, b) => new Date(b.checkInDate || 0) - new Date(a.checkInDate || 0));
+    } else if (sortBy === 'amount-desc') {
+      result.sort((a, b) => (Number(b.totalAmount || b.depositAmount || 0)) - (Number(a.totalAmount || a.depositAmount || 0)));
+    } else if (sortBy === 'amount-asc') {
+      result.sort((a, b) => (Number(a.totalAmount || a.depositAmount || 0)) - (Number(b.totalAmount || b.depositAmount || 0)));
+    }
+
+    return result;
+  }, [bookings, statusFilter, roomFilter, searchQuery, dateFrom, dateTo, sortBy]);
 
   // ─── KPI Calculations ─────────────────────────────────────────
   const kpiData = useMemo(() => {
@@ -647,21 +679,160 @@ export default function ManageBooking() {
                     onChange={(e) => setSearchQuery(e.target.value)}
                   />
                 </div>
-                <div className="relative w-full md:w-48 shrink-0">
+                <div className="relative w-full md:w-52 shrink-0">
                   <select
                     className="w-full px-space-sm py-space-xs appearance-none rounded-lg bg-surface-container-low text-on-surface font-body-md text-body-md focus:outline-none focus:bg-surface-container-lowest focus:ring-1 focus:ring-secondary cursor-pointer"
                     value={roomFilter}
                     onChange={(e) => setRoomFilter(e.target.value)}
                   >
-                    <option value="">Tất cả loại phòng</option>
-                    <option value="Mountain">Mountain View</option>
-                    <option value="Lake">Lake View</option>
-                    <option value="Bungalow">Bungalow Suối</option>
-                    <option value="Sàn">Nhà Sàn Trải Nghiệm</option>
+                    <option value="">🏠 Tất cả phòng</option>
+                    {availableRooms.length > 0
+                      ? availableRooms.map(r => (
+                          <option key={r.id} value={r.name}>{r.name}</option>
+                        ))
+                      : (
+                        <>
+                          <option value="Mountain">Mountain View</option>
+                          <option value="Lake">Lake View</option>
+                          <option value="Bungalow">Bungalow Suối</option>
+                          <option value="Sàn">Nhà Sàn Trải Nghiệm</option>
+                        </>
+                      )
+                    }
                   </select>
                   <span className="material-symbols-outlined absolute right-2.5 top-2.5 text-[16px] text-outline pointer-events-none">
                     expand_more
                   </span>
+                </div>
+              </div>
+
+              {/* Date Presets + Range + Sort Controls */}
+              {/* Date Presets + Range + Sort Controls */}
+              <div className="flex items-center justify-between gap-space-xs flex-wrap pt-2 border-t border-surface-container/60">
+                <div className="flex items-center gap-2 flex-wrap">
+                  {/* Time Presets */}
+                  <div className="inline-flex items-center gap-1 shrink-0 bg-surface-container-low p-1 rounded-lg border border-outline-variant/30">
+                    <button
+                      type="button"
+                      onClick={() => { setDateFrom(''); setDateTo(''); }}
+                      className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${
+                        !dateFrom && !dateTo
+                          ? 'bg-secondary text-on-secondary shadow-xs'
+                          : 'text-on-surface-variant hover:text-on-surface'
+                      }`}
+                    >
+                      Tất cả
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const end = new Date();
+                        const start = new Date(Date.now() - 7 * 86400000);
+                        setDateFrom(start.toISOString().split('T')[0]);
+                        setDateTo(end.toISOString().split('T')[0]);
+                      }}
+                      className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${
+                        dateFrom && dateTo && Math.round((new Date(dateTo) - new Date(dateFrom)) / 86400000) <= 8
+                          ? 'bg-secondary text-on-secondary shadow-xs'
+                          : 'text-on-surface-variant hover:text-on-surface'
+                      }`}
+                    >
+                      1 tuần
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const end = new Date();
+                        const start = new Date(Date.now() - 30 * 86400000);
+                        setDateFrom(start.toISOString().split('T')[0]);
+                        setDateTo(end.toISOString().split('T')[0]);
+                      }}
+                      className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${
+                        dateFrom && dateTo && Math.round((new Date(dateTo) - new Date(dateFrom)) / 86400000) > 8 && Math.round((new Date(dateTo) - new Date(dateFrom)) / 86400000) <= 35
+                          ? 'bg-secondary text-on-secondary shadow-xs'
+                          : 'text-on-surface-variant hover:text-on-surface'
+                      }`}
+                    >
+                      1 tháng
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const end = new Date();
+                        const start = new Date(Date.now() - 365 * 86400000);
+                        setDateFrom(start.toISOString().split('T')[0]);
+                        setDateTo(end.toISOString().split('T')[0]);
+                      }}
+                      className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${
+                        dateFrom && dateTo && Math.round((new Date(dateTo) - new Date(dateFrom)) / 86400000) > 35
+                          ? 'bg-secondary text-on-secondary shadow-xs'
+                          : 'text-on-surface-variant hover:text-on-surface'
+                      }`}
+                    >
+                      1 năm
+                    </button>
+                  </div>
+
+                  {/* Custom Date Range */}
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-surface-container-low rounded-lg border border-outline-variant/30 shrink-0">
+                    <span className="material-symbols-outlined text-[16px] text-secondary shrink-0">calendar_today</span>
+                    <span className="text-xs font-semibold text-on-surface-variant">Từ:</span>
+                    <input
+                      type="date"
+                      value={dateFrom}
+                      onChange={(e) => setDateFrom(e.target.value)}
+                      style={{ width: '130px', minWidth: '130px' }}
+                      className="px-2 py-0.5 text-xs font-semibold rounded bg-surface-container-lowest text-on-surface border border-outline-variant/40 focus:outline-none focus:ring-1 focus:ring-secondary cursor-pointer"
+                    />
+                    <span className="text-xs font-bold text-outline">–</span>
+                    <span className="text-xs font-semibold text-on-surface-variant">Đến:</span>
+                    <input
+                      type="date"
+                      value={dateTo}
+                      onChange={(e) => setDateTo(e.target.value)}
+                      style={{ width: '130px', minWidth: '130px' }}
+                      className="px-2 py-0.5 text-xs font-semibold rounded bg-surface-container-lowest text-on-surface border border-outline-variant/40 focus:outline-none focus:ring-1 focus:ring-secondary cursor-pointer"
+                    />
+                    {(dateFrom || dateTo) && (
+                      <button
+                        type="button"
+                        onClick={() => { setDateFrom(''); setDateTo(''); }}
+                        className="p-0.5 text-outline hover:text-error shrink-0 transition-colors ml-1"
+                        title="Xóa bộ lọc ngày"
+                      >
+                        <span className="material-symbols-outlined text-[15px]">close</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  <div className="relative">
+                    <span className="material-symbols-outlined absolute left-2.5 top-2 text-[15px] text-outline pointer-events-none">sort</span>
+                    <select
+                      value={sortBy}
+                      onChange={(e) => setSortBy(e.target.value)}
+                      className="pl-8 pr-7 py-1.5 appearance-none text-xs font-bold rounded-lg bg-surface-container-low text-on-surface border border-outline-variant/30 focus:outline-none focus:ring-1 focus:ring-secondary cursor-pointer"
+                    >
+                      <option value="newest">Mới nhất</option>
+                      <option value="oldest">Cũ nhất</option>
+                      <option value="checkin-asc">Check-in sớm nhất</option>
+                      <option value="checkin-desc">Check-in muộn nhất</option>
+                      <option value="amount-desc">Tiền cọc cao nhất</option>
+                      <option value="amount-asc">Tiền cọc thấp nhất</option>
+                    </select>
+                    <span className="material-symbols-outlined absolute right-2 top-2 text-[14px] text-outline pointer-events-none">expand_more</span>
+                  </div>
+                  {(searchQuery || roomFilter || dateFrom || dateTo || sortBy !== 'newest') && (
+                    <button
+                      type="button"
+                      onClick={() => { setSearchQuery(''); setRoomFilter(''); setDateFrom(''); setDateTo(''); setSortBy('newest'); }}
+                      className="flex items-center gap-1 text-[11.5px] text-error hover:bg-error/10 font-bold shrink-0 px-2.5 py-1.5 rounded-lg border border-error/30 transition-all"
+                    >
+                      <span className="material-symbols-outlined text-[14px]">restart_alt</span>
+                      Đặt lại
+                    </button>
+                  )}
                 </div>
               </div>
 

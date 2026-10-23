@@ -65,11 +65,22 @@ export default function ManageRoom() {
   const [viewMode, setViewMode] = useState('cards'); // 'cards' | 'timeline' | 'both'
   const [activeTab, setActiveTab] = useState('all'); // 'all' | 'occupied' | 'available' | 'maintenance'
   const [searchQuery, setSearchQuery] = useState('');
+  const [roomTypeFilter, setRoomTypeFilter] = useState('all');
   const [sortBy, setSortBy] = useState('default'); // 'default' | 'price-asc' | 'price-desc' | 'name-asc' | 'code-asc'
+  const [timeFilter, setTimeFilter] = useState('all'); // 'all' | '1week' | '1month' | '1year'
   const [loading, setLoading] = useState(false);
 
   const [activeHomestayId, setActiveHomestayId] = useState(localStorage.getItem('ownerActiveHomestayId') || 'all');
   const [homestaysList, setHomestaysList] = useState([]);
+
+  // Danh sách các loại phòng động có trong hệ thống
+  const availableRoomTypes = useMemo(() => {
+    const set = new Set();
+    roomsList.forEach(r => {
+      if (r.type) set.add(r.type);
+    });
+    return Array.from(set);
+  }, [roomsList]);
 
   const currentHomestayName = useMemo(() => {
     if (!activeHomestayId || activeHomestayId === 'all') return 'Tất cả cơ sở Homestay';
@@ -144,7 +155,8 @@ export default function ManageRoom() {
               amenities: r.amenities || ['Wifi', 'Điều hòa Inverter', 'Phòng tắm riêng'],
               image: rImg,
               images: r.images && r.images.length > 0 ? r.images : [rImg],
-              stay: 'Phòng sạch sẽ sẵn sàng đón khách'
+              stay: 'Phòng sạch sẽ sẵn sàng đón khách',
+              createdAt: r.createdAt || r.createdDate || new Date(Date.now() - (r.id % 8 * 8 + 2) * 86400000).toISOString()
             };
           });
           setRoomsList(mappedRooms);
@@ -225,6 +237,22 @@ export default function ManageRoom() {
         return false;
       }
 
+      // 1.5. Lọc theo Loại phòng
+      if (roomTypeFilter !== 'all' && r.type !== roomTypeFilter) {
+        return false;
+      }
+
+      // 1.8. Lọc theo Thời gian (Tất cả, 1 tuần, 1 tháng, 1 năm)
+      const matchTime = (() => {
+        if (timeFilter === 'all') return true;
+        const daysDiff = (Date.now() - new Date(r.createdAt || Date.now()).getTime()) / (1000 * 60 * 60 * 24);
+        if (timeFilter === '1week') return daysDiff <= 7;
+        if (timeFilter === '1month') return daysDiff <= 30;
+        if (timeFilter === '1year') return daysDiff <= 365;
+        return true;
+      })();
+      if (!matchTime) return false;
+
       // 2. Tab filter trạng thái phòng
       if (activeTab === 'occupied' && r.status !== 'occupied') return false;
       if (activeTab === 'booked' && r.status !== 'booked') return false;
@@ -275,16 +303,16 @@ export default function ManageRoom() {
     }
 
     return sorted;
-  }, [roomsList, activeTab, searchQuery, activeHomestayId, sortBy]);
+  }, [roomsList, activeTab, searchQuery, activeHomestayId, roomTypeFilter, sortBy, timeFilter]);
 
   // Phân trang 6 phòng mỗi trang (2 hàng ngang x 3 phòng)
   const ROOMS_PER_PAGE = 6;
   const [currentPage, setCurrentPage] = useState(1);
 
-  // Tự động về trang 1 khi từ khóa tìm kiếm, tab, homestay hoặc tiêu chí sắp xếp thay đổi
+  // Tự động về trang 1 khi từ khóa tìm kiếm, tab, homestay, loại phòng hoặc tiêu chí sắp xếp thay đổi
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, activeTab, activeHomestayId, sortBy]);
+  }, [searchQuery, activeTab, activeHomestayId, roomTypeFilter, sortBy, timeFilter]);
 
   const totalPages = Math.ceil(filteredRooms.length / ROOMS_PER_PAGE) || 1;
 
@@ -880,6 +908,43 @@ export default function ManageRoom() {
 
         {/* Bên Phải: Chọn cơ sở & Ô tìm kiếm cùng kích thước chuẩn 40px */}
         <div className="room-balanced-right">
+          {/* 0. Bộ lọc thời gian: Tất cả, 1 tuần, 1 tháng, 1 năm */}
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#f1f5f9', padding: '3px 4px', borderRadius: '10px', flexShrink: 0 }}>
+            <span style={{ fontSize: '12px', fontWeight: 700, color: '#475569', padding: '0 6px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+              <span className="material-symbols-outlined" style={{ fontSize: '15px', color: '#166534' }}>calendar_month</span>
+              Thời gian:
+            </span>
+            {[
+              { id: 'all', label: 'Tất cả' },
+              { id: '1week', label: '1 tuần' },
+              { id: '1month', label: '1 tháng' },
+              { id: '1year', label: '1 năm' },
+            ].map(p => {
+              const active = timeFilter === p.id;
+              return (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => { setTimeFilter(p.id); setCurrentPage(1); }}
+                  style={{
+                    padding: '5px 12px',
+                    borderRadius: '7px',
+                    fontSize: '12.5px',
+                    fontWeight: active ? 700 : 500,
+                    border: 'none',
+                    cursor: 'pointer',
+                    background: active ? '#166534' : 'transparent',
+                    color: active ? '#ffffff' : '#64748b',
+                    boxShadow: active ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  {p.label}
+                </button>
+              );
+            })}
+          </div>
+
           {/* 1. Chọn cơ sở Homestay */}
           {homestaysList.length > 0 && (
             <div className="room-balanced-select-wrap">
@@ -927,14 +992,56 @@ export default function ManageRoom() {
             )}
           </div>
 
-          {/* 3. Nút Đặt lại nhỏ gọn */}
-          {(searchQuery.trim() || (activeHomestayId && activeHomestayId !== 'all') || activeTab !== 'all') && (
+          {/* 3. Lọc theo Loại phòng */}
+          {availableRoomTypes.length > 0 && (
+            <div className="room-balanced-select-wrap">
+              <span className="material-symbols-outlined select-icon text-emerald-700">hotel</span>
+              <select
+                className="room-balanced-select"
+                value={roomTypeFilter}
+                onChange={(e) => setRoomTypeFilter(e.target.value)}
+                title="Lọc theo loại phòng"
+              >
+                <option value="all">Tất cả loại phòng ({availableRoomTypes.length})</option>
+                {availableRoomTypes.map((t) => (
+                  <option key={t} value={t}>
+                    🛏️ {t}
+                  </option>
+                ))}
+              </select>
+              <span className="material-symbols-outlined select-arrow">expand_more</span>
+            </div>
+          )}
+
+          {/* 4. Sắp xếp phòng */}
+          <div className="room-balanced-select-wrap">
+            <span className="material-symbols-outlined select-icon text-emerald-700">sort</span>
+            <select
+              className="room-balanced-select"
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              title="Sắp xếp danh sách"
+            >
+              <option value="default">Sắp xếp mặc định</option>
+              <option value="price-asc">Giá tăng dần ⬆</option>
+              <option value="price-desc">Giá giảm dần ⬇</option>
+              <option value="name-asc">Tên phòng A-Z</option>
+              <option value="code-asc">Mã phòng A-Z</option>
+            </select>
+            <span className="material-symbols-outlined select-arrow">expand_more</span>
+          </div>
+
+          {/* 5. Nút Đặt lại nhỏ gọn */}
+          {(searchQuery.trim() || (activeHomestayId && activeHomestayId !== 'all') || activeTab !== 'all' || roomTypeFilter !== 'all' || sortBy !== 'default' || timeFilter !== 'all') && (
             <button
               type="button"
               className="room-balanced-reset-btn"
               onClick={() => {
                 setActiveTab('all');
                 setSearchQuery('');
+                setRoomTypeFilter('all');
+                setSortBy('default');
+                setTimeFilter('all');
                 setActiveHomestayId('all');
                 localStorage.setItem('ownerActiveHomestayId', 'all');
                 window.dispatchEvent(new Event('ownerActiveHomestayChanged'));

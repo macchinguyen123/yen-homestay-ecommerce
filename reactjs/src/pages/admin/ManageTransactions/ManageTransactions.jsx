@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import './ManageTransactions.css';
 import { adminTransactionService } from '../../../services/adminTransactionService';
 
 export default function ManageTransactions() {
     const [transactions, setTransactions] = useState([]);
+    const [timeFilter, setTimeFilter] = useState('all');
     const [stats, setStats] = useState({
         yenFeeMonth: '34.800.000đ',
         escrowDepositTotal: '68.500.000đ',
@@ -109,6 +110,22 @@ export default function ManageTransactions() {
         setLoading(false);
     };
 
+    const filteredTransactions = useMemo(() => {
+        return transactions.filter(tx => {
+            if (timeFilter === 'all') return true;
+            const txDate = tx.createdAt || tx.date;
+            if (!txDate) return true;
+            const now = new Date();
+            const d = new Date(txDate);
+            if (isNaN(d.getTime())) return true;
+            const diffDays = (now - d) / (1000 * 60 * 60 * 24);
+            if (timeFilter === '1week') return diffDays <= 7;
+            if (timeFilter === '1month') return diffDays <= 30;
+            if (timeFilter === '1year') return diffDays <= 365;
+            return true;
+        });
+    }, [transactions, timeFilter]);
+
     return (
         <div className="manage-transactions-wrapper">
             <div className="tx-page-header">
@@ -167,33 +184,104 @@ export default function ManageTransactions() {
             </div>
 
             {/* Filter Bar */}
-            <div className="tx-filter-bar">
-                <div className="tx-filter-chips">
-                    <button className={`tx-chip ${filterStatus === 'all' ? 'active' : ''}`} onClick={() => handleFilterChange('all')}>
-                        Tất cả <span className="tx-chip-badge">{stats.totalCount}</span>
-                    </button>
-                    <button className={`tx-chip ${filterStatus === 'escrow' ? 'active' : ''}`} onClick={() => handleFilterChange('escrow')}>
-                        Quản lý tiền cọc <span className="tx-chip-badge">{stats.escrowCount}</span>
-                    </button>
-                    <button className={`tx-chip ${filterStatus === 'refund' ? 'active' : ''}`} onClick={() => handleFilterChange('refund')}>
-                        Xác nhận hoàn tiền <span className="tx-chip-badge">{stats.refundCount}</span>
-                    </button>
-                    <button className={`tx-chip ${filterStatus === 'payout' ? 'active' : ''}`} onClick={() => handleFilterChange('payout')}>
-                        Thanh toán Owner <span className="tx-chip-badge">{stats.payoutCount}</span>
-                    </button>
+            <div className="tx-filter-bar" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', width: '100%' }}>
+                    <div className="tx-filter-chips">
+                        <button className={`tx-chip ${filterStatus === 'all' ? 'active' : ''}`} onClick={() => handleFilterChange('all')}>
+                            Tất cả <span className="tx-chip-badge">{stats.totalCount}</span>
+                        </button>
+                        <button className={`tx-chip ${filterStatus === 'escrow' ? 'active' : ''}`} onClick={() => handleFilterChange('escrow')}>
+                            Quản lý tiền cọc <span className="tx-chip-badge">{stats.escrowCount}</span>
+                        </button>
+                        <button className={`tx-chip ${filterStatus === 'refund' ? 'active' : ''}`} onClick={() => handleFilterChange('refund')}>
+                            Xác nhận hoàn tiền <span className="tx-chip-badge">{stats.refundCount}</span>
+                        </button>
+                        <button className={`tx-chip ${filterStatus === 'payout' ? 'active' : ''}`} onClick={() => handleFilterChange('payout')}>
+                            Thanh toán Owner <span className="tx-chip-badge">{stats.payoutCount}</span>
+                        </button>
+                    </div>
+
+                    <div style={{
+                        background: '#f1f5f9',
+                        padding: '4px',
+                        borderRadius: '10px',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        border: '1px solid #e2e8f0'
+                    }}>
+                        <span style={{ fontSize: '13px', fontWeight: 600, color: '#64748b', padding: '0 8px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>schedule</span>
+                            Thời gian:
+                        </span>
+                        {[
+                            { key: 'all', label: 'Tất cả' },
+                            { key: '1week', label: '1 tuần' },
+                            { key: '1month', label: '1 tháng' },
+                            { key: '1year', label: '1 năm' }
+                        ].map(item => (
+                            <button
+                                key={item.key}
+                                type="button"
+                                onClick={() => setTimeFilter(item.key)}
+                                style={{
+                                    border: 'none',
+                                    background: timeFilter === item.key ? '#0284c7' : 'transparent',
+                                    color: timeFilter === item.key ? '#ffffff' : '#64748b',
+                                    fontWeight: timeFilter === item.key ? 700 : 500,
+                                    fontSize: '13px',
+                                    padding: '5px 12px',
+                                    borderRadius: '7px',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.15s ease'
+                                }}
+                            >
+                                {item.label}
+                            </button>
+                        ))}
+                    </div>
                 </div>
 
-                <div className="tx-filter-right">
-                    <div className="tx-search-wrap">
-                        <span className="material-symbols-outlined">search</span>
-                        <input type="text" placeholder="Tìm mã GD, tên khách, homestay..." value={searchTerm} onChange={handleSearchChange} />
+                <div style={{ display: 'flex', justifyContent: 'flex-end', width: '100%' }}>
+                    <div className="tx-filter-right" style={{ width: '100%', justifyContent: 'flex-end', display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                        <div className="tx-search-wrap">
+                            <span className="material-symbols-outlined">search</span>
+                            <input type="text" placeholder="Tìm mã GD, tên khách, homestay..." value={searchTerm} onChange={handleSearchChange} />
+                        </div>
+                        <select className="tx-select" value={gateway} onChange={handleGatewayChange}>
+                            <option value="all">Tất cả phương thức</option>
+                            <option value="vnpay">VNPay QR</option>
+                            <option value="momo">Ví MoMo</option>
+                            <option value="vietqr">VietQR</option>
+                        </select>
+                        {(timeFilter !== 'all' || filterStatus !== 'all' || searchTerm || gateway !== 'all') && (
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setTimeFilter('all');
+                                    handleFilterChange('all');
+                                    setSearchTerm('');
+                                    setGateway('all');
+                                }}
+                                style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '4px',
+                                    padding: '6px 12px',
+                                    borderRadius: '8px',
+                                    border: '1px solid #cbd5e1',
+                                    background: '#ffffff',
+                                    color: '#475569',
+                                    fontSize: '13px',
+                                    fontWeight: 500,
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>restart_alt</span>
+                                Đặt lại
+                            </button>
+                        )}
                     </div>
-                    <select className="tx-select" value={gateway} onChange={handleGatewayChange}>
-                        <option value="all">Tất cả phương thức</option>
-                        <option value="vnpay">VNPay QR</option>
-                        <option value="momo">Ví MoMo</option>
-                        <option value="vietqr">VietQR</option>
-                    </select>
                 </div>
             </div>
 
@@ -213,14 +301,16 @@ export default function ManageTransactions() {
                     <tbody>
                         {loading ? (
                             <tr><td colSpan="6" style={{ textAlign: 'center', color: '#64748B', padding: '24px' }}>Đang tải dữ liệu giao dịch...</td></tr>
-                        ) : transactions.length === 0 ? (
+                        ) : filteredTransactions.length === 0 ? (
                             <tr><td colSpan="6" style={{ textAlign: 'center', color: '#94A3B8', padding: '24px' }}>Không tìm thấy giao dịch phù hợp.</td></tr>
                         ) : (
-                            transactions.map(item => (
+                            filteredTransactions.map(item => (
                                 <tr key={item.id}>
                                     <td>
                                         <div className="tx-title-main">{item.txCode}</div>
-                                        <div className="tx-sub-info">Mã BK: {item.bookingCode}</div>
+                                        <div className="tx-sub-info">
+                                            Mã BK: {item.bookingCode} {item.createdAt ? `• ${new Date(item.createdAt).toLocaleDateString('vi-VN')}` : ''}
+                                        </div>
                                     </td>
                                     <td>
                                         <div className="tx-title-main">{item.guest}</div>

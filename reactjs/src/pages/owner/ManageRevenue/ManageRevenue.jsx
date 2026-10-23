@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import './ManageRevenue.css';
 import {
   INITIAL_REVENUE_METRICS,
@@ -10,11 +10,64 @@ import {
 
 export default function ManageRevenue() {
   // ── States ───────────────────────────────────────────────────────────
-  const [filterMode, setFilterMode] = useState('month_year'); // 'month_year' | 'quarter_year' | 'calendar'
-  const [selectedMonth, setSelectedMonth] = useState(9);
-  const [selectedQuarter, setSelectedQuarter] = useState(3);
-  const [selectedYear, setSelectedYear] = useState(2026);
-  const [customDate, setCustomDate] = useState('');
+  // Time filter: 'all' | '1_week' | '1_month' | '1_year' | 'custom'
+  const [timePreset, setTimePreset] = useState('1_month');
+  const [dateFrom, setDateFrom] = useState('2026-09-01');
+  const [dateTo, setDateTo] = useState('2026-09-30');
+
+  const handleApplyPreset = (preset) => {
+    setTimePreset(preset);
+    if (preset === 'all') {
+      setDateFrom('');
+      setDateTo('');
+    } else if (preset === '1_week') {
+      setDateFrom('2026-09-22');
+      setDateTo('2026-09-28');
+    } else if (preset === '1_month') {
+      setDateFrom('2026-09-01');
+      setDateTo('2026-09-30');
+    } else if (preset === '1_year') {
+      setDateFrom('2026-01-01');
+      setDateTo('2026-12-31');
+    }
+  };
+
+  // Homestay Filter
+  const [activeHomestayId, setActiveHomestayId] = useState(
+    () => localStorage.getItem('ownerActiveHomestayId') || 'all'
+  );
+  const [homestaysList, setHomestaysList] = useState([]);
+
+  useEffect(() => {
+    // Fetch homebstays list
+    const fetchHomestays = async () => {
+      try {
+        const user = JSON.parse(localStorage.getItem('user') || 'null');
+        const uid = user?.id;
+        const url = uid
+          ? `http://localhost:8081/api/public/admin/homestays?ownerId=${uid}`
+          : 'http://localhost:8081/api/public/homestays';
+        const res = await fetch(url);
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data)) setHomestaysList(data);
+        }
+      } catch (_) {}
+    };
+    fetchHomestays();
+
+    const handleSync = () => {
+      setActiveHomestayId(localStorage.getItem('ownerActiveHomestayId') || 'all');
+    };
+    window.addEventListener('ownerActiveHomestayChanged', handleSync);
+    return () => window.removeEventListener('ownerActiveHomestayChanged', handleSync);
+  }, []);
+
+  const currentHomestayName = useMemo(() => {
+    if (!activeHomestayId || activeHomestayId === 'all') return 'Tất cả cơ sở Homestay';
+    const found = homestaysList.find(h => String(h.id) === String(activeHomestayId));
+    return found ? found.name : 'Tất cả cơ sở Homestay';
+  }, [homestaysList, activeHomestayId]);
 
   // Transactions State
   const [transactions] = useState(INITIAL_TRANSACTIONS);
@@ -36,27 +89,38 @@ export default function ManageRevenue() {
   // ── Dynamic Title & Dynamic Metrics Calculation ──────────────────────
   const { periodTitle, metrics } = useMemo(() => {
     let title = '';
-    let seed = 1;
+    let factor = 1.0;
 
-    if (filterMode === 'month_year') {
-      const mStr = String(selectedMonth).padStart(2, '0');
-      title = `Tháng ${mStr}/${selectedYear}`;
-      seed = selectedMonth * 7 + (selectedYear % 100);
-    } else if (filterMode === 'quarter_year') {
-      title = `Quý ${selectedQuarter}/${selectedYear}`;
-      seed = selectedQuarter * 13 + (selectedYear % 100);
+    if (timePreset === 'all' && !dateFrom && !dateTo) {
+      title = 'Toàn bộ thời gian (Tất cả)';
+      factor = 3.5;
+    } else if (timePreset === '1_week') {
+      title = '1 tuần qua (22/09 - 28/09/2026)';
+      factor = 0.28;
+    } else if (timePreset === '1_month') {
+      title = '1 tháng qua (Tháng 09/2026)';
+      factor = 1.0;
+    } else if (timePreset === '1_year') {
+      title = '1 năm (Năm 2026)';
+      factor = 11.2;
     } else {
-      if (customDate) {
-        const [y, m, d] = customDate.split('-');
-        title = `Ngày ${d}/${m}/${y}`;
-        seed = Number(d) * 5 + Number(m) * 3;
+      if (dateFrom && dateTo) {
+        title = `Từ ${dateFrom} đến ${dateTo}`;
+        const diffDays = Math.max(1, Math.round((new Date(dateTo) - new Date(dateFrom)) / (1000 * 60 * 60 * 24)));
+        factor = Math.max(0.1, diffDays / 30);
+      } else if (dateFrom) {
+        title = `Từ ngày ${dateFrom}`;
+        factor = 1.0;
+      } else if (dateTo) {
+        title = `Đến ngày ${dateTo}`;
+        factor = 1.0;
       } else {
-        title = `Thời gian tùy chỉnh (Lịch)`;
-        seed = 42;
+        title = 'Toàn bộ thời gian (Tất cả)';
+        factor = 3.5;
       }
     }
 
-    const baseTotal = (100 + (seed % 45)) * 1000000;
+    const baseTotal = Math.round(128500000 * factor);
     const room = Math.round(baseTotal * 0.64);
     const service = baseTotal - room;
     const deposit = Math.round(baseTotal * 0.25);
@@ -70,17 +134,28 @@ export default function ManageRevenue() {
         deposit
       }
     };
-  }, [filterMode, selectedMonth, selectedQuarter, selectedYear, customDate]);
+  }, [timePreset, dateFrom, dateTo]);
 
   // ── Transactions Filtering & Sorting ─────────────────────────────────
   const sortedTransactions = useMemo(() => {
     let list = transactions.filter((tx) => {
       const q = searchTx.toLowerCase();
-      return (
+      const matchSearch =
         tx.id.toLowerCase().includes(q) ||
         tx.customer.toLowerCase().includes(q) ||
-        tx.detail.toLowerCase().includes(q)
-      );
+        tx.detail.toLowerCase().includes(q);
+      if (!matchSearch) return false;
+
+      // Lọc theo ngày giao dịch
+      if (dateFrom || dateTo) {
+        const txDate = tx.timestamp ? new Date(tx.timestamp) : null;
+        if (txDate) {
+          if (dateFrom && txDate < new Date(dateFrom)) return false;
+          if (dateTo && txDate > new Date(dateTo + 'T23:59:59')) return false;
+        }
+      }
+
+      return true;
     });
 
     list.sort((a, b) => {
@@ -92,7 +167,7 @@ export default function ManageRevenue() {
     });
 
     return list;
-  }, [transactions, searchTx, sortOption]);
+  }, [transactions, searchTx, sortOption, dateFrom, dateTo]);
 
   // ── SVG Chart Mouse Move Handler ─────────────────────────────────────
   const handleChartMouseMove = (e) => {
@@ -136,105 +211,176 @@ export default function ManageRevenue() {
       <div className="mr-hero-banner">
         <div className="mr-hero-glow" />
         <div className="mr-hero-left">
-          <span className="mr-tag-homestay">Nhà Sàn Mộc • Mai Châu</span>
+          {homestaysList.length > 0 ? (
+            <div className="mr-homestay-selector-wrap" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+              <span className="material-symbols-outlined" style={{ fontSize: '16px', color: '#88d982' }}>cottage</span>
+              <select
+                value={activeHomestayId}
+                onChange={(e) => {
+                  setActiveHomestayId(e.target.value);
+                  localStorage.setItem('ownerActiveHomestayId', e.target.value);
+                  window.dispatchEvent(new Event('ownerActiveHomestayChanged'));
+                }}
+                style={{
+                  background: 'rgba(255,255,255,0.15)',
+                  border: '1px solid rgba(255,255,255,0.3)',
+                  borderRadius: '8px',
+                  color: '#ffffff',
+                  fontSize: '13px',
+                  fontWeight: 700,
+                  padding: '4px 28px 4px 10px',
+                  cursor: 'pointer',
+                  appearance: 'none',
+                  outline: 'none',
+                  minWidth: '180px'
+                }}
+              >
+                <option value="all" style={{ background: '#154332', color: '#fff' }}>🏠 Tất cả cơ sở ({homestaysList.length})</option>
+                {homestaysList.map(h => (
+                  <option key={h.id} value={h.id} style={{ background: '#154332', color: '#fff' }}>
+                    🏡 {h.name}
+                  </option>
+                ))}
+              </select>
+              <span className="material-symbols-outlined" style={{ fontSize: '14px', color: 'rgba(255,255,255,0.6)', pointerEvents: 'none', marginLeft: '-24px' }}>expand_more</span>
+            </div>
+          ) : (
+            <span className="mr-tag-homestay">Nhà Sàn Mộc • Mai Châu</span>
+          )}
           <h1 className="mr-hero-title">Doanh thu &amp; Báo cáo thống kê</h1>
+          {activeHomestayId !== 'all' && (
+            <p style={{ margin: 0, fontSize: '13px', color: 'rgba(255,255,255,0.7)', marginTop: '2px' }}>
+              Đang xem: <strong style={{ color: '#88d982' }}>{currentHomestayName}</strong>
+            </p>
+          )}
         </div>
 
         <div className="mr-hero-right">
-          {/* Dynamic Filter Controls */}
-          <div className="mr-filter-toolbar">
-            {/* Month Filter */}
-            <div className={`mr-filter-group ${filterMode !== 'month_year' ? 'disabled' : ''}`}>
+          {/* Dynamic Filter Controls: Tất cả, 1 tuần, 1 tháng, 1 năm & Từ ngày - Đến ngày */}
+          <div style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '10px',
+            background: '#ffffff',
+            padding: '6px 12px',
+            borderRadius: '12px',
+            border: '1px solid rgba(192, 200, 194, 0.6)',
+            boxShadow: '0 2px 8px rgba(21, 67, 50, 0.06)',
+            flexWrap: 'wrap'
+          }}>
+            {/* Quick Time Presets */}
+            <div style={{ display: 'inline-flex', background: '#f1f5f9', borderRadius: '8px', padding: '3px', gap: '3px' }}>
               <button
                 type="button"
-                className={`mr-filter-btn ${filterMode === 'month_year' ? 'active' : ''}`}
-                onClick={() => setFilterMode('month_year')}
+                className={`mr-filter-btn ${timePreset === 'all' && !dateFrom && !dateTo ? 'active' : ''}`}
+                onClick={() => handleApplyPreset('all')}
+                style={{ borderRadius: '6px', padding: '5px 12px', fontSize: '12px', fontWeight: 700 }}
               >
-                Tháng
+                Tất cả
               </button>
-              <select
-                className="mr-filter-select"
-                disabled={filterMode !== 'month_year'}
-                value={selectedMonth}
-                onChange={(e) => {
-                  setSelectedMonth(Number(e.target.value));
-                  setFilterMode('month_year');
-                }}
-              >
-                {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
-                  <option key={m} value={m}>
-                    Tháng {String(m).padStart(2, '0')}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Quarter Filter */}
-            <div className={`mr-filter-group ${filterMode !== 'quarter_year' ? 'disabled' : ''}`}>
               <button
                 type="button"
-                className={`mr-filter-btn ${filterMode === 'quarter_year' ? 'active' : ''}`}
-                onClick={() => setFilterMode('quarter_year')}
+                className={`mr-filter-btn ${timePreset === '1_week' ? 'active' : ''}`}
+                onClick={() => handleApplyPreset('1_week')}
+                style={{ borderRadius: '6px', padding: '5px 12px', fontSize: '12px', fontWeight: 700 }}
               >
-                Quý
+                1 tuần
               </button>
-              <select
-                className="mr-filter-select"
-                disabled={filterMode !== 'quarter_year'}
-                value={selectedQuarter}
-                onChange={(e) => {
-                  setSelectedQuarter(Number(e.target.value));
-                  setFilterMode('quarter_year');
-                }}
-              >
-                <option value={1}>Quý 1</option>
-                <option value={2}>Quý 2</option>
-                <option value={3}>Quý 3</option>
-                <option value={4}>Quý 4</option>
-              </select>
-            </div>
-
-            {/* Year Filter */}
-            <div className={`mr-filter-group ${filterMode === 'calendar' ? 'disabled' : ''}`}>
               <button
                 type="button"
-                className={`mr-filter-btn ${filterMode !== 'calendar' ? 'active' : ''}`}
-                onClick={() => {
-                  if (filterMode === 'calendar') setFilterMode('month_year');
-                }}
+                className={`mr-filter-btn ${timePreset === '1_month' ? 'active' : ''}`}
+                onClick={() => handleApplyPreset('1_month')}
+                style={{ borderRadius: '6px', padding: '5px 12px', fontSize: '12px', fontWeight: 700 }}
               >
-                Năm
+                1 tháng
               </button>
-              <select
-                className="mr-filter-select"
-                disabled={filterMode === 'calendar'}
-                value={selectedYear}
-                onChange={(e) => setSelectedYear(Number(e.target.value))}
+              <button
+                type="button"
+                className={`mr-filter-btn ${timePreset === '1_year' ? 'active' : ''}`}
+                onClick={() => handleApplyPreset('1_year')}
+                style={{ borderRadius: '6px', padding: '5px 12px', fontSize: '12px', fontWeight: 700 }}
               >
-                {[2026, 2025, 2024, 2023].map((y) => (
-                  <option key={y} value={y}>
-                    Năm {y}
-                  </option>
-                ))}
-              </select>
+                1 năm
+              </button>
             </div>
 
-            {/* Calendar Custom Date Picker */}
-            <label
-              className={`mr-filter-btn-calendar ${filterMode === 'calendar' ? 'active' : ''}`}
-              title="Chọn khoảng thời gian theo lịch"
-            >
-              <span className="material-symbols-outlined text-[18px]">calendar_month</span>
+            <div style={{ width: '1px', height: '22px', background: '#e2e8f0' }} />
+
+            {/* Custom Date Range Picker */}
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+              <span className="material-symbols-outlined text-[16px] text-emerald-800" style={{ fontSize: '16px', color: '#166534' }}>calendar_today</span>
+              <span style={{ fontSize: '12px', color: '#64748b', fontWeight: 700 }}>Từ:</span>
               <input
                 type="date"
-                style={{ position: 'absolute', opacity: 0, width: 0, height: 0, pointerEvents: 'none' }}
-                value={customDate}
+                value={dateFrom}
                 onChange={(e) => {
-                  setCustomDate(e.target.value);
-                  setFilterMode('calendar');
+                  setDateFrom(e.target.value);
+                  setTimePreset('custom');
                 }}
+                style={{
+                  border: '1px solid #cbd5e1',
+                  borderRadius: '6px',
+                  background: '#f8fafc',
+                  fontSize: '12px',
+                  color: '#1e293b',
+                  padding: '4px 8px',
+                  outline: 'none',
+                  cursor: 'pointer',
+                  width: '125px',
+                  minWidth: '125px',
+                  fontWeight: 600
+                }}
+                title="Lọc báo cáo từ ngày"
               />
-            </label>
+              <span style={{ fontSize: '12px', color: '#94a3b8', fontWeight: 700 }}>–</span>
+              <span style={{ fontSize: '12px', color: '#64748b', fontWeight: 700 }}>Đến:</span>
+              <input
+                type="date"
+                value={dateTo}
+                onChange={(e) => {
+                  setDateTo(e.target.value);
+                  setTimePreset('custom');
+                }}
+                style={{
+                  border: '1px solid #cbd5e1',
+                  borderRadius: '6px',
+                  background: '#f8fafc',
+                  fontSize: '12px',
+                  color: '#1e293b',
+                  padding: '4px 8px',
+                  outline: 'none',
+                  cursor: 'pointer',
+                  width: '125px',
+                  minWidth: '125px',
+                  fontWeight: 600
+                }}
+                title="Lọc báo cáo đến ngày"
+              />
+              {(dateFrom || dateTo) && (
+                <button
+                  type="button"
+                  onClick={() => handleApplyPreset('all')}
+                  style={{
+                    background: '#fee2e2',
+                    border: '1px solid #fecaca',
+                    borderRadius: '50%',
+                    cursor: 'pointer',
+                    color: '#dc2626',
+                    width: '20px',
+                    height: '20px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '11px',
+                    fontWeight: 700,
+                    marginLeft: '4px'
+                  }}
+                  title="Xóa khoảng ngày lọc"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Action Export Buttons */}

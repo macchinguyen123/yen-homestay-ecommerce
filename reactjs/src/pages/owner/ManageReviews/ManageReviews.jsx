@@ -114,6 +114,9 @@ export default function ManageReviews() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedRoom, setSelectedRoom] = useState('Tất cả phòng / cơ sở');
   const [showCharts, setShowCharts] = useState(true);
+  const [reviewDateFrom, setReviewDateFrom] = useState('');
+  const [reviewDateTo, setReviewDateTo] = useState('');
+  const [reviewSortBy, setReviewSortBy] = useState('newest'); // 'newest' | 'oldest' | 'rating-desc' | 'rating-asc'
 
   // Input trả lời review & Toast
   const [replyInputs, setReplyInputs] = useState({});
@@ -485,7 +488,7 @@ export default function ManageReviews() {
 
   // ── 4. Lọc Danh Sách Đánh Giá ─────────────────────────────────────────────
   const filteredReviews = useMemo(() => {
-    return reviewsList.filter((r) => {
+    let list = reviewsList.filter((r) => {
       // Lọc theo tab
       if (activeFilter === 'negative' && r.sentiment !== 'NEGATIVE') return false;
       if (activeFilter === 'neutral' && r.sentiment !== 'NEUTRAL') return false;
@@ -503,6 +506,17 @@ export default function ManageReviews() {
         return false;
       }
 
+      // Lọc theo khoảng thời gian
+      if (reviewDateFrom || reviewDateTo) {
+        const rDate = r.createdAt && r.createdAt !== 'Gần đây'
+          ? new Date(r.createdAt)
+          : null;
+        if (rDate) {
+          if (reviewDateFrom && rDate < new Date(reviewDateFrom)) return false;
+          if (reviewDateTo && rDate > new Date(reviewDateTo + 'T23:59:59')) return false;
+        }
+      }
+
       // Tìm kiếm
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
@@ -515,7 +529,23 @@ export default function ManageReviews() {
 
       return true;
     });
-  }, [reviewsList, activeFilter, selectedRoom, searchQuery]);
+
+    // Sắp xếp
+    if (reviewSortBy === 'oldest') {
+      list = [...list].sort((a, b) => {
+        const da = a.createdAt && a.createdAt !== 'Gần đây' ? new Date(a.createdAt) : new Date(0);
+        const db = b.createdAt && b.createdAt !== 'Gần đây' ? new Date(b.createdAt) : new Date(0);
+        return da - db;
+      });
+    } else if (reviewSortBy === 'rating-desc') {
+      list = [...list].sort((a, b) => b.rating - a.rating);
+    } else if (reviewSortBy === 'rating-asc') {
+      list = [...list].sort((a, b) => a.rating - b.rating);
+    }
+    // 'newest' is default API order
+
+    return list;
+  }, [reviewsList, activeFilter, selectedRoom, searchQuery, reviewDateFrom, reviewDateTo, reviewSortBy]);
 
   // Gợi ý câu trả lời AI thông minh theo sắc thái của đánh giá
   const getAiSuggestedTemplates = (sentiment, customerName) => {
@@ -1090,7 +1120,7 @@ export default function ManageReviews() {
           </button>
         </div>
 
-        <div className="filter-tools">
+        <div className="filter-tools" style={{ flexWrap: 'wrap', gap: '8px' }}>
           <div className="search-input-box">
             <span className="material-symbols-outlined">search</span>
             <input
@@ -1111,6 +1141,124 @@ export default function ManageReviews() {
               </option>
             ))}
           </select>
+          {/* Preset Buttons */}
+          <div style={{ display: 'inline-flex', background: '#f1f5f9', borderRadius: '8px', padding: '2px', gap: '2px' }}>
+            <button
+              type="button"
+              className="filter-tab-btn"
+              style={{
+                padding: '4px 8px',
+                fontSize: '11.5px',
+                background: !reviewDateFrom && !reviewDateTo ? '#166534' : 'transparent',
+                color: !reviewDateFrom && !reviewDateTo ? '#fff' : '#475569'
+              }}
+              onClick={() => { setReviewDateFrom(''); setReviewDateTo(''); }}
+            >
+              Tất cả
+            </button>
+            <button
+              type="button"
+              className="filter-tab-btn"
+              style={{
+                padding: '4px 8px',
+                fontSize: '11.5px',
+                background: reviewDateFrom && reviewDateTo && Math.round((new Date(reviewDateTo) - new Date(reviewDateFrom)) / 86400000) <= 8 ? '#166534' : 'transparent',
+                color: reviewDateFrom && reviewDateTo && Math.round((new Date(reviewDateTo) - new Date(reviewDateFrom)) / 86400000) <= 8 ? '#fff' : '#475569'
+              }}
+              onClick={() => {
+                const end = new Date();
+                const start = new Date(Date.now() - 7 * 86400000);
+                setReviewDateFrom(start.toISOString().split('T')[0]);
+                setReviewDateTo(end.toISOString().split('T')[0]);
+              }}
+            >
+              1 tuần
+            </button>
+            <button
+              type="button"
+              className="filter-tab-btn"
+              style={{
+                padding: '4px 8px',
+                fontSize: '11.5px',
+                background: reviewDateFrom && reviewDateTo && Math.round((new Date(reviewDateTo) - new Date(reviewDateFrom)) / 86400000) > 8 && Math.round((new Date(reviewDateTo) - new Date(reviewDateFrom)) / 86400000) <= 35 ? '#166534' : 'transparent',
+                color: reviewDateFrom && reviewDateTo && Math.round((new Date(reviewDateTo) - new Date(reviewDateFrom)) / 86400000) > 8 && Math.round((new Date(reviewDateTo) - new Date(reviewDateFrom)) / 86400000) <= 35 ? '#fff' : '#475569'
+              }}
+              onClick={() => {
+                const end = new Date();
+                const start = new Date(Date.now() - 30 * 86400000);
+                setReviewDateFrom(start.toISOString().split('T')[0]);
+                setReviewDateTo(end.toISOString().split('T')[0]);
+              }}
+            >
+              1 tháng
+            </button>
+            <button
+              type="button"
+              className="filter-tab-btn"
+              style={{
+                padding: '4px 8px',
+                fontSize: '11.5px',
+                background: reviewDateFrom && reviewDateTo && Math.round((new Date(reviewDateTo) - new Date(reviewDateFrom)) / 86400000) > 35 ? '#166534' : 'transparent',
+                color: reviewDateFrom && reviewDateTo && Math.round((new Date(reviewDateTo) - new Date(reviewDateFrom)) / 86400000) > 35 ? '#fff' : '#475569'
+              }}
+              onClick={() => {
+                const end = new Date();
+                const start = new Date(Date.now() - 365 * 86400000);
+                setReviewDateFrom(start.toISOString().split('T')[0]);
+                setReviewDateTo(end.toISOString().split('T')[0]);
+              }}
+            >
+              1 năm
+            </button>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ fontSize: '12px', color: '#64748b', fontWeight: 600 }}>Từ:</span>
+            <input
+              type="date"
+              className="select-room-filter"
+              style={{ padding: '6px 10px', fontSize: '12px' }}
+              value={reviewDateFrom}
+              onChange={(e) => setReviewDateFrom(e.target.value)}
+            />
+            <span style={{ fontSize: '12px', color: '#64748b', fontWeight: 600 }}>Đến:</span>
+            <input
+              type="date"
+              className="select-room-filter"
+              style={{ padding: '6px 10px', fontSize: '12px' }}
+              value={reviewDateTo}
+              onChange={(e) => setReviewDateTo(e.target.value)}
+            />
+          </div>
+          <select
+            className="select-room-filter"
+            value={reviewSortBy}
+            onChange={(e) => setReviewSortBy(e.target.value)}
+            title="Sắp xếp đánh giá"
+          >
+            <option value="newest">Mới nhất</option>
+            <option value="oldest">Cũ nhất</option>
+            <option value="rating-desc">Sao cao nhất</option>
+            <option value="rating-asc">Sao thấp nhất</option>
+          </select>
+          {(reviewDateFrom || reviewDateTo || searchQuery || selectedRoom !== 'Tất cả phòng / cơ sở' || activeFilter !== 'all' || reviewSortBy !== 'newest') && (
+            <button
+              type="button"
+              className="filter-tab-btn"
+              style={{ background: '#fee2e2', color: '#dc2626', fontWeight: 600 }}
+              onClick={() => {
+                setReviewDateFrom('');
+                setReviewDateTo('');
+                setSearchQuery('');
+                setSelectedRoom('Tất cả phòng / cơ sở');
+                setActiveFilter('all');
+                setReviewSortBy('newest');
+              }}
+              title="Đặt lại bộ lọc"
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: '15px' }}>restart_alt</span>
+              Đặt lại
+            </button>
+          )}
         </div>
       </div>
 

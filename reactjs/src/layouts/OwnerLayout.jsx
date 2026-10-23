@@ -6,7 +6,7 @@ import { userService } from '../services/userService';
 
 // ─── Danh sách nav theo sidebar.html gốc ─────────────────────────────────────
 const OWNER_NAV = [
-  { to: '/owner/dashboard',  icon: 'bi-speedometer2',    label: 'Trang chủ' },
+  { to: '/owner/dashboard',  icon: 'bi-speedometer2',    label: 'Dashboard' },
   { to: '/owner/homestay',   icon: 'bi-house-heart',     label: 'Quản lý Homestay' },
   { to: '/owner/rooms',      icon: 'bi-door-open',       label: 'Quản lý phòng' },
   { to: '/owner/services',   icon: 'bi-basket2',         label: 'Quản lý dịch vụ' },

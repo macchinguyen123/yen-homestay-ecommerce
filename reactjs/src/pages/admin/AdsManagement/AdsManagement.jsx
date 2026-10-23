@@ -43,6 +43,7 @@ export default function AdsManagement() {
     const [searchQuery, setSearchQuery] = useState('');
     const [statusFilter, setStatusFilter] = useState('all');
     const [typeFilter, setTypeFilter] = useState('all');
+    const [timeFilter, setTimeFilter] = useState('all'); // 'all' | '1week' | '1month' | '1year'
 
     // Modals state
     const [showModal, setShowModal] = useState(false); // Form modal (Create / Edit)
@@ -184,6 +185,7 @@ export default function AdsManagement() {
         setSearchQuery('');
         setStatusFilter('all');
         setTypeFilter('all');
+        setTimeFilter('all');
     };
 
     // Bộ lọc Client-side siêu tốc (0ms, không lag khi gõ tìm kiếm)
@@ -202,9 +204,23 @@ export default function AdsManagement() {
 
             const matchesType = typeFilter === 'all' || pkg.packageType === typeFilter;
 
-            return matchesSearch && matchesStatus && matchesType;
+            let matchesTime = true;
+            if (timeFilter !== 'all') {
+                const rawDate = pkg.createdAt || pkg.startDate;
+                if (rawDate) {
+                    const d = new Date(rawDate);
+                    if (!isNaN(d.getTime())) {
+                        const diffDays = (new Date() - d) / (1000 * 60 * 60 * 24);
+                        if (timeFilter === '1week')  matchesTime = diffDays <= 7;
+                        if (timeFilter === '1month') matchesTime = diffDays <= 30;
+                        if (timeFilter === '1year')  matchesTime = diffDays <= 365;
+                    }
+                }
+            }
+
+            return matchesSearch && matchesStatus && matchesType && matchesTime;
         });
-    }, [packages, searchQuery, statusFilter, typeFilter]);
+    }, [packages, searchQuery, statusFilter, typeFilter, timeFilter]);
 
     const filteredSlots = useMemo(() => {
         const q = searchQuery.trim().toLowerCase();
@@ -219,9 +235,23 @@ export default function AdsManagement() {
                 (statusFilter === 'selling' && (slot.status === 'SELLING' || slot.status === 'ĐANG BÁN')) ||
                 (statusFilter === 'locked' && (slot.status === 'LOCKED' || slot.status === 'TẠM KHÓA'));
 
-            return matchesSearch && matchesStatus;
+            let matchesTime = true;
+            if (timeFilter !== 'all') {
+                const rawDate = slot.createdAt || slot.startDate;
+                if (rawDate) {
+                    const d = new Date(rawDate);
+                    if (!isNaN(d.getTime())) {
+                        const diffDays = (new Date() - d) / (1000 * 60 * 60 * 24);
+                        if (timeFilter === '1week')  matchesTime = diffDays <= 7;
+                        if (timeFilter === '1month') matchesTime = diffDays <= 30;
+                        if (timeFilter === '1year')  matchesTime = diffDays <= 365;
+                    }
+                }
+            }
+
+            return matchesSearch && matchesStatus && matchesTime;
         });
-    }, [slots, searchQuery, statusFilter]);
+    }, [slots, searchQuery, statusFilter, timeFilter]);
 
     const filteredOrders = useMemo(() => {
         const q = searchQuery.trim().toLowerCase();
@@ -238,9 +268,23 @@ export default function AdsManagement() {
                 (statusFilter === 'running' && (ord.status === 'RUNNING' || ord.status === 'ACTIVE')) ||
                 (statusFilter === 'paused' && (ord.status === 'PAUSED' || ord.status === 'TẠM DỪNG'));
 
-            return matchesSearch && matchesStatus;
+            let matchesTime = true;
+            if (timeFilter !== 'all') {
+                const rawDate = ord.createdAt || ord.startDate || ord.orderDate;
+                if (rawDate) {
+                    const d = new Date(rawDate);
+                    if (!isNaN(d.getTime())) {
+                        const diffDays = (new Date() - d) / (1000 * 60 * 60 * 24);
+                        if (timeFilter === '1week')  matchesTime = diffDays <= 7;
+                        if (timeFilter === '1month') matchesTime = diffDays <= 30;
+                        if (timeFilter === '1year')  matchesTime = diffDays <= 365;
+                    }
+                }
+            }
+
+            return matchesSearch && matchesStatus && matchesTime;
         });
-    }, [orders, searchQuery, statusFilter]);
+    }, [orders, searchQuery, statusFilter, timeFilter]);
 
     // Open Create Modal
     const openCreateModal = () => {
@@ -639,7 +683,7 @@ export default function AdsManagement() {
 
                 {/* Module Toolbar (Search & Filter & Create Button) */}
                 <div className="module-toolbar">
-                    <div className="toolbar-left">
+                    <div className="toolbar-left" style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                         <div className="search-box-sm">
                             <span className="material-symbols-outlined" style={{ color: 'var(--text-muted)', marginRight: '6px', fontSize: '18px' }}>search</span>
                             <input 
@@ -676,9 +720,66 @@ export default function AdsManagement() {
                             )}
                         </select>
 
+                        {/* Time filter pills */}
+                        <div style={{
+                            background: '#f1f5f9',
+                            padding: '4px',
+                            borderRadius: '10px',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            border: '1px solid #e2e8f0'
+                        }}>
+                            <span style={{ fontSize: '12px', fontWeight: 600, color: '#64748b', padding: '0 6px', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                <span className="material-symbols-outlined" style={{ fontSize: '15px' }}>schedule</span>
+                                Thời gian:
+                            </span>
+                            {[
+                                { key: 'all', label: 'Tất cả' },
+                                { key: '1week', label: '1 tuần' },
+                                { key: '1month', label: '1 tháng' },
+                                { key: '1year', label: '1 năm' }
+                            ].map(t => (
+                                <button
+                                    key={t.key}
+                                    type="button"
+                                    onClick={() => setTimeFilter(t.key)}
+                                    style={{
+                                        border: 'none',
+                                        background: timeFilter === t.key ? '#0284c7' : 'transparent',
+                                        color: timeFilter === t.key ? '#ffffff' : '#64748b',
+                                        fontWeight: timeFilter === t.key ? 700 : 500,
+                                        fontSize: '12px',
+                                        padding: '4px 10px',
+                                        borderRadius: '7px',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.15s ease'
+                                    }}
+                                >
+                                    {t.label}
+                                </button>
+                            ))}
+                        </div>
+
                         <button className="btn-admin-cancel" onClick={loadData} title="Tải lại từ CSDL" style={{ padding: '8px 12px' }}>
                             <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>refresh</span>
                         </button>
+
+                        {(timeFilter !== 'all' || statusFilter !== 'all' || typeFilter !== 'all' || searchQuery) && (
+                            <button
+                                type="button"
+                                onClick={() => { setTimeFilter('all'); setStatusFilter('all'); setTypeFilter('all'); setSearchQuery(''); }}
+                                style={{
+                                    display: 'inline-flex', alignItems: 'center', gap: '4px',
+                                    padding: '6px 12px', borderRadius: '8px',
+                                    border: '1px solid #cbd5e1', background: '#ffffff',
+                                    color: '#475569', fontSize: '12px', fontWeight: 500, cursor: 'pointer'
+                                }}
+                            >
+                                <span className="material-symbols-outlined" style={{ fontSize: '15px' }}>restart_alt</span>
+                                Đặt lại
+                            </button>
+                        )}
                     </div>
 
                     <button 

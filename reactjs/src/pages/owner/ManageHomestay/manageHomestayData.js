@@ -76,6 +76,7 @@ export const INITIAL_HOMESTAYS = [
     services: ["WiFi miễn phí", "Bữa sáng miễn phí", "Khu vực BBQ", "Đốt lửa trại"],
     customServices: ["Trekking bản làng", "Hưởng trà Shan Tuyết"],
     isCurrent: true,
+    createdAt: new Date(Date.now() - 3 * 86400000).toISOString(),
   },
   {
     id: 2,
@@ -93,6 +94,7 @@ export const INITIAL_HOMESTAYS = [
     services: ["WiFi miễn phí", "Bể bơi vô cực", "Bữa sáng miễn phí", "Thuê xe máy"],
     customServices: ["Chèo bè mảng sông Chăm"],
     isCurrent: false,
+    createdAt: new Date(Date.now() - 16 * 86400000).toISOString(),
   },
   {
     id: 3,
@@ -113,6 +115,7 @@ export const INITIAL_HOMESTAYS = [
     services: ["WiFi miễn phí", "Khu vực BBQ"],
     customServices: ["Tắm lá thuốc người Dao"],
     isCurrent: false,
+    createdAt: new Date(Date.now() - 55 * 86400000).toISOString(),
   },
   {
     id: 4,
@@ -130,6 +133,7 @@ export const INITIAL_HOMESTAYS = [
     services: ["WiFi miễn phí", "Khu vực BBQ", "Thuê xe máy"],
     customServices: ["Hái mận tại vườn"],
     isCurrent: false,
+    createdAt: new Date(Date.now() - 110 * 86400000).toISOString(),
   }
 ];
 
