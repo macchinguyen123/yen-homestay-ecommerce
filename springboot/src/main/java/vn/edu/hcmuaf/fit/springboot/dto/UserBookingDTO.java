@@ -58,6 +58,9 @@ public class UserBookingDTO {
     public static class TaskDTO {
         private Long id;
         private String title;
+        private String description;
+        private String icon;
+        private Boolean needPhoto;
         private String rewardText;
         private String status; // 'pending' or 'completed'
         private List<ChecklistItemDTO> checklist;
@@ -71,7 +74,13 @@ public class UserBookingDTO {
     @Builder
     public static class ChecklistItemDTO {
         private Integer id;
+        private Long taskId;
         private String text;
+        private String title;
+        private String description;
+        private String rewardText;
+        private String icon;
+        private Boolean needPhoto;
         private Boolean done;
     }
 

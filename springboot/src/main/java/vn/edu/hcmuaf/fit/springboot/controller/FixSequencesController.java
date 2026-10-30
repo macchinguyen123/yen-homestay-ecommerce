@@ -65,4 +65,9 @@ public class FixSequencesController {
 
         return ResponseEntity.ok(res);
     }
+
+    @GetMapping("/guest-tasks")
+    public ResponseEntity<?> getGuestTasks() {
+        return ResponseEntity.ok(jdbc.queryForList("SELECT * FROM guest_tasks ORDER BY task_id ASC LIMIT 30"));
+    }
 }

@@ -41,4 +41,12 @@ public class HomestayDTO {
     private List<RoomDTO> rooms;
     private Long defaultRoomId;
     private List<GuestTaskDTO> tasks;
+
+    // Thông tin chủ nhà lấy chính xác từ CSDL (bảng users)
+    private String ownerName;
+    private String ownerAvatar;
+    private String ownerEmail;
+    private String ownerPhone;
+    private String ownerBio;
+    private Integer yearsHosting;
 }
