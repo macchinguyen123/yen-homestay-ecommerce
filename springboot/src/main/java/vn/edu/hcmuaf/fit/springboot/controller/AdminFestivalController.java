@@ -34,7 +34,7 @@ public class AdminFestivalController {
     private final HomestayRepository homestayRepository;
     private final HomestayImageRepository homestayImageRepository;
 
-    @GetMapping("/admin/local-content/festivals")
+    @GetMapping({"/admin/local-content/festivals", "/public/admin/local-content/festivals"})
     @Cacheable("adminFestivals")
     public List<Map<String, Object>> getFestivals() {
         List<Festival> festivals = festivalRepository.findAll();
@@ -90,7 +90,7 @@ public class AdminFestivalController {
         }).toList();
     }
 
-    @GetMapping("/admin/local-content/homestays")
+    @GetMapping({"/admin/local-content/homestays", "/public/admin/local-content/homestays"})
     @Cacheable(value = "adminFestivalHomestays", key = "#city == null ? 'ALL' : #city.trim().toLowerCase()")
     public List<Map<String, Object>> getHomestays(@RequestParam(required = false) String city) {
         List<Homestay> homestays = city == null || city.isBlank()
@@ -100,7 +100,7 @@ public class AdminFestivalController {
         return homestays.stream().map(h -> homestayResponse(h, images.get(h.getId()), null)).toList();
     }
 
-    @PostMapping("/admin/local-content/festivals")
+    @PostMapping({"/admin/local-content/festivals", "/public/admin/local-content/festivals"})
     @Transactional
     @CacheEvict(value = {"adminFestivals", "publicFestivals"}, allEntries = true)
     public ResponseEntity<?> create(@RequestBody FestivalRequest request) {
@@ -113,7 +113,7 @@ public class AdminFestivalController {
         return ResponseEntity.ok(toResponse(festival, true));
     }
 
-    @PutMapping("/admin/local-content/festivals/{id}")
+    @PutMapping({"/admin/local-content/festivals/{id}", "/public/admin/local-content/festivals/{id}"})
     @Transactional
     @CacheEvict(value = {"adminFestivals", "publicFestivals"}, allEntries = true)
     public ResponseEntity<?> update(@PathVariable Long id, @RequestBody FestivalRequest request) {
@@ -127,7 +127,7 @@ public class AdminFestivalController {
         return ResponseEntity.ok(toResponse(festival, true));
     }
 
-    @DeleteMapping("/admin/local-content/festivals/{id}")
+    @DeleteMapping({"/admin/local-content/festivals/{id}", "/public/admin/local-content/festivals/{id}"})
     @Transactional
     @CacheEvict(value = {"adminFestivals", "publicFestivals"}, allEntries = true)
     public ResponseEntity<?> delete(@PathVariable Long id) {

@@ -1,136 +1,395 @@
-/* Material filter sidebar */
+/* ===================================================
+   YÊN HOMESTAY - MODERN FILTER SIDEBAR
+   Thiết kế cao cấp, chuẩn Travel UI hiện đại
+   =================================================== */
+
 .search-filter-sidebar {
   position: sticky;
-  top: 18px;
-  border: 1px solid #dce5de;
-  border-radius: 18px;
+  top: 86px;
+  border: 1px solid #e2ebe4;
+  border-radius: 20px;
   overflow: hidden;
-  background: #fff;
-  box-shadow: 0 8px 22px rgba(9, 73, 44, 0.08);
+  background: #ffffff;
+  box-shadow: 0 10px 30px rgba(18, 61, 42, 0.06), 0 2px 6px rgba(18, 61, 42, 0.03);
+  transition: all 0.3s ease;
+  max-height: calc(100vh - 100px);
+  display: flex;
+  flex-direction: column;
 }
 
+/* Header Bộ lọc */
 .filter-heading {
-  padding: 18px;
+  padding: 18px 20px;
   display: flex;
-  gap: 10px;
-  align-items: flex-start;
-  border-bottom: 1px solid #e5ece6;
-  background: linear-gradient(135deg, #f0f8f1, #fff);
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid #e8f0ea;
+  background: linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%);
+  position: relative;
+  flex-shrink: 0;
+}
+
+.filter-heading-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: #dcfce7;
+  color: #15803d;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  flex-shrink: 0;
+  box-shadow: 0 2px 6px rgba(22, 101, 52, 0.1);
+}
+
+.filter-heading-text {
+  flex: 1;
+}
+
+.filter-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .filter-heading h2 {
-  font-size: 17px;
-  color: #123d2a;
-  margin: 1px 0 4px;
+  font-size: 16px;
+  color: #143826;
+  margin: 0;
+  font-weight: 800;
+  letter-spacing: -0.2px;
+}
+
+.active-filter-badge {
+  background: #15803d;
+  color: #ffffff;
+  font-size: 11px;
   font-weight: 700;
+  padding: 1px 7px;
+  border-radius: 12px;
+  line-height: 1.4;
+  box-shadow: 0 2px 4px rgba(21, 128, 61, 0.3);
 }
 
 .filter-heading p {
   font-size: 12px;
-  color: #64756a;
-  margin: 0;
+  color: #64748b;
+  margin: 2px 0 0;
+  font-weight: 500;
 }
 
 .filter-clear {
-  margin-left: auto;
-  border: 0;
-  color: #176b42;
-  font: inherit;
+  border: 1px solid #d1fae5;
+  background: #ecfdf5;
+  color: #047857;
   font-size: 12px;
   font-weight: 700;
-  background: transparent;
+  padding: 6px 12px;
+  border-radius: 8px;
   cursor: pointer;
-  padding: 6px 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  transition: all 0.2s ease;
 }
 
 .filter-clear:hover {
-  text-decoration: underline;
+  background: #d1fae5;
+  color: #065f46;
+  border-color: #a7f3d0;
+  transform: scale(1.02);
 }
 
+/* Danh sách nhóm lọc có thanh cuộn mượt */
 .filter-groups {
-  overflow: auto;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 4px 0;
+  flex: 1;
 }
 
+.filter-groups::-webkit-scrollbar {
+  width: 5px;
+}
+
+.filter-groups::-webkit-scrollbar-track {
+  background: #f8fafc;
+}
+
+.filter-groups::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+.filter-groups::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Nhóm Lọc */
 .filter-group {
-  padding: 18px;
-  border-bottom: 1px solid #e5ece6;
+  padding: 18px 20px;
+  border-bottom: 1px solid #f1f5f3;
 }
 
 .filter-group:last-child {
-  border: 0;
+  border-bottom: none;
+}
+
+.filter-group-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.filter-group-header .group-icon {
+  font-size: 16px;
+  color: #15803d;
 }
 
 .filter-group h3 {
-  margin: 0 0 12px;
-  font-size: 15px;
-  color: #173c2a;
+  margin: 0;
+  font-size: 14px;
+  color: #143826;
   font-weight: 700;
+  letter-spacing: -0.1px;
+  flex: 1;
+}
+
+.group-active-count {
+  background: #e0f2fe;
+  color: #0369a1;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 1px 7px;
+  border-radius: 10px;
+}
+
+/* Chips chọn nhanh khoảng giá */
+.quick-price-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.quick-price-chip {
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  color: #475569;
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 5px 10px;
+  border-radius: 14px;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  user-select: none;
+}
+
+.quick-price-chip:hover {
+  background: #e2e8f0;
+  color: #1e293b;
+}
+
+.quick-price-chip.active {
+  background: #dcfce7;
+  border-color: #86efac;
+  color: #15803d;
+  font-weight: 700;
+  box-shadow: 0 2px 5px rgba(22, 101, 52, 0.1);
+}
+
+/* Ô nhập khoảng giá */
+.price-range {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.price-input-wrapper {
+  position: relative;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 10px;
+  background: #ffffff;
+  padding: 0 8px;
+  transition: all 0.2s ease;
+}
+
+.price-input-wrapper:focus-within {
+  border-color: #15803d;
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.15);
+}
+
+.price-prefix {
+  font-size: 11.5px;
+  color: #64748b;
+  font-weight: 600;
+  margin-right: 4px;
+  user-select: none;
+}
+
+.price-input-wrapper input {
+  width: 100%;
+  border: none;
+  background: transparent;
+  padding: 9px 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: #0f172a;
+  outline: none;
+  min-width: 0;
+}
+
+.price-unit {
+  font-size: 11.5px;
+  color: #94a3b8;
+  font-weight: 700;
+  margin-left: 2px;
+  user-select: none;
+}
+
+.price-separator {
+  color: #94a3b8;
+  font-size: 12px;
+  font-weight: 700;
+  user-select: none;
+}
+
+/* Danh sách tùy chọn bộ lọc */
+.filter-options-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .filter-option {
   display: flex;
-  gap: 9px;
   align-items: center;
-  margin: 10px 0;
-  cursor: pointer;
-  font-size: 14px;
-  color: #33453a;
-}
-
-.filter-option input {
-  width: 18px;
-  height: 18px;
-  accent-color: #176b42;
-  cursor: pointer;
-}
-
-.filter-option span:nth-child(2) {
-  flex: 1;
-}
-
-.filter-option small {
-  color: #68796e;
-  font-size: 12px;
-  margin-left: auto;
-}
-
-.price-range {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-}
-
-.price-range input {
-  min-width: 0;
-  border: 1px solid #bdcbbf;
+  gap: 10px;
+  padding: 8px 10px;
   border-radius: 9px;
-  padding: 10px;
-  outline-color: #176b42;
-  font-size: 13px;
+  cursor: pointer;
+  font-size: 13.5px;
+  color: #334155;
+  transition: all 0.15s ease;
+  user-select: none;
+  position: relative;
+  background: transparent;
 }
 
-.active-filter-summary {
-  margin: 12px 18px 0;
-  padding: 9px 11px;
-  border-radius: 9px;
-  background: #e6f4e8;
-  color: #176b42;
-  font-size: 12px;
+.filter-option:hover {
+  background: #f8fafc;
+  color: #0f172a;
+}
+
+.filter-option.selected {
+  background: #f0fdf4;
+  color: #14532d;
   font-weight: 600;
 }
 
-@media (max-width: 900px) {
-  .search-filter-sidebar {
-    position: static;
-  }
-  .filter-groups {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
+/* Ẩn checkbox native */
+.filter-option input[type="checkbox"] {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
 }
 
-@media (max-width: 560px) {
-  .filter-groups {
-    display: block;
+/* Custom checkbox vuông bo tròn chuẩn hiện đại */
+.filter-custom-checkbox {
+  width: 19px;
+  height: 19px;
+  border: 1.8px solid #cbd5e1;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #ffffff;
+  color: #ffffff;
+  font-size: 13px;
+  transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+  flex-shrink: 0;
+}
+
+.filter-custom-checkbox i {
+  display: none;
+}
+
+.filter-option:hover .filter-custom-checkbox {
+  border-color: #10b981;
+}
+
+.filter-option.selected .filter-custom-checkbox {
+  background: #15803d;
+  border-color: #15803d;
+  color: #ffffff;
+}
+
+.filter-option.selected .filter-custom-checkbox i {
+  display: block;
+}
+
+.filter-item-icon {
+  font-size: 13.5px;
+  color: #15803d;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  background: #f0fdf4;
+  border: 1px solid #dcfce7;
+  flex-shrink: 0;
+  transition: all 0.18s ease;
+}
+
+.filter-option:hover .filter-item-icon {
+  background: #dcfce7;
+  color: #166534;
+  border-color: #bbf7d0;
+}
+
+.filter-option.selected .filter-item-icon {
+  background: #15803d;
+  color: #ffffff;
+  border-color: #15803d;
+  box-shadow: 0 2px 5px rgba(21, 128, 61, 0.25);
+}
+
+.filter-item-label {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: -0.1px;
+}
+
+.filter-item-count {
+  font-size: 11px;
+  color: #94a3b8;
+  font-weight: 600;
+  background: #f1f5f9;
+  padding: 1px 6px;
+  border-radius: 8px;
+  transition: all 0.15s ease;
+}
+
+.filter-option.selected .filter-item-count {
+  background: #dcfce7;
+  color: #166534;
+}
+
+/* Responsive */
+@media (max-width: 991px) {
+  .search-filter-sidebar {
+    position: static;
+    max-height: none;
+    margin-bottom: 20px;
   }
 }

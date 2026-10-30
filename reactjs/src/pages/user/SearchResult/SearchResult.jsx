@@ -260,9 +260,9 @@ export default function SearchResult() {
     });
   };
 
-  // Danh sách homestays nạp tức thì từ SAMPLE_HOMESTAYS (tốc độ 0ms) và đồng bộ cơ sở dữ liệu
-  const [homestays, setHomestays] = useState(SAMPLE_HOMESTAYS);
-  const [loading, setLoading] = useState(false);
+  // Danh sách homestays nạp từ API cơ sở dữ liệu
+  const [homestays, setHomestays] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   // Lắng nghe kết quả tìm kiếm bằng hình ảnh từ Modal
   useEffect(() => {
@@ -762,7 +762,18 @@ export default function SearchResult() {
                     '/images/categories/7_thien_nhien_sinh_thai.jpg';
 
                   return (
-                    <article key={item.id} className="hotel-card mui-shadow" data-id={item.id}>
+                    <article
+                      key={item.id}
+                      className="hotel-card mui-shadow"
+                      data-id={item.id}
+                      onClick={(e) => {
+                        if (e.target.closest('.btn-favorite') || e.target.closest('.hotel-location a')) {
+                          return;
+                        }
+                        navigate(`/homestay/${item.id}`, { state: { homestay: item } });
+                      }}
+                      style={{ cursor: 'pointer' }}
+                    >
                       <div className="hotel-image">
                         <img src={imageSrc} alt={item.name} loading="lazy" />
                         <button
