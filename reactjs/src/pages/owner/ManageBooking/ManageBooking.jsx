@@ -1045,11 +1045,10 @@ export default function ManageBooking() {
                                 <button
                                   onClick={() => openModal('approveBookingModal', b.bookingCode || b.id)}
                                   title="Duyệt đơn & Giữ phòng"
-                                  className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white flex items-center justify-center gap-1 transition-colors shadow-sm text-[12px] font-semibold"
+                                  className="w-8 h-8 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white flex items-center justify-center transition-colors"
                                   type="button"
                                 >
-                                  <span className="material-symbols-outlined text-[16px]">check_circle</span>
-                                  <span>Duyệt đơn</span>
+                                  <span className="material-symbols-outlined text-[17px]">check_circle</span>
                                 </button>
                               )}
 
@@ -1057,11 +1056,10 @@ export default function ManageBooking() {
                                 <button
                                   onClick={() => openModal('checkinModal', b.bookingCode || b.id)}
                                   title="Check-in nhận phòng"
-                                  className="px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center gap-1 transition-colors shadow-sm text-[12px] font-semibold"
+                                  className="w-8 h-8 rounded-lg bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center transition-colors"
                                   type="button"
                                 >
-                                  <span className="material-symbols-outlined text-[16px]">login</span>
-                                  <span>Check-in</span>
+                                  <span className="material-symbols-outlined text-[17px]">login</span>
                                 </button>
                               )}
 
