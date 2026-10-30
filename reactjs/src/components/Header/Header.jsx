@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { NavLink, Link, useNavigate } from 'react-router-dom';
 import { authService } from '../../services/authService';
 import { wishlistService } from '../../services/wishlistService';
+import { bookingService } from '../../services/bookingService';
 import logoImg from '../../assets/logo.png';
 import './Header.css';
 
@@ -11,6 +12,7 @@ export default function Header() {
   const [user, setUser] = useState(null);
   const [unreadCount, setUnreadCount] = useState(0);
   const [wishlistCount, setWishlistCount] = useState(0);
+  const [bookingCount, setBookingCount] = useState(0);
 
   useEffect(() => {
     const current = authService.getCurrentUser();
@@ -35,9 +37,35 @@ export default function Header() {
     };
     updateWishlist();
 
-    window.addEventListener('wishlist-updated', updateWishlist);
-    window.addEventListener('storage', updateWishlist);
+    const updateBookings = async () => {
+      try {
+        const uid = current?.id || current?.userId || (sessionStorage.getItem('userId') ? Number(sessionStorage.getItem('userId')) : null);
+        if (!uid) {
+          setBookingCount(0);
+          return;
+        }
+        // 1. Tải tức thì từ bộ nhớ đệm (0ms)
+        const cached = bookingService.getCachedUserBookings(uid);
+        if (Array.isArray(cached) && cached.length > 0) {
+          setBookingCount(cached.length);
+        }
+        // 2. Đồng bộ danh sách đặt phòng thật từ Neon PostgreSQL
+        const list = await bookingService.getUserBookings(uid);
+        if (Array.isArray(list)) {
+          setBookingCount(list.length);
+        }
+      } catch (e) {
+        setBookingCount(0);
+      }
+    };
+    updateBookings();
 
+    window.addEventListener('wishlist-updated', updateWishlist);
+    window.addEventListener('booking-updated', updateBookings);
+    window.addEventListener('storage', updateWishlist);
+    window.addEventListener('storage', updateBookings);
+
+    let socket = null;
     if (current?.id) {
       const apiBase = import.meta.env.VITE_API_BASE_URL?.replace(/\/auth\/?$/, '') || 'http://localhost:8081/api';
       const loadUnread = () => fetch(`${apiBase}/notifications/unread-count`, { 
@@ -51,21 +79,19 @@ export default function Header() {
         .catch(() => setUnreadCount(0));
       loadUnread();
       const socketBase = import.meta.env.VITE_WS_BASE_URL || apiBase.replace(/^http/, 'ws').replace(/\/api$/, '');
-      const socket = new WebSocket(`${socketBase}/ws/notifications?token=${encodeURIComponent(current.token || '')}`);
+      socket = new WebSocket(`${socketBase}/ws/notifications?token=${encodeURIComponent(current.token || '')}`);
       socket.onmessage = (event) => {
         try { const payload = JSON.parse(event.data); if (typeof payload.unreadCount === 'number') setUnreadCount(payload.unreadCount); else loadUnread(); }
         catch { loadUnread(); }
       };
-      return () => {
-        socket.close();
-        window.removeEventListener('wishlist-updated', updateWishlist);
-        window.removeEventListener('storage', updateWishlist);
-      };
     }
 
     return () => {
+      if (socket) socket.close();
       window.removeEventListener('wishlist-updated', updateWishlist);
+      window.removeEventListener('booking-updated', updateBookings);
       window.removeEventListener('storage', updateWishlist);
+      window.removeEventListener('storage', updateBookings);
     };
   }, []);
 
@@ -174,6 +200,7 @@ export default function Header() {
               >
                 <i className="bi bi-calendar-event nav-icon" />
                 <span>Đặt phòng</span>
+                {bookingCount > 0 && <span className="yen-noti-badge">{bookingCount}</span>}
               </NavLink>
             </li>
               <li className="yen-nav-item">

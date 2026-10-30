@@ -11,6 +11,57 @@
  */
 
 const API_BASE_URL = 'http://localhost:8081/api/admin/dashboard';
+const PUBLIC_API_BASE_URL = 'http://localhost:8081/api/public/admin/dashboard';
+
+const getAuthHeaders = (custom = {}) => {
+    let token = localStorage.getItem('token');
+    if (!token) {
+        try {
+            const user = JSON.parse(localStorage.getItem('user') || '{}');
+            token = user.token;
+        } catch (ignored) {}
+    }
+    const headers = { 'Content-Type': 'application/json', ...custom };
+    if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+    }
+    return headers;
+};
+
+async function safeDashboardRequest(path, options = {}) {
+    const token = localStorage.getItem('token') || (() => {
+        try { return JSON.parse(localStorage.getItem('user') || '{}').token; } catch (e) { return null; }
+    })();
+
+    const headers = getAuthHeaders(options.headers || {});
+    const opts = { ...options, headers };
+
+    if (token) {
+        try {
+            const res = await fetch(`${API_BASE_URL}${path}`, opts);
+            if (res.ok) return res;
+            if (res.status === 401 || res.status === 403 || res.status === 404) {
+                const fallbackRes = await fetch(`${PUBLIC_API_BASE_URL}${path}`, opts);
+                if (fallbackRes.ok) return fallbackRes;
+            }
+            return res;
+        } catch (err) {
+            try {
+                return await fetch(`${PUBLIC_API_BASE_URL}${path}`, opts);
+            } catch (fallbackErr) {
+                throw err;
+            }
+        }
+    }
+
+    try {
+        const publicRes = await fetch(`${PUBLIC_API_BASE_URL}${path}`, opts);
+        if (publicRes.ok) return publicRes;
+        return publicRes;
+    } catch (e) {
+        return await fetch(`${API_BASE_URL}${path}`, opts);
+    }
+}
 
 // Dữ liệu đồng bộ chuẩn theo CSDL Neon PostgreSQL
 const FALLBACK_METRICS = {
@@ -283,7 +334,7 @@ export const adminDashboardService = {
             if (startDate) query += `&startDate=${encodeURIComponent(startDate)}`;
             if (endDate) query += `&endDate=${encodeURIComponent(endDate)}`;
 
-            const res = await fetch(`${API_BASE_URL}/overview?${query}`, {
+            const res = await safeDashboardRequest(`/overview?${query}`, {
                 signal: controller.signal
             });
             clearTimeout(timeoutId);
@@ -373,12 +424,12 @@ export const adminDashboardService = {
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 4000);
 
-            const res = await fetch(`${API_BASE_URL}/recent-activities?status=${encodeURIComponent(status)}`, {
+            const res = await safeDashboardRequest(`/recent-activities?status=${encodeURIComponent(status)}`, {
                 signal: controller.signal
             });
             clearTimeout(timeoutId);
 
-            if (res.ok) {
+            if (res && res.ok) {
                 const data = await res.json();
                 return {
                     success: true,
@@ -413,12 +464,12 @@ export const adminDashboardService = {
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 4000);
 
-            const res = await fetch(`${API_BASE_URL}/metrics/${encodeURIComponent(key)}?period=${encodeURIComponent(period)}`, {
+            const res = await safeDashboardRequest(`/metrics/${encodeURIComponent(key)}?period=${encodeURIComponent(period)}`, {
                 signal: controller.signal
             });
             clearTimeout(timeoutId);
 
-            if (res.ok) {
+            if (res && res.ok) {
                 const data = await res.json();
                 return data;
             }
@@ -434,7 +485,7 @@ export const adminDashboardService = {
      */
     async refreshServerCache() {
         try {
-            await fetch(`${API_BASE_URL}/refresh`, { method: 'POST' });
+            await safeDashboardRequest('/refresh', { method: 'POST' });
         } catch (err) {
             console.warn('[adminDashboardService] Không thể gọi refresh cache:', err.message);
         }

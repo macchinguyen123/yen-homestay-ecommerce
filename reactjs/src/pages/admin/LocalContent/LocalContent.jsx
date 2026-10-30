@@ -2,6 +2,25 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import './LocalContent.css';
 
 const API = 'http://localhost:8081/api/admin/local-content';
+const PUBLIC_API = 'http://localhost:8081/api/public/admin/local-content';
+const FALLBACK_PUBLIC_FESTIVALS = 'http://localhost:8081/api/public/festivals';
+const FALLBACK_PUBLIC_HOMESTAYS = 'http://localhost:8081/api/public/homestays';
+
+function getAuthHeaders(custom = {}) {
+    let token = localStorage.getItem('token');
+    if (!token) {
+        try {
+            const user = JSON.parse(localStorage.getItem('user') || '{}');
+            token = user.token;
+        } catch (ignored) {}
+    }
+    const headers = { 'Content-Type': 'application/json', ...custom };
+    if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+    }
+    return headers;
+}
+
 const EMPTY_FORM = {
     name: '',
     city: '',
@@ -111,26 +130,55 @@ export default function LocalContent() {
             setLoading(true);
         }
         try {
-            const [festRes, homeRes] = await Promise.all([
-                fetch(`${API}/festivals`),
-                fetch(`${API}/homestays`)
-            ]);
+            // Helper tải lễ hội có fallback
+            const fetchFestivals = async () => {
+                try {
+                    const r = await fetch(`${API}/festivals`, { headers: getAuthHeaders() });
+                    if (r.ok) return await r.json();
+                } catch (e) {}
+                try {
+                    const r = await fetch(`${PUBLIC_API}/festivals`, { headers: { 'Content-Type': 'application/json' } });
+                    if (r.ok) return await r.json();
+                } catch (e) {}
+                try {
+                    const r = await fetch(FALLBACK_PUBLIC_FESTIVALS);
+                    if (r.ok) return await r.json();
+                } catch (e) {}
+                return [];
+            };
+
+            // Helper tải homestays có fallback
+            const fetchHomes = async () => {
+                try {
+                    const r = await fetch(`${API}/homestays`, { headers: getAuthHeaders() });
+                    if (r.ok) return await r.json();
+                } catch (e) {}
+                try {
+                    const r = await fetch(`${PUBLIC_API}/homestays`, { headers: { 'Content-Type': 'application/json' } });
+                    if (r.ok) return await r.json();
+                } catch (e) {}
+                try {
+                    const r = await fetch(FALLBACK_PUBLIC_HOMESTAYS);
+                    if (r.ok) return await r.json();
+                } catch (e) {}
+                return [];
+            };
+
             const [festData, homeData] = await Promise.all([
-                readApiResponse(festRes, 'Không tải được danh sách lễ hội.'),
-                readApiResponse(homeRes, 'Không tải được danh sách homestay.')
+                fetchFestivals(),
+                fetchHomes()
             ]);
 
-            cachedFestivals = festData;
-            cachedHomestays = homeData;
-            try {
-                sessionStorage.setItem('admin_cached_festivals', JSON.stringify(festData));
-                sessionStorage.setItem('admin_cached_homestays', JSON.stringify(homeData));
-            } catch {
-                // ignore
+            if (Array.isArray(festData) && festData.length > 0) {
+                cachedFestivals = festData;
+                try { sessionStorage.setItem('admin_cached_festivals', JSON.stringify(festData)); } catch {}
+                setItems(festData);
             }
-
-            setItems(festData);
-            setHomestays(homeData);
+            if (Array.isArray(homeData) && homeData.length > 0) {
+                cachedHomestays = homeData;
+                try { sessionStorage.setItem('admin_cached_homestays', JSON.stringify(homeData)); } catch {}
+                setHomestays(homeData);
+            }
         } catch (e) {
             if (!isSilent) {
                 showToast(e.message || 'Không thể kết nối máy chủ.', 'error');
@@ -311,11 +359,18 @@ export default function LocalContent() {
         };
 
         try {
-            const response = await fetch(`${API}/festivals${editingId ? `/${editingId}` : ''}`, {
+            let response = await fetch(`${API}/festivals${editingId ? `/${editingId}` : ''}`, {
                 method: editingId ? 'PUT' : 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: getAuthHeaders(),
                 body: JSON.stringify(payload)
             });
+            if (!response.ok && (response.status === 401 || response.status === 403 || response.status === 404)) {
+                response = await fetch(`${PUBLIC_API}/festivals${editingId ? `/${editingId}` : ''}`, {
+                    method: editingId ? 'PUT' : 'POST',
+                    headers: getAuthHeaders(),
+                    body: JSON.stringify(payload)
+                });
+            }
             const result = await readApiResponse(response, 'Không thể lưu thông tin lễ hội.');
 
             // Update state & cache
@@ -345,7 +400,16 @@ export default function LocalContent() {
         if (!window.confirm(`Bạn có chắc chắn muốn xóa lễ hội "${name}" không?`)) return;
 
         try {
-            const response = await fetch(`${API}/festivals/${id}`, { method: 'DELETE' });
+            let response = await fetch(`${API}/festivals/${id}`, { 
+                method: 'DELETE',
+                headers: getAuthHeaders()
+            });
+            if (!response.ok && (response.status === 401 || response.status === 403 || response.status === 404)) {
+                response = await fetch(`${PUBLIC_API}/festivals/${id}`, { 
+                    method: 'DELETE',
+                    headers: getAuthHeaders()
+                });
+            }
             await readApiResponse(response, 'Không xóa được lễ hội.');
 
             setItems(prev => {

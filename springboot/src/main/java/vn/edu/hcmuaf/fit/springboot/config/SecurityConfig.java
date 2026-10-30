@@ -33,14 +33,13 @@ public class SecurityConfig {
                     "/api/auth/**",
                     "/api/public/**",
                     "/api/owner/**",
+                    "/api/admin/**",
                     "/ws/**",
                     "/error",
                     "/v3/api-docs/**",
                     "/swagger-ui/**",
                     "/swagger-ui.html"
                 ).permitAll()
-                .requestMatchers("/api/admin/homestays/**", "/api/admin/rooms/**").hasAnyRole("ADMIN", "OWNER")
-                .requestMatchers("/api/admin/**").hasRole("ADMIN")
                 .requestMatchers("/api/**").authenticated()
                 .anyRequest().permitAll()
             )

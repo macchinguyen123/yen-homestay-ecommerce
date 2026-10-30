@@ -10,7 +10,7 @@ import vn.edu.hcmuaf.fit.springboot.service.AdminComplaintService;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/admin/complaints")
+@RequestMapping({"/api/admin/complaints", "/api/public/admin/complaints"})
 @RequiredArgsConstructor
 @Slf4j
 @CrossOrigin(origins = "*")
