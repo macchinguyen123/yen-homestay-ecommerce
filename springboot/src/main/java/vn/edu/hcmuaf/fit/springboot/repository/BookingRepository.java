@@ -29,7 +29,9 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
     @Query("""
         SELECT b FROM Booking b 
         WHERE b.roomId = :roomId 
-          AND UPPER(b.status) NOT IN ('CANCELLED', 'REJECTED')
+          AND LOWER(COALESCE(b.status, '')) NOT LIKE '%cancel%'
+          AND LOWER(COALESCE(b.status, '')) NOT LIKE '%reject%'
+          AND LOWER(COALESCE(b.status, '')) NOT LIKE '%hủy%'
           AND b.checkInDate < :checkOutDate 
           AND b.checkOutDate > :checkInDate
     """)
@@ -45,7 +47,9 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
     @Query("""
         SELECT b FROM Booking b 
         WHERE b.roomId = :roomId 
-          AND UPPER(b.status) NOT IN ('CANCELLED', 'REJECTED')
+          AND LOWER(COALESCE(b.status, '')) NOT LIKE '%cancel%'
+          AND LOWER(COALESCE(b.status, '')) NOT LIKE '%reject%'
+          AND LOWER(COALESCE(b.status, '')) NOT LIKE '%hủy%'
           AND b.checkOutDate >= :fromDate
         ORDER BY b.checkInDate ASC
     """)
@@ -60,7 +64,9 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
     @Query("""
         SELECT b FROM Booking b 
         WHERE b.homestayId = :homestayId 
-          AND UPPER(b.status) NOT IN ('CANCELLED', 'REJECTED')
+          AND LOWER(COALESCE(b.status, '')) NOT LIKE '%cancel%'
+          AND LOWER(COALESCE(b.status, '')) NOT LIKE '%reject%'
+          AND LOWER(COALESCE(b.status, '')) NOT LIKE '%hủy%'
           AND b.checkOutDate >= :fromDate
         ORDER BY b.checkInDate ASC
     """)

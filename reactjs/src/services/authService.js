@@ -49,6 +49,11 @@ export const authService = {
         sessionStorage.setItem('userRole', sessionRole);
         sessionStorage.setItem('userId', String(data.id));
 
+        if (data.token) {
+          localStorage.setItem('token', data.token);
+          sessionStorage.setItem('token', data.token);
+        }
+
         return { success: true, message: data.message || 'Đăng nhập thành công!', user: userData };
       } else {
         return { success: false, message: data.message || 'Đăng nhập thất bại. Vui lòng thử lại!' };
@@ -187,12 +192,40 @@ export const authService = {
   },
 
   /**
+   * Lấy token xác thực từ storage
+   */
+  getToken() {
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+    if (token) return token;
+    try {
+      const u = JSON.parse(localStorage.getItem('user'));
+      return u?.token || null;
+    } catch (e) {
+      return null;
+    }
+  },
+
+  /**
+   * Lấy headers đã kèm Authorization Bearer token
+   */
+  getAuthHeaders(customHeaders = {}) {
+    const token = this.getToken();
+    const headers = { 'Content-Type': 'application/json', ...customHeaders };
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    return headers;
+  },
+
+  /**
    * Đăng xuất
    */
   logout() {
     localStorage.removeItem('user');
+    localStorage.removeItem('token');
     localStorage.removeItem('user_role');
     sessionStorage.removeItem('isLoggedIn');
+    sessionStorage.removeItem('token');
     sessionStorage.removeItem('userName');
     sessionStorage.removeItem('userRole');
     sessionStorage.removeItem('userId');

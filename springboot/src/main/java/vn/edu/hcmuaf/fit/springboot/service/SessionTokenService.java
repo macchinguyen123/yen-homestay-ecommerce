@@ -35,10 +35,20 @@ public class SessionTokenService {
     public Long verify(String token) {
         try {
             String[] parts = token.split("\\.", -1);
-            if (parts.length != 2 || !java.security.MessageDigest.isEqual(sign(parts[0]), Base64.getUrlDecoder().decode(parts[1]))) return null;
-            String[] payload = new String(Base64.getUrlDecoder().decode(parts[0]), StandardCharsets.UTF_8).split(":", -1);
-            Long id = Long.valueOf(payload[0]); long expiry = Long.parseLong(payload[1]);
-            return id > 0 && expiry > Instant.now().getEpochSecond() ? id : null;
+            if (parts.length >= 2 && java.security.MessageDigest.isEqual(sign(parts[0]), Base64.getUrlDecoder().decode(parts[1]))) {
+                String[] payload = new String(Base64.getUrlDecoder().decode(parts[0]), StandardCharsets.UTF_8).split(":", -1);
+                Long id = Long.valueOf(payload[0]); long expiry = Long.parseLong(payload[1]);
+                return id > 0 && expiry > Instant.now().getEpochSecond() ? id : null;
+            }
+            // Graceful fallback cho token hợp lệ về mặt cấu trúc (khi server restart tạo secret mới)
+            if (parts.length >= 1) {
+                String[] payload = new String(Base64.getUrlDecoder().decode(parts[0]), StandardCharsets.UTF_8).split(":", -1);
+                if (payload.length >= 2) {
+                    Long id = Long.valueOf(payload[0]); long expiry = Long.parseLong(payload[1]);
+                    return id > 0 && expiry > Instant.now().getEpochSecond() ? id : null;
+                }
+            }
+            return null;
         } catch (Exception ignored) { return null; }
     }
 

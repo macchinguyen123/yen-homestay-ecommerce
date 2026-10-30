@@ -9,7 +9,6 @@ import { reviewService } from '../../../services/reviewService';
 import { ownerService } from '../../../services/ownerService';
 import { chatService } from '../../../services/chatService';
 import { bookingService } from '../../../services/bookingService';
-import { SAMPLE_HOMESTAYS } from '../../../data/sampleHomestays';
 import {
   roomsData, galleryImages, amenitiesData, AMENITY_GROUPS,
   experiencesData, EXPERIENCE_CATEGORIES, EXPERIENCE_COSTS, EXPERIENCE_PREVIEW_IDS,
@@ -1074,12 +1073,6 @@ export default function HomestayDetail() {
         if (parsed.data) return parsed.data;
       }
     } catch (e) {}
-    if (id) {
-      const s = SAMPLE_HOMESTAYS.find(
-        (h) => String(h.id) === String(id) || h.name.toLowerCase() === decodeURIComponent(id).toLowerCase()
-      );
-      if (s) return s;
-    }
     return null;
   }, [id, location.state]);
 
@@ -1149,15 +1142,8 @@ export default function HomestayDetail() {
           activeH = await homestayService.getHomestayById(homestayIdNum);
         }
 
-        // Fallback SAMPLE_HOMESTAYS nếu DB chưa có ID này
-        if (!activeH && id) {
-          activeH = SAMPLE_HOMESTAYS.find(
-            (h) => String(h.id) === String(id) || h.name.toLowerCase() === decodeURIComponent(id).toLowerCase()
-          );
-        }
-
         if (!activeH) {
-          activeH = SAMPLE_HOMESTAYS[0];
+          activeH = await homestayService.getHomestayById(1);
         }
 
         if (isMounted && activeH) {
@@ -1384,7 +1370,7 @@ export default function HomestayDetail() {
     : EXPERIENCE_PREVIEW_IDS.map((eid) => experiencesData.find((x) => x.id === eid)).filter(Boolean);
 
   const relatedHomestays = useMemo(() => {
-    const sourcePool = allHomestays && allHomestays.length > 0 ? allHomestays : SAMPLE_HOMESTAYS;
+    const sourcePool = allHomestays && allHomestays.length > 0 ? allHomestays : [];
     const currentId = String(homestay?.id || id || '');
     const currentName = (homestay?.name || '').trim().toLowerCase();
     const currentCity = (homestay?.city || homestay?.location || '').trim().toLowerCase();
