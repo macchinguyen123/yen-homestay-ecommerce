@@ -28,8 +28,21 @@ public class SecurityConfig {
             .csrf(AbstractHttpConfigurer::disable)
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/auth/**", "/api/public/**", "/ws/**", "/**").permitAll()
-                .anyRequest().authenticated()
+                .requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**").permitAll()
+                .requestMatchers(
+                    "/api/auth/**",
+                    "/api/public/**",
+                    "/api/owner/**",
+                    "/ws/**",
+                    "/error",
+                    "/v3/api-docs/**",
+                    "/swagger-ui/**",
+                    "/swagger-ui.html"
+                ).permitAll()
+                .requestMatchers("/api/admin/homestays/**", "/api/admin/rooms/**").hasAnyRole("ADMIN", "OWNER")
+                .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                .requestMatchers("/api/**").authenticated()
+                .anyRequest().permitAll()
             )
             .addFilterBefore(sessionTokenFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();

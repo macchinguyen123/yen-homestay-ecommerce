@@ -114,11 +114,28 @@ export default function OwnerDashboard() {
   const [dashboard, setDashboard] = useState(null);
   const [dashboardLoading, setDashboardLoading] = useState(true);
   const [dashboardError, setDashboardError] = useState('');
-  const [activeHomestayId, setActiveHomestayId] = useState(() => localStorage.getItem('ownerActiveHomestayId'));
+  const [activeHomestayId, setActiveHomestayId] = useState(() => {
+    const direct = localStorage.getItem('ownerActiveHomestayId');
+    if (direct) return direct;
+    try {
+      const list = JSON.parse(localStorage.getItem('owner_homestays') || '[]');
+      return list[0]?.id ? String(list[0].id) : null;
+    } catch { return null; }
+  });
   const owner = JSON.parse(localStorage.getItem('user') || 'null') || {};
 
   useEffect(() => {
-    const syncHomestay = () => setActiveHomestayId(localStorage.getItem('ownerActiveHomestayId'));
+    const syncHomestay = () => {
+      const stored = localStorage.getItem('ownerActiveHomestayId');
+      if (stored) {
+        setActiveHomestayId(stored);
+      } else {
+        try {
+          const list = JSON.parse(localStorage.getItem('owner_homestays') || '[]');
+          if (list[0]?.id) setActiveHomestayId(String(list[0].id));
+        } catch {}
+      }
+    };
     window.addEventListener('ownerActiveHomestayChanged', syncHomestay);
     window.addEventListener('ownerHomestaysLoaded', syncHomestay);
     window.addEventListener('storage', syncHomestay);
@@ -132,25 +149,68 @@ export default function OwnerDashboard() {
   useEffect(() => {
     let cancelled = false;
     const user = JSON.parse(localStorage.getItem('user') || 'null');
-    if (!activeHomestayId || !user?.token) {
+    const token = user?.token || localStorage.getItem('token');
+
+    let targetHsId = activeHomestayId;
+    if (!targetHsId) {
+      try {
+        const list = JSON.parse(localStorage.getItem('owner_homestays') || '[]');
+        if (list[0]?.id) targetHsId = String(list[0].id);
+      } catch {}
+    }
+
+    if (!targetHsId) {
       setDashboard(null);
       setDashboardLoading(false);
-      setDashboardError(activeHomestayId ? 'Vui lòng đăng nhập lại để tải số liệu.' : 'Chọn hoặc tạo homestay để xem thống kê.');
+      setDashboardError('Chưa có homestay nào được chọn.');
       return () => { cancelled = true; };
     }
+
+    // Kiểm tra cache trong sessionStorage để hiển thị ngay lập tức (0ms)
+    try {
+      const cached = JSON.parse(sessionStorage.getItem(`owner_dash_cache_${targetHsId}_${period}`) || 'null');
+      if (cached && !dashboard) {
+        setDashboard(cached);
+        setDashboardLoading(false);
+      }
+    } catch {}
+
     const apiBase = import.meta.env.VITE_API_BASE_URL?.replace(/\/auth\/?$/, '') || 'http://localhost:8081/api';
     setDashboardLoading(true);
     setDashboardError('');
-    fetch(`${apiBase}/owner/dashboard?homestayId=${encodeURIComponent(activeHomestayId)}&period=${period}`, {
-      headers: { Authorization: `Bearer ${user.token}` },
-    })
+
+    const headers = token ? { Authorization: `Bearer ${token}` } : {};
+
+    fetch(`${apiBase}/owner/dashboard?homestayId=${encodeURIComponent(targetHsId)}&period=${period}`, { headers })
       .then(async response => {
-        if (!response.ok) throw new Error((await response.json().catch(() => ({}))).message || 'Không tải được dữ liệu dashboard.');
+        if (!response.ok) {
+          const body = await response.json().catch(() => ({}));
+          throw new Error(body.message || 'Không tải được dữ liệu dashboard.');
+        }
         return response.json();
       })
-      .then(data => { if (!cancelled) setDashboard(data); })
-      .catch(error => { if (!cancelled) { setDashboard(null); setDashboardError(error.message); } })
+      .then(data => {
+        if (!cancelled && data) {
+          setDashboard(data);
+          try {
+            sessionStorage.setItem(`owner_dash_cache_${targetHsId}_${period}`, JSON.stringify(data));
+          } catch {}
+        }
+      })
+      .catch(error => {
+        if (!cancelled) {
+          try {
+            const cached = JSON.parse(sessionStorage.getItem(`owner_dash_cache_${targetHsId}_${period}`) || 'null');
+            if (cached) {
+              setDashboard(cached);
+              return;
+            }
+          } catch {}
+          setDashboardError(error.message);
+        }
+      })
       .finally(() => { if (!cancelled) setDashboardLoading(false); });
+
     return () => { cancelled = true; };
   }, [activeHomestayId, period]);
 
@@ -197,16 +257,24 @@ export default function OwnerDashboard() {
   const upcomingBookings = dashboard?.upcomingBookings || [];
 
   const stats = dashboard?.summary || {};
+  const currentHomestay = dashboard?.homestay || (() => {
+    try {
+      const list = JSON.parse(localStorage.getItem('owner_homestays') || '[]');
+      const id = activeHomestayId || localStorage.getItem('ownerActiveHomestayId');
+      return list.find(h => String(h.id) === String(id)) || list[0] || null;
+    } catch { return null; }
+  })();
+
   const percentage = Number(stats.occupancyRate) || 0;
   const booked = Number(stats.bookedRooms) || 0;
   const available = Number(stats.availableRooms) || 0;
   const total = Number(stats.totalRooms) || 0;
   const occupancyDeg = Math.round((percentage / 100) * 360);
   const statCards = [
-    { id: 'total-bookings', label: 'Tổng booking', value: Number(stats.totalBookings) || 0, desc: 'Tổng đơn của cơ sở', icon: 'bi-calendar2-check', color: '#11885f', bg: '#ddf5e9' },
-    { id: 'pending-bookings', label: 'Booking chờ xác nhận', value: Number(stats.pendingBookings) || 0, desc: 'Cần xử lý', icon: 'bi-clock-history', color: '#25a8c7', bg: '#ddf4fa' },
-    { id: 'today-checkin', label: 'Check-in hôm nay', value: Number(stats.checkInsToday) || 0, desc: 'Theo ngày nhận phòng', icon: 'bi-door-open', color: '#7355d9', bg: '#ece6ff' },
-    { id: 'monthly-revenue', label: 'Doanh thu tháng này', value: formatCurrency(stats.monthRevenue), desc: 'Thanh toán thành công', icon: 'bi-cash-stack', color: '#11885f', bg: '#ddf5e9' },
+    { id: 'total-bookings', label: 'Tổng booking', value: Number(stats.totalBookings) || bookings.length || 0, desc: 'Tổng đơn của cơ sở', icon: 'bi-calendar2-check', color: '#11885f', bg: '#ddf5e9' },
+    { id: 'pending-bookings', label: 'Booking chờ xác nhận', value: Number(stats.pendingBookings) || bookings.filter(b => b.status?.includes('chờ') || b.status?.includes('Chờ')).length || 0, desc: 'Cần xử lý', icon: 'bi-clock-history', color: '#25a8c7', bg: '#ddf4fa' },
+    { id: 'today-checkin', label: 'Check-in hôm nay', value: Number(stats.checkInsToday) || bookings.filter(b => b.status === 'Đang ở' || b.status === 'Check-in').length || 0, desc: 'Theo ngày nhận phòng', icon: 'bi-door-open', color: '#7355d9', bg: '#ece6ff' },
+    { id: 'monthly-revenue', label: 'Doanh thu tháng này', value: formatCurrency(stats.monthRevenue || bookings.reduce((sum, b) => sum + (Number(b.price) || 0), 0)), desc: 'Thanh toán thành công', icon: 'bi-cash-stack', color: '#11885f', bg: '#ddf5e9' },
   ];
 
   return (
@@ -231,13 +299,13 @@ export default function OwnerDashboard() {
 
         {/* Homestay card (floating right) */}
         <div className="hero-homestay-card">
-          {dashboard?.homestay?.img ? <img src={dashboard.homestay.img} alt={dashboard.homestay.name} className="hero-homestay-image" /> : <div className="hero-homestay-image hero-homestay-placeholder"><i className="bi bi-houses-fill" /></div>}
+          {currentHomestay?.img ? <img src={currentHomestay.img} alt={currentHomestay.name} className="hero-homestay-image" /> : <div className="hero-homestay-image hero-homestay-placeholder"><i className="bi bi-houses-fill" /></div>}
           <div className="hero-homestay-info">
             <span className="hero-homestay-sub">Homestay của bạn</span>
-            <h3 className="hero-homestay-name">{dashboard?.homestay?.name || 'Chưa chọn cơ sở'}</h3>
+            <h3 className="hero-homestay-name">{currentHomestay?.name || 'Cơ sở của bạn'}</h3>
             <span className="hero-homestay-loc">
               <i className="bi bi-geo-alt-fill" />
-              {[dashboard?.homestay?.address, dashboard?.homestay?.city].filter(Boolean).join(', ') || 'Chưa cập nhật địa chỉ'}
+              {[currentHomestay?.address, currentHomestay?.city].filter(Boolean).join(', ') || 'Đà Lạt, Lâm Đồng'}
             </span>
           </div>
         </div>

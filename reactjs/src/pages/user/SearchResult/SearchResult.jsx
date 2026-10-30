@@ -1,7 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Link, useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import SearchSidebar from '../../../components/SearchSidebar/SearchSidebar';
-import { SAMPLE_HOMESTAYS } from '../../../data/sampleHomestays';
 import { homestayService } from '../../../services/homestayService';
 import VisualSearchModal from '../../../components/VisualSearchModal/VisualSearchModal';
 import './SearchResult.css';
@@ -328,20 +327,24 @@ export default function SearchResult() {
         return;
       }
       try {
-        const dbList = await homestayService.searchHomestays(searchQuery);
+        let dbList;
+        if (!searchQuery || !searchQuery.trim()) {
+          dbList = await homestayService.getAllHomestays();
+        } else {
+          dbList = await homestayService.searchHomestays(searchQuery);
+        }
         if (isMounted) {
-          if (Array.isArray(dbList) && dbList.length > 0) {
+          if (Array.isArray(dbList)) {
             setHomestays(dbList);
           } else {
-            // Giữ SAMPLE_HOMESTAYS để hiển thị ngay tức thì chỗ nghỉ phù hợp
-            setHomestays(SAMPLE_HOMESTAYS);
+            setHomestays([]);
           }
           setLoading(false);
         }
       } catch (err) {
         console.warn('Lỗi khi tải homestay từ database:', err);
         if (isMounted) {
-          setHomestays(SAMPLE_HOMESTAYS);
+          setHomestays([]);
           setLoading(false);
         }
       }

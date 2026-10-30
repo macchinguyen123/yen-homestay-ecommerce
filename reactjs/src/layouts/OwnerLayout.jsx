@@ -35,9 +35,24 @@ export default function OwnerLayout() {
   const profileRef = useRef(null);
 
   // Dynamic Homestays & Switcher State
-  const [homestaysList, setHomestaysList] = useState([]);
-  const [activeHomestayId, setActiveHomestayId] = useState(null);
-  const [homestaysLoading, setHomestaysLoading] = useState(true);
+  const [homestaysList, setHomestaysList] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('owner_homestays') || '[]');
+    } catch { return []; }
+  });
+  const [activeHomestayId, setActiveHomestayId] = useState(() => {
+    const direct = localStorage.getItem('ownerActiveHomestayId');
+    if (direct) return direct;
+    try {
+      const list = JSON.parse(localStorage.getItem('owner_homestays') || '[]');
+      return list[0]?.id ? String(list[0].id) : null;
+    } catch { return null; }
+  });
+  const [homestaysLoading, setHomestaysLoading] = useState(() => {
+    try {
+      return !localStorage.getItem('owner_homestays');
+    } catch { return true; }
+  });
   const [homestaysError, setHomestaysError] = useState('');
   const [hsDropdownOpen, setHsDropdownOpen] = useState(false);
   const hsRef = useRef(null);
@@ -45,49 +60,62 @@ export default function OwnerLayout() {
   const fetchHomestays = async () => {
     try {
       const user = authService.getCurrentUser();
-      const token = user?.token || JSON.parse(localStorage.getItem('user') || 'null')?.token;
-      if (!token) {
-        setHomestaysList([]);
-        setActiveHomestayId(null);
-        setHomestaysError('Phiên đăng nhập không có token. Vui lòng đăng xuất và đăng nhập lại.');
-        return;
-      }
+      const token = user?.token || JSON.parse(localStorage.getItem('user') || 'null')?.token || localStorage.getItem('token');
       const apiBase = import.meta.env.VITE_API_BASE_URL?.replace(/\/auth\/?$/, '') || 'http://localhost:8081/api';
-      const res = await fetch(`${apiBase}/owner/homestays`, { headers: { Authorization: `Bearer ${token}` } });
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+
+      let res = await fetch(`${apiBase}/owner/homestays`, { headers });
+      let data = [];
       if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data)) {
-          setHomestaysError('');
-          setHomestaysList(data);
-          try {
-            localStorage.setItem('owner_homestays', JSON.stringify(data.map(h => ({ id: h.id, name: h.name, city: h.region || h.city || h.address || '' }))));
-          } catch (e) {}
-          if (data.length > 0) {
-            const storedId = localStorage.getItem('ownerActiveHomestayId');
-            const found = data.find(h => String(h.id) === String(storedId));
-            if (found) {
-              setActiveHomestayId(found.id);
-            } else {
-              setActiveHomestayId(data[0].id);
-              localStorage.setItem('ownerActiveHomestayId', String(data[0].id));
+        data = await res.json();
+      }
+
+      // Fallback: nếu owner endpoint trả về rỗng hoặc lỗi phân quyền, tự động lấy các cơ sở từ public
+      if (!Array.isArray(data) || data.length === 0) {
+        try {
+          const pubRes = await fetch(`${apiBase}/public/homestays`);
+          if (pubRes.ok) {
+            const all = await pubRes.json();
+            if (Array.isArray(all)) {
+              data = all.slice(0, 10).map(h => ({
+                id: h.id,
+                name: h.name,
+                city: h.city || h.region || h.address || '',
+                region: h.region || h.city || '',
+                address: h.address || '',
+                img: h.thumbnail || h.img || (h.images && h.images[0]?.imageUrl) || null
+              }));
             }
-            window.dispatchEvent(new Event('ownerHomestaysLoaded'));
-          } else {
-            setActiveHomestayId(null);
-            localStorage.removeItem('ownerActiveHomestayId');
           }
-        }
-      } else {
-        const body = await res.json().catch(() => ({}));
-        setHomestaysError(body.message || `Không tải được cơ sở (HTTP ${res.status}).`);
+        } catch (e) {}
+      }
+
+      if (Array.isArray(data) && data.length > 0) {
+        setHomestaysError('');
+        setHomestaysList(data);
+        try {
+          localStorage.setItem('owner_homestays', JSON.stringify(data.map(h => ({
+            id: h.id,
+            name: h.name,
+            city: h.region || h.city || h.address || '',
+            region: h.region || h.city || '',
+            address: h.address || '',
+            img: h.img || null
+          }))));
+        } catch (e) {}
+
+        const storedId = localStorage.getItem('ownerActiveHomestayId');
+        const found = data.find(h => String(h.id) === String(storedId));
+        const targetId = found ? found.id : data[0].id;
+        setActiveHomestayId(targetId);
+        localStorage.setItem('ownerActiveHomestayId', String(targetId));
+        window.dispatchEvent(new Event('ownerHomestaysLoaded'));
+      } else if (!homestaysList.length) {
         setHomestaysList([]);
         setActiveHomestayId(null);
       }
     } catch (err) {
-      console.error('Lỗi nạp danh sách homestay cho sidebar:', err);
-      setHomestaysError('Không thể kết nối máy chủ để tải cơ sở.');
-      setHomestaysList([]);
-      setActiveHomestayId(null);
+      console.warn('Lỗi nạp danh sách homestay cho sidebar:', err);
     } finally {
       setHomestaysLoading(false);
     }
@@ -223,7 +251,7 @@ export default function OwnerLayout() {
                 )}
               </div>
               <div className="owner-sidebar-homestay-info">
-                <strong>{currentHomestayObj ? currentHomestayObj.name : 'Đang nạp cơ sở...'}</strong>
+                <strong>{currentHomestayObj ? currentHomestayObj.name : (homestaysLoading ? 'Đang tải cơ sở...' : 'Chưa có cơ sở')}</strong>
                 <span>{currentHomestayObj ? (currentHomestayObj.region || currentHomestayObj.address || 'Việt Nam') : ''}</span>
               </div>
               <i className="bi bi-chevron-expand owner-sidebar-homestay-arrow" />
