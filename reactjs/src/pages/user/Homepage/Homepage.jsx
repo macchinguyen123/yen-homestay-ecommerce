@@ -609,10 +609,7 @@ export default function Homepage() {
     setIsSearchOpen(false);
     saveToHistory(term);
     if (autoSubmit) {
-      triggerToast(`Đang tìm kiếm homestay tại: ${term}...`);
-      setTimeout(() => {
-        navigate(`/search?q=${encodeURIComponent(term)}`);
-      }, 350);
+      navigate(`/search?q=${encodeURIComponent(term)}`);
     }
   };
 
@@ -623,10 +620,7 @@ export default function Homepage() {
     if (term) {
       saveToHistory(term);
     }
-    triggerToast(`Đang tìm kiếm homestay tại: ${term || 'Tất cả điểm đến'}...`);
-    setTimeout(() => {
-      navigate(`/search?q=${encodeURIComponent(term)}`);
-    }, 450);
+    navigate(`/search?q=${encodeURIComponent(term)}`);
   };
 
   const handleOpenAiAssistant = (topic = 'gợi ý homestay') => {
@@ -890,7 +884,7 @@ export default function Homepage() {
             <div className="hero-badge">
               <i className="bi bi-compass" /> Du lịch gắn kết văn hóa bản địa chân thực
             </div>
-            <h1 className="hero-slogan">Đi đâu không chỉ để ở – mà để<br />trải nghiệm.</h1>
+            <h1 className="hero-slogan">Đi đâu không chỉ để ở – mà để trải nghiệm.</h1>
             <p className="hero-subslogan">Tìm một nơi lưu trú phù hợp và bắt đầu hành trình khám phá những câu chuyện văn hóa độc bản khắp mọi miền Việt Nam.</p>
 
             {/* THANH TÌM KIẾM HERO */}

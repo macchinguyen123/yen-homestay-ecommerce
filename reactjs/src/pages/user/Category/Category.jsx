@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Link, useSearchParams, useNavigate } from 'react-router-dom';
+import { Link, useSearchParams, useNavigate, useParams } from 'react-router-dom';
 import './Category.css';
 import { homestayService } from '../../../services/homestayService';
 import { wishlistService } from '../../../services/wishlistService';
@@ -256,8 +256,9 @@ const ITEMS_PER_PAGE = 16;
 
 export default function Category() {
   const navigate = useNavigate();
+  const { id: pathId } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
-  const urlCategoryParam = searchParams.get('cat') || searchParams.get('type') || 'all';
+  const urlCategoryParam = pathId || searchParams.get('cat') || searchParams.get('type') || 'all';
 
   // Filters State
   const [activeCategory, setActiveCategory] = useState(resolveCategoryTab(urlCategoryParam));

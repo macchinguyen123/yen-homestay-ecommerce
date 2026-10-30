@@ -47,7 +47,10 @@ export const homestayService = {
     }
 
     try {
-      const response = await fetch(API_BASE_URL);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 2500);
+      const response = await fetch(API_BASE_URL, { signal: controller.signal });
+      clearTimeout(timeoutId);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -64,13 +67,16 @@ export const homestayService = {
   },
 
   /**
-   * Tìm kiếm homestay trực tiếp từ Database theo từ khóa
+   * Tìm kiếm homestay trực tiếp từ Database theo từ khóa (có timeout và cache)
    */
   async searchHomestays(query) {
     try {
       const q = query ? query.trim() : '';
       const url = q ? `${API_BASE_URL}?q=${encodeURIComponent(q)}` : API_BASE_URL;
-      const response = await fetch(url);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 2500);
+      const response = await fetch(url, { signal: controller.signal });
+      clearTimeout(timeoutId);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }

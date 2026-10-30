@@ -132,8 +132,16 @@
   color: var(--white);
   line-height: 1.22;
   margin-bottom: 12px;
-  max-width: 860px;
+  max-width: 1200px;
+  white-space: nowrap;
   letter-spacing: -0.5px;
+}
+
+@media (max-width: 1024px) {
+  .hero-slogan {
+    white-space: normal;
+    font-size: 2.2rem;
+  }
 }
 
 .hero-subslogan {
@@ -149,7 +157,7 @@
   position: relative;
   margin-top: 14px;
   width: 100%;
-  max-width: 1140px;
+  max-width: 1200px;
   z-index: 40;
 }
 
@@ -191,27 +199,61 @@
 }
 
 .field-with-border {
-  padding: 6px 16px;
+  padding: 6px 12px;
   flex: 1 1 0;
   min-width: 0;
+  position: relative;
 }
 
-.field-with-border:not(:last-of-type) {
-  border-right: 1px solid #E2E8F0;
+.field-with-border::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  top: 18%;
+  height: 64%;
+  width: 1px;
+  background: #E2E8F0;
+  pointer-events: none;
 }
 
 .field-destination {
-  flex: 1.85 1 0;
+  flex: 1.8 1 0;
+  min-width: 190px;
   position: relative;
 }
 
 .field-destination.field-active {
-  background: rgba(240, 253, 244, 0.85);
-  box-shadow: 0 0 0 1px rgba(134, 239, 172, 0.7);
+  background: transparent;
+  box-shadow: none !important;
+  outline: none !important;
+  border: none !important;
 }
 
-.field-checkin, .field-checkout { flex: 0.95 1 0; }
-.field-guests-rooms { flex: 1.1 1 0; position: relative; border-right: 1px solid #E2E8F0; }
+.field-checkin, .field-checkout {
+  flex: 1.05 1 0;
+  min-width: 128px;
+}
+
+.field-guests-rooms {
+  flex: 1.15 1 0;
+  min-width: 138px;
+  position: relative;
+}
+
+.field-guests-rooms .field-content,
+.field-guests-rooms .field-input,
+.field-guests-rooms .field-label {
+  white-space: nowrap !important;
+}
+
+.field-guests-rooms .field-input {
+  font-size: 0.88rem;
+}
+
+input[type="date"].field-input {
+  font-size: 0.88rem;
+  min-width: 116px;
+}
 
 .search-field-icon {
   font-size: 1.25rem;
@@ -249,9 +291,20 @@
   font-weight: 600;
   color: #1E293B;
   width: 100%;
-  border: none;
-  outline: none;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
   font-family: inherit;
+  -webkit-appearance: none;
+}
+
+.field-input:focus,
+.field-input:focus-visible,
+#searchDest:focus,
+#searchDest:focus-visible {
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
 }
 
 .field-input::placeholder {
@@ -794,14 +847,15 @@
 .guests-toggle-btn {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   width: 100%;
   height: 100%;
-  padding: 5px 14px;
+  padding: 4px 8px;
   border-radius: var(--radius-md);
   background: transparent;
   cursor: pointer;
   border: none;
+  white-space: nowrap;
 }
 
 .guests-popover {
@@ -1974,6 +2028,9 @@
     width: 100%;
     flex: 1 1 100%;
     padding: 8px 12px;
+  }
+  .field-with-border::after {
+    display: none;
   }
   .field-destination {
     flex: 1 1 100%;

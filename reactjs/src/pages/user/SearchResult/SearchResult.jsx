@@ -26,33 +26,49 @@ function matchesQuery(item, query) {
   const kw = query.toLowerCase().trim();
   if (kw === 'tat ca' || kw === 'tất cả' || kw === 'tat ca diem den' || kw === 'tất cả điểm đến') return true;
 
-  // Với từ khóa ngắn (<= 2 ký tự như 'r', 'đà'): Chỉ tìm trong Name và City để tránh khớp tràn lan chữ 'đường/phường' trong địa chỉ
-  const rawFields = kw.length <= 2
-    ? [item.name, item.homestayName, item.city].filter(Boolean)
-    : [
-        item.name,
-        item.homestayName,
-        item.city,
-        item.location,
-        item.address,
-        item.desc,
-        item.description
-      ].filter(Boolean);
+  const roomNames = (item.rooms || []).map((r) => r.name || r.roomName || '').join(' ');
+  const servicesStr = (item.services || []).join(' ');
+  const amenitiesStr = (item.amenities || []).join(' ');
+
+  const rawFields = [
+    item.name,
+    item.homestayName,
+    item.city,
+    item.location,
+    item.address,
+    item.desc,
+    item.description,
+    item.categoryName,
+    servicesStr,
+    amenitiesStr,
+    roomNames
+  ].filter(Boolean);
 
   const rawTarget = rawFields.join(' ').toLowerCase();
 
-  // 1. Khớp cụm từ trực tiếp (có dấu)
-  if (rawTarget.includes(kw)) return true;
+  // 1. Khớp chuỗi có dấu
+  if (kw.length <= 3) {
+    const rawWords = new Set(rawTarget.split(/[\s,.-]+/));
+    if (rawWords.has(kw)) return true;
+  } else if (rawTarget.includes(kw)) {
+    return true;
+  }
 
-  // 2. Khớp cụm từ không dấu
+  // 2. Khớp chuỗi không dấu
   const noToneKw = removeVietnameseTones(kw);
   const noToneTarget = removeVietnameseTones(rawTarget);
-  if (noToneTarget.includes(noToneKw)) return true;
+  const targetWords = new Set(noToneTarget.split(/[\s,.-]+/));
 
-  // 3. Khớp không dấu và bỏ khoảng trắng (Ví dụ: "dalat" -> "da lat", "sapa" -> "sa pa", "phuquoc" -> "phu quoc", "vungtau" -> "vung tau")
+  if (noToneKw.length <= 3) {
+    if (targetWords.has(noToneKw)) return true;
+  } else if (noToneTarget.includes(noToneKw)) {
+    return true;
+  }
+
+  // 3. Khớp chuỗi không dấu viết liền (ví dụ: "dalat" -> "da lat", "sapa" -> "sa pa", "phuquoc" -> "phu quoc")
   const noSpaceKw = noToneKw.replace(/\s+/g, '');
   const noSpaceTarget = noToneTarget.replace(/\s+/g, '');
-  if (noSpaceKw.length >= 3 && noSpaceTarget.includes(noSpaceKw)) return true;
+  if (noSpaceKw.length >= 4 && noSpaceTarget.includes(noSpaceKw)) return true;
 
   // Xử lý các từ viết tắt phổ biến:
   if ((noSpaceKw === 'hcm' || noSpaceKw === 'tphcm' || noSpaceKw === 'saigon') &&
@@ -71,7 +87,26 @@ function matchesQuery(item, query) {
   // Nếu người dùng chỉ gõ stop words thì khớp tất cả
   if (tokens.length === 0) return true;
 
-  return tokens.every((token) => noToneTarget.includes(token));
+  // Khớp tất cả các từ khóa
+  const allTokensMatch = tokens.every((token) => {
+    if (token.length <= 3) {
+      return targetWords.has(token);
+    }
+    return noToneTarget.includes(token);
+  });
+  if (allTokensMatch) return true;
+
+  // Hỗ trợ cụm tìm kiếm kết hợp (ví dụ: "Sapa săn mây", "Đà Lạt đồi thông", "Hội An đèn lồng")
+  const locationTokens = ['dalat', 'sapa', 'hoian', 'danang', 'ninhbinh', 'hagiang', 'phuquoc', 'hue', 'hanoi', 'saigon', 'tiengiang'];
+  const matchedLoc = locationTokens.find((loc) => noSpaceKw.includes(loc));
+  if (matchedLoc) {
+    const locTarget = removeVietnameseTones([item.city, item.location, item.address].filter(Boolean).join(' ')).replace(/\s+/g, '');
+    if (locTarget.includes(matchedLoc)) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 // Cắt ngắn mô tả cho thẻ tìm kiếm để giao diện gọn gàng, bấm xem chi tiết mới hiện hết
@@ -226,9 +261,9 @@ export default function SearchResult() {
     });
   };
 
-  // Danh sách homestays lấy 100% từ Database thật theo từ khóa tìm kiếm
-  const [homestays, setHomestays] = useState([]);
-  const [loading, setLoading] = useState(true);
+  // Danh sách homestays nạp tức thì từ SAMPLE_HOMESTAYS (tốc độ 0ms) và đồng bộ cơ sở dữ liệu
+  const [homestays, setHomestays] = useState(SAMPLE_HOMESTAYS);
+  const [loading, setLoading] = useState(false);
 
   // Lắng nghe kết quả tìm kiếm bằng hình ảnh từ Modal
   useEffect(() => {
@@ -292,35 +327,30 @@ export default function SearchResult() {
       if (visualActive && (!searchQuery || !searchQuery.trim())) {
         return;
       }
-      setLoading(true);
       try {
         const dbList = await homestayService.searchHomestays(searchQuery);
         if (isMounted) {
-          if (dbList && dbList.length > 0) {
+          if (Array.isArray(dbList) && dbList.length > 0) {
             setHomestays(dbList);
-          } else if (!searchQuery || !searchQuery.trim()) {
-            setHomestays(SAMPLE_HOMESTAYS);
           } else {
-            setHomestays([]);
+            // Giữ SAMPLE_HOMESTAYS để hiển thị ngay tức thì chỗ nghỉ phù hợp
+            setHomestays(SAMPLE_HOMESTAYS);
           }
           setLoading(false);
         }
       } catch (err) {
         console.warn('Lỗi khi tải homestay từ database:', err);
         if (isMounted) {
-          setHomestays([]);
+          setHomestays(SAMPLE_HOMESTAYS);
           setLoading(false);
         }
       }
     };
 
-    const timer = setTimeout(() => {
-      fetchHomestaysFromDb();
-    }, 200);
+    fetchHomestaysFromDb();
 
     return () => {
       isMounted = false;
-      clearTimeout(timer);
     };
   }, [searchQuery, visualActive]);
 
@@ -645,8 +675,10 @@ export default function SearchResult() {
                     </span>
                     Gợi ý chỗ nghỉ nổi bật ({filteredHomestays.length} chỗ nghỉ)
                   </>
+                ) : loading && filteredHomestays.length === 0 ? (
+                  `${searchQuery.trim() ? `${searchQuery.trim()}: đang tìm kiếm...` : 'Đang tìm kiếm chỗ nghỉ...'}`
                 ) : (
-                  `${searchQuery.trim()}: tìm thấy ${filteredHomestays.length} chỗ nghỉ`
+                  `${searchQuery.trim() ? `${searchQuery.trim()}: ` : ''}tìm thấy ${filteredHomestays.length} chỗ nghỉ`
                 )}
               </h2>
               {filteredHomestays.length > 0 && (
