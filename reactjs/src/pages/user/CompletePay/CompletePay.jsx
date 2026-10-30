@@ -111,7 +111,7 @@ export default function CompletePay() {
                 },
                 method: vnpResponseCode ? 'vnpay' : (localFound?.method || 'vietqr'),
                 depositStatus: vnpResponseCode === '00' ? 'PAID' : (dbData.depositStatus || 'PENDING'),
-                status: vnpResponseCode === '00' ? 'CONFIRMED' : (dbData.status || 'PENDING'),
+                status: dbData.status || 'PENDING',
               };
 
               const finalBooking = (localFound && localFound.pricing) ? {
@@ -120,7 +120,7 @@ export default function CompletePay() {
                 code: dbData.bookingCode,
                 homestay: dbData.homestayName || localFound.homestay,
                 depositStatus: vnpResponseCode === '00' ? 'PAID' : (dbData.depositStatus || 'PENDING'),
-                status: vnpResponseCode === '00' ? 'CONFIRMED' : (dbData.status || 'PENDING'),
+                status: dbData.status || 'PENDING',
                 room: {
                   name: dbData.roomName || localFound.room?.name,
                   thumb: dbData.roomImage || localFound.room?.thumb,
@@ -161,7 +161,7 @@ export default function CompletePay() {
           if (localFound) {
             if (vnpResponseCode === '00') {
               localFound.depositStatus = 'PAID';
-              localFound.status = 'CONFIRMED';
+              localFound.status = localFound.status || 'PENDING';
               bookingService.clearCache();
               try {
                 sessionStorage.setItem(LAST_KEY, JSON.stringify(localFound));
@@ -310,8 +310,12 @@ export default function CompletePay() {
               </div>
             )}
             <p className="cp-hero-sub">
-              Cảm ơn <b>{booking.contact?.fullName || 'quý khách'}</b>! Chúng tôi đã gửi email xác nhận tới <b>{booking.contact?.email}</b>.
-              {isDeposit && ` Bạn đã đặt cọc ${fmtVND(pr.paid)}, phần còn lại trả khi nhận phòng.`}
+              Cảm ơn <b>{booking.contact?.fullName || 'quý khách'}</b>! Yêu cầu đặt phòng và tiền cọc đã được ghi nhận thành công.
+              <br />
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', marginTop: '8px', padding: '6px 14px', borderRadius: '8px', background: '#FEF3C7', color: '#92400E', fontWeight: 600, fontSize: '0.9rem' }}>
+                <i className="bi bi-clock-history" style={{ fontSize: '1.1rem', color: '#D97706' }}></i>
+                Đang chờ Chủ Homestay xác nhận duyệt phòng. Sau khi Chủ nhà xác nhận, hệ thống sẽ kích hoạt phòng cho bạn.
+              </span>
             </p>
 
             <div className="cp-code-box">
@@ -385,8 +389,8 @@ export default function CompletePay() {
             <section className="cp-card">
               <div className="cp-card-title-row">
                 <h2>Chi tiết thanh toán</h2>
-                <span className={`cp-status ${isDeposit ? 'is-deposit' : ''}`}>
-                  {isDeposit ? 'Đã đặt cọc' : 'Đã thanh toán đủ'}
+                <span className={`cp-status ${booking.status === 'PENDING' ? 'is-pending' : (isDeposit ? 'is-deposit' : '')}`}>
+                  {booking.status === 'PENDING' ? 'Chờ chủ nhà xác nhận' : (isDeposit ? 'Đã đặt cọc' : 'Đã thanh toán đủ')}
                 </span>
               </div>
 
