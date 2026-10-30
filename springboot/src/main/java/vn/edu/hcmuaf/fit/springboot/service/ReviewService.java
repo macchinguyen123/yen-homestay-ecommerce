@@ -47,6 +47,20 @@ public class ReviewService {
     }
 
     /**
+     * Lưu hoặc cập nhật phản hồi của chủ nhà cho một review
+     */
+    public boolean saveOwnerReply(Long reviewId, String reply) {
+        String sql = "UPDATE reviews SET owner_reply = ? WHERE review_id = ?";
+        try {
+            int rows = jdbcTemplate.update(sql, reply, reviewId);
+            return rows > 0;
+        } catch (Exception e) {
+            log.error("Lỗi khi lưu phản hồi chủ nhà cho review {}: {}", reviewId, e.getMessage());
+            return false;
+        }
+    }
+
+    /**
      * Lấy toàn bộ đánh giá của tất cả Homestay trên toàn hệ thống cho Admin
      */
     public List<ReviewDTO> getAllReviews() {

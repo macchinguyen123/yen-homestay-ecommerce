@@ -121,6 +121,7 @@ export default function ManageReviews() {
   // Input trả lời review & Toast
   const [replyInputs, setReplyInputs] = useState({});
   const [replyVoucher, setReplyVoucher] = useState({});
+  const [editingReplyId, setEditingReplyId] = useState(null);
   const [toastMessage, setToastMessage] = useState(null);
 
   const showToast = (msg) => {
@@ -590,6 +591,15 @@ export default function ManageReviews() {
     setReplyVoucher((prev) => ({ ...prev, [reviewId]: !prev[reviewId] }));
   };
 
+  const startEditReply = (reviewId, existingContent) => {
+    setEditingReplyId(reviewId);
+    setReplyInputs((prev) => ({ ...prev, [reviewId]: existingContent || '' }));
+  };
+
+  const cancelEditReply = (reviewId) => {
+    setEditingReplyId(null);
+  };
+
   const handleSendReply = async (reviewId, customerName) => {
     const text = replyInputs[reviewId]?.trim();
     if (!text) {
@@ -598,15 +608,30 @@ export default function ManageReviews() {
     }
 
     try {
-      showToast(`Đang gửi phản hồi cho ${customerName}...`);
+      showToast(`Đang gửi phản hồi cho du khách ${customerName}...`);
       const payload = { reply: text };
 
-      // Gửi lên backend API
-      await fetch(`http://localhost:8081/api/owner/reviews/${reviewId}/reply`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      }).catch(() => null);
+      // Gửi lên backend API (thử cả 2 endpoint để đảm bảo tương thích 100%)
+      let ok = false;
+      try {
+        const res = await fetch(`http://localhost:8081/api/public/reviews/${reviewId}/reply`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        if (res.ok) ok = true;
+      } catch (err) {}
+
+      if (!ok) {
+        try {
+          const res2 = await fetch(`http://localhost:8081/api/owner/reviews/${reviewId}/reply`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+          if (res2.ok) ok = true;
+        } catch (err) {}
+      }
 
       // Cập nhật state UI tức thì
       setReviewsList((prev) =>
@@ -614,19 +639,21 @@ export default function ManageReviews() {
           r.id === reviewId
             ? {
                 ...r,
+                ownerReply: text,
                 reply: {
                   hostName: 'Chủ nhà (Lê Thị Mai)',
                   repliedAt: 'Vừa xong',
                   content: text,
-                  voucherCode: replyVoucher[reviewId] ? 'YENHOST10' : null
+                  voucherCode: replyVoucher[reviewId] ? 'YENHOST10' : (r.reply?.voucherCode || null)
                 }
               }
             : r
         )
       );
 
+      setEditingReplyId(null);
       setReplyInputs((prev) => ({ ...prev, [reviewId]: '' }));
-      showToast(`✅ Đã gửi phản hồi thành công đến du khách ${customerName}!`);
+      showToast(`✅ Đã lưu phản hồi thành công gửi đến ${customerName}!`);
     } catch (e) {
       showToast('Lỗi gửi phản hồi: ' + e.message);
     }
@@ -1423,31 +1450,53 @@ export default function ManageReviews() {
                     </div>
                   )}
 
-                  {/* Đã phản hồi: Hộp phản hồi của chủ nhà */}
-                  {hasReplied && (
-                    <div className="existing-reply-box" style={{ background: '#f0fdf4', border: '1px solid #bbf7d0' }}>
-                      <div className="existing-reply-header">
+                  {/* Đã phản hồi: Hộp phản hồi của chủ nhà kèm nút chỉnh sửa */}
+                  {hasReplied && editingReplyId !== review.id && (
+                    <div className="existing-reply-box" style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', position: 'relative' }}>
+                      <div className="existing-reply-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <span className="host-signature" style={{ color: '#166534', fontWeight: 700 }}>
                           <span className="material-symbols-outlined text-[16px]">verified</span>
                           Phản hồi từ {review.reply.hostName} • {review.reply.repliedAt}
                         </span>
-                        {review.reply.voucherCode && (
-                          <span className="voucher-badge">Đã tặng voucher {review.reply.voucherCode}</span>
-                        )}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          {review.reply.voucherCode && (
+                            <span className="voucher-badge">Đã tặng voucher {review.reply.voucherCode}</span>
+                          )}
+                          <button
+                            type="button"
+                            className="btn-edit-reply"
+                            onClick={() => startEditReply(review.id, review.reply.content)}
+                            title="Chỉnh sửa nội dung phản hồi"
+                          >
+                            <span className="material-symbols-outlined text-[14px]">edit</span>
+                            Sửa phản hồi
+                          </button>
+                        </div>
                       </div>
-                      <p className="existing-reply-text" style={{ color: '#14532d' }}>
+                      <p className="existing-reply-text" style={{ color: '#14532d', marginTop: '6px' }}>
                         {review.reply.content}
                       </p>
                     </div>
                   )}
 
-                  {/* Chưa phản hồi: Form AI gợi ý và soạn phản hồi nhanh */}
-                  {isUnreplied && (
-                    <div className="reply-input-section" style={{ marginTop: '14px' }}>
+                  {/* Form soạn phản hồi trực tiếp (khi chưa phản hồi hoặc khi đang chỉnh sửa) */}
+                  {(isUnreplied || editingReplyId === review.id) && (
+                    <div
+                      className="reply-input-section"
+                      style={{
+                        marginTop: '14px',
+                        border: editingReplyId === review.id ? '2px solid #059669' : '1px solid #e2e8f0',
+                        boxShadow: editingReplyId === review.id ? '0 4px 12px rgba(5, 150, 105, 0.12)' : 'none'
+                      }}
+                    >
                       <div className="reply-input-header">
                         <span className="target-customer-label">
-                          <span className="material-symbols-outlined text-[16px] text-secondary">chat</span>
-                          Soạn phản hồi gửi du khách {review.customerName}
+                          <span className="material-symbols-outlined text-[16px] text-secondary">
+                            {editingReplyId === review.id ? 'edit_note' : 'chat'}
+                          </span>
+                          {editingReplyId === review.id
+                            ? `Chỉnh sửa phản hồi gửi du khách ${review.customerName}`
+                            : `Soạn phản hồi gửi du khách ${review.customerName}`}
                         </span>
                         <span className="quick-templates-title">💡 Gợi ý câu mẫu AI:</span>
                       </div>
@@ -1475,7 +1524,7 @@ export default function ManageReviews() {
                       <textarea
                         className="reply-textarea"
                         placeholder="Nhập lời cảm ơn hoặc giải pháp xử lý chân thành gửi du khách..."
-                        value={replyInputs[review.id] || ''}
+                        value={replyInputs[review.id] ?? ''}
                         onChange={(e) => handleReplyChange(review.id, e.target.value)}
                       />
 
@@ -1493,12 +1542,21 @@ export default function ManageReviews() {
                         </div>
 
                         <div className="reply-action-btns">
+                          {editingReplyId === review.id && (
+                            <button
+                              type="button"
+                              className="btn-draft"
+                              onClick={() => cancelEditReply(review.id)}
+                            >
+                              Hủy bỏ
+                            </button>
+                          )}
                           <button
                             type="button"
                             className="btn-send-reply"
                             onClick={() => handleSendReply(review.id, review.customerName)}
                           >
-                            Gửi phản hồi du khách
+                            {editingReplyId === review.id ? 'Lưu cập nhật' : 'Gửi phản hồi du khách'}
                             <span className="material-symbols-outlined text-[15px]">send</span>
                           </button>
                         </div>
