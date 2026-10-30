@@ -48,6 +48,15 @@ export const viewedHistoryService = {
         throw new Error(`Server error: ${response.status}`);
       }
       const resData = await response.json();
+      if (resData?.success && resData.data) {
+        try {
+          const key = `viewed_history_${userId}`;
+          const previous = JSON.parse(localStorage.getItem(key) || '[]');
+          const next = Array.isArray(previous) ? previous.filter((item) => Number(item.homestayId || item.id) !== Number(homestayId)) : [];
+          next.unshift(resData.data);
+          localStorage.setItem(key, JSON.stringify(next));
+        } catch { /* Ignore local cache errors; the database write already succeeded. */ }
+      }
       return { success: true, data: resData.data };
     } catch (error) {
       console.warn('Lỗi kết nối API ghi nhận lịch sử xem:', error);

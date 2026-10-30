@@ -15,11 +15,6 @@ public class WalletResponseDTO {
     private BigDecimal balance;
     private BigDecimal totalCashback;
     private BigDecimal cashbackRate;
-    private String bankName;
-    private String accountNumber;
-    private String accountHolder;
-    private Boolean isLinked;
-    private Boolean isPinSet;
     private List<WalletTransactionDTO> transactions;
 
     @Getter

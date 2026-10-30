@@ -51,7 +51,7 @@ public class NotificationService {
             repository.save(Notification.builder()
                     .userId(userId)
                     .title("Tự động tích lũy 5% vào Ví Hoàn Tiền")
-                    .message("Mỗi đơn đặt phòng thanh toán thành công được tự động hoàn 5% vào Ví YÊN của bạn để rút về ngân hàng hoặc giảm giá lần đặt sau.")
+                    .message("Mỗi đơn đặt phòng thanh toán thành công được tự động cộng điểm vào Ví YÊN để giảm giá cho lần đặt phòng tiếp theo.")
                     .type("CASHBACK")
                     .link("/personal-account")
                     .read(true)
