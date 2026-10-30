@@ -14,11 +14,13 @@ import vn.edu.hcmuaf.fit.springboot.model.Homestay;
 import vn.edu.hcmuaf.fit.springboot.model.HomestayImage;
 import vn.edu.hcmuaf.fit.springboot.model.Room;
 import vn.edu.hcmuaf.fit.springboot.model.RoomImage;
+import vn.edu.hcmuaf.fit.springboot.model.User;
 import vn.edu.hcmuaf.fit.springboot.repository.GuestTaskRepository;
 import vn.edu.hcmuaf.fit.springboot.repository.HomestayImageRepository;
 import vn.edu.hcmuaf.fit.springboot.repository.HomestayRepository;
 import vn.edu.hcmuaf.fit.springboot.repository.RoomImageRepository;
 import vn.edu.hcmuaf.fit.springboot.repository.RoomRepository;
+import vn.edu.hcmuaf.fit.springboot.repository.UserRepository;
 
 import java.math.BigDecimal;
 import java.util.*;
@@ -34,6 +36,7 @@ public class RoomService {
     private final HomestayRepository homestayRepository;
     private final HomestayImageRepository homestayImageRepository;
     private final GuestTaskRepository guestTaskRepository;
+    private final UserRepository userRepository;
     private final org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
 
     @PostConstruct
@@ -475,6 +478,32 @@ public class RoomService {
             hsRating = hsStat.getCount() > 0 ? hsStat.getAvgRating() : (h.getRating() != null ? h.getRating() : 5.0);
         }
 
+        // Lấy thông tin chủ nhà thật từ bảng users trong CSDL
+        String ownerName = null;
+        String ownerAvatar = null;
+        String ownerEmail = null;
+        String ownerPhone = null;
+        String ownerBio = null;
+        int yearsHosting = 3;
+
+        if (h.getOwnerId() != null) {
+            try {
+                User owner = userRepository.findById(h.getOwnerId()).orElse(null);
+                if (owner != null) {
+                    ownerName = owner.getFullName();
+                    ownerAvatar = owner.getAvatar();
+                    ownerEmail = owner.getEmail();
+                    ownerPhone = owner.getPhoneNumber();
+                    if (owner.getCreatedAt() != null) {
+                        yearsHosting = Math.max(1, java.time.LocalDateTime.now().getYear() - owner.getCreatedAt().getYear() + 1);
+                    }
+                    ownerBio = "Xin chào! Tôi là " + ownerName + ", người sáng lập và quản lý homestay. Rất vui được đón tiếp quý khách đến nghỉ dưỡng và tận hưởng những ngày bình yên.";
+                }
+            } catch (Exception e) {
+                log.warn("Không thể tải thông tin chủ nhà ID {}: {}", h.getOwnerId(), e.getMessage());
+            }
+        }
+
         return HomestayDTO.builder()
                 .id(h.getId())
                 .ownerId(h.getOwnerId())
@@ -507,6 +536,12 @@ public class RoomService {
                 .rooms(rooms)
                 .defaultRoomId(defaultRoomId)
                 .tasks(tasks != null ? tasks : Collections.emptyList())
+                .ownerName(ownerName)
+                .ownerAvatar(ownerAvatar)
+                .ownerEmail(ownerEmail)
+                .ownerPhone(ownerPhone)
+                .ownerBio(ownerBio)
+                .yearsHosting(yearsHosting)
                 .build();
     }
 

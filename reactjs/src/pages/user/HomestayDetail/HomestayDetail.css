@@ -603,15 +603,139 @@ body {
     padding: 2px 10px; border-radius: var(--radius-full);
 }
 
+/* ══ PHẢN HỒI CỦA CHỦ NHÀ 2 CHIỀU (OWNER REPLY NESTED) ══ */
+.review-owner-reply-nested {
+    position: relative;
+    margin-top: 14px;
+    padding-left: 18px;
+}
+
+.review-owner-reply-nested::before {
+    content: '';
+    position: absolute;
+    left: 4px;
+    top: 0;
+    bottom: 12px;
+    width: 2px;
+    background: linear-gradient(180deg, #10b981 0%, #a7f3d0 100%);
+    border-radius: 2px;
+}
+
+.owner-reply-card {
+    background: linear-gradient(135deg, #f0fdf4 0%, #fafffa 100%);
+    border: 1px solid #bbf7d0;
+    border-left: 4px solid #059669;
+    border-radius: 0 14px 14px 14px;
+    padding: 13px 16px;
+    box-shadow: 0 3px 12px rgba(16, 185, 129, 0.08);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.owner-reply-card:hover {
+    box-shadow: 0 5px 16px rgba(16, 185, 129, 0.12);
+}
+
+.owner-reply-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+    border-bottom: 1px dashed #d1fae5;
+    padding-bottom: 8px;
+}
+
+.owner-reply-identity {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.owner-reply-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: #059669;
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 15px;
+    box-shadow: 0 2px 6px rgba(5, 150, 105, 0.3);
+    flex-shrink: 0;
+}
+
+.owner-reply-info {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+}
+
+.owner-reply-name-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.owner-reply-name {
+    font-size: 0.88rem;
+    font-weight: 700;
+    color: #065f46;
+}
+
+.owner-reply-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: #047857;
+    background: #d1fae5;
+    padding: 2px 8px;
+    border-radius: 20px;
+    border: 1px solid #a7f3d0;
+}
+
+.owner-reply-badge i {
+    font-size: 0.75rem;
+    color: #059669;
+}
+
+.owner-reply-subtext {
+    font-size: 0.75rem;
+    color: #059669;
+    opacity: 0.85;
+}
+
+.owner-reply-icon-quote {
+    color: #10b981;
+    font-size: 1.25rem;
+    opacity: 0.35;
+}
+
+.owner-reply-body {
+    padding-top: 4px;
+}
+
+.owner-reply-text {
+    font-size: 0.88rem;
+    line-height: 1.6;
+    color: #1f2937;
+    margin: 0;
+    white-space: pre-line;
+}
+
+/* Fallback tương thích */
 .review-owner-reply {
-    margin-top: 12px; padding: 12px 14px; background: #F8FAFC;
-    border-left: 3px solid var(--primary-color); border-radius: 6px; font-size: 0.85rem;
+    margin-top: 12px; padding: 12px 14px; background: #f0fdf4;
+    border-left: 3px solid #059669; border-radius: 6px; font-size: 0.85rem;
 }
 .review-owner-reply strong {
     display: flex; align-items: center; gap: 6px;
-    color: var(--primary-color); font-size: 0.82rem; margin-bottom: 4px;
+    color: #059669; font-size: 0.82rem; margin-bottom: 4px;
 }
-.review-owner-reply p { margin: 0; color: #475569; line-height: 1.5; }
+.review-owner-reply p { margin: 0; color: #1f2937; line-height: 1.5; }
 
 .rv-empty-state {
     text-align: center; padding: 36px 16px; background: #F8FAFC;

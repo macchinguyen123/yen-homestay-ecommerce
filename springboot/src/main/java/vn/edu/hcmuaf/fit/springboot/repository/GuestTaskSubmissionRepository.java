@@ -13,4 +13,6 @@ public interface GuestTaskSubmissionRepository extends JpaRepository<GuestTaskSu
     List<GuestTaskSubmission> findByHomestayIdAndStatusOrderBySubmittedAtDesc(Long homestayId, String status);
     Optional<GuestTaskSubmission> findBySubmissionCode(String submissionCode);
     long countByHomestayIdAndStatus(Long homestayId, String status);
+    List<GuestTaskSubmission> findByTouristId(Long touristId);
+    List<GuestTaskSubmission> findByTouristIdAndHomestayId(Long touristId, Long homestayId);
 }

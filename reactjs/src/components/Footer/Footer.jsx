@@ -53,32 +53,32 @@ export default function Footer() {
           <h3 className="th-footer-title">Khám phá & Điểm đến</h3>
           <ul className="th-footer-menu">
             <li>
-              <Link to="/search?location=Đà Lạt">
+              <Link to="/search?q=Đà Lạt">
                 <i className="bi bi-geo-alt me-1.5" /> Đà Lạt – Ngắm mây & Đồi thông
               </Link>
             </li>
             <li>
-              <Link to="/search?location=Sa Pa">
+              <Link to="/search?q=Sa Pa">
                 <i className="bi bi-geo-alt me-1.5" /> Sa Pa – Bản Lao Chải & Tả Van
               </Link>
             </li>
             <li>
-              <Link to="/search?location=Ninh Bình">
+              <Link to="/search?q=Ninh Bình">
                 <i className="bi bi-geo-alt me-1.5" /> Ninh Bình – Tràng An & Tam Cốc
               </Link>
             </li>
             <li>
-              <Link to="/search?location=Hà Giang">
+              <Link to="/search?q=Hà Giang">
                 <i className="bi bi-geo-alt me-1.5" /> Hà Giang – Cao nguyên đá hùng vĩ
               </Link>
             </li>
             <li>
-              <Link to="/category/miet-vuan">
+              <Link to="/search?q=Miệt vườn">
                 <i className="bi bi-tree me-1.5" /> Miệt vườn & Sông nước Nam Bộ
               </Link>
             </li>
             <li>
-              <Link to="/category/lang-nghe">
+              <Link to="/search?q=Làng nghề">
                 <i className="bi bi-brush me-1.5" /> Làng nghề truyền thống độc bản
               </Link>
             </li>

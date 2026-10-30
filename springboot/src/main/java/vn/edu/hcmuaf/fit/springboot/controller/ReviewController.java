@@ -50,4 +50,22 @@ public class ReviewController {
         }
         return ResponseEntity.ok(reviewService.getReviewsByOwnerEmail("lethimai86@gmail.com"));
     }
+
+    @PostMapping("/{reviewId}/reply")
+    public ResponseEntity<?> replyReview(
+            @PathVariable Long reviewId,
+            @RequestBody java.util.Map<String, String> payload
+    ) {
+        String replyText = payload != null ? payload.get("reply") : null;
+        if (replyText == null || replyText.trim().isEmpty()) {
+            return ResponseEntity.badRequest().body(java.util.Map.of("success", false, "message", "Nội dung phản hồi không được để trống"));
+        }
+        boolean ok = reviewService.saveOwnerReply(reviewId, replyText.trim());
+        if (ok) {
+            return ResponseEntity.ok(java.util.Map.of("success", true, "message", "Đã lưu phản hồi thành công"));
+        } else {
+            return ResponseEntity.badRequest().body(java.util.Map.of("success", false, "message", "Không tìm thấy đánh giá hoặc lỗi cập nhật"));
+        }
+    }
 }
+

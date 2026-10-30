@@ -31,6 +31,7 @@ export default function Bookings() {
   // Task Modal State
   const [taskModalOpen, setTaskModalOpen] = useState(false);
   const [activeTaskBkId, setActiveTaskBkId] = useState(null);
+  const [activeTaskItem, setActiveTaskItem] = useState(null);
   const [starRating, setStarRating] = useState(5);
   const [reviewTitle, setReviewTitle] = useState('');
   const [reviewContent, setReviewContent] = useState('');
@@ -97,7 +98,13 @@ export default function Bookings() {
     const completedCount = userBookings.filter((b) => b.status === 'completed').length;
     const complaintCount = userBookings.filter((b) => b.status === 'complaint').length;
     const cancelledCount = userBookings.filter((b) => b.status === 'cancelled').length;
-    const pendingTasksCount = userBookings.filter((b) => b.task && b.task.status === 'pending').length;
+    const pendingTasksCount = userBookings.reduce((sum, b) => {
+      if (!b.task) return sum;
+      if (Array.isArray(b.task.checklist) && b.task.checklist.length > 0) {
+        return sum + b.task.checklist.filter((i) => !i.done).length;
+      }
+      return sum + (b.task.status === 'pending' ? 1 : 0);
+    }, 0);
     return {
       all: userBookings.length,
       active: activeCount,
@@ -125,8 +132,14 @@ export default function Bookings() {
   }, [userBookings, currentFilter, searchQuery]);
 
   // Task Modal Handler
-  const openTaskModal = (bkId) => {
+  const openTaskModal = (bkId, item = null) => {
     setActiveTaskBkId(bkId);
+    const bk = userBookings.find((b) => b.id === bkId);
+    let chosenItem = item;
+    if (!chosenItem && bk?.task?.checklist && bk.task.checklist.length > 0) {
+      chosenItem = bk.task.checklist.find((i) => !i.done) || bk.task.checklist[0];
+    }
+    setActiveTaskItem(chosenItem);
     setTaskModalOpen(true);
     setStarRating(5);
     setReviewTitle('');
@@ -142,18 +155,19 @@ export default function Bookings() {
     const bk = userBookings.find((b) => b.id === activeTaskBkId);
     if (!bk) return;
     try {
+      const targetTaskId = activeTaskItem?.taskId || activeTaskItem?.id || bk.task?.id;
       const res = await bookingService.submitReview({
         bookingId: bk.id,
         touristId: userId,
         homestayId: bk.homestayId,
-        taskId: bk.task?.id,
+        taskId: targetTaskId,
         rating: starRating,
         title: reviewTitle,
         comment: reviewContent,
       });
       if (!res?.success) { showToast(res?.message || 'Gửi đánh giá thất bại!'); return; }
       setTaskModalOpen(false);
-      showToast('Đã hoàn thành danh sách nhiệm vụ & gửi đánh giá!');
+      showToast('Đã hoàn thành nhiệm vụ & gửi đánh giá thành công!');
       loadBookings();
     } catch (err) {
       showToast('Không kết nối được máy chủ!');
@@ -365,29 +379,53 @@ export default function Bookings() {
                       {bk.task && (
                         <div className={`bk-task-checklist-box ${isTaskDone ? 'is-completed' : ''}`}>
                           <div className="task-checklist-head">
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
                               <div className={`task-checklist-icon-badge ${isTaskDone ? 'completed' : ''}`}>
                                 <i className={`bi ${isTaskDone ? 'bi-check-circle-fill' : 'bi-card-checklist'}`} />
                               </div>
                               <div>
                                 <h4 className="task-checklist-title">{bk.task.title}</h4>
+                                {bk.task.description && (
+                                  <p style={{ margin: '3px 0 6px', fontSize: '0.82rem', color: '#475569', lineHeight: 1.45 }}>
+                                    <i className="bi bi-info-circle text-primary" style={{ marginRight: 5 }} />
+                                    {bk.task.description}
+                                  </p>
+                                )}
                                 <span className="task-reward-pill"><i className="bi bi-gift-fill" /> {bk.task.rewardText}</span>
                               </div>
                             </div>
                             <span className={`task-progress-badge ${isTaskDone ? 'done' : 'pending'}`}>
-                              {isTaskDone ? '3/3 việc hoàn thành' : `${doneCount}/${totalCount} việc đã làm`}
+                              {isTaskDone ? `${totalCount}/${totalCount} việc hoàn thành` : `${doneCount}/${totalCount} việc đã làm`}
                             </span>
                           </div>
 
                           <div className="task-checklist-items">
                             {checklist.map((item) => (
-                              <div key={item.id} className={`task-item-row ${item.done ? 'done' : ''}`}
-                                onClick={() => openTaskModal(bk.id)}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                  <i className={`bi ${item.done ? 'bi-check-square-fill text-success' : 'bi-square'}`} />
-                                  <span>{item.text}</span>
+                              <div key={item.id || item.taskId} className={`task-item-row ${item.done ? 'done' : ''}`}
+                                onClick={() => openTaskModal(bk.id, item)}
+                                title="Bấm để xem và hoàn thành nhiệm vụ này">
+                                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, flex: 1, minWidth: 0 }}>
+                                  <i className={`bi ${item.done ? 'bi-check-square-fill text-success' : 'bi-square'}`}
+                                    style={{ fontSize: '1.05rem', marginTop: 2, flexShrink: 0 }} />
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2, flex: 1, minWidth: 0 }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                                      <span style={{ fontWeight: 600, color: item.done ? '#64748B' : '#0F172A', textDecoration: item.done ? 'line-through' : 'none' }}>
+                                        {item.title || item.text}
+                                      </span>
+                                      {item.rewardText && (
+                                        <span style={{ fontSize: '0.78rem', color: '#D97706', background: '#FEF3C7', padding: '1px 8px', borderRadius: 12, fontWeight: 700 }}>
+                                          🎁 {item.rewardText}
+                                        </span>
+                                      )}
+                                    </div>
+                                    {item.description && (
+                                      <div style={{ fontSize: '0.78rem', color: '#64748B', lineHeight: 1.35, textDecoration: item.done ? 'line-through' : 'none' }}>
+                                        {item.description}
+                                      </div>
+                                    )}
+                                  </div>
                                 </div>
-                                <span className={`task-item-status-tag ${item.done ? 'done' : 'pending'}`}>
+                                <span className={`task-item-status-tag ${item.done ? 'done' : 'pending'}`} style={{ alignSelf: 'center', flexShrink: 0 }}>
                                   {item.done ? 'Đã xong' : 'Chưa xong'}
                                 </span>
                               </div>
@@ -396,7 +434,10 @@ export default function Bookings() {
 
                           <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: 4 }}>
                             <button type="button" className={`btn-complete-mission ${isTaskDone ? 'done' : ''}`}
-                              onClick={() => openTaskModal(bk.id)}>
+                              onClick={() => {
+                                const nextPending = checklist.find((i) => !i.done) || checklist[0];
+                                openTaskModal(bk.id, nextPending);
+                              }}>
                               <i className={`bi ${isTaskDone ? 'bi-patch-check-fill' : 'bi-cloud-arrow-up-fill'}`} />
                               {isTaskDone ? 'Nhiệm vụ đã hoàn thành' : 'Hoàn thành nhiệm vụ'}
                             </button>
@@ -442,19 +483,65 @@ export default function Bookings() {
       <div className={`bk-modal-overlay ${taskModalOpen ? 'show' : ''}`}>
         <div className="bk-modal-card">
           <div className="bk-modal-head">
-            <h3><i className="bi bi-clipboard-check text-success" /> Danh Sách Nhiệm Vụ Homestay</h3>
+            <h3><i className="bi bi-clipboard-check text-success" /> Chi Tiết Nhiệm Vụ Homestay</h3>
             <button type="button" className="bk-modal-close" onClick={() => setTaskModalOpen(false)}>×</button>
           </div>
           <div className="bk-modal-body">
             <div className="task-detail-banner">
-              <i className="bi bi-gift-fill" style={{ fontSize: '1.5rem', color: '#D97706' }} />
+              <i className="bi bi-gift-fill" style={{ fontSize: '1.5rem', color: '#D97706', flexShrink: 0 }} />
               <div>
-                <h4>Nhiệm vụ: Đăng ảnh & gửi nhận xét trải nghiệm</h4>
-                <p>Dành riêng cho chuyến lưu trú tại <b>{activeTaskBk?.homestayName}</b>.</p>
+                <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800 }}>
+                  {activeTaskItem?.title || activeTaskBk?.task?.title || 'Nhiệm vụ trải nghiệm Homestay'}
+                </h4>
+                <p style={{ margin: '4px 0 0', color: '#475569', fontSize: '0.86rem', lineHeight: 1.45 }}>
+                  {activeTaskItem?.description || activeTaskBk?.task?.description || `Dành riêng cho chuyến lưu trú tại ${activeTaskBk?.homestayName}.`}
+                </p>
+                <div style={{ marginTop: 6, display: 'inline-flex', alignItems: 'center', gap: 6, color: '#D97706', fontWeight: 700, fontSize: '0.84rem' }}>
+                  <i className="bi bi-gift-fill" /> Phần thưởng nhận được: {activeTaskItem?.rewardText || activeTaskBk?.task?.rewardText}
+                </div>
               </div>
             </div>
 
-            {activeTaskBk?.task?.status === 'completed' && activeTaskBk.task.userReview ? (
+            {/* DANH SÁCH CÁC NHIỆM VỤ CỦA HOMESTAY TỪ CSDL */}
+            {activeTaskBk?.task?.checklist && activeTaskBk.task.checklist.length > 1 && (
+              <div style={{ margin: '14px 0', background: '#F8FAFC', border: '1px solid #E2E8F0', padding: '12px 16px', borderRadius: 10 }}>
+                <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#334155', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <i className="bi bi-list-check text-success" /> Chọn nhiệm vụ bạn muốn nộp bài thực hiện:
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {activeTaskBk.task.checklist.map((item) => {
+                    const isSelected = activeTaskItem ? (activeTaskItem.taskId === item.taskId || activeTaskItem.id === item.id) : false;
+                    return (
+                      <div key={item.id || item.taskId}
+                        onClick={() => setActiveTaskItem(item)}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          padding: '8px 12px',
+                          borderRadius: 8,
+                          cursor: 'pointer',
+                          background: isSelected ? '#EFF6FF' : '#FFFFFF',
+                          border: isSelected ? '1.5px solid #2563EB' : '1px solid #E2E8F0',
+                          transition: 'all 0.2s ease'
+                        }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.86rem' }}>
+                          <i className={`bi ${item.done ? 'bi-check-circle-fill text-success' : (isSelected ? 'bi-record-circle-fill text-primary' : 'bi-circle text-muted')}`} />
+                          <span style={{ fontWeight: isSelected ? 700 : 500, color: item.done ? '#64748B' : '#0F172A', textDecoration: item.done ? 'line-through' : 'none' }}>
+                            {item.title || item.text}
+                          </span>
+                        </div>
+                        <span style={{ fontSize: '0.78rem', color: item.done ? '#16A34A' : '#D97706', fontWeight: 700 }}>
+                          {item.done ? '✓ Đã hoàn thành' : (item.rewardText ? `🎁 ${item.rewardText}` : 'Chưa xong')}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {((activeTaskItem && activeTaskItem.done) || (activeTaskBk?.task?.status === 'completed' && (!activeTaskItem || activeTaskItem.done))) && activeTaskBk?.task?.userReview ? (
               <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 12, padding: 20 }}>
                 <span className="status-badge status-completed" style={{ marginBottom: 12 }}>ĐÃ HOÀN THÀNH</span>
                 <div style={{ fontSize: '1.2rem', color: '#F59E0B', marginBottom: 8 }}>

@@ -34,6 +34,8 @@ public class BookingService {
     private final ReportRepository reportRepository;
     private final ReviewRepository reviewRepository;
     private final GuestTaskRepository guestTaskRepository;
+    private final GuestTaskSubmissionRepository guestTaskSubmissionRepository;
+    private final RoomRepository roomRepository;
     private final PaymentRepository paymentRepository;
     private final HomestayRepository homestayRepository;
     private final NotificationService notificationService;
@@ -129,21 +131,49 @@ public class BookingService {
                 log.warn("Bỏ qua lỗi tải reviews: {}", ex.getMessage());
             }
 
-            // BATCH FETCH 3: Guest Tasks an toàn
-            Map<Long, GuestTask> taskMap = new HashMap<>();
+            // BATCH FETCH 3: Guest Tasks thực tế từ CSDL Neon PostgreSQL (không lấy dữ liệu giả)
+            Map<Long, List<GuestTask>> tasksByHomestay = new HashMap<>();
             try {
                 if (!homestayIds.isEmpty()) {
-                    List<GuestTask> tasks = guestTaskRepository.findByHomestayIdIn(homestayIds);
-                    if (tasks != null) {
-                        for (GuestTask t : tasks) {
-                            if (t != null && t.getHomestayId() != null) {
-                                taskMap.putIfAbsent(t.getHomestayId(), t);
+                    List<GuestTask> allTasks = guestTaskRepository.findByHomestayIdIn(homestayIds);
+                    if (allTasks != null) {
+                        for (GuestTask t : allTasks) {
+                            if (t != null && t.getHomestayId() != null && !"INACTIVE".equalsIgnoreCase(t.getStatus())) {
+                                tasksByHomestay.computeIfAbsent(t.getHomestayId(), k -> new ArrayList<>()).add(t);
                             }
                         }
                     }
                 }
             } catch (Exception ex) {
                 log.warn("Bỏ qua lỗi tải guest tasks: {}", ex.getMessage());
+            }
+
+            // BATCH FETCH 4: Submissions / Reviews của du khách để đối soát trạng thái hoàn thành từng nhiệm vụ
+            Map<String, Boolean> completedTasksMap = new HashMap<>();
+            try {
+                List<Review> userReviews = reviewRepository.findByTouristId(touristId);
+                if (userReviews != null) {
+                    for (Review r : userReviews) {
+                        if (r.getHomestayId() != null && r.getTaskId() != null) {
+                            completedTasksMap.put(r.getHomestayId() + "_" + r.getTaskId(), true);
+                        }
+                        if (r.getBookingId() != null && r.getTaskId() != null) {
+                            completedTasksMap.put("b_" + r.getBookingId() + "_" + r.getTaskId(), true);
+                        }
+                    }
+                }
+                List<GuestTaskSubmission> userSubs = guestTaskSubmissionRepository.findByTouristId(touristId);
+                if (userSubs != null) {
+                    for (GuestTaskSubmission s : userSubs) {
+                        if (s.getHomestayId() != null && s.getTaskId() != null) {
+                            if ("approved".equalsIgnoreCase(s.getStatus()) || "pending".equalsIgnoreCase(s.getStatus())) {
+                                completedTasksMap.put(s.getHomestayId() + "_" + s.getTaskId(), true);
+                            }
+                        }
+                    }
+                }
+            } catch (Exception ex) {
+                log.warn("Bỏ qua lỗi tải submissions: {}", ex.getMessage());
             }
 
             // Lắp ráp UserBookingDTO an toàn từng phần tử
@@ -153,7 +183,8 @@ public class BookingService {
                     result.add(convertRawToDTO(raw, 
                             raw.bookingId() != null ? reportMap.get(raw.bookingId()) : null, 
                             raw.bookingId() != null ? reviewMap.get(raw.bookingId()) : null, 
-                            raw.homestayId() != null ? taskMap.get(raw.homestayId()) : null));
+                            raw.homestayId() != null ? tasksByHomestay.get(raw.homestayId()) : null,
+                            completedTasksMap));
                 } catch (Exception ex) {
                     log.error("Lỗi convert đơn đặt phòng ID {}: {}", raw.bookingId(), ex.getMessage());
                     result.add(fallbackDTO(raw));
@@ -194,8 +225,25 @@ public class BookingService {
             RawBooking raw = list.get(0);
             Report report = reportRepository.findFirstByBookingId(raw.bookingId()).orElse(null);
             Review review = reviewRepository.findFirstByBookingId(raw.bookingId()).orElse(null);
-            GuestTask task = guestTaskRepository.findByHomestayId(raw.homestayId()).stream().findFirst().orElse(null);
-            return convertRawToDTO(raw, report, review, task);
+            List<GuestTask> tasks = guestTaskRepository.findByHomestayId(raw.homestayId()).stream()
+                    .filter(t -> !"INACTIVE".equalsIgnoreCase(t.getStatus()))
+                    .collect(Collectors.toList());
+            Map<String, Boolean> completedTasksMap = new HashMap<>();
+            if (review != null && review.getTaskId() != null) {
+                completedTasksMap.put(raw.homestayId() + "_" + review.getTaskId(), true);
+                completedTasksMap.put("b_" + raw.bookingId() + "_" + review.getTaskId(), true);
+            }
+            try {
+                if (raw.touristId() != null) {
+                    List<GuestTaskSubmission> userSubs = guestTaskSubmissionRepository.findByTouristIdAndHomestayId(raw.touristId(), raw.homestayId());
+                    for (GuestTaskSubmission s : userSubs) {
+                        if (s.getTaskId() != null) {
+                            completedTasksMap.put(raw.homestayId() + "_" + s.getTaskId(), true);
+                        }
+                    }
+                }
+            } catch (Exception ignored) {}
+            return convertRawToDTO(raw, report, review, tasks, completedTasksMap);
         } catch (Exception e) {
             log.error("Lỗi khi truy vấn đơn đặt phòng theo mã {}: {}", bookingCode, e.getMessage());
             return null;
@@ -528,6 +576,48 @@ public class BookingService {
 
         Review savedReview = reviewRepository.save(review);
         reviewSentimentService.analyzeAsync(savedReview);
+
+        // Lưu bản ghi vào guest_task_submissions từ CSDL thật để liên kết trực tiếp với Quản lý nhiệm vụ của Chủ nhà
+        try {
+            Long taskIdToRecord = req.getTaskId() != null ? req.getTaskId() : savedReview.getTaskId();
+            GuestTask task = taskIdToRecord != null ? guestTaskRepository.findById(taskIdToRecord).orElse(null) : null;
+            Booking bk = req.getBookingId() != null ? bookingRepository.findById(req.getBookingId()).orElse(null) : null;
+            String guestName = "Du khách";
+            String guestAvatar = null;
+            if (touristId != null) {
+                User u = userRepository.findById(touristId).orElse(null);
+                if (u != null) {
+                    if (u.getFullName() != null && !u.getFullName().isBlank()) guestName = u.getFullName();
+                    guestAvatar = u.getAvatar();
+                }
+            }
+            String roomName = "Phòng nghỉ";
+            if (bk != null && bk.getRoomId() != null) {
+                roomName = roomRepository.findById(bk.getRoomId()).map(Room::getRoomName).orElse("Phòng nghỉ");
+            }
+            String subCode = "SUB-" + (task != null ? task.getId() : (taskIdToRecord != null ? taskIdToRecord : 1)) + "-" + (System.currentTimeMillis() % 100000);
+            GuestTaskSubmission sub = GuestTaskSubmission.builder()
+                    .submissionCode(subCode)
+                    .homestayId(homestayId)
+                    .touristId(touristId)
+                    .guestName(guestName)
+                    .guestAvatar(guestAvatar)
+                    .roomName(roomName)
+                    .taskId(task != null ? task.getId() : taskIdToRecord)
+                    .taskTitle(task != null ? task.getTitle() : (req.getTitle() != null ? req.getTitle() : "Nhiệm vụ homestay"))
+                    .taskType(task != null && task.getRewardType() != null ? task.getRewardType() : "review")
+                    .reviewText(savedReview.getComment())
+                    .rewardText(task != null && task.getRewardNote() != null ? task.getRewardNote() : "Voucher homestay")
+                    .photosCount(req.getImages() != null && !req.getImages().isBlank() ? req.getImages().split(",").length : 1)
+                    .submissionImage(req.getImages())
+                    .status(task != null && Boolean.TRUE.equals(task.getAutoApprove()) ? "approved" : "pending")
+                    .submittedAt(LocalDateTime.now())
+                    .build();
+            guestTaskSubmissionRepository.save(sub);
+        } catch (Exception subEx) {
+            log.warn("Không thể lưu guest_task_submission: {}", subEx.getMessage());
+        }
+
         homestayRepository.findById(homestayId).ifPresent(h -> notificationService.create(h.getOwnerId(),
                 "Khách vừa gửi đánh giá mới", "Homestay " + h.getName() + " vừa nhận được đánh giá mới.",
                 "REVIEW", savedReview.getId(), "/owner/reviews"));
@@ -568,7 +658,165 @@ public class BookingService {
         );
     }
 
-    private UserBookingDTO convertRawToDTO(RawBooking raw, Report report, Review review, GuestTask taskEntity) {
+    public GuestTask ensureTaskForHomestay(Long homestayId) {
+        if (homestayId == null) return null;
+        try {
+            List<GuestTask> existing = guestTaskRepository.findByHomestayId(homestayId);
+            if (!existing.isEmpty()) {
+                return existing.stream()
+                        .filter(t -> "ACTIVE".equalsIgnoreCase(t.getStatus()))
+                        .findFirst()
+                        .orElse(existing.get(0));
+            }
+
+            String homestayName = homestayRepository.findById(homestayId).map(Homestay::getName).orElse("Homestay");
+            GuestTask task = GuestTask.builder()
+                    .homestayId(homestayId)
+                    .title("Check-in & Khám phá trải nghiệm tại " + homestayName)
+                    .description("1. Chụp ảnh check-in thực tế phòng và khuôn viên tại " + homestayName + "\n" +
+                                 "2. Trải nghiệm dịch vụ tiện ích và lưu giữ khoảnh khắc đẹp\n" +
+                                 "3. Đăng nhận xét & đánh giá chân thực trên hệ thống YÊN")
+                    .rewardNote("Voucher giảm 10% cho lần đặt phòng tiếp theo")
+                    .icon("bi-camera-fill")
+                    .rewardType("voucher-percent")
+                    .rewardValue("10")
+                    .needPhoto(true)
+                    .autoApprove(false)
+                    .givenCount(0)
+                    .status("ACTIVE")
+                    .createdAt(LocalDateTime.now())
+                    .build();
+            return guestTaskRepository.save(task);
+        } catch (Exception ex) {
+            log.warn("Không thể tạo task mặc định cho homestay {}: {}", homestayId, ex.getMessage());
+            return null;
+        }
+    }
+
+    private UserBookingDTO.TaskDTO buildTaskDTO(RawBooking raw, Review review, List<GuestTask> homestayTasks, Map<String, Boolean> completedTasksMap) {
+        if ((homestayTasks == null || homestayTasks.isEmpty()) && review == null) {
+            return null;
+        }
+
+        boolean hasReviewed = review != null;
+        UserBookingDTO.UserReviewDTO userReviewDTO = null;
+        if (hasReviewed) {
+            String commentText = review.getComment() != null ? review.getComment() : "";
+            String revTitle = "Đánh giá tuyệt vời!";
+            if (commentText.contains("\n")) {
+                String[] parts = commentText.split("\n", 2);
+                revTitle = parts[0];
+                commentText = parts[1];
+            }
+            String revDate = review.getCreatedAt() != null ? review.getCreatedAt().format(DATE_FMT) : "Gần đây";
+            userReviewDTO = UserBookingDTO.UserReviewDTO.builder()
+                    .id(review.getId())
+                    .rating(review.getRating() != null ? review.getRating() : 5)
+                    .title(revTitle)
+                    .content(commentText)
+                    .ownerReply(review.getOwnerReply())
+                    .createdAt(revDate)
+                    .build();
+        }
+
+        List<UserBookingDTO.ChecklistItemDTO> checklist = new ArrayList<>();
+        int doneCount = 0;
+
+        if (homestayTasks != null && !homestayTasks.isEmpty()) {
+            for (int i = 0; i < homestayTasks.size(); i++) {
+                GuestTask t = homestayTasks.get(i);
+                boolean isDone = false;
+                if (review != null) {
+                    if (review.getTaskId() == null || review.getTaskId().equals(t.getId())) {
+                        isDone = true;
+                    }
+                }
+                if (!isDone && completedTasksMap != null) {
+                    if (raw.bookingId() != null && Boolean.TRUE.equals(completedTasksMap.get("b_" + raw.bookingId() + "_" + t.getId()))) {
+                        isDone = true;
+                    } else if (raw.homestayId() != null && Boolean.TRUE.equals(completedTasksMap.get(raw.homestayId() + "_" + t.getId()))) {
+                        isDone = true;
+                    }
+                }
+                if (isDone) doneCount++;
+
+                String rw = t.getRewardNote();
+                if (rw == null || rw.isBlank()) {
+                    if ("voucher-percent".equalsIgnoreCase(t.getRewardType()) && t.getRewardValue() != null) {
+                        rw = "Voucher giảm " + t.getRewardValue() + "%";
+                    } else if ("voucher-amount".equalsIgnoreCase(t.getRewardType()) && t.getRewardValue() != null) {
+                        rw = "Voucher " + t.getRewardValue() + "đ";
+                    } else if (t.getRewardValue() != null && !t.getRewardValue().isBlank()) {
+                        rw = t.getRewardValue();
+                    } else {
+                        rw = "Quà tặng tri ân";
+                    }
+                }
+
+                String displayText = t.getTitle();
+                if (rw != null && !rw.isBlank()) {
+                    displayText += " (" + rw + ")";
+                }
+
+                checklist.add(UserBookingDTO.ChecklistItemDTO.builder()
+                        .id(i + 1)
+                        .taskId(t.getId())
+                        .text(displayText)
+                        .title(t.getTitle())
+                        .description(t.getDescription())
+                        .rewardText(rw)
+                        .icon(t.getIcon() != null && !t.getIcon().isBlank() ? t.getIcon() : "bi-gift-fill")
+                        .needPhoto(t.getNeedPhoto() != null ? t.getNeedPhoto() : Boolean.TRUE)
+                        .done(isDone)
+                        .build());
+            }
+        }
+
+        if (checklist.isEmpty()) {
+            return null;
+        }
+
+        boolean isAllDone = (doneCount == checklist.size()) || hasReviewed;
+
+        String headerTitle;
+        String headerDesc;
+        String headerReward;
+        String headerIcon = "bi-gift-fill";
+        Long primaryTaskId = homestayTasks != null && !homestayTasks.isEmpty() ? homestayTasks.get(0).getId() : 1L;
+
+        if (homestayTasks != null && homestayTasks.size() == 1) {
+            GuestTask single = homestayTasks.get(0);
+            headerTitle = single.getTitle();
+            headerDesc = single.getDescription();
+            headerReward = checklist.get(0).getRewardText();
+            if (single.getIcon() != null && !single.getIcon().isBlank()) {
+                headerIcon = single.getIcon();
+            }
+        } else {
+            headerTitle = "Nhiệm vụ trải nghiệm nhận quà tại " + (raw.homestayName() != null ? raw.homestayName() : "Homestay");
+            headerDesc = "Hoàn thành các nhiệm vụ trải nghiệm thực tế do chủ homestay thiết lập trong CSDL để nhận quà tặng & voucher ưu đãi!";
+            headerReward = (homestayTasks != null ? homestayTasks.size() : 1) + " phần quà ưu đãi";
+        }
+
+        return UserBookingDTO.TaskDTO.builder()
+                .id(primaryTaskId)
+                .title(headerTitle)
+                .description(headerDesc)
+                .icon(headerIcon)
+                .needPhoto(Boolean.TRUE)
+                .rewardText(isAllDone ? "🎁 Đã nhận quà tặng từ Homestay" : headerReward)
+                .status(isAllDone ? "completed" : "pending")
+                .checklist(checklist)
+                .userReview(userReviewDTO)
+                .build();
+    }
+
+    private UserBookingDTO convertRawToDTO(RawBooking raw, Report report, Review review, GuestTask singleTask) {
+        List<GuestTask> list = singleTask != null ? List.of(singleTask) : Collections.emptyList();
+        return convertRawToDTO(raw, report, review, list, Collections.emptyMap());
+    }
+
+    private UserBookingDTO convertRawToDTO(RawBooking raw, Report report, Review review, List<GuestTask> homestayTasks, Map<String, Boolean> completedTasksMap) {
         LocalDate checkInDate = raw.checkInDate();
         LocalDate checkOutDate = raw.checkOutDate();
 
@@ -618,69 +866,8 @@ public class BookingService {
                     .build();
         }
 
-        UserBookingDTO.TaskDTO taskDTO = null;
-        if (taskEntity != null || review != null) {
-            boolean hasReviewed = review != null;
-            String rewardText = taskEntity != null && taskEntity.getRewardNote() != null 
-                    ? taskEntity.getRewardNote() 
-                    : "🎁 Quà tặng trực tiếp từ Homestay";
-
-            List<UserBookingDTO.ChecklistItemDTO> checklist = List.of(
-                    UserBookingDTO.ChecklistItemDTO.builder()
-                            .id(1)
-                            .text("Chụp ảnh phòng ở thực tế & nội thất homestay")
-                            .done(hasReviewed)
-                            .build(),
-                    UserBookingDTO.ChecklistItemDTO.builder()
-                            .id(2)
-                            .text("Chụp ảnh check-in khuôn viên & cảnh quan xung quanh")
-                            .done(hasReviewed)
-                            .build(),
-                    UserBookingDTO.ChecklistItemDTO.builder()
-                            .id(3)
-                            .text("Đăng nhận xét & đánh giá trải nghiệm homestay")
-                            .done(hasReviewed)
-                            .build()
-            );
-
-            UserBookingDTO.UserReviewDTO userReviewDTO = null;
-            if (hasReviewed) {
-                String commentText = review.getComment() != null ? review.getComment() : "";
-                String revTitle = "Đánh giá tuyệt vời!";
-                if (commentText.contains("\n")) {
-                    String[] parts = commentText.split("\n", 2);
-                    revTitle = parts[0];
-                    commentText = parts[1];
-                }
-
-                String revDate = review.getCreatedAt() != null ? review.getCreatedAt().format(DATE_FMT) : "Gần đây";
-
-                userReviewDTO = UserBookingDTO.UserReviewDTO.builder()
-                        .id(review.getId())
-                        .rating(review.getRating() != null ? review.getRating() : 5)
-                        .title(revTitle)
-                        .content(commentText)
-                        .ownerReply(review.getOwnerReply())
-                        .createdAt(revDate)
-                        .build();
-            }
-
-            Long taskIdVal = 1L;
-            if (taskEntity != null && taskEntity.getId() != null) {
-                taskIdVal = taskEntity.getId();
-            } else if (review != null && review.getTaskId() != null) {
-                taskIdVal = review.getTaskId();
-            }
-
-            taskDTO = UserBookingDTO.TaskDTO.builder()
-                    .id(taskIdVal)
-                    .title(taskEntity != null ? taskEntity.getTitle() : "Danh sách việc cần làm tại Homestay")
-                    .rewardText(hasReviewed ? "🎁 Đã nhận quà tặng từ Homestay" : rewardText)
-                    .status(hasReviewed ? "completed" : "pending")
-                    .checklist(checklist)
-                    .userReview(userReviewDTO)
-                    .build();
-        }
+        // Xây dựng TaskDTO 100% từ dữ liệu thật trong bảng guest_tasks
+        UserBookingDTO.TaskDTO taskDTO = buildTaskDTO(raw, review, homestayTasks, completedTasksMap);
 
         // Chuẩn hóa status theo giao diện tab: 'active', 'upcoming', 'completed', 'cancelled', 'complaint'
         LocalDate today = LocalDate.now();
