@@ -832,7 +832,7 @@ export default function BookingAndPay() {
         remainingAmount: payLater,
         paymentMethod: 'VNPAY',
         depositStatus: 'PAID',
-        status: 'CONFIRMED',
+        status: 'PENDING',
         customerName: fullName,
         customerPhone: phone,
         customerEmail: email,
@@ -932,7 +932,7 @@ export default function BookingAndPay() {
         remainingAmount: payLater,
         paymentMethod: dbPayMethod,
         depositStatus: 'PAID',
-        status: 'CONFIRMED',
+        status: 'PENDING',
         customerName: fullName,
         customerPhone: phone,
         customerEmail: email,
@@ -996,6 +996,12 @@ export default function BookingAndPay() {
         list.unshift(bookingRecord);
         localStorage.setItem('yenBookings', JSON.stringify(list));
         localStorage.removeItem(`cached_cashback_wallet_${uid}`);
+        // Xóa cache danh sách đơn để phía Chủ nhà (Owner) luôn tải ngay đơn mới nhất
+        Object.keys(localStorage).forEach((k) => {
+          if (k.startsWith('cached_owner_bookings_')) {
+            localStorage.removeItem(k);
+          }
+        });
       } catch (e) {
         console.error('Save booking error:', e);
       }
