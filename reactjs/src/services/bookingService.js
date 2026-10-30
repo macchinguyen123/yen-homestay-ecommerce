@@ -97,6 +97,14 @@ export const bookingService = {
         err.response = data;
         throw err;
       }
+      // Dọn cache bookings của owner để khi chuyển sang tài khoản owner sẽ fetch đơn mới tức thì
+      try {
+        Object.keys(localStorage).forEach((k) => {
+          if (k.startsWith('cached_owner_bookings_')) {
+            localStorage.removeItem(k);
+          }
+        });
+      } catch (ignored) {}
       return data;
     } catch (error) {
       console.error('Lỗi khi gửi đơn đặt phòng:', error);

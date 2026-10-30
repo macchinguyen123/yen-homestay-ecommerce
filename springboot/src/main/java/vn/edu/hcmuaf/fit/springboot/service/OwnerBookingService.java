@@ -300,7 +300,7 @@ public class OwnerBookingService {
             params.add(kw);
         }
 
-        sql.append(" ORDER BY b.created_at DESC, b.booking_id DESC");
+        sql.append(" ORDER BY b.booking_id DESC");
 
         List<OwnerBookingDTO> result = new ArrayList<>();
         try {
@@ -359,8 +359,8 @@ public class OwnerBookingService {
         if (st == null) st = "";
         String sLower = st.toLowerCase();
         return switch (tab.toLowerCase()) {
-            case "pending", "cho-xac-nhan" -> sLower.contains("xác nhận") || sLower.contains("pending");
-            case "deposit", "da-coc", "checkin", "cho-checkin" -> sLower.contains("check-in") || sLower.contains("cọc") || sLower.contains("confirmed") || sLower.contains("deposit");
+            case "pending", "cho-xac-nhan" -> sLower.contains("xác nhận") || sLower.contains("pending") || sLower.contains("duyệt");
+            case "deposit", "da-coc", "checkin", "cho-checkin" -> (sLower.contains("check-in") || sLower.contains("cọc") || sLower.contains("confirmed") || sLower.contains("deposit")) && !sLower.contains("xác nhận") && !sLower.contains("duyệt") && !sLower.contains("pending");
             case "staying", "dang-o" -> sLower.contains("đang ở") || sLower.contains("ở") || sLower.contains("checked_in") || sLower.contains("staying");
             case "completed", "da-hoan-tat" -> sLower.contains("hoàn tất") || sLower.contains("completed");
             case "cancelled", "da-huy" -> sLower.contains("hủy") || sLower.contains("cancelled") || sLower.contains("rejected");
@@ -450,7 +450,7 @@ public class OwnerBookingService {
         String displayStatus = rawStatus;
         String statusBadge = "status-checkin";
 
-        if (rawStatus.equalsIgnoreCase("PENDING") || rawStatus.contains("xác nhận")) {
+        if (rawStatus.equalsIgnoreCase("PENDING") || rawStatus.contains("xác nhận") || rawStatus.contains("Chờ duyệt") || rawStatus.contains("Chưa duyệt")) {
             displayStatus = "Chờ xác nhận";
             statusBadge = "status-pending";
         } else if (rawStatus.equalsIgnoreCase("CHECKED_IN") || rawStatus.equalsIgnoreCase("STAYING") || rawStatus.contains("Đang ở")) {
@@ -462,9 +462,12 @@ public class OwnerBookingService {
         } else if (rawStatus.equalsIgnoreCase("CANCELLED") || rawStatus.equalsIgnoreCase("REJECTED") || rawStatus.contains("hủy")) {
             displayStatus = "Đã hủy";
             statusBadge = "status-cancelled";
-        } else {
+        } else if (rawStatus.equalsIgnoreCase("CONFIRMED") || rawStatus.contains("Check-in")) {
             displayStatus = "Chờ Check-in";
             statusBadge = "status-checkin";
+        } else {
+            displayStatus = "Chờ xác nhận";
+            statusBadge = "status-pending";
         }
 
         String specialRequest = (String) row.get("special_request");

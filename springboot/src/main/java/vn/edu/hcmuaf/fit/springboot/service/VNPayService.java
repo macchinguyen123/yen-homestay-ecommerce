@@ -188,7 +188,9 @@ public class VNPayService {
                 final BigDecimal payAmount = BigDecimal.valueOf(amount);
                 bookingRepository.findByBookingCode(txnRef).ifPresent(booking -> {
                     booking.setDepositStatus("PAID");
-                    booking.setStatus("CONFIRMED");
+                    if (!"CONFIRMED".equalsIgnoreCase(booking.getStatus()) && !"Chờ Check-in".equalsIgnoreCase(booking.getStatus())) {
+                        booking.setStatus("PENDING");
+                    }
                     bookingRepository.save(booking);
 
                     // Tự động tích lũy 5% hoàn tiền / điểm thưởng vào Ví YÊN

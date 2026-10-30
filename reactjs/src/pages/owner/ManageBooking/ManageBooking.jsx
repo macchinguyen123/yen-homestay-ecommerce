@@ -133,8 +133,17 @@ export default function ManageBooking() {
       // 2. Fetch Bookings thực tế từ Neon PostgreSQL
       const data = await ownerBookingService.getBookings(activeId);
       if (Array.isArray(data) && data.length > 0) {
-        setBookings(data);
-        setCurrentBookingId(data[0].bookingCode || data[0].id);
+        // Luôn sắp xếp đơn mới nhất (theo ID hoặc createdAt) lên đầu tiên
+        const sortedData = [...data].sort((a, b) => {
+          const idA = Number(String(a.id || a.bookingCode || '').replace(/\D/g, '')) || 0;
+          const idB = Number(String(b.id || b.bookingCode || '').replace(/\D/g, '')) || 0;
+          const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+          const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          if (timeA && timeB && timeA !== timeB) return timeB - timeA;
+          return idB - idA;
+        });
+        setBookings(sortedData);
+        setCurrentBookingId(sortedData[0].bookingCode || sortedData[0].id);
       }
 
       // 3. Fetch Rooms thực tế
@@ -184,9 +193,9 @@ export default function ManageBooking() {
 
   const normalizeStatus = (status) => {
     if (!status) return 'pending';
-    const s = String(status).toLowerCase();
-    if (s.includes('chờ xác nhận') || s.includes('pending')) return 'pending';
-    if (s.includes('check-in') || s.includes('cọc') || s.includes('confirmed') || s.includes('deposit')) return 'deposit';
+    const s = String(status).toLowerCase().trim();
+    if (s.includes('chờ xác nhận') || s.includes('pending') || s.includes('chờ duyệt') || s.includes('chưa duyệt') || s.includes('unconfirmed')) return 'pending';
+    if (s.includes('check-in') || s.includes('checkin') || s.includes('cọc') || s.includes('confirmed') || s.includes('deposit') || s.includes('đã duyệt')) return 'deposit';
     if (s.includes('đang ở') || s.includes('ở') || s.includes('staying') || s.includes('occupied') || s.includes('checked_in')) return 'staying';
     if (s.includes('hoàn tất') || s.includes('completed')) return 'completed';
     if (s.includes('hủy') || s.includes('cancel') || s.includes('rejected')) return 'cancelled';
@@ -245,9 +254,23 @@ export default function ManageBooking() {
     // Sort
     result = [...result];
     if (sortBy === 'newest') {
-      result.sort((a, b) => new Date(b.createdAt || b.checkInDate || 0) - new Date(a.createdAt || a.checkInDate || 0));
+      result.sort((a, b) => {
+        const idA = Number(String(a.id || a.bookingCode || '').replace(/\D/g, '')) || 0;
+        const idB = Number(String(b.id || b.bookingCode || '').replace(/\D/g, '')) || 0;
+        const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        if (timeA && timeB && timeA !== timeB) return timeB - timeA;
+        return idB - idA;
+      });
     } else if (sortBy === 'oldest') {
-      result.sort((a, b) => new Date(a.createdAt || a.checkInDate || 0) - new Date(b.createdAt || b.checkInDate || 0));
+      result.sort((a, b) => {
+        const idA = Number(String(a.id || a.bookingCode || '').replace(/\D/g, '')) || 0;
+        const idB = Number(String(b.id || b.bookingCode || '').replace(/\D/g, '')) || 0;
+        const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        if (timeA && timeB && timeA !== timeB) return timeA - timeB;
+        return idA - idB;
+      });
     } else if (sortBy === 'checkin-asc') {
       result.sort((a, b) => new Date(a.checkInDate || 0) - new Date(b.checkInDate || 0));
     } else if (sortBy === 'checkin-desc') {
@@ -396,6 +419,22 @@ export default function ManageBooking() {
       const bId = currentBooking.id || currentBookingId;
       await ownerBookingService.approveBooking(bId, { confirmDeposit: true, note: 'Chủ nhà đã duyệt đơn qua hệ thống' });
       showToast(`Đã duyệt đơn và xác nhận giữ phòng #${currentBooking.bookingCode || currentBookingId}!`, 'success');
+      
+      // Cập nhật trạng thái trực tiếp trong state để nút Check-in xuất hiện ngay lập tức
+      setBookings((prev) =>
+        prev.map((item) => {
+          if (String(item.id) === String(bId) || item.bookingCode === currentBookingId) {
+            return {
+              ...item,
+              status: 'Chờ Check-in',
+              statusBadge: 'status-checkin',
+              depositStatus: 'Đã nhận đủ cọc'
+            };
+          }
+          return item;
+        })
+      );
+
       closeModal();
       loadAllData(selectedHomestayId);
     } catch (err) {
@@ -1006,10 +1045,11 @@ export default function ManageBooking() {
                                 <button
                                   onClick={() => openModal('approveBookingModal', b.bookingCode || b.id)}
                                   title="Duyệt đơn & Giữ phòng"
-                                  className="w-8 h-8 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white flex items-center justify-center transition-colors shadow-sm"
+                                  className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white flex items-center justify-center gap-1 transition-colors shadow-sm text-[12px] font-semibold"
                                   type="button"
                                 >
-                                  <span className="material-symbols-outlined text-[17px]">check_circle</span>
+                                  <span className="material-symbols-outlined text-[16px]">check_circle</span>
+                                  <span>Duyệt đơn</span>
                                 </button>
                               )}
 
@@ -1017,10 +1057,11 @@ export default function ManageBooking() {
                                 <button
                                   onClick={() => openModal('checkinModal', b.bookingCode || b.id)}
                                   title="Check-in nhận phòng"
-                                  className="w-8 h-8 rounded-lg bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center transition-colors shadow-sm"
+                                  className="px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center gap-1 transition-colors shadow-sm text-[12px] font-semibold"
                                   type="button"
                                 >
-                                  <span className="material-symbols-outlined text-[17px]">login</span>
+                                  <span className="material-symbols-outlined text-[16px]">login</span>
+                                  <span>Check-in</span>
                                 </button>
                               )}
 
