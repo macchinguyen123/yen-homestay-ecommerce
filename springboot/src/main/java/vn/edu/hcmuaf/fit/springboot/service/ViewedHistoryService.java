@@ -119,12 +119,12 @@ public class ViewedHistoryService {
 
         try {
             jdbc.update(
-                "INSERT INTO viewed_histories (user_id, homestay_id, viewed_at) VALUES (?, ?, CURRENT_TIMESTAMP) " +
-                "ON CONFLICT (user_id, homestay_id) DO UPDATE SET viewed_at = CURRENT_TIMESTAMP",
+                "INSERT INTO viewed_histories (user_id, homestay_id, viewed_at) VALUES (?, ?, timezone('Asia/Ho_Chi_Minh', CURRENT_TIMESTAMP)) " +
+                "ON CONFLICT (user_id, homestay_id) DO UPDATE SET viewed_at = timezone('Asia/Ho_Chi_Minh', CURRENT_TIMESTAMP)",
                 userId, homestayId);
             Optional<ViewedHistory> updated = viewedHistoryRepository.findByUserIdAndHomestayId(userId, homestayId);
             if (updated.isPresent()) {
-                return mapToDTO(updated.get(), userId);
+                return mapToDTO(updated.get(), userId, vietnamNow());
             }
         } catch (Exception e) {
             log.warn("Lỗi khi ghi nhận lịch sử xem (upsert): {}", e.getMessage());
@@ -133,9 +133,9 @@ public class ViewedHistoryService {
         ViewedHistory fallback = ViewedHistory.builder()
                 .userId(userId)
                 .homestayId(homestayId)
-                .viewedAt(LocalDateTime.now())
+                .viewedAt(vietnamNow())
                 .build();
-        return mapToDTO(fallback, userId);
+        return mapToDTO(fallback, userId, vietnamNow());
     }
 
     /**
@@ -147,8 +147,22 @@ public class ViewedHistoryService {
         }
 
         List<ViewedHistory> list = viewedHistoryRepository.findByUserIdOrderByViewedAtDesc(userId);
+        if (list.isEmpty()) return Collections.emptyList();
+        LocalDateTime now = vietnamNow();
+        List<Long> homestayIds = list.stream().map(ViewedHistory::getHomestayId).filter(Objects::nonNull).distinct().toList();
+        Map<Long, Homestay> homestayMap = homestayRepository.findAllById(homestayIds).stream()
+                .collect(Collectors.toMap(Homestay::getId, h -> h, (a, b) -> a));
+        Map<Long, String> imageMap = new HashMap<>();
+        for (HomestayImage image : homestayImageRepository.findByHomestayIdIn(homestayIds)) {
+            if (image.getHomestayId() != null && image.getImageUrl() != null && !image.getImageUrl().isBlank()
+                    && (!imageMap.containsKey(image.getHomestayId()) || Boolean.TRUE.equals(image.getIsPrimary()))) {
+                imageMap.put(image.getHomestayId(), image.getImageUrl());
+            }
+        }
+        Set<Long> likedIds = wishlistRepository.findByTouristIdAndHomestayIdIn(userId, homestayIds).stream()
+                .map(v -> v.getHomestayId()).collect(Collectors.toSet());
         return list.stream()
-                .map(item -> mapToDTO(item, userId))
+                .map(item -> mapToDTO(item, userId, now, homestayMap, imageMap, likedIds))
                 .collect(Collectors.toList());
     }
 
@@ -170,51 +184,65 @@ public class ViewedHistoryService {
         log.info("Đã xóa toàn bộ lịch sử xem của User ID {}", userId);
     }
 
-    private ViewedHistoryDTO mapToDTO(ViewedHistory entity, Long userId) {
+    private LocalDateTime vietnamNow() {
+        try {
+            return jdbc.queryForObject("SELECT timezone('Asia/Ho_Chi_Minh', CURRENT_TIMESTAMP)", LocalDateTime.class);
+        } catch (Exception ignored) {
+            return LocalDateTime.now(java.time.ZoneId.of("Asia/Ho_Chi_Minh"));
+        }
+    }
+
+    private ViewedHistoryDTO mapToDTO(ViewedHistory entity, Long userId, LocalDateTime now) {
+        return mapToDTO(entity, userId, now, null, null, null);
+    }
+
+    private ViewedHistoryDTO mapToDTO(ViewedHistory entity, Long userId, LocalDateTime now,
+                                      Map<Long, Homestay> homestayMap, Map<Long, String> imageMap,
+                                      Set<Long> likedIds) {
         Long hId = entity.getHomestayId();
 
-        Homestay h = entity.getHomestay();
-        if (h == null) {
-            h = homestayRepository.findById(hId).orElse(null);
-        }
+        Homestay h = homestayMap != null ? homestayMap.get(hId) : entity.getHomestay();
+        if (homestayMap == null && h == null) h = homestayRepository.findById(hId).orElse(null);
 
         String name = (h != null && h.getName() != null) ? h.getName() : "Homestay #" + hId;
-        String location = (h != null && h.getCity() != null) ? h.getCity() : ((h != null && h.getAddress() != null) ? h.getAddress() : "Việt Nam");
-        String rating = (h != null && h.getRating() != null) ? String.format(Locale.US, "%.1f", h.getRating()) : "5.0";
-        String reviews = "120";
+        String location = (h != null && h.getCity() != null) ? h.getCity() : ((h != null && h.getAddress() != null) ? h.getAddress() : "Chưa cập nhật địa điểm");
+        String rating = (h != null && h.getRating() != null) ? String.format(Locale.US, "%.1f", h.getRating()) : "—";
+        String reviews = "";
 
-        String numRoomsStr = (h != null && h.getNumRooms() != null) ? h.getNumRooms() + " phòng ngủ" : "2 phòng ngủ";
-        String maxGuestsStr = (h != null && h.getMaxGuests() != null) ? h.getMaxGuests() + " khách" : "4 khách";
+        String numRoomsStr = (h != null && h.getNumRooms() != null) ? h.getNumRooms() + " phòng ngủ" : "Chưa cập nhật số phòng";
+        String maxGuestsStr = (h != null && h.getMaxGuests() != null) ? h.getMaxGuests() + " khách" : "Chưa cập nhật sức chứa";
         String specs = numRoomsStr + " • " + maxGuestsStr;
 
         String amenities = (h != null && h.getAmenities() != null && !h.getAmenities().isEmpty())
                 ? h.getAmenities()
-                : "Đầy đủ tiện nghi · WiFi miễn phí";
+                : "";
 
         DecimalFormat df = new DecimalFormat("#,###");
         String price = (h != null && h.getBasePrice() != null)
                 ? df.format(h.getBasePrice()) + "đ"
-                : "1.200.000đ";
+                : "Liên hệ để biết giá";
 
         // Query real image from homestay_images table
-        String img = "https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=600&q=80";
-        try {
-            List<HomestayImage> imgs = homestayImageRepository.findByHomestayId(hId);
-            if (imgs != null && !imgs.isEmpty()) {
-                for (HomestayImage hi : imgs) {
-                    if (hi.getImageUrl() != null && !hi.getImageUrl().isBlank()) {
-                        img = hi.getImageUrl();
-                        break;
+        String img = imageMap == null ? null : imageMap.get(hId);
+        if (imageMap == null) {
+            try {
+                List<HomestayImage> imgs = homestayImageRepository.findByHomestayId(hId);
+                if (imgs != null && !imgs.isEmpty()) {
+                    for (HomestayImage hi : imgs) {
+                        if (hi.getImageUrl() != null && !hi.getImageUrl().isBlank()) {
+                            img = hi.getImageUrl();
+                            break;
+                        }
                     }
                 }
+            } catch (Exception e) {
+                log.warn("Lỗi khi tải ảnh cho homestay {}: {}", hId, e.getMessage());
             }
-        } catch (Exception e) {
-            log.warn("Lỗi khi tải ảnh cho homestay {}: {}", hId, e.getMessage());
         }
 
         // Wishlist status check
-        boolean isFav = false;
-        if (userId != null) {
+        boolean isFav = likedIds != null && likedIds.contains(hId);
+        if (likedIds == null && userId != null) {
             try {
                 isFav = wishlistRepository.existsByTouristIdAndHomestayId(userId, hId);
             } catch (Exception ignored) {}
@@ -226,7 +254,7 @@ public class ViewedHistoryService {
                 .homestayId(hId)
                 .name(name)
                 .location(location)
-                .timeAgo(formatTimeAgo(entity.getViewedAt()))
+                .timeAgo(formatTimeAgo(entity.getViewedAt(), now))
                 .rating(rating)
                 .reviews(reviews)
                 .specs(specs)
@@ -238,10 +266,14 @@ public class ViewedHistoryService {
                 .build();
     }
 
-    public static String formatTimeAgo(LocalDateTime dateTime) {
+    private String formatTimeAgo(LocalDateTime dateTime, LocalDateTime now) {
         if (dateTime == null) return "Vừa xem";
-        LocalDateTime now = LocalDateTime.now();
         Duration duration = Duration.between(dateTime, now);
+        // Dữ liệu cũ được lưu theo UTC wall time, trong khi lịch sử mới dùng giờ Việt Nam.
+        if (duration.toHours() >= 6 && duration.toHours() <= 8) {
+            duration = Duration.between(dateTime.plusHours(7), now);
+        }
+        if (duration.isNegative()) return "Vừa xem";
         long seconds = duration.getSeconds();
 
         if (seconds < 60) {

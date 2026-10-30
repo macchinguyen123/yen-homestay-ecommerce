@@ -10,7 +10,12 @@ export const cashbackService = {
     try {
       const cached = localStorage.getItem(getCacheKey(userId));
       if (cached) {
-        return JSON.parse(cached);
+        const wallet = JSON.parse(cached);
+        const { bankName, accountNumber, accountHolder, isLinked, isPinSet, walletPin, ...pointsWallet } = wallet;
+        if (Array.isArray(pointsWallet.transactions)) {
+          pointsWallet.transactions = pointsWallet.transactions.filter((item) => !/rút tiền|ngân hàng/i.test(item.title || ''));
+        }
+        return pointsWallet;
       }
     } catch (e) {
       console.warn('Không thể đọc cache ví hoàn tiền:', e);
@@ -37,6 +42,9 @@ export const cashbackService = {
       }
 
       const data = await response.json();
+      if (Array.isArray(data.transactions)) {
+        data.transactions = data.transactions.filter((item) => !/rút tiền|ngân hàng/i.test(item.title || ''));
+      }
       // Lưu lại cache để lần sau mở lên hiển thị tức thì
       try {
         localStorage.setItem(getCacheKey(userId), JSON.stringify(data));
@@ -55,90 +63,4 @@ export const cashbackService = {
     }
   },
 
-  /**
-   * Gửi yêu cầu rút tiền về tài khoản ngân hàng
-   */
-  async withdraw(userId, { bank, accNum, amount, pin }) {
-    try {
-      const response = await fetch(`${API_BASE_URL}/${userId || 1}/withdraw`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ bank, accNum, amount: Number(amount), pin }),
-      });
-
-      const resData = await response.json();
-      if (!response.ok || !resData.success) {
-        throw new Error(resData.message || 'Rút tiền thất bại');
-      }
-
-      if (resData.wallet) {
-        try {
-          localStorage.setItem(getCacheKey(userId), JSON.stringify(resData.wallet));
-        } catch (e) {}
-      }
-
-      return { success: true, data: resData.wallet, message: resData.message };
-    } catch (error) {
-      console.error('Lỗi khi rút tiền:', error);
-      return { success: false, error: error.message };
-    }
-  },
-
-  /**
-   * Cập nhật thông tin tài khoản ngân hàng liên kết
-   */
-  async updateBank(userId, { bankName, accountNumber, accountHolder }) {
-    try {
-      const response = await fetch(`${API_BASE_URL}/${userId || 1}/bank`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ bankName, accountNumber, accountHolder }),
-      });
-
-      const resData = await response.json();
-      if (!response.ok || !resData.success) {
-        throw new Error(resData.message || 'Cập nhật ngân hàng thất bại');
-      }
-
-      if (resData.wallet) {
-        try {
-          localStorage.setItem(getCacheKey(userId), JSON.stringify(resData.wallet));
-        } catch (e) {}
-      }
-
-      return { success: true, data: resData.wallet, message: resData.message };
-    } catch (error) {
-      console.error('Lỗi khi cập nhật ngân hàng:', error);
-      return { success: false, error: error.message };
-    }
-  },
-
-  /**
-   * Đổi mã PIN Ví
-   */
-  async updatePin(userId, { currentPin, newPin }) {
-    try {
-      const response = await fetch(`${API_BASE_URL}/${userId || 1}/pin`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ currentPin, newPin }),
-      });
-
-      const resData = await response.json();
-      if (!response.ok || !resData.success) {
-        throw new Error(resData.message || 'Cập nhật mã PIN thất bại');
-      }
-
-      if (resData.wallet) {
-        try {
-          localStorage.setItem(getCacheKey(userId), JSON.stringify(resData.wallet));
-        } catch (e) {}
-      }
-
-      return { success: true, data: resData.wallet, message: resData.message };
-    } catch (error) {
-      console.error('Lỗi khi cập nhật PIN:', error);
-      return { success: false, error: error.message };
-    }
-  }
 };
