@@ -1048,6 +1048,27 @@ body {
 }
 
 /* Ô Tìm Kiếm Toolbar Đồng Bộ */
+.viewed-history-toolbar {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  flex-wrap: nowrap !important;
+  gap: 12px !important;
+  width: 100% !important;
+}
+
+.viewed-history-toolbar .search-hs-box {
+  flex: 1 1 auto !important;
+  width: auto !important;
+  min-width: 0 !important;
+  margin-bottom: 0 !important;
+}
+
+.viewed-history-toolbar > button {
+  flex-shrink: 0 !important;
+  white-space: nowrap !important;
+}
+
 .search-hs-box {
   position: relative;
   display: flex;
@@ -1786,7 +1807,7 @@ body {
   letter-spacing: -0.02em !important;
 }
 
-.btn-withdraw-action {
+.btn-use-points {
   background: #ffffff !important;
   color: #047857 !important;
   font-weight: 700 !important;
@@ -1801,7 +1822,7 @@ body {
   align-items: center !important;
 }
 
-.btn-withdraw-action:hover {
+.btn-use-points:hover {
   background: #f0fdf4 !important;
   transform: translateY(-2px) !important;
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18) !important;
@@ -3979,3 +4000,24 @@ input[placeholder="Số nhà, tên đường"] {
 
 
 
+
+.viewed-history-toolbar {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  flex-wrap: nowrap !important;
+  gap: 12px !important;
+  width: 100% !important;
+}
+
+.viewed-history-toolbar .search-hs-box {
+  flex: 1 1 auto !important;
+  width: auto !important;
+  min-width: 0 !important;
+  margin-bottom: 0 !important;
+}
+
+.viewed-history-toolbar > button {
+  flex-shrink: 0 !important;
+  white-space: nowrap !important;
+}
