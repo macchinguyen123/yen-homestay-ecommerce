@@ -40,9 +40,12 @@ export default function ManageHomestay() {
     try {
       const user = authService.getCurrentUser();
       const ownerId = user?.id || 1;
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('token') || (JSON.parse(localStorage.getItem('user') || '{}'))?.token;
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
       let response = await fetch(`http://localhost:8081/api/admin/homestays?ownerId=${ownerId}`, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers
       });
       if (!response.ok) {
         response = await fetch(`http://localhost:8081/api/public/admin/homestays?ownerId=${ownerId}`);
@@ -60,12 +63,12 @@ export default function ManageHomestay() {
             specificAddress: item.address || item.name,
             image: item.img || 'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=800&q=80',
             status: item.status === 'suspended' ? 'locked' : (item.status === 'active' ? 'active' : 'active'),
-            revenue: `${(Math.random() * 120 + 65).toFixed(1)}M đ`,
-            occupancy: item.status === 'suspended' ? 'Tạm khóa' : `${Math.floor(Math.random() * 20 + 75)}%`,
-            weeklyBookings: item.status === 'suspended' ? 'Tạm khóa' : `${Math.floor(Math.random() * 25 + 15)} đơn`,
-            rooms: item.rooms || 6,
-            services: STANDARD_SERVICES.slice(0, 4),
-            customServices: ['Dịch vụ bản địa cao cấp'],
+            revenue: item.revenue || '0đ',
+            occupancy: item.occupancy || '0%',
+            weeklyBookings: item.weeklyBookings || '0 đơn',
+            rooms: item.rooms || 0,
+            services: Array.isArray(item.services) && item.services.length > 0 ? item.services : ['WiFi tốc độ cao', 'Điều hòa nhiệt độ', 'Bình nước nóng'],
+            customServices: Array.isArray(item.customServices) ? item.customServices : [],
             isCurrent: activeId ? String(item.id) === String(activeId) : idx === 0,
             createdAt: item.createdAt || item.createdDate || new Date(Date.now() - (idx * 14 + 2) * 86400000).toISOString()
           }));

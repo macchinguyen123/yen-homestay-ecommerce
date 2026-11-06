@@ -245,19 +245,21 @@
 
 .hotel-card {
   display: flex;
-  border: 1px solid #e7e7e7;
-  border-radius: 12px;
+  border: 1px solid #e2ebe4;
+  border-radius: 14px;
   background: #ffffff;
   overflow: hidden;
-  transition: box-shadow 0.25s ease, transform 0.2s ease;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   height: 205px;
   min-height: 205px;
   max-height: 205px;
+  cursor: pointer;
 }
 
 .hotel-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0px 6px 16px rgba(0, 0, 0, 0.12);
+  transform: translateY(-3px);
+  border-color: #86efac;
+  box-shadow: 0px 10px 24px rgba(22, 101, 52, 0.12);
 }
 
 /* Card Image (Quy định 1 kích cỡ đồng nhất 100%: 260px x 205px) */
@@ -279,6 +281,11 @@
   height: 100%;
   object-fit: cover;
   display: block;
+  transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.hotel-card:hover .hotel-image img {
+  transform: scale(1.05);
 }
 
 /* Nút tim yêu thích nằm ở góc trên bên phải của ảnh */

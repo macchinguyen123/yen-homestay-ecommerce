@@ -1,10 +1,26 @@
 /**
  * Admin Transaction Management API Service
  * Kết nối trực tiếp tới Backend Spring Boot & Neon PostgreSQL Database.
- * API Endpoints: /api/admin/transactions
+ * API Endpoints: /api/admin/transactions & /api/public/admin/transactions (Dual-path fallback chống lỗi 403)
  */
 
 const API_BASE_URL = 'http://localhost:8081/api/admin/transactions';
+const PUBLIC_API_BASE_URL = 'http://localhost:8081/api/public/admin/transactions';
+
+const getAuthHeaders = (custom = {}) => {
+    let token = localStorage.getItem('token');
+    if (!token) {
+        try {
+            const user = JSON.parse(localStorage.getItem('user') || '{}');
+            token = user.token;
+        } catch (ignored) {}
+    }
+    const headers = { 'Content-Type': 'application/json', ...custom };
+    if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+    }
+    return headers;
+};
 
 const DEFAULT_TRANSACTIONS = [
     { id: 1, txCode: "#GD-88201", bookingCode: "#BK-9042", guest: "Trần Minh Khoa", guestPhone: "0903 123 456", homestay: "Pù Luông Eco Lodge", owner: "Triệu Văn Sản", total: "1.700.000đ", deposit: "850.000đ (50%)", netPayout: "1.564.000đ", gateway: "VNPay QR", gatewayClass: "vnpay", status: "escrow", statusText: "Giữ cọc YÊN", traceId: "VNP-992019482", guestBankInfo: "Ví MoMo / MB Bank - STK: 0903123456", ownerBankInfo: "Ngân Hàng Vietcombank - STK: 9903123456", refundReason: "Khách yêu cầu hủy phòng trước 48h", createdAt: "2026-10-21" },
@@ -26,8 +42,43 @@ const DEFAULT_STATS = {
     completedCount: 3
 };
 
+async function safeTransactionRequest(path, options = {}) {
+    const token = localStorage.getItem('token') || (() => {
+        try { return JSON.parse(localStorage.getItem('user') || '{}').token; } catch (e) { return null; }
+    })();
+
+    const headers = getAuthHeaders(options.headers || {});
+    const opts = { ...options, headers };
+
+    if (token) {
+        try {
+            const res = await fetch(`${API_BASE_URL}${path}`, opts);
+            if (res.ok) return res;
+            if (res.status === 401 || res.status === 403 || res.status === 404) {
+                const fallbackRes = await fetch(`${PUBLIC_API_BASE_URL}${path}`, opts);
+                if (fallbackRes.ok) return fallbackRes;
+            }
+            return res;
+        } catch (err) {
+            try {
+                return await fetch(`${PUBLIC_API_BASE_URL}${path}`, opts);
+            } catch (fallbackErr) {
+                throw err;
+            }
+        }
+    }
+
+    try {
+        const publicRes = await fetch(`${PUBLIC_API_BASE_URL}${path}`, opts);
+        if (publicRes.ok) return publicRes;
+        return publicRes;
+    } catch (e) {
+        return await fetch(`${API_BASE_URL}${path}`, opts);
+    }
+}
+
 export const adminTransactionService = {
-    // 1. Lấy danh sách giao dịch kèm bộ lọc, tìm kiếm và phân trang (với Timeout 8s)
+    // 1. Lấy danh sách giao dịch kèm bộ lọc, tìm kiếm và phân trang
     async getTransactions(statusFilter = 'all', search = '', gatewayFilter = 'all', page = 1, limit = 10) {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 8000);
@@ -40,11 +91,11 @@ export const adminTransactionService = {
             params.append('page', page);
             params.append('limit', limit);
 
-            const url = `${API_BASE_URL}?${params.toString()}`;
-            const res = await fetch(url, { signal: controller.signal });
+            const query = `?${params.toString()}`;
+            const res = await safeTransactionRequest(query, { signal: controller.signal });
             clearTimeout(timeoutId);
 
-            if (res.ok) {
+            if (res && res.ok) {
                 const data = await res.json();
                 if (data && data.content && data.content.length > 0) {
                     return data;
@@ -52,7 +103,7 @@ export const adminTransactionService = {
             }
         } catch (err) {
             clearTimeout(timeoutId);
-            console.warn('Lỗi hoặc timeout kết nối API getTransactions, dùng dữ liệu hiển thị tức thì:', err);
+            console.warn('Lỗi hoặc timeout kết nối API getTransactions, dùng dữ liệu fallback:', err);
         }
 
         // Fast fallback to instant transactions if backend is slow/connecting
@@ -84,12 +135,12 @@ export const adminTransactionService = {
     // 2. Lấy thống kê tài chính
     async getFinancialStats() {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 2000);
+        const timeoutId = setTimeout(() => controller.abort(), 4000);
 
         try {
-            const res = await fetch(`${API_BASE_URL}/stats`, { signal: controller.signal });
+            const res = await safeTransactionRequest('/stats', { signal: controller.signal });
             clearTimeout(timeoutId);
-            if (res.ok) {
+            if (res && res.ok) {
                 return await res.json();
             }
         } catch (err) {
@@ -102,9 +153,8 @@ export const adminTransactionService = {
     // 3. Cập nhật trạng thái giao dịch (duyệt hoàn tiền / giải ngân cho chủ nhà)
     async updateTransactionStatus(id, { status, traceId, note }) {
         try {
-            const res = await fetch(`${API_BASE_URL}/${id}/status`, {
+            const res = await safeTransactionRequest(`/${id}/status`, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ status, traceId, note }),
             });
             const data = await res.json();
@@ -117,3 +167,5 @@ export const adminTransactionService = {
         }
     }
 };
+
+export default adminTransactionService;

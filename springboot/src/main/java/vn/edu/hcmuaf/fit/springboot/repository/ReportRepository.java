@@ -21,6 +21,7 @@ public interface ReportRepository extends JpaRepository<Report, Long> {
     @org.springframework.transaction.annotation.Transactional
     @Query(value = "ALTER TABLE reports ALTER COLUMN booking_id DROP NOT NULL; " +
                    "ALTER TABLE reports ALTER COLUMN reporter_id DROP NOT NULL; " +
+                   "UPDATE reports SET status = 'PENDING' WHERE status IS NULL OR UPPER(status) NOT IN ('PENDING', 'INVESTIGATING', 'RESOLVED', 'REJECTED'); " +
                    "ALTER TABLE reports DROP CONSTRAINT IF EXISTS reports_status_check; " +
                    "ALTER TABLE reports ADD CONSTRAINT reports_status_check CHECK (UPPER(status) IN ('PENDING', 'INVESTIGATING', 'RESOLVED', 'REJECTED'));", nativeQuery = true)
     void dropAndRecreateStatusConstraint();

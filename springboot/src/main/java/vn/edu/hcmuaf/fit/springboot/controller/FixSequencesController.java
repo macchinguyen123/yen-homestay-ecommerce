@@ -6,7 +6,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.*;
 
 @RestController
-@RequestMapping("/api/public/fix-sequences")
+@RequestMapping("/api/admin/fix-sequences")
 @CrossOrigin(origins = "*")
 @RequiredArgsConstructor
 public class FixSequencesController {

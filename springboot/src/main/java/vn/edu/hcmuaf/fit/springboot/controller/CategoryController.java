@@ -1,6 +1,7 @@
 package vn.edu.hcmuaf.fit.springboot.controller;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import vn.edu.hcmuaf.fit.springboot.model.Category;
@@ -17,6 +18,7 @@ public class CategoryController {
     private final CategoryRepository categoryRepository;
 
     @GetMapping
+    @Cacheable("publicCategories")
     public ResponseEntity<List<Category>> getAllCategories() {
         return ResponseEntity.ok(categoryRepository.findAll());
     }

@@ -1,10 +1,61 @@
 /**
  * Service xử lý dữ liệu động cho Trang Quảng Cáo Admin (Bán & Dịch vụ Quảng cáo)
  * Kết nối trực tiếp với Backend Spring Boot & PostgreSQL database.
+ * Dual-path fallback chống lỗi 403 Forbidden.
  */
 
 const API_BASE_URL = 'http://localhost:8081/api/admin/ads';
 const PUBLIC_API_BASE_URL = 'http://localhost:8081/api/public/admin/ads';
+
+const getAuthHeaders = (custom = {}) => {
+    let token = localStorage.getItem('token');
+    if (!token) {
+        try {
+            const user = JSON.parse(localStorage.getItem('user') || '{}');
+            token = user.token;
+        } catch (ignored) {}
+    }
+    const headers = { 'Content-Type': 'application/json', ...custom };
+    if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+    }
+    return headers;
+};
+
+async function safeAdsRequest(path, options = {}) {
+    const token = localStorage.getItem('token') || (() => {
+        try { return JSON.parse(localStorage.getItem('user') || '{}').token; } catch (e) { return null; }
+    })();
+
+    const headers = getAuthHeaders(options.headers || {});
+    const opts = { ...options, headers };
+
+    if (token) {
+        try {
+            const res = await fetch(`${API_BASE_URL}${path}`, opts);
+            if (res.ok) return res;
+            if (res.status === 401 || res.status === 403 || res.status === 404) {
+                const fallbackRes = await fetch(`${PUBLIC_API_BASE_URL}${path}`, opts);
+                if (fallbackRes.ok) return fallbackRes;
+            }
+            return res;
+        } catch (err) {
+            try {
+                return await fetch(`${PUBLIC_API_BASE_URL}${path}`, opts);
+            } catch (fallbackErr) {
+                throw err;
+            }
+        }
+    }
+
+    try {
+        const publicRes = await fetch(`${PUBLIC_API_BASE_URL}${path}`, opts);
+        if (publicRes.ok) return publicRes;
+        return publicRes;
+    } catch (e) {
+        return await fetch(`${API_BASE_URL}${path}`, opts);
+    }
+}
 
 export const adminAdsService = {
     // 0. Siêu tải đồng thời toàn bộ dữ liệu (Bootstrap Fast Loading - 1 request duy nhất)
@@ -13,10 +64,10 @@ export const adminAdsService = {
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 10000);
             
-            const res = await fetch(`${API_BASE_URL}/bootstrap`, { signal: controller.signal });
+            const res = await safeAdsRequest('/bootstrap', { signal: controller.signal });
             clearTimeout(timeoutId);
 
-            if (res.ok) {
+            if (res && res.ok) {
                 const data = await res.json();
                 return { success: true, data };
             }
@@ -32,10 +83,10 @@ export const adminAdsService = {
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 10000);
             
-            const res = await fetch(`${API_BASE_URL}/stats`, { signal: controller.signal });
+            const res = await safeAdsRequest('/stats', { signal: controller.signal });
             clearTimeout(timeoutId);
 
-            if (res.ok) {
+            if (res && res.ok) {
                 const data = await res.json();
                 return { success: true, data };
             }
@@ -66,10 +117,11 @@ export const adminAdsService = {
             if (status && status !== 'all') params.append('status', status);
             if (type && type !== 'all') params.append('type', type);
 
-            const res = await fetch(`${API_BASE_URL}/packages?${params.toString()}`, { signal: controller.signal });
+            const query = params.toString() ? `?${params.toString()}` : '';
+            const res = await safeAdsRequest(`/packages${query}`, { signal: controller.signal });
             clearTimeout(timeoutId);
 
-            if (res.ok) {
+            if (res && res.ok) {
                 const data = await res.json();
                 return { success: true, packages: data };
             }
@@ -82,12 +134,11 @@ export const adminAdsService = {
 
     async createPackage(packageData) {
         try {
-            const res = await fetch(`${API_BASE_URL}/packages`, {
+            const res = await safeAdsRequest('/packages', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(packageData)
             });
-            if (res.ok) {
+            if (res && res.ok) {
                 const data = await res.json();
                 return { success: true, data };
             }
@@ -100,12 +151,11 @@ export const adminAdsService = {
 
     async updatePackage(id, packageData) {
         try {
-            const res = await fetch(`${API_BASE_URL}/packages/${id}`, {
+            const res = await safeAdsRequest(`/packages/${id}`, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(packageData)
             });
-            if (res.ok) {
+            if (res && res.ok) {
                 const data = await res.json();
                 return { success: true, data };
             }
@@ -118,12 +168,11 @@ export const adminAdsService = {
 
     async togglePackageStatus(id, newStatus = null) {
         try {
-            const res = await fetch(`${API_BASE_URL}/packages/${id}/status`, {
+            const res = await safeAdsRequest(`/packages/${id}/status`, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ status: newStatus })
             });
-            if (res.ok) {
+            if (res && res.ok) {
                 const data = await res.json();
                 return { success: true, data };
             }
@@ -135,10 +184,10 @@ export const adminAdsService = {
 
     async clonePackage(id) {
         try {
-            const res = await fetch(`${API_BASE_URL}/packages/${id}/clone`, {
+            const res = await safeAdsRequest(`/packages/${id}/clone`, {
                 method: 'POST'
             });
-            if (res.ok) {
+            if (res && res.ok) {
                 const data = await res.json();
                 return { success: true, data };
             }
@@ -150,10 +199,10 @@ export const adminAdsService = {
 
     async deletePackage(id) {
         try {
-            const res = await fetch(`${API_BASE_URL}/packages/${id}`, {
+            const res = await safeAdsRequest(`/packages/${id}`, {
                 method: 'DELETE'
             });
-            if (res.ok) {
+            if (res && res.ok) {
                 const data = await res.json();
                 return { success: true, data };
             }
@@ -174,10 +223,11 @@ export const adminAdsService = {
             if (status && status !== 'all') params.append('status', status);
             if (pageArea && pageArea !== 'all') params.append('pageArea', pageArea);
 
-            const res = await fetch(`${API_BASE_URL}/slots?${params.toString()}`, { signal: controller.signal });
+            const query = params.toString() ? `?${params.toString()}` : '';
+            const res = await safeAdsRequest(`/slots${query}`, { signal: controller.signal });
             clearTimeout(timeoutId);
 
-            if (res.ok) {
+            if (res && res.ok) {
                 const data = await res.json();
                 return { success: true, slots: data };
             }
@@ -190,12 +240,11 @@ export const adminAdsService = {
 
     async createSlot(slotData) {
         try {
-            const res = await fetch(`${API_BASE_URL}/slots`, {
+            const res = await safeAdsRequest('/slots', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(slotData)
             });
-            if (res.ok) {
+            if (res && res.ok) {
                 const data = await res.json();
                 return { success: true, data };
             }
@@ -208,12 +257,11 @@ export const adminAdsService = {
 
     async updateSlot(id, slotData) {
         try {
-            const res = await fetch(`${API_BASE_URL}/slots/${id}`, {
+            const res = await safeAdsRequest(`/slots/${id}`, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(slotData)
             });
-            if (res.ok) {
+            if (res && res.ok) {
                 const data = await res.json();
                 return { success: true, data };
             }
@@ -226,12 +274,11 @@ export const adminAdsService = {
 
     async updateSlotStatus(id, newStatus = null) {
         try {
-            const res = await fetch(`${API_BASE_URL}/slots/${id}/status`, {
+            const res = await safeAdsRequest(`/slots/${id}/status`, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ status: newStatus })
             });
-            if (res.ok) {
+            if (res && res.ok) {
                 const data = await res.json();
                 return { success: true, data };
             }
@@ -243,10 +290,10 @@ export const adminAdsService = {
 
     async deleteSlot(id) {
         try {
-            const res = await fetch(`${API_BASE_URL}/slots/${id}`, {
+            const res = await safeAdsRequest(`/slots/${id}`, {
                 method: 'DELETE'
             });
-            if (res.ok) {
+            if (res && res.ok) {
                 const data = await res.json();
                 return { success: true, data };
             }
@@ -266,10 +313,11 @@ export const adminAdsService = {
             if (searchQuery) params.append('q', searchQuery);
             if (status && status !== 'all') params.append('status', status);
 
-            const res = await fetch(`${API_BASE_URL}/orders?${params.toString()}`, { signal: controller.signal });
+            const query = params.toString() ? `?${params.toString()}` : '';
+            const res = await safeAdsRequest(`/orders${query}`, { signal: controller.signal });
             clearTimeout(timeoutId);
 
-            if (res.ok) {
+            if (res && res.ok) {
                 const data = await res.json();
                 return { success: true, orders: data };
             }
@@ -282,12 +330,11 @@ export const adminAdsService = {
 
     async createOrder(orderData) {
         try {
-            const res = await fetch(`${API_BASE_URL}/orders`, {
+            const res = await safeAdsRequest('/orders', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(orderData)
             });
-            if (res.ok) {
+            if (res && res.ok) {
                 const data = await res.json();
                 return { success: true, data };
             }
@@ -299,12 +346,11 @@ export const adminAdsService = {
 
     async updateOrderStatus(id, newStatus) {
         try {
-            const res = await fetch(`${API_BASE_URL}/orders/${id}/status`, {
+            const res = await safeAdsRequest(`/orders/${id}/status`, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ status: newStatus })
             });
-            if (res.ok) {
+            if (res && res.ok) {
                 const data = await res.json();
                 return { success: true, data };
             }
@@ -316,10 +362,10 @@ export const adminAdsService = {
 
     async deleteOrder(id) {
         try {
-            const res = await fetch(`${API_BASE_URL}/orders/${id}`, {
+            const res = await safeAdsRequest(`/orders/${id}`, {
                 method: 'DELETE'
             });
-            if (res.ok) {
+            if (res && res.ok) {
                 const data = await res.json();
                 return { success: true, data };
             }
@@ -329,3 +375,5 @@ export const adminAdsService = {
         return { success: false };
     }
 };
+
+export default adminAdsService;

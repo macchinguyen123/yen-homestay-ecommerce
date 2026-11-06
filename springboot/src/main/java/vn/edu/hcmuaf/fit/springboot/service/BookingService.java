@@ -285,10 +285,10 @@ public class BookingService {
         // deposit_status: 'HELD', 'REFUNDED' hoặc 'FORFEITED'
         String depStatus = "REFUNDED".equalsIgnoreCase(req.getDepositStatus()) ? "REFUNDED" :
                            ("FORFEITED".equalsIgnoreCase(req.getDepositStatus()) ? "FORFEITED" : "HELD");
-        // status: 'PENDING', 'CONFIRMED', 'COMPLETED', 'CANCELLED'
+        // status: 'PENDING', 'CONFIRMED', 'COMPLETED', 'CANCELLED' - Mặc định đơn mới tạo/thanh toán luôn là PENDING chờ chủ nhà duyệt
         String bookingStatus = "CANCELLED".equalsIgnoreCase(req.getStatus()) ? "CANCELLED" :
                                ("COMPLETED".equalsIgnoreCase(req.getStatus()) ? "COMPLETED" :
-                               ("PENDING".equalsIgnoreCase(req.getStatus()) ? "PENDING" : "CONFIRMED"));
+                               ("CONFIRMED".equalsIgnoreCase(req.getStatus()) ? "CONFIRMED" : "PENDING"));
 
         Booking booking = Booking.builder()
                 .bookingCode(code)

@@ -202,32 +202,7 @@ const CATEGORY_SPECIFIC_IMAGES = {
   ],
 };
 
-const SAMPLE_CATEGORY_HOMESTAYS = [
-  { id: 201, name: 'Nông Trại Rau Xuân Thọ', city: 'dalat', location: 'Đà Lạt', rating: 5.0, reviews: 1, rooms: 6, maxGuests: 15, specs: '6 phòng ngủ · 15 khách', amenities: '{"Vườn rau hữu cơ", "Khu chăn nuôi t..."}', price: '4.200.000đ', basePriceNum: 4200000, tag: 'Top Bán Chạy', category: 'nong-trai', img: 'https://images.unsplash.com/photo-1500595046743-cd271d694d30?auto=format&fit=crop&w=600&q=80' },
-  { id: 202, name: 'Đồi Thông Võng Chiếu', city: 'dalat', location: 'Đà Lạt', rating: 5.0, reviews: 1, rooms: 5, maxGuests: 9, specs: '5 phòng ngủ · 9 khách', amenities: '{"Võng ngoài hiên", "Góc đọc sách"...}', price: '2.650.000đ', basePriceNum: 2650000, tag: 'Top Bán Chạy', category: 'thien-nhien', img: 'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=600&q=80' },
-  { id: 203, name: 'Nhà Sàn Mường Hoa Hát Giao Duyên', city: 'sapa', location: 'Sa Pa', rating: 5.0, reviews: 1, rooms: 3, maxGuests: 12, specs: '3 phòng ngủ · 12 khách', amenities: '{"Sân khấu nhỏ ngoài trời", "Nhạc cụ..."}', price: '1.350.000đ', basePriceNum: 1350000, tag: 'Top Bán Chạy', category: 'nha-que', img: 'https://images.unsplash.com/photo-1510798831971-661eb04b3739?auto=format&fit=crop&w=600&q=80' },
-  { id: 204, name: 'Vườn Rau Trà Quế Homestay', city: 'hoian', location: 'Hội An', rating: 5.0, reviews: 1, rooms: 3, maxGuests: 5, specs: '3 phòng ngủ · 5 khách', amenities: '{"Sân vườn", "Vườn trái cây tự hái", "BBQ ngoài trời"}', price: '3.100.000đ', basePriceNum: 3100000, tag: 'Top Bán Chạy', category: 'miet-vuan', img: 'https://images.unsplash.com/photo-1513519245088-0e12902e5a38?auto=format&fit=crop&w=600&q=80' },
-  { id: 205, name: 'Miệt Vườn Phong Điền Eco Villa', city: 'cantho', location: 'Cần Thơ', rating: 4.95, reviews: 32, rooms: 4, maxGuests: 10, specs: '4 phòng ngủ · 10 khách', amenities: '{"Đi xuồng chèo", "Hái trái cây tại vườn", "Nấu ăn mộc mạc"}', price: '1.850.000đ', basePriceNum: 1850000, tag: 'Ưu Đãi Đặt Sớm', category: 'song-nuoc', img: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=600&q=80' },
-  { id: 206, name: 'Làng Nghề Gốm Thanh Hà Lodge', city: 'hoian', location: 'Hội An', rating: 4.92, reviews: 24, rooms: 3, maxGuests: 6, specs: '3 phòng ngủ · 6 khách', amenities: '{"Học xoay gốm thủ công", "Trà đạo", "Xe đạp dạo phố"}', price: '2.200.000đ', basePriceNum: 2200000, tag: 'Làng Nghề Độc Bản', category: 'lang-nghe', img: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=600&q=80' },
-  { id: 207, name: 'Mây Thung Lũng Sapa Ecolodge', city: 'sapa', location: 'Sa Pa', rating: 4.98, reviews: 45, rooms: 2, maxGuests: 4, specs: '2 phòng ngủ · 4 khách', amenities: '{"Bồn tắm gỗ Pơ-mu", "Săn mây thung lũng", "Lò sưởi củi"}', price: '2.950.000đ', basePriceNum: 2950000, tag: 'View Tuyệt Đẹp', category: 'san-may', img: 'https://images.unsplash.com/photo-1528127269322-539801943592?auto=format&fit=crop&w=600&q=80' },
-  { id: 208, name: 'Nhà Cổ Nam Bộ Bến Tre', city: 'bentre', location: 'Bến Tre', rating: 4.90, reviews: 19, rooms: 5, maxGuests: 12, specs: '5 phòng ngủ · 12 khách', amenities: '{"Bánh xèo miền Tây", "Bắt cá mương", "Đi xuồng dừa"}', price: '1.600.000đ', basePriceNum: 1600000, tag: 'Đời Sống Dân Dã', category: 'doi-song', img: 'https://images.unsplash.com/photo-1544644181-1484b3fdfc62?auto=format&fit=crop&w=600&q=80' },
-  { id: 209, name: 'Nông Trại Dâu Tây Cầu Đất', city: 'dalat', location: 'Đà Lạt', rating: 4.96, reviews: 58, rooms: 4, maxGuests: 8, specs: '4 phòng ngủ · 8 khách', amenities: '{"Hái dâu tại vườn", "BBQ ngoài trời", "Bể bơi nước ấm"}', price: '3.400.000đ', basePriceNum: 3400000, tag: 'Top Nông Trại', category: 'nong-trai', img: 'https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?auto=format&fit=crop&w=600&q=80' },
-  { id: 210, name: 'Nhà Thủy Tạ Sông Hàn Villa', city: 'danang', location: 'Đà Nẵng', rating: 4.94, reviews: 67, rooms: 4, maxGuests: 10, specs: '4 phòng ngủ · 10 khách', amenities: '{"View sông trực diện", "Bể bơi vô cực", "Đón tiễn sân bay"}', price: '3.800.000đ', basePriceNum: 3800000, tag: 'Sang Trọng', category: 'song-nuoc', img: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=600&q=80' },
-  { id: 211, name: 'Bếp Quê Mẹ Nấu Homestay', city: 'hue', location: 'Huế', rating: 4.91, reviews: 29, rooms: 3, maxGuests: 6, specs: '3 phòng ngủ · 6 khách', amenities: '{"Học nấu món Cố Đô", "Trà sen ngự uyển", "Áo dài chụp ảnh"}', price: '1.750.000đ', basePriceNum: 1750000, tag: 'Ẩm Thực Đậm Chất', category: 'am-thuc', img: 'https://images.unsplash.com/photo-1516253593875-bd7ba052fbc5?auto=format&fit=crop&w=600&q=80' },
-  { id: 212, name: 'Làng Dệt Thổ Cẩm Tả Phìn', city: 'sapa', location: 'Sa Pa', rating: 4.89, reviews: 21, rooms: 2, maxGuests: 4, specs: '2 phòng ngủ · 4 khách', amenities: '{"Tắm lá thuốc Dao Đỏ", "Dệt thổ cẩm", "Ăn tối cùng gia chủ"}', price: '1.200.000đ', basePriceNum: 1200000, tag: 'Làng Nghề Thổ Cẩm', category: 'lang-nghe', img: 'https://images.unsplash.com/photo-1518780664697-55e3ad937233?auto=format&fit=crop&w=600&q=80' },
-  { id: 213, name: 'Rừng Thông Hoàng Anh Villa', city: 'dalat', location: 'Đà Lạt', rating: 4.97, reviews: 88, rooms: 5, maxGuests: 12, specs: '5 phòng ngủ · 12 khách', amenities: '{"Sân BBQ đồi thông", "Lò sưởi củi", "Xe máy miễn phí"}', price: '3.900.000đ', basePriceNum: 3900000, tag: 'Hot Đặt Nhiều', category: 'thien-nhien', img: 'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=600&q=80' },
-  { id: 214, name: 'Vườn Trái Cây Cái Mơn', city: 'bentre', location: 'Bến Tre', rating: 4.93, reviews: 40, rooms: 3, maxGuests: 8, specs: '3 phòng ngủ · 8 khách', amenities: '{"Thưởng thức sầu riêng tại vườn", "Câu cá giải trí", "Võng dừa"}', price: '1.900.000đ', basePriceNum: 1900000, tag: 'Miệt Vườn Xanh', category: 'miet-vuan', img: 'https://images.unsplash.com/photo-1500595046743-cd271d694d30?auto=format&fit=crop&w=600&q=80' },
-  { id: 215, name: 'Nông Trại Trà Xanh Tam Đảo', city: 'tamdao', location: 'Vĩnh Phúc', rating: 4.88, reviews: 18, rooms: 3, maxGuests: 6, specs: '3 phòng ngủ · 6 khách', amenities: '{"Đồi trà xanh ngát", "Tiệc nướng đêm", "Bể bơi mây"}', price: '2.100.000đ', basePriceNum: 2100000, tag: 'Gần Hà Nội', category: 'nong-trai', img: 'https://images.unsplash.com/photo-1510798831971-661eb04b3739?auto=format&fit=crop&w=600&q=80' },
-  { id: 216, name: 'Nhà Ba Căn Cổ Truyền Bắc Bộ', city: 'hanoi', location: 'Hà Nội', rating: 4.92, reviews: 35, rooms: 4, maxGuests: 8, specs: '4 phòng ngủ · 8 khách', amenities: '{"Sân gạch ngói đỏ", "Ao cá ao sen", "Cơm quê niêu đất"}', price: '2.450.000đ', basePriceNum: 2450000, tag: 'Nét Cổ Bắc Bộ', category: 'nha-que', img: 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=600&q=80' },
-  { id: 217, name: 'Miệt Vườn Chợ Lách Homestay', city: 'bentre', location: 'Bến Tre', rating: 4.90, reviews: 26, rooms: 3, maxGuests: 6, specs: '3 phòng ngủ · 6 khách', amenities: '{"Vườn chôm chôm bưởi da xanh", "Đờn ca tài tử", "Bánh xèo"}', price: '1.500.000đ', basePriceNum: 1500000, tag: 'Miệt Vườn', category: 'miet-vuan', img: 'https://images.unsplash.com/photo-1544644181-1484b3fdfc62?auto=format&fit=crop&w=600&q=80' },
-  { id: 218, name: 'Nông Trại Bò Sữa Mộc Châu', city: 'mocchau', location: 'Sơn La', rating: 4.94, reviews: 52, rooms: 4, maxGuests: 10, specs: '4 phòng ngủ · 10 khách', amenities: '{"Vắt sữa bò trải nghiệm", "Đồi cải trắng", "Lửa trại"}', price: '2.300.000đ', basePriceNum: 2300000, tag: 'Khám Phá Mộc Châu', category: 'nong-trai', img: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=600&q=80' },
-  { id: 219, name: 'Chèo Sub Đầm Chuồn Huế', city: 'hue', location: 'Thừa Thiên Huế', rating: 4.96, reviews: 61, rooms: 3, maxGuests: 6, specs: '3 phòng ngủ · 6 khách', amenities: '{"Chèo SUP ngắm bình minh", "Hải sản đầm phá tươi sống", "Nhà chồ"}', price: '2.800.000đ', basePriceNum: 2800000, tag: 'Sông Nước Đầm Phá', category: 'song-nuoc', img: 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=600&q=80' },
-  { id: 220, name: 'Làng Nón Lá Thủy Thanh', city: 'hue', location: 'Huế', rating: 4.87, reviews: 15, rooms: 2, maxGuests: 4, specs: '2 phòng ngủ · 4 khách', amenities: '{"Làm nón bài thơ", "Thăm cầu ngói Thanh Toàn", "Cơm hến"}', price: '1.100.000đ', basePriceNum: 1100000, tag: 'Làng Nghề', category: 'lang-nghe', img: 'https://images.unsplash.com/photo-1513519245088-0e12902e5a38?auto=format&fit=crop&w=600&q=80' },
-  { id: 221, name: 'Sapa Cloud Hunting Lodge', city: 'sapa', location: 'Sa Pa', rating: 4.98, reviews: 74, rooms: 3, maxGuests: 6, specs: '3 phòng ngủ · 6 khách', amenities: '{"Ban công săn mây toàn cảnh", "Bồn tắm ngoài trời", "Lò sưởi củi"}', price: '2.850.000đ', basePriceNum: 2850000, tag: 'Săn Mây Độc Bản', category: 'san-may', img: 'https://images.unsplash.com/photo-1528127269322-539801943592?auto=format&fit=crop&w=600&q=80' },
-  { id: 222, name: 'An Bàng Seaside Ocean Villa', city: 'hoian', location: 'Hội An', rating: 4.95, reviews: 89, rooms: 4, maxGuests: 8, specs: '4 phòng ngủ · 8 khách', amenities: '{"Sát biển 20m", "Bể bơi riêng ngắm biển", "Xe đạp dạo phố"}', price: '3.600.000đ', basePriceNum: 3600000, tag: 'Nghỉ Dưỡng Biển', category: 'bien-dao', img: 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=600&q=80' },
-  { id: 223, name: 'Nhà Sàn Dao Đỏ Tả Phìn', city: 'sapa', location: 'Sa Pa', rating: 4.91, reviews: 42, rooms: 4, maxGuests: 10, specs: '4 phòng ngủ · 10 khách', amenities: '{"Tắm lá thuốc người Dao", "Trải nghiệm dệt vải", "Lễ hội lửa trại"}', price: '1.400.000đ', basePriceNum: 1400000, tag: 'Văn Hóa Bản Địa', category: 'van-hoa', img: 'https://images.unsplash.com/photo-1518780664697-55e3ad937233?auto=format&fit=crop&w=600&q=80' },
-  { id: 224, name: 'Sơn Trà Infinity Luxury Resort', city: 'danang', location: 'Đà Nẵng', rating: 4.99, reviews: 112, rooms: 5, maxGuests: 12, specs: '5 phòng ngủ · 12 khách', amenities: '{"Bể bơi vô cực triệu đô", "Quản gia riêng 24/7", "BBQ hải sản tươi"}', price: '5.500.000đ', basePriceNum: 5500000, tag: 'Villa Thượng Đỉnh', category: 'villa', img: 'https://images.unsplash.com/photo-1571896349842-33c89424de2d?auto=format&fit=crop&w=600&q=80' },
-];
+
 
 // Hàm chuẩn hóa linh hoạt URL param thành Category Tab ID (hỗ trợ slug, id số, tên tiếng Việt)
 export const resolveCategoryTab = (param) => {
@@ -289,8 +264,8 @@ export default function Category() {
     });
   }, []);
 
-  // Homestays data list from DB & fallback
-  const [homestays, setHomestays] = useState(SAMPLE_CATEGORY_HOMESTAYS);
+  // Homestays data list from DB
+  const [homestays, setHomestays] = useState([]);
   const [rawHomestays, setRawHomestays] = useState([]);
   const [dbCategories, setDbCategories] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -324,6 +299,10 @@ export default function Category() {
             const mapped = dbList.map((h, i) => {
               const rawPrice = h.basePrice || h.pricePerNight || h.price || 1500000;
               const numPrice = Number(rawPrice);
+              const imgUrl = (Array.isArray(h.images) && h.images.length > 0)
+                ? (typeof h.images[0] === 'string' ? h.images[0] : h.images[0].imageUrl)
+                : (h.thumbnail || h.primaryImage || h.image || 'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=600&q=80');
+
               return {
                 id: h.id || h.homestayId || (i + 1),
                 categoryId: h.categoryId,
@@ -338,18 +317,17 @@ export default function Category() {
                 basePriceNum: numPrice,
                 tag: i % 3 === 0 ? 'Top Bán Chạy' : (i % 2 === 0 ? 'Ưu Đãi' : 'Nổi Bật'),
                 category: h.categorySlug || catKeys[i % catKeys.length],
-                img: (h.images && h.images.length > 0) ? h.images[0] : (h.image || h.primaryImage || SAMPLE_CATEGORY_HOMESTAYS[i % SAMPLE_CATEGORY_HOMESTAYS.length].img)
+                img: imgUrl
               };
             });
-            // Gộp cả dữ liệu thật và sample để đảm bảo luôn đủ 16+ homestay cho người dùng phân trang
-            setHomestays([...mapped, ...SAMPLE_CATEGORY_HOMESTAYS]);
+            setHomestays(mapped);
           } else {
-            setHomestays(SAMPLE_CATEGORY_HOMESTAYS);
+            setHomestays([]);
           }
         }
       } catch (err) {
         console.warn('Lỗi tải dữ liệu danh mục:', err);
-        if (isMounted) setHomestays(SAMPLE_CATEGORY_HOMESTAYS);
+        if (isMounted) setHomestays([]);
       } finally {
         if (isMounted) setLoading(false);
       }
