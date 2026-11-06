@@ -29,6 +29,7 @@ async function call(path, options = {}) {
 export const chatService = {
   list: () => call('/conversations'),
   open: (homestayId) => call('/conversations', { method: 'POST', body: JSON.stringify({ homestayId }) }),
+  startSupportChat: () => call('/support', { method: 'POST' }),
   messages: (id) => call(`/conversations/${id}/messages`),
   send: (id, content, imageUrl = null) =>
     call(`/conversations/${id}/messages`, {

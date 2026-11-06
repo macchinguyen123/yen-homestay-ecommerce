@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
 import { chatService } from '../../../services/chatService';
 import './Messages.css';
@@ -22,6 +22,7 @@ export default function Messages() {
   const loc = useLocation();
   const navigate = useNavigate();
   const u = JSON.parse(localStorage.getItem('user') || 'null');
+  const isAdmin = (u?.role || '').toUpperCase() === 'ADMIN' || loc.pathname.startsWith('/admin');
 
   const [list, setList] = useState([]);
   const [active, setActive] = useState(loc.state?.conversation || null);
@@ -30,6 +31,8 @@ export default function Messages() {
   const [search, setSearch] = useState('');
   const [error, setError] = useState('');
   const [sending, setSending] = useState(false);
+  const [startingSupport, setStartingSupport] = useState(false);
+  const [adminTab, setAdminTab] = useState('all'); // 'all' | 'support' | 'homestay'
 
   // Danh sách ảnh đang chờ gửi (Pending queue)
   const [pendingImages, setPendingImages] = useState([]);
@@ -45,7 +48,6 @@ export default function Messages() {
   const handleScroll = () => {
     if (!listRef.current) return;
     const { scrollTop, scrollHeight, clientHeight } = listRef.current;
-    // Người dùng được coi là ở đáy nếu cách đáy < 60px
     isAtBottomRef.current = scrollHeight - scrollTop - clientHeight < 60;
   };
 
@@ -69,7 +71,7 @@ export default function Messages() {
     }
   }, [error]);
 
-  const load = async () => {
+  const load = async (selectSupport = false) => {
     if (!u?.id) return;
     try {
       const d = await chatService.list();
@@ -79,6 +81,15 @@ export default function Messages() {
           combined.unshift(active);
         }
         setList(combined);
+
+        if (selectSupport) {
+          const supportConv = combined.find((x) => x.conversation_type === 'SUPPORT');
+          if (supportConv) {
+            setActive(supportConv);
+            return;
+          }
+        }
+
         if (!active && combined[0]) {
           setActive(combined[0]);
         }
@@ -94,8 +105,29 @@ export default function Messages() {
       navigate('/login', { state: { from: loc.pathname } });
       return;
     }
-    load();
+    load(loc.state?.openSupport || false);
   }, []);
+
+  // Bắt đầu hoặc mở cuộc trò chuyện với CSKH YÊN
+  const handleStartSupportChat = async () => {
+    setStartingSupport(true);
+    setError('');
+    try {
+      const conv = await chatService.startSupportChat();
+      if (conv?.conversation_id) {
+        setList((prev) => {
+          const filtered = prev.filter((c) => c.conversation_id !== conv.conversation_id);
+          return [conv, ...filtered];
+        });
+        setActive(conv);
+      }
+    } catch (e) {
+      console.error('Lỗi kết nối CSKH:', e);
+      setError(e.message || 'Không thể kết nối đến Bộ phận CSKH lúc này');
+    } finally {
+      setStartingSupport(false);
+    }
+  };
 
   // Lắng nghe và cập nhật tin nhắn định kỳ
   useEffect(() => {
@@ -115,7 +147,7 @@ export default function Messages() {
                   m.is_read === data[idx].is_read &&
                   m.image_url === data[idx].image_url
               );
-              if (isUnchanged) return prev; // Giữ nguyên tham chiếu để KHÔNG kéo cuộn của user
+              if (isUnchanged) return prev;
             }
             return data;
           });
@@ -158,91 +190,139 @@ export default function Messages() {
   // Xử lý chọn nhiều hình ảnh
   const handleImagesSelect = (e) => {
     const files = Array.from(e.target.files || []);
-    if (files.length === 0) return;
+    if (!files.length) return;
 
     if (pendingImages.length + files.length > 10) {
-      alert('Bạn chỉ có thể đính kèm tối đa 10 ảnh trong một lần gửi!');
+      setError('Bạn chỉ có thể gửi tối đa 10 ảnh cùng lúc');
       return;
     }
 
-    files.forEach((file) => {
-      if (!file.type.startsWith('image/')) {
-        alert(`Tệp "${file.name}" không phải là ảnh hợp lệ!`);
-        return;
-      }
-      if (file.size > 8 * 1024 * 1024) {
-        alert(`Ảnh "${file.name}" vượt quá dung lượng tối đa 8MB!`);
-        return;
-      }
+    const readers = files.map((file) => {
+      return new Promise((resolve) => {
+        if (!file.type.startsWith('image/')) {
+          resolve(null);
+          return;
+        }
+        if (file.size > 8 * 1024 * 1024) {
+          setError(`Ảnh "${file.name}" vượt quá 8MB, vui lòng chọn ảnh nhẹ hơn`);
+          resolve(null);
+          return;
+        }
 
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const dataUrl = event.target.result;
-        setPendingImages((prev) => [
-          ...prev,
-          {
-            id: `pending_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-            dataUrl,
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          resolve({
+            id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            file,
             name: file.name,
-          },
-        ]);
-      };
-      reader.readAsDataURL(file);
+            dataUrl: ev.target.result,
+          });
+        };
+        reader.onerror = () => resolve(null);
+        reader.readAsDataURL(file);
+      });
     });
 
-    e.target.value = '';
+    Promise.all(readers).then((newImgs) => {
+      const valid = newImgs.filter(Boolean);
+      if (valid.length > 0) {
+        setPendingImages((prev) => [...prev, ...valid]);
+      }
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    });
   };
 
-  // Nút X xóa từng ảnh khỏi hàng đợi chờ gửi
-  const handleRemovePendingImage = (imgId) => {
-    setPendingImages((prev) => prev.filter((img) => img.id !== imgId));
+  const handleRemovePendingImage = (id) => {
+    setPendingImages((prev) => prev.filter((img) => img.id !== id));
   };
 
   const handleClearAllPending = () => {
     setPendingImages([]);
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const send = async () => {
-    if ((!text.trim() && pendingImages.length === 0) || !active?.conversation_id || sending) return;
-    const content = text.trim();
-    const imagesToSend = [...pendingImages];
+    const textToSend = text.trim();
+    if (!active?.conversation_id) return;
+    if (!textToSend && pendingImages.length === 0) return;
 
-    setText('');
-    setPendingImages([]);
     setSending(true);
     setError('');
 
-    try {
-      if (content) {
-        const firstImg = imagesToSend.length > 0 ? imagesToSend[0].dataUrl : null;
-        const m = await chatService.send(active.conversation_id, content, firstImg);
-        isAtBottomRef.current = true;
-        setMsgs((prev) => [...prev, m]);
+    const imagesQueue = [...pendingImages];
+    setPendingImages([]);
+    setText('');
 
-        for (let i = 1; i < imagesToSend.length; i++) {
-          const imgMsg = await chatService.send(active.conversation_id, '', imagesToSend[i].dataUrl);
-          setMsgs((prev) => [...prev, imgMsg]);
+    try {
+      if (imagesQueue.length > 0) {
+        for (let i = 0; i < imagesQueue.length; i++) {
+          const imgItem = imagesQueue[i];
+          const contentForThisMsg = i === 0 && textToSend ? textToSend : '';
+
+          const sentMsg = await chatService.send(
+            active.conversation_id,
+            contentForThisMsg,
+            imgItem.dataUrl
+          );
+          setMsgs((prev) => [...prev, sentMsg]);
         }
-      } else {
-        for (let i = 0; i < imagesToSend.length; i++) {
-          const imgMsg = await chatService.send(active.conversation_id, '', imagesToSend[i].dataUrl);
-          setMsgs((prev) => [...prev, imgMsg]);
-        }
+      } else if (textToSend) {
+        const sentMsg = await chatService.send(active.conversation_id, textToSend, null);
+        setMsgs((prev) => [...prev, sentMsg]);
       }
 
-      isAtBottomRef.current = true;
-      setTimeout(() => scrollToBottom(true), 30);
-      load();
+      setList((prev) =>
+        prev.map((c) =>
+          c.conversation_id === active.conversation_id
+            ? {
+                ...c,
+                last_message: textToSend || '[Hình ảnh]',
+                last_message_at: new Date().toISOString(),
+              }
+            : c
+        )
+      );
+
+      setTimeout(() => scrollToBottom(true), 40);
     } catch (e) {
-      setError(e.message || 'Không thể gửi tin nhắn.');
+      setError(e.message || 'Không thể gửi tin nhắn');
+      if (textToSend) setText(textToSend);
+      if (imagesQueue.length > 0) setPendingImages(imagesQueue);
     } finally {
       setSending(false);
     }
   };
 
-  const shown = list.filter((x) =>
-    (x.homestay_name || '').toLowerCase().includes(search.toLowerCase()) ||
-    (x.other_party_name || '').toLowerCase().includes(search.toLowerCase())
+  // Lọc danh sách hội thoại (Search + Admin tab)
+  const filteredList = useMemo(() => {
+    let result = list;
+
+    if (isAdmin && adminTab !== 'all') {
+      if (adminTab === 'support') {
+        result = result.filter((c) => c.conversation_type === 'SUPPORT');
+      } else if (adminTab === 'homestay') {
+        result = result.filter((c) => c.conversation_type !== 'SUPPORT');
+      }
+    }
+
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      result = result.filter(
+        (x) =>
+          (x.homestay_name || '').toLowerCase().includes(q) ||
+          (x.other_party_name || '').toLowerCase().includes(q)
+      );
+    }
+    return result;
+  }, [list, isAdmin, adminTab, search]);
+
+  const supportCount = useMemo(
+    () => list.filter((c) => c.conversation_type === 'SUPPORT').length,
+    [list]
+  );
+  const homestayCount = useMemo(
+    () => list.filter((c) => c.conversation_type !== 'SUPPORT').length,
+    [list]
   );
 
   return (
@@ -251,11 +331,62 @@ export default function Messages() {
         <aside className="messages-sidebar">
           <div className="messages-sidebar-head">
             <div>
-              <small>HỘP THƯ YÊN HOMESTAY</small>
-              <h1>Tin nhắn</h1>
+              <small>{isAdmin ? 'HỆ THỐNG QUẢN TRỊ CSKH' : 'HỘP THƯ YÊN HOMESTAY'}</small>
+              <h1>{isAdmin ? 'Quản lý tin nhắn' : 'Tin nhắn'}</h1>
             </div>
             <b>{list.length}</b>
           </div>
+
+          {/* Nút Chat với CSKH cho Khách hàng & Chủ nhà */}
+          {!isAdmin && (
+            <button
+              type="button"
+              className="support-banner-btn"
+              onClick={handleStartSupportChat}
+              disabled={startingSupport}
+            >
+              <div className="support-banner-icon">
+                <i className="bi bi-headset" />
+              </div>
+              <div className="support-banner-text">
+                <strong>CSKH YÊN Homestay 24/7</strong>
+                <small>{startingSupport ? 'Đang kết nối...' : 'Cần hỗ trợ? Nhấn để chat ngay'}</small>
+              </div>
+              <i className="bi bi-chat-dots-fill" style={{ fontSize: '16px', opacity: 0.8 }} />
+            </button>
+          )}
+
+          {/* Bộ lọc Tab dành cho Admin */}
+          {isAdmin && (
+            <div className="admin-chat-tabs">
+              <button
+                type="button"
+                className={`admin-chat-tab ${adminTab === 'all' ? 'active' : ''}`}
+                onClick={() => setAdminTab('all')}
+              >
+                <span>Tất cả</span>
+                <span className="admin-chat-tab-count">{list.length}</span>
+              </button>
+              <button
+                type="button"
+                className={`admin-chat-tab ${adminTab === 'support' ? 'active' : ''}`}
+                onClick={() => setAdminTab('support')}
+              >
+                <i className="bi bi-headset" />
+                <span>CSKH</span>
+                <span className="admin-chat-tab-count">{supportCount}</span>
+              </button>
+              <button
+                type="button"
+                className={`admin-chat-tab ${adminTab === 'homestay' ? 'active' : ''}`}
+                onClick={() => setAdminTab('homestay')}
+              >
+                <i className="bi bi-house-door" />
+                <span>Homestay</span>
+                <span className="admin-chat-tab-count">{homestayCount}</span>
+              </button>
+            </div>
+          )}
 
           <div className="messages-search">
             <i className="bi bi-search" />
@@ -267,35 +398,43 @@ export default function Messages() {
           </div>
 
           <div className="conversations-scrollable">
-            {shown.length === 0 ? (
+            {filteredList.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '30px 15px', color: '#889891', fontSize: '13px' }}>
                 <i className="bi bi-chat-dots" style={{ fontSize: '24px', display: 'block', marginBottom: '8px', opacity: 0.5 }} />
                 {search ? 'Không tìm thấy cuộc trò chuyện phù hợp' : 'Chưa có cuộc trò chuyện nào'}
               </div>
             ) : (
-              shown.map((c) => (
-                <button
-                  className={`conversation-item ${active?.conversation_id === c.conversation_id ? 'selected' : ''}`}
-                  onClick={() => {
-                    setActive(c);
-                    setError('');
-                  }}
-                  key={c.conversation_id}
-                >
-                  <span className="conversation-avatar">
-                    <i className="bi bi-house-heart" />
-                  </span>
-                  <span>
-                    <b>{c.homestay_name || 'Homestay'}</b>
-                    <small>
-                      {c.other_party_name ? `${c.other_party_name}: ` : ''}
-                      {c.last_message || 'Bắt đầu trò chuyện'}
-                    </small>
-                  </span>
-                  {c.unread_count > 0 && <span className="unread-badge">{c.unread_count}</span>}
-                  <i className="bi bi-chevron-right" />
-                </button>
-              ))
+              filteredList.map((c) => {
+                const isSupport = c.conversation_type === 'SUPPORT';
+                return (
+                  <button
+                    className={`conversation-item ${active?.conversation_id === c.conversation_id ? 'selected' : ''} ${isSupport ? 'is-support' : ''}`}
+                    onClick={() => {
+                      setActive(c);
+                      setError('');
+                    }}
+                    key={c.conversation_id}
+                  >
+                    <span className="conversation-avatar" style={isSupport ? { background: '#10B981', color: '#FFF' } : {}}>
+                      <i className={`bi ${isSupport ? 'bi-headset' : 'bi-house-heart'}`} />
+                    </span>
+                    <span>
+                      {isSupport && (
+                        <span className="support-tag">
+                          <i className="bi bi-patch-check-fill" /> Hỗ trợ CSKH 24/7
+                        </span>
+                      )}
+                      <b>{c.homestay_name || 'Homestay'}</b>
+                      <small>
+                        {c.other_party_name ? `${c.other_party_name}: ` : ''}
+                        {c.last_message || 'Bắt đầu trò chuyện'}
+                      </small>
+                    </span>
+                    {c.unread_count > 0 && <span className="unread-badge">{c.unread_count}</span>}
+                    <i className="bi bi-chevron-right" />
+                  </button>
+                );
+              })
             )}
           </div>
         </aside>
@@ -322,11 +461,21 @@ export default function Messages() {
                   >
                     <i className="bi bi-arrow-left" />
                   </button>
-                  <span className="conversation-avatar large">
-                    <i className="bi bi-house-heart" />
+                  <span
+                    className="conversation-avatar large"
+                    style={active.conversation_type === 'SUPPORT' ? { background: '#10B981', color: '#FFF' } : {}}
+                  >
+                    <i className={`bi ${active.conversation_type === 'SUPPORT' ? 'bi-headset' : 'bi-house-heart'}`} />
                   </span>
                   <div>
-                    <h2>{active.homestay_name || 'Homestay'}</h2>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <h2 style={{ margin: 0 }}>{active.homestay_name || 'Homestay'}</h2>
+                      {active.conversation_type === 'SUPPORT' && (
+                        <span className="support-badge-pill">
+                          <i className="bi bi-shield-check" /> Kênh chính thức
+                        </span>
+                      )}
+                    </div>
                     <small>
                       <i className="bi bi-circle-fill online-dot" />{' '}
                       {active.other_party_name ? `Trò chuyện với ${active.other_party_name}` : 'Đang hoạt động'}
@@ -359,12 +508,15 @@ export default function Messages() {
                 {msgs.length ? (
                   msgs.map((m) => {
                     const isMine = String(m.sender_id) === String(u?.id);
+                    const isSenderAdmin = (m.sender_role || '').toUpperCase() === 'ADMIN';
+
                     return (
                       <div className={`message-row ${isMine ? 'mine' : ''}`} key={m.message_id}>
                         <div className="message-bubble">
-                          {!isMine && m.sender_name && (
-                            <span style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: isMine ? '#fff' : '#16845b', marginBottom: '3px' }}>
-                              {m.sender_name}
+                          {!isMine && (
+                            <span style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: 700, color: isMine ? '#fff' : '#16845b', marginBottom: '3px' }}>
+                              {isSenderAdmin && <i className="bi bi-shield-fill-check text-success" title="Quản trị viên / CSKH" />}
+                              {m.sender_name || 'Người gửi'}
                             </span>
                           )}
 
@@ -391,14 +543,14 @@ export default function Messages() {
                   })
                 ) : (
                   <div className="message-empty">
-                    <i className="bi bi-chat-heart" />
-                    <h3>Bắt đầu cuộc trò chuyện</h3>
-                    <p>Hãy gửi lời chào hoặc hình ảnh đến chủ homestay để được hỗ trợ tốt nhất.</p>
+                    <i className={`bi ${active.conversation_type === 'SUPPORT' ? 'bi-headset' : 'bi-chat-heart'}`} />
+                    <h3>{active.conversation_type === 'SUPPORT' ? 'Chào mừng bạn đến với CSKH YÊN' : 'Bắt đầu cuộc trò chuyện'}</h3>
+                    <p>{active.conversation_type === 'SUPPORT' ? 'Hãy gửi thắc mắc của bạn để nhân viên hỗ trợ ngay lập tức.' : 'Hãy gửi lời chào hoặc hình ảnh đến chủ homestay để được hỗ trợ tốt nhất.'}</p>
                   </div>
                 )}
               </section>
 
-              {/* HÀNG ĐỢI XEM TRƯỚC NHIỀU ẢNH TRƯỚC KHI GỬI (PENDING QUEUE) */}
+              {/* HÀNG ĐỢI XEM TRƯỚC NHIỀU ẢNH TRƯỚC KHI GỬI */}
               {pendingImages.length > 0 && (
                 <div className="chat-images-queue-panel">
                   <div className="queue-panel-header">
@@ -421,7 +573,6 @@ export default function Messages() {
                       <div className="queue-thumb-item" key={img.id}>
                         <img src={img.dataUrl} alt={img.name} />
                         <span className="queue-status-badge">Chờ gửi</span>
-                        {/* Nút X xóa ảnh khỏi hàng đợi khi đổi ý */}
                         <button
                           type="button"
                           className="btn-remove-queue-item"
@@ -488,7 +639,7 @@ export default function Messages() {
             <div className="message-welcome">
               <i className="bi bi-chat-square-heart" />
               <h2>Chọn một cuộc trò chuyện</h2>
-              <p>Tin nhắn giữa bạn và chủ homestay sẽ hiển thị tại đây.</p>
+              <p>Tin nhắn hỗ trợ hoặc trao đổi homestay sẽ hiển thị tại đây.</p>
             </div>
           )}
 

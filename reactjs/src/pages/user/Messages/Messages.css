@@ -605,6 +605,138 @@
   font-size: 12px;
 }
 
+/* SUPPORT BUTTON & BADGES */
+.support-banner-btn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 14px 10px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid #BBF7D0;
+  background: linear-gradient(135deg, #ECFDF5 0%, #DCFCE7 100%);
+  color: #065F46;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: left;
+  box-shadow: 0 2px 6px rgba(16, 185, 129, 0.08);
+  flex-shrink: 0;
+}
+
+.support-banner-btn:hover {
+  background: linear-gradient(135deg, #DCFCE7 0%, #BBF7D0 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.16);
+}
+
+.support-banner-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #10B981;
+  color: #FFFFFF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  flex-shrink: 0;
+}
+
+.support-banner-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.support-banner-text strong {
+  display: block;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #064E3B;
+  line-height: 1.2;
+}
+
+.support-banner-text small {
+  display: block;
+  font-size: 10.5px;
+  color: #047857;
+  margin-top: 2px;
+}
+
+.support-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: #DCFCE7;
+  color: #15803D;
+  font-size: 9.5px;
+  font-weight: 700;
+  margin-bottom: 2px;
+}
+
+.support-badge-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 99px;
+  background: #ECFDF5;
+  border: 1px solid #A7F3D0;
+  color: #065F46;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+/* ADMIN FILTER TABS */
+.admin-chat-tabs {
+  display: flex;
+  gap: 6px;
+  padding: 0 14px 10px;
+  border-bottom: 1px solid #E8EEE9;
+  margin-bottom: 8px;
+  flex-shrink: 0;
+}
+
+.admin-chat-tab {
+  flex: 1;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #64748B;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  transition: all 0.15s ease;
+}
+
+.admin-chat-tab:hover {
+  background: #F1F5F9;
+  color: #1E293B;
+}
+
+.admin-chat-tab.active {
+  background: #15803D;
+  color: #FFFFFF;
+}
+
+.admin-chat-tab-count {
+  font-size: 10px;
+  padding: 1px 5px;
+  border-radius: 99px;
+  background: rgba(0, 0, 0, 0.08);
+}
+
+.admin-chat-tab.active .admin-chat-tab-count {
+  background: rgba(255, 255, 255, 0.25);
+  color: #FFFFFF;
+}
+
 @keyframes fadeIn {
   from { opacity: 0; }
   to { opacity: 1; }
